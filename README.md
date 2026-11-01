@@ -36,6 +36,16 @@ node .output/server/index.mjs   # porta 3000 (PORT para alterar)
 Para outras plataformas, defina o preset do Nitro, por exemplo `NITRO_PRESET=vercel bun run build`
 (também `netlify`, `cloudflare-module`, etc.). A Vercel detecta o preset automaticamente.
 
+## Backend (Supabase + Claude)
+
+- **Banco:** projeto Supabase `presence`, compartilhado com o assistente virtual. Este app usa só o schema
+  `presence_app` (migrations em `supabase/migrations/`). Tabelas: `profiles`, `assistant_messages`, `demands`,
+  todas com RLS por usuária.
+- **Login:** e-mail e senha pelo Supabase Auth (`/entrar`).
+- **Assistente:** server function `askAssistant` (`src/lib/assistant.functions.ts`) chama o Claude no servidor,
+  com ferramentas para registrar e listar demandas. Precisa de `ANTHROPIC_API_KEY` no ambiente do servidor.
+- **Voz:** reconhecimento de fala do próprio navegador (pt-BR); onde não existir, cai para digitação.
+
 ## Estrutura
 
 - `src/routes/` — rotas baseadas em arquivos (TanStack Router); `routeTree.gen.ts` é gerado automaticamente.

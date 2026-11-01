@@ -1,11 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, type CSSProperties } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { toast } from "sonner";
 import {
   ArrowRight, AudioLines, BarChart3, Bookmark, Calendar, CalendarCheck, ClipboardList, Dumbbell, Heart, Home,
   Layers, Lightbulb, ListChecks, LogOut, Mic, Puzzle, Settings, Sparkles, Sun, Sprout, SquarePlus, Wallet, CreditCard,
-  Workflow,
+  Workflow, Loader2, Trash2, X,
 } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/auth";
+import { useHome } from "@/lib/use-home";
+import { useSpeech } from "@/lib/use-speech";
 import imgRotina from "@/assets/card-rotina.jpg";
 import imgSaude from "@/assets/card-saude.jpg";
 import imgFoco from "@/assets/card-foco.jpg";
@@ -99,9 +104,66 @@ function RailBits({ Icon, label, on }: { Icon: typeof Home; label: string; on: b
 
 function Assistente() {
 
-  const [listening, setListening] = useState(false);
+  const session = useSession();
+  const navigate = useNavigate();
+  const home = useHome(session);
   const [text, setText] = useState("");
-  const [active, setActive] = useState(8);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [demandDraft, setDemandDraft] = useState<string | null>(null);
+  const [active, setActive] = useState(0);
+  const voiceTarget = useRef<"chat" | "demand">("chat");
+  const convoEnd = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (session === null) navigate({ to: "/entrar" });
+  }, [session, navigate]);
+
+  useEffect(() => {
+    convoEnd.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [home.messages.length, home.thinking]);
+
+  useEffect(() => {
+    if (home.error) toast.error(home.error);
+  }, [home.error]);
+
+  async function saveDemand(title: string, source: "voz" | "texto") {
+    const d = await home.registerDemand(title, source);
+    if (d) toast.success("Demanda registrada", { description: d.title });
+  }
+
+  const speech = useSpeech((spoken) => {
+    if (voiceTarget.current === "demand") void saveDemand(spoken, "voz");
+    else void home.ask(spoken);
+  });
+  const listening = speech.listening;
+
+  function toggleVoice(target: "chat" | "demand") {
+    if (speech.listening) return speech.stop();
+    voiceTarget.current = target;
+    if (!speech.start()) {
+      // Navegador sem reconhecimento de voz: cai para digitação.
+      if (target === "demand") setDemandDraft("");
+      else setChatOpen(true);
+    }
+  }
+
+  function send(message: string) {
+    setText("");
+    void home.ask(message);
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    navigate({ to: "/entrar" });
+  }
+
+  if (!session) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background">
+        <Loader2 className="animate-spin text-cyan" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-3 [background:radial-gradient(60%_50%_at_50%_30%,color-mix(in_oklab,var(--cyan)_7%,transparent),transparent_70%),oklch(0.11_0.025_265)]">
@@ -116,7 +178,7 @@ function Assistente() {
                 onClick={() => setActive(i)} delay={`${(i % 5) * 0.7}s`} />
             ))}
           </div>
-          <RailIcon Icon={LogOut} label="Sair" c="violet" delay="2.4s" />
+          <RailIcon Icon={LogOut} label="Sair" c="violet" delay="2.4s" onClick={logout} />
         </aside>
 
 
@@ -130,16 +192,16 @@ function Assistente() {
             </div>
             <div className="flex items-center gap-4">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: listening ? "var(--emerald)" : "var(--cyan)", boxShadow: "0 0 8px currentColor" }} />
-              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening ? "Ouvindo…" : "Standby"}</span>
+              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening ? "Ouvindo…" : home.thinking ? "Pensando…" : "Standby"}</span>
               <span className="h-8 w-px bg-border" />
-              <button onClick={() => setListening((l) => !l)} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz"><AudioLines size={18} /></button>
+              <button onClick={() => toggleVoice("chat")} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz"><AudioLines size={18} /></button>
             </div>
           </header>
 
           {/* Hero: text · orb (centered) · quick actions */}
           <section className="grid items-center gap-6 px-[3%] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,0.8fr)] sm:gap-2">
             <div className="flex animate-rise flex-col items-center text-center sm:items-start sm:justify-self-start sm:text-left" style={{ animationDelay: ".1s" }}>
-              <p className="mono-caps mb-3">Olá, Jheny <span className="text-violet">✦</span></p>
+              <p className="mono-caps mb-3">Olá{home.displayName ? `, ${home.displayName}` : ""} <span className="text-violet">✦</span></p>
               <h1 className="font-serif text-4xl leading-[1.05] tracking-tight sm:text-[clamp(1.9rem,4.2vw,4.25rem)]">
                 Como posso<br /><span className="text-gradient">te ajudar hoje?</span>
               </h1>
@@ -152,7 +214,7 @@ function Assistente() {
               </Link>
             </div>
 
-            <button onClick={() => setListening((l) => !l)} aria-label="Tocar para falar"
+            <button onClick={() => toggleVoice("chat")} aria-label="Tocar para falar"
               className="relative mx-auto aspect-[4/3] w-[clamp(240px,36vw,620px)] shrink-0 animate-rise" style={{ animationDelay: ".2s" }}>
               <div className="pointer-events-none absolute inset-0 origin-center scale-[1.12] sm:scale-[1.32] md:scale-[1.36] lg:scale-[1.45] xl:scale-[1.55]">
                 <div className="absolute inset-[12%] rounded-full blur-3xl transition" style={{ background: `color-mix(in oklab, var(--${listening ? "emerald" : "cyan"}) ${listening ? 38 : 26}%, transparent)` }} />
@@ -169,7 +231,7 @@ function Assistente() {
                 const inner = (<><Icon size={19} style={{ color: "var(--glow)" }} /><span className="leading-snug">{label[0]}<br />{label[1]}</span></>);
                 return i < 2
                   ? <Link key={i} to={i === 0 ? "/organizar" : "/treino"} className={cls} style={st}>{inner}</Link>
-                  : <button key={i} onClick={() => setText(label.join(" "))} className={cls} style={st}>{inner}</button>;
+                  : <button key={i} onClick={() => send(label.join(" "))} className={cls} style={st}>{inner}</button>;
               })}
             </div>
           </section>
@@ -184,26 +246,64 @@ function Assistente() {
           {/* Action */}
           <div className="w-full space-y-4 px-[3%] animate-rise" style={{ animationDelay: ".3s" }}>
             <div className="flex items-center gap-4">
-              <button onClick={() => setListening((l) => !l)} className="flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full py-5 text-base font-semibold text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)]"
+              <button onClick={() => toggleVoice("demand")} className="flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full py-5 text-base font-semibold text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)]"
                 style={{ background: "linear-gradient(90deg, var(--cyan), oklch(0.66 0.19 265) 55%, var(--violet))" }}>
-                <Mic size={22} className={listening ? "animate-pulse-ring" : ""} /> {listening ? "Ouvindo…" : "Registrar demanda"}
+                <Mic size={22} className={listening ? "animate-pulse-ring" : ""} /> {listening ? (speech.interim || "Ouvindo…") : "Registrar demanda"}
               </button>
-              <Link to="/demandas" className="icon-tile h-16 w-16 shrink-0 !rounded-2xl transition hover:scale-105" style={tint("violet")} aria-label="Nova demanda"><SquarePlus size={20} /></Link>
+              <button onClick={() => setDemandDraft("")} className="icon-tile h-16 w-16 shrink-0 !rounded-2xl transition hover:scale-105" style={tint("violet")} aria-label="Nova demanda (digitar)"><SquarePlus size={20} /></button>
             </div>
 
             <div className="flex flex-wrap justify-center gap-3">
               {prompts.map(({ Icon, t }) => (
-                <button key={t} onClick={() => setText(t)}
+                <button key={t} onClick={() => send(t)} disabled={home.thinking}
                   className="glass flex shrink-0 items-center gap-3 rounded-full px-5 py-3 text-sm text-foreground/85 transition hover:text-foreground hover:shadow-[0_0_20px_-8px_var(--cyan)]">
                   <Icon size={18} className="text-violet" /> {t}
                 </button>
               ))}
             </div>
 
-            {text && (
-              <form onSubmit={(e) => { e.preventDefault(); setText(""); }} className="glass flex items-center gap-3 rounded-full p-2 pl-5">
-                <input value={text} onChange={(e) => setText(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" autoFocus />
-                <button type="submit" className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-primary-foreground" aria-label="Enviar"><ArrowRight size={16} /></button>
+            {home.pendingCount !== null && (
+              <p className="text-center text-xs text-muted-foreground">
+                {home.pendingCount === 0 ? "Nenhuma demanda em aberto" : `${home.pendingCount} demanda${home.pendingCount > 1 ? "s" : ""} em aberto`}
+              </p>
+            )}
+
+            {demandDraft !== null && (
+              <form onSubmit={(e) => { e.preventDefault(); if (demandDraft.trim()) { void saveDemand(demandDraft, "texto"); setDemandDraft(null); } }}
+                className="glass flex items-center gap-3 rounded-full p-2 pl-5" style={tint("violet")}>
+                <input value={demandDraft} onChange={(e) => setDemandDraft(e.target.value)} placeholder="Descreva a demanda…" maxLength={300}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none" autoFocus />
+                <button type="button" onClick={() => setDemandDraft(null)} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:text-foreground" aria-label="Cancelar"><X size={16} /></button>
+                <button type="submit" className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-primary-foreground" aria-label="Registrar"><ArrowRight size={16} /></button>
+              </form>
+            )}
+
+            {(home.messages.length > 0 || home.thinking) && (
+              <div className="glass mx-auto max-h-[420px] w-full max-w-3xl space-y-3 overflow-y-auto rounded-3xl p-5">
+                <div className="flex items-center justify-between">
+                  <span className="mono-caps !text-[0.65rem]">Conversa</span>
+                  <button onClick={() => void home.clearConversation()} className="text-muted-foreground transition hover:text-foreground" aria-label="Limpar conversa"><Trash2 size={15} /></button>
+                </div>
+                {home.messages.map((m) => (
+                  <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <p className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      m.role === "user" ? "bg-[color-mix(in_oklab,var(--cyan)_16%,transparent)] text-foreground" : "bg-secondary/70 text-foreground/90"}`}>
+                      {m.content}
+                    </p>
+                  </div>
+                ))}
+                {home.thinking && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin text-cyan" /> Presence está pensando…</div>
+                )}
+                <div ref={convoEnd} />
+              </div>
+            )}
+
+            {(chatOpen || text || home.messages.length > 0) && (
+              <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) send(text); }} className="glass mx-auto flex w-full max-w-3xl items-center gap-3 rounded-full p-2 pl-5">
+                <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Fale com a Presence…" maxLength={4000}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none" autoFocus={chatOpen} disabled={home.thinking} />
+                <button type="submit" disabled={home.thinking || !text.trim()} className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-primary-foreground disabled:opacity-50" aria-label="Enviar"><ArrowRight size={16} /></button>
               </form>
             )}
           </div>
