@@ -1,19 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  AlarmClock, BarChart3, Book, CalendarDays, Check, CheckCircle2, Clock, Dumbbell, Flag, Flower2, GripVertical, Heart,
-  Home, Laptop, Layers, ListTodo, Plus, Search, SlidersHorizontal, Sparkles, Sun, Target, Utensils, Wallet, Zap,
+  AlarmClock, BarChart3, CalendarDays, Check, CheckCircle2, Clock, Flag, Layers, ListTodo, Loader2, Plus, Search,
+  SlidersHorizontal, Sparkles, Target, Trash2, Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { PlanShell, Panel, colorVar } from "@/components/PlanShell";
 import holo from "@/assets/tarefas-holo.jpg";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { addDays, format, isSameDay, isSameMonth, isSameWeek } from "date-fns";
+import { addDays, format, isSameDay, isSameMonth, isSameWeek, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { fromIsoDate as fromIso, hhmm, isoDate as iso } from "@/lib/dates";
+import { getIcon } from "@/lib/icons";
+import type { Color, Priority } from "@/lib/types";
+import { useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask } from "@/lib/data/tasks";
 
 const T0 = new Date(); T0.setHours(0, 0, 0, 0);
-const iso = (d: Date) => format(d, "yyyy-MM-dd");
-const fromIso = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y!, m! - 1, d!); };
 
 export const Route = createFileRoute("/tarefas")({
   head: () => ({
@@ -29,62 +32,113 @@ export const Route = createFileRoute("/tarefas")({
   component: TarefasPage,
 });
 
-type C = "cyan" | "violet" | "emerald" | "amber" | "rose";
-const cats: { id: string; t: string; Icon: typeof Home; c: C; n: number; p: number }[] = [
-  { id: "rotina", t: "Rotina do dia", Icon: Sun, c: "cyan", n: 6, p: 80 },
-  { id: "comp", t: "Compromissos", Icon: CalendarDays, c: "violet", n: 3, p: 66 },
-  { id: "auto", t: "Autocuidado", Icon: Flower2, c: "rose", n: 4, p: 60 },
-  { id: "saude", t: "Saúde & Treino", Icon: Dumbbell, c: "emerald", n: 3, p: 70 },
-  { id: "trab", t: "Trabalho / Projetos", Icon: Laptop, c: "cyan", n: 7, p: 75 },
-  { id: "casa", t: "Casa & Organização", Icon: Home, c: "amber", n: 4, p: 50 },
-  { id: "fin", t: "Financeiro", Icon: Wallet, c: "amber", n: 2, p: 40 },
-  { id: "pes", t: "Pessoal", Icon: Heart, c: "violet", n: 3, p: 33 },
-];
+type C = Color;
+type Row = {
+  id: string; t: string; d: string; tag: string; c: C; Icon: ReturnType<typeof getIcon>; time: string; done: boolean; cat: string; date: string; priority: Priority;
+};
 
-type Task = { id: number; t: string; d: string; tag: string; c: C; Icon: typeof Home; time: string; done: boolean; cat: string; date: string };
-const initial: Task[] = ([
-  { id: 1, t: "Rotina da manhã", d: "Higiene, skincare e organização", tag: "Rotina", c: "cyan", Icon: Sun, time: "09:00", done: true, cat: "rotina" },
-  { id: 2, t: "Treino – Glúteo e Posterior", d: "Academia · ~60 min", tag: "Saúde", c: "emerald", Icon: Dumbbell, time: "10:00", done: true, cat: "saude" },
-  { id: 3, t: "Responder demandas", d: "E-mails, suporte e ajustes", tag: "Trabalho", c: "amber", Icon: Laptop, time: "11:30", done: false, cat: "trab" },
-  { id: 4, t: "Almoço e pausa", d: "Alimentação e descanso", tag: "Rotina", c: "cyan", Icon: Utensils, time: "12:30", done: false, cat: "rotina" },
-  { id: 5, t: "Autocuidado", d: "Cabelo, banho e cuidados pessoais", tag: "Autocuidado", c: "rose", Icon: Flower2, time: "18:00", done: false, cat: "auto" },
-  { id: 6, t: "Organizar a casa", d: "Limpeza rápida e manter tudo em ordem", tag: "Casa", c: "amber", Icon: Home, time: "19:00", done: false, cat: "casa" },
-  { id: 7, t: "Leitura", d: "Tempo livre · 30 min", tag: "Pessoal", c: "violet", Icon: Book, time: "21:00", done: false, cat: "pes" },
-  { id: 8, t: "Reunião de alinhamento", d: "Google Meet", tag: "Compromisso", c: "violet", Icon: CalendarDays, time: "15:00", done: false, cat: "comp", off: 1 },
-  { id: 9, t: "Consulta médica", d: "Clínica · levar exames", tag: "Compromisso", c: "cyan", Icon: Heart, time: "14:00", done: false, cat: "comp", off: 4 },
-  { id: 10, t: "Pagar fatura do cartão", d: "Vence em breve", tag: "Financeiro", c: "amber", Icon: Wallet, time: "10:00", done: false, cat: "fin", off: 9 },
-] as (Omit<Task, "date"> & { off?: number })[]).map(({ off = 0, ...t }) => ({ ...t, date: iso(addDays(T0, off)) }));
-
-const week = [["Seg", 12, 1], ["Ter", 14, 0], ["Qua", 11, 1], ["Qui", 10, 0], ["Sex", 9, 1], ["Sáb", 6, 0], ["Dom", 4, 0]] as const;
 const tabs = ["Hoje", "Esta semana", "Este mês", "Todas"];
+const weekLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const RANK: Record<Priority, number> = { alta: 0, media: 1, baixa: 2 };
+const prioLabel: Record<Priority, string> = { alta: "Prioridade alta", media: "Prioridade normal", baixa: "Prioridade baixa" };
+const prioNext: Record<Priority, Priority> = { media: "alta", alta: "baixa", baixa: "media" };
 
 function TarefasPage() {
-  const [tasks, setTasks] = useState(initial);
+  const catsQ = useCategories();
+  const tasksQ = useTasks();
+  const createTask = useCreateTask();
+  const toggle = useToggleTask();
+  const del = useDeleteTask();
+  const createCat = useCreateCategory();
+
   const [tab, setTab] = useState(0);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [newCat, setNewCat] = useState("rotina");
+  const [newCat, setNewCat] = useState("");
+  const [newPrio, setNewPrio] = useState<Priority>("media");
   const [time, setTime] = useState("");
   const [day, setDay] = useState<Date>(T0);
   const [newDate, setNewDate] = useState<Date | undefined>();
+  const [addingCat, setAddingCat] = useState(false);
+  const [catName, setCatName] = useState("");
 
-  const inRange = (t: Task) => { const d = fromIso(t.date); return tab === 0 ? isSameDay(d, day) : tab === 1 ? isSameWeek(d, day, { weekStartsOn: 1 }) : tab === 2 ? isSameMonth(d, day) : true; };
-  const dayTasks = tasks.filter((t) => isSameDay(fromIso(t.date), day));
-  const taskDays = useMemo(() => [...new Set(tasks.map((t) => t.date))].map(fromIso), [tasks]);
-  const upcoming = tasks.filter((t) => fromIso(t.date) >= T0 && t.cat === "comp").sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 3);
+  const categories = catsQ.data ?? [];
+  const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const compId = categories.find((c) => c.slug === "comp")?.id;
+
+  const tasks: Row[] = useMemo(
+    () =>
+      (tasksQ.data ?? [])
+        .map((t): Row => {
+          const c = t.category_id ? catById.get(t.category_id) : undefined;
+          return {
+            id: t.id, t: t.title, d: t.description ?? c?.name ?? "Sem categoria", tag: c ? c.name.split(" ")[0]! : "Tarefa",
+            c: (c?.color ?? "cyan") as C, Icon: getIcon(c?.icon ?? "check"), time: t.due_time ? hhmm(t.due_time) : "—",
+            done: t.done, cat: t.category_id ?? "", date: t.due_date ?? "", priority: t.priority,
+          };
+        })
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
+    [tasksQ.data, catById],
+  );
+
+  const cats = useMemo(
+    () =>
+      categories.map((c) => {
+        const mine = tasks.filter((t) => t.cat === c.id);
+        return { id: c.id, t: c.name, Icon: getIcon(c.icon), c: c.color as C, n: mine.length, p: mine.length ? Math.round((mine.filter((t) => t.done).length / mine.length) * 100) : 0 };
+      }),
+    [categories, tasks],
+  );
+  const catId = newCat || cats[0]?.id || "";
+
+  // Tarefas sem data aparecem em "Hoje" (quando o dia é hoje) e em "Todas".
+  const onDay = (t: Row) => (t.date ? isSameDay(fromIso(t.date), day) : isSameDay(day, T0));
+  const inRange = (t: Row) => {
+    if (tab === 3) return true;
+    if (!t.date) return tab === 0 && isSameDay(day, T0);
+    const d = fromIso(t.date);
+    return tab === 0 ? isSameDay(d, day) : tab === 1 ? isSameWeek(d, day, { weekStartsOn: 1 }) : isSameMonth(d, day);
+  };
+  const dayTasks = tasks.filter(onDay);
+  const taskDays = useMemo(() => [...new Set(tasks.map((t) => t.date).filter(Boolean))].map(fromIso), [tasks]);
+  const upcoming = tasks.filter((t) => t.date && !t.done && fromIso(t.date) >= T0 && t.cat === compId).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 3);
   const done = tasks.filter((t) => t.done).length;
   const pct = dayTasks.length ? Math.round((dayTasks.filter((t) => t.done).length / dayTasks.length) * 100) : 0;
   const shown = useMemo(() => tasks.filter((t) => inRange(t) && (!cat || t.cat === cat) && t.t.toLowerCase().includes(q.toLowerCase())), [tasks, cat, q, tab, day]);
-  const lastTime = shown.length ? shown.map((t) => t.time).sort().at(-1) : null;
+  const lastTime = shown.length ? shown.map((t) => t.time).filter((t) => t !== "—").sort().at(-1) : null;
+
+  const weekStart = startOfWeek(day, { weekStartsOn: 1 });
+  const week = weekLabels.map((label, i) => {
+    const d = addDays(weekStart, i);
+    const mine = tasks.filter((t) => t.date && isSameDay(fromIso(t.date), d));
+    return [label, mine.length, mine.length > 0 && mine.every((t) => t.done) ? 1 : 0] as const;
+  });
+  const dayPrios = dayTasks.filter((t) => !t.done).sort((a, b) => RANK[a.priority] - RANK[b.priority]).slice(0, 3);
 
   const add = () => {
-    if (!title.trim()) return;
-    const c = cats.find((x) => x.id === newCat)!;
-    setTasks((l) => [...l, { id: Date.now(), t: title.trim().slice(0, 80), d: "Adicionada agora", tag: c.t.split(" ")[0]!, c: c.c, Icon: c.Icon, time: time || "—", done: false, cat: c.id, date: iso(newDate ?? day) }]
-      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)));
-    if (newDate) setDay(newDate);
-    setTitle(""); setTime(""); setNewDate(undefined);
+    if (!title.trim() || createTask.isPending) return;
+    createTask.mutate(
+      { title: title.trim(), category_id: catId || null, priority: newPrio, due_date: iso(newDate ?? day), due_time: time || null },
+      {
+        onSuccess: () => {
+          if (newDate) setDay(newDate);
+          setTitle(""); setTime(""); setNewDate(undefined); setNewPrio("media");
+          toast.success("Tarefa adicionada");
+        },
+        onError: (e) => toast.error(`Não consegui salvar: ${e.message}`),
+      },
+    );
+  };
+  const addCategory = () => {
+    if (!catName.trim()) return;
+    createCat.mutate(
+      { name: catName, color: "violet", icon: "star" },
+      {
+        onSuccess: (c) => { setCatName(""); setAddingCat(false); setNewCat(c.id); toast.success("Categoria criada"); },
+        onError: (e) => toast.error(`Não consegui criar: ${e.message}`),
+      },
+    );
   };
 
   const stats = [
@@ -138,9 +192,17 @@ function TarefasPage() {
               );
             })}
           </ul>
-          <button className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-2.5 text-sm text-muted-foreground transition hover:border-violet hover:text-violet">
-            <Plus size={15} /> Nova categoria
-          </button>
+          {addingCat ? (
+            <form onSubmit={(e) => { e.preventDefault(); addCategory(); }} className="mt-4 flex items-center gap-2 rounded-2xl border border-violet/50 p-1.5 pl-3">
+              <input autoFocus value={catName} onChange={(e) => setCatName(e.target.value)} maxLength={60} placeholder="Nome da categoria"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+              <button type="submit" disabled={createCat.isPending} className="rounded-xl bg-gradient-brand px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">Criar</button>
+            </form>
+          ) : (
+            <button onClick={() => setAddingCat(true)} className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-2.5 text-sm text-muted-foreground transition hover:border-violet hover:text-violet">
+              <Plus size={15} /> Nova categoria
+            </button>
+          )}
         </Panel>
 
         <div className="flex min-w-0 flex-col gap-4">
@@ -167,7 +229,7 @@ function TarefasPage() {
               {shown.map((tk, i) => (
                 <li key={tk.id} style={{ "--glow": colorVar(tk.c), animationDelay: `${i * 0.05}s` } as React.CSSProperties}
                   className="group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 py-3 animate-rise sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]">
-                  <button aria-label="Concluir" onClick={() => setTasks((l) => l.map((x) => x.id === tk.id ? { ...x, done: !x.done } : x))}
+                  <button aria-label="Concluir" onClick={() => toggle.mutate({ id: tk.id, done: !tk.done }, { onError: (e) => toast.error(e.message) })}
                     className={`grid h-5 w-5 place-items-center rounded-md border transition ${tk.done ? "border-cyan bg-cyan text-background shadow-[0_0_12px_var(--cyan)]" : "border-muted-foreground/50 hover:border-cyan"}`}>
                     {tk.done && <Check size={13} strokeWidth={3} />}
                   </button>
@@ -180,14 +242,16 @@ function TarefasPage() {
                     <span className="block truncate text-xs text-muted-foreground">{tk.d}</span>
                   </span>
                   <span className="tag hidden sm:inline">{tk.tag}</span>
-                  <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tab !== 0 && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
+                  <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tab !== 0 && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
                   <span className="hidden items-center gap-2 text-muted-foreground sm:flex">
                     <AlarmClock size={15} className="text-[color:var(--glow)]" />
-                    <GripVertical size={15} className="opacity-40 group-hover:opacity-100" />
+                    <button aria-label="Excluir tarefa" onClick={() => del.mutate(tk.id, { onError: (e) => toast.error(e.message) })} className="opacity-40 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={15} /></button>
                   </span>
                 </li>
               ))}
-              {shown.length === 0 && <li className="py-10 text-center text-sm text-muted-foreground">Nenhuma tarefa encontrada.</li>}
+              {tasksQ.isPending && <li className="flex justify-center py-10"><Loader2 className="animate-spin text-cyan" /></li>}
+              {tasksQ.isError && <li className="py-10 text-center text-sm text-destructive">Não consegui carregar as tarefas: {tasksQ.error.message}</li>}
+              {tasksQ.isSuccess && shown.length === 0 && <li className="py-10 text-center text-sm text-muted-foreground">{tasks.length === 0 ? "Você ainda não tem tarefas. Crie a primeira ao lado." : "Nenhuma tarefa encontrada."}</li>}
             </ul>
             <div className="relative flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
               <div className="absolute inset-x-10 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan/25 to-transparent" />
@@ -214,7 +278,7 @@ function TarefasPage() {
             <div className="mt-4 space-y-2.5">
               <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Título da tarefa" maxLength={80}
                 className="w-full rounded-xl border border-border bg-secondary/40 px-3.5 py-2.5 text-sm outline-none transition focus:border-violet focus:shadow-[0_0_18px_-6px_var(--violet)]" />
-              <select value={newCat} onChange={(e) => setNewCat(e.target.value)} className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-violet">
+              <select value={catId} onChange={(e) => setNewCat(e.target.value)} className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-violet">
                 {cats.map((c) => <option key={c.id} value={c.id} className="bg-popover">{c.t}</option>)}
               </select>
               <div className="grid grid-cols-2 gap-2">
@@ -230,9 +294,9 @@ function TarefasPage() {
               </Popover>
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full min-w-0 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none [color-scheme:dark] focus:border-violet" />
               </div>
-              <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm text-muted-foreground"><Flag size={14} /> Prioridade normal</div>
-              <button onClick={add} className="shine flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--cyan)] transition hover:scale-[1.02]">
-                <Check size={16} /> Adicionar tarefa
+              <button type="button" onClick={() => setNewPrio(prioNext[newPrio])} className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-left text-sm text-muted-foreground transition hover:border-violet"><Flag size={14} style={{ color: newPrio === "alta" ? colorVar("rose") : newPrio === "baixa" ? colorVar("emerald") : undefined }} /> {prioLabel[newPrio]}</button>
+              <button onClick={add} disabled={createTask.isPending} className="shine flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--cyan)] transition hover:scale-[1.02] disabled:opacity-60">
+                {createTask.isPending ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Adicionar tarefa
               </button>
             </div>
           </Panel>
@@ -252,6 +316,7 @@ function TarefasPage() {
                   <span className="flex-1 font-medium">{t}</span><span className="font-mono text-xs text-muted-foreground">{w}</span>
                 </li>
               ))}
+            {upcoming.length === 0 && <li className="text-xs text-muted-foreground">Nenhum compromisso por vir.</li>}
             </ul>
           </Panel>
         </div>
@@ -262,7 +327,7 @@ function TarefasPage() {
         <Panel c="cyan">
           <Head Icon={BarChart3} t="Progresso por categoria" s="Andamento das suas tarefas." />
           <ul className="mt-4 space-y-3">
-            {cats.slice(0, 5).map(({ t, Icon, c, p }) => (
+            {[...cats].sort((a, b) => b.n - a.n).slice(0, 5).map(({ t, Icon, c, p }) => (
               <li key={t} className="grid grid-cols-[18px_120px_1fr_36px] items-center gap-3 text-sm" style={{ "--glow": colorVar(c) } as React.CSSProperties}>
                 <Icon size={16} className="text-[color:var(--glow)]" /><span className="truncate">{t}</span>
                 <span className="h-2 overflow-hidden rounded-full bg-secondary"><span className="bar-grow block h-full rounded-full bg-[color:var(--glow)] shadow-[0_0_10px_var(--glow)]" style={{ width: `${p}%` }} /></span>
@@ -275,7 +340,7 @@ function TarefasPage() {
           <Head Icon={CalendarDays} t="Visão da semana" s="Distribuição das tarefas." />
           <div className="mt-4 grid grid-cols-7 gap-1.5">
             {week.map(([d, n, ok], i) => {
-              const today = i === 4;
+              const today = isSameDay(addDays(weekStart, i), T0);
               return (
                 <div key={d} className={`flex flex-col items-center gap-1.5 rounded-xl border py-2.5 text-xs transition hover:-translate-y-1 ${today ? "border-cyan bg-cyan/10 shadow-[0_0_20px_-6px_var(--cyan)]" : "border-border bg-secondary/30"}`}>
                   <span className="text-muted-foreground">{d}</span><b className="font-display text-base">{n}</b>
@@ -288,8 +353,9 @@ function TarefasPage() {
         <Panel c="violet">
           <Head Icon={Target} t="Prioridades do dia" s="Suas 3 principais tarefas." />
           <ol className="mt-4 space-y-2">
-            {["Responder demandas do suporte", "Treino – Glúteo e Posterior", "Organizar a casa"].map((t, i) => (
-              <li key={t} className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm transition hover:border-violet">
+            {dayPrios.length === 0 && <li className="rounded-xl border border-dashed border-border px-3 py-3 text-center text-xs text-muted-foreground">Sem pendências para este dia.</li>}
+            {dayPrios.map(({ id, t }, i) => (
+              <li key={id} className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm transition hover:border-violet">
                 <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-brand font-mono text-xs text-primary-foreground">{i + 1}</span>
                 <span className="flex-1">{t}</span><Zap size={14} className="text-violet" />
               </li>
@@ -303,7 +369,7 @@ function TarefasPage() {
 
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 
-function Head({ Icon, t, s }: { Icon: typeof Home; t: string; s?: string }) {
+function Head({ Icon, t, s }: { Icon: ReturnType<typeof getIcon>; t: string; s?: string }) {
   return (
     <div className="flex items-center gap-3">
       <span className="icon-tile h-10 w-10 rounded-full"><Icon size={18} /></span>

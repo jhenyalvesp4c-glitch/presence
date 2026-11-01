@@ -1,9 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Clock, Dumbbell, Heart, Lightbulb, Link2, ListChecks, Moon, ScanFace, Smile, Sparkles, Zap } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
-import { Panel, PlanShell, colorVar, icons, tint } from "@/components/PlanShell";
-import { baseDay, tempoLabels, todayLabel, type Disposicao, type Tempo } from "@/lib/plan-data";
+import { Panel, PlanShell, colorVar, tint } from "@/components/PlanShell";
+import { tempoLabels, todayLabel, type Disposicao, type Tempo } from "@/lib/plan-data";
+import { hhmm, todayIso } from "@/lib/dates";
+import { getIcon } from "@/lib/icons";
+import { useCategories, useTasks } from "@/lib/data/tasks";
+import { useDayPlan, useGenerateDay, useRoutine, useSchedule } from "@/lib/data/day";
+import { useSplit } from "@/lib/data/workouts";
 
 export const Route = createFileRoute("/planejamento")({
   head: () => ({
@@ -19,36 +25,67 @@ export const Route = createFileRoute("/planejamento")({
   component: Planejamento,
 });
 
-const count = (k: string) => baseDay.filter((a) => a.kind === k).length;
-const stats = [
-  { Icon: CheckCircle2, n: count("tarefa"), t: "Tarefas", c: "cyan" },
-  { Icon: CalendarDays, n: count("compromisso"), t: "Compromissos", c: "violet" },
-  { Icon: Heart, n: count("habito"), t: "Hábitos", c: "emerald" },
-];
-
 const disp: { v: Disposicao; Icon: typeof Zap; l: string }[] = [
   { v: "alta", Icon: Zap, l: "Alta" }, { v: "normal", Icon: Smile, l: "Normal" }, { v: "baixa", Icon: Moon, l: "Baixa" },
 ];
 
-const integr = [
-  { Icon: CalendarDays, t: "Calendário", d: `${count("compromisso")} compromissos encontrados` },
-  { Icon: ListChecks, t: "Tarefas", d: `${count("tarefa")} tarefas pendentes` },
-  { Icon: Heart, t: "Hábitos", d: `${count("habito")} hábitos previstos` },
-  { Icon: Dumbbell, t: "Saúde", d: "Treino programado" },
-];
-
 function Planejamento() {
   const navigate = useNavigate();
+  const today = todayIso();
+  const routineQ = useRoutine();
+  const schedQ = useSchedule(today);
+  const tasksQ = useTasks();
+  const catsQ = useCategories();
+  const splitQ = useSplit();
+  const planQ = useDayPlan(today);
+  const generate = useGenerateDay();
   const [disposicao, setDisp] = useState<Disposicao>("normal");
   const [tempo, setTempo] = useState<Tempo>("completo");
   const [prioridade, setPrio] = useState("");
   const [pausas, setPausas] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const loading = generate.isPending;
+
+  // Reaproveita as preferências já salvas para hoje.
+  const plan = planQ.data;
+  useEffect(() => {
+    if (!plan) return;
+    setDisp(plan.disposicao); setTempo(plan.tempo); setPrio(plan.prioridade); setPausas(plan.pausas);
+  }, [plan?.id]);
 
   const gerar = () => {
-    setLoading(true);
-    setTimeout(() => navigate({ to: "/planejamento/dia", search: { disposicao, tempo, prioridade, pausas } }), 1100);
+    generate.mutate(
+      { mode: "planejamento", date: today, disposicao, tempo, prioridade, pausas },
+      { onSuccess: () => navigate({ to: "/planejamento/dia" }), onError: (e) => toast.error(`Não consegui gerar o plano: ${e.message}`) },
+    );
   };
+
+  // Prévia do dia: o plano já gerado ou, antes disso, a rotina-base + tarefas de hoje.
+  const generated = (schedQ.data?.length ?? 0) > 0;
+  const agenda = useMemo(() => (generated ? schedQ.data! : (routineQ.data ?? [])), [generated, schedQ.data, routineQ.data]);
+  const compId = (catsQ.data ?? []).find((c) => c.slug === "comp")?.id;
+  const allTasks = tasksQ.data ?? [];
+  const pending = allTasks.filter((t) => !t.done);
+  const compToday = pending.filter((t) => t.category_id === compId && t.due_date === today).length;
+  const overdue = pending.filter((t) => t.due_date && t.due_date < today).length;
+  const count = (k: string) => agenda.filter((a) => a.kind === k).length;
+  const nTarefas = count("tarefa") + (generated ? 0 : pending.filter((t) => t.category_id !== compId && t.due_date === today).length);
+  const nComp = count("compromisso") + (generated ? 0 : compToday);
+  const nHabitos = count("habito");
+  const todaySplit = splitQ.data?.find((x) => x.weekday === new Date().getDay());
+  const doneCount = generated ? schedQ.data!.filter((a) => a.done).length : 0;
+  const dayPct = generated ? Math.round((doneCount / schedQ.data!.length) * 100) : 0;
+
+  const stats = [
+    { Icon: CheckCircle2, n: nTarefas, t: "Tarefas", c: "cyan" },
+    { Icon: CalendarDays, n: nComp, t: "Compromissos", c: "violet" },
+    { Icon: Heart, n: nHabitos, t: "Hábitos", c: "emerald" },
+  ];
+  const integr = [
+    { Icon: CalendarDays, t: "Calendário", d: `${nComp} compromisso${nComp === 1 ? "" : "s"} encontrado${nComp === 1 ? "" : "s"}` },
+    { Icon: ListChecks, t: "Tarefas", d: `${pending.length} tarefa${pending.length === 1 ? "" : "s"} pendente${pending.length === 1 ? "" : "s"}` },
+    { Icon: Heart, t: "Hábitos", d: `${nHabitos} hábito${nHabitos === 1 ? "" : "s"} previsto${nHabitos === 1 ? "" : "s"}` },
+    { Icon: Dumbbell, t: "Saúde", d: todaySplit?.workout_id ? `Treino: ${todaySplit.title}` : (todaySplit?.title ?? "Sem treino cadastrado") },
+  ];
 
   return (
     <PlanShell>
@@ -79,8 +116,8 @@ function Planejamento() {
             ))}
           </div>
           <div className="glass rounded-2xl px-5 py-4">
-            <div className="mb-3 flex justify-between text-sm"><span className="text-muted-foreground">Progresso do dia</span><span className="font-semibold">0 %</span></div>
-            <div className="h-1.5 rounded-full bg-secondary" />
+            <div className="mb-3 flex justify-between text-sm"><span className="text-muted-foreground">Progresso do dia</span><span className="font-semibold">{dayPct} %</span></div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-gradient-brand transition-all duration-700" style={{ width: `${dayPct}%` }} /></div>
           </div>
         </div>
       </div>
@@ -149,29 +186,30 @@ function Planejamento() {
             <span className="text-sm font-medium text-muted-foreground">{todayLabel()}</span>
           </div>
           <ol className="relative space-y-2 before:absolute before:bottom-4 before:left-[7px] before:top-4 before:w-px before:bg-cyan/40">
-            {baseDay.slice(2, 10).map((a) => {
-              const I = icons[a.icon];
+            {agenda.length === 0 && <li className="py-6 text-center text-sm text-muted-foreground">Sua rotina-base está vazia.</li>}
+            {agenda.slice(0, 8).map((a) => {
+              const I = getIcon(a.icon);
               return (
                 <li key={a.id} className="relative flex items-center gap-3 pl-6">
                   <span className="absolute left-0.5 h-3 w-3 rounded-full border-2 border-cyan bg-background" />
-                  <span className="w-16 shrink-0 rounded-full border border-cyan/40 py-1.5 text-center text-sm font-semibold">{a.time}</span>
+                  <span className="w-16 shrink-0 rounded-full border border-cyan/40 py-1.5 text-center text-sm font-semibold">{hhmm(a.time)}</span>
                   <span className="icon-tile hidden h-9 w-9 shrink-0 !rounded-full sm:grid" style={tint("cyan")}><I size={16} /></span>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{a.title}</span><span className="block truncate text-xs text-muted-foreground">{a.desc}</span></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{a.title}</span><span className="block truncate text-xs text-muted-foreground">{a.description}</span></span>
                   <span className="tag hidden shrink-0 sm:inline" style={{ "--glow": colorVar(a.color) } as React.CSSProperties}>{a.tag}</span>
                 </li>
               );
             })}
           </ol>
-          <p className="mt-4 text-center text-xs text-muted-foreground">Prévia · o plano completo é montado ao gerar</p>
+          <p className="mt-4 text-center text-xs text-muted-foreground">{generated ? "Plano de hoje já gerado · gere de novo para refazer" : "Prévia · o plano completo é montado ao gerar"}</p>
         </Panel>
 
         <div className="flex flex-col gap-5">
           <Panel c="violet" style={{ animationDelay: ".46s" }}>
             <h2 className="mb-3 flex items-center gap-2.5 font-display text-lg font-semibold"><Sparkles size={20} className="text-violet" /> Análise da Presence</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">Você tem um dia equilibrado, com foco nas suas demandas, treino e autocuidado. Mantenha a atenção nas tarefas do projeto, que são a sua prioridade hoje.</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">Hoje você tem {nTarefas} tarefa{nTarefas === 1 ? "" : "s"}, {nComp} compromisso{nComp === 1 ? "" : "s"} e {nHabitos} hábito{nHabitos === 1 ? "" : "s"} previstos{todaySplit?.workout_id ? `, além do treino ${todaySplit.title}` : ""}.</p>
             <div className="mt-4 flex gap-3 border-t border-border pt-4">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" style={{ color: colorVar("amber") }} />
-              <p className="text-sm"><span className="font-semibold" style={{ color: colorVar("amber") }}>Atenção</span><br /><span className="text-muted-foreground">Você tem 1 tarefa pendente que já foi adiada 2 vezes. Recomendo encaixá-la ainda hoje.</span></p>
+              <p className="text-sm"><span className="font-semibold" style={{ color: colorVar("amber") }}>Atenção</span><br /><span className="text-muted-foreground">{overdue > 0 ? `Você tem ${overdue} tarefa${overdue === 1 ? "" : "s"} atrasada${overdue === 1 ? "" : "s"}. Recomendo encaixar ainda hoje.` : "Nenhuma tarefa atrasada. Bom trabalho!"}</span></p>
             </div>
             <div className="mt-4 flex gap-3 border-t border-border pt-4">
               <Lightbulb size={18} className="mt-0.5 shrink-0 text-cyan" />

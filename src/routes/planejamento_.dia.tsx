@@ -1,11 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, type CSSProperties } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, GripVertical, Pencil, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
-import { Panel, PlanShell, colorVar, icons, tint } from "@/components/PlanShell";
-import { buildPlan, parseInput, sortByTime, tempoLabels, todayLabel, type Activity } from "@/lib/plan-data";
+import { useState, type CSSProperties } from "react";
+import { toast } from "sonner";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, GripVertical, Loader2, Pencil, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
+import { Panel, PlanShell, colorVar, tint } from "@/components/PlanShell";
+import { tempoLabels, todayLabel } from "@/lib/plan-data";
+import { hhmm, todayIso } from "@/lib/dates";
+import { getIcon } from "@/lib/icons";
+import type { Color, Kind } from "@/lib/types";
+import { useDayPlan, useDeleteScheduleItem, useGenerateDay, useSaveScheduleItem, useSchedule, useSetItemTimes, useToggleScheduleItem } from "@/lib/data/day";
 
 export const Route = createFileRoute("/planejamento_/dia")({
-  validateSearch: (s: Record<string, unknown>) => parseInput(s),
   head: () => ({
     meta: [
       { title: "Seu plano do dia · Presence" },
@@ -19,22 +23,36 @@ export const Route = createFileRoute("/planejamento_/dia")({
   component: PlanoDia,
 });
 
-const kinds: Record<Activity["kind"], string> = {
-  tarefa: "Tarefa", compromisso: "Compromisso", habito: "Hábito", treino: "Treino", autocuidado: "Autocuidado", pausa: "Pausa", extra: "Adicionado por você",
+type Activity = { id: string; time: string; title: string; desc: string; tag: string; color: Color; icon: string; kind: Kind; done: boolean; task_id: string | null };
+
+const kinds: Record<Kind, string> = {
+  tarefa: "Tarefa", compromisso: "Compromisso", habito: "Hábito", treino: "Treino", autocuidado: "Autocuidado", financeiro: "Financeiro", pausa: "Pausa", extra: "Adicionado por você",
 };
-const dispLabel = { alta: "Alta", normal: "Normal", baixa: "Baixa" };
+const dispLabel = { alta: "Alta", normal: "Normal", baixa: "Baixa" } as const;
 
 function PlanoDia() {
-  const input = Route.useSearch();
-  const initial = useMemo(() => buildPlan(input), [input]);
-  const [list, setList] = useState<Activity[]>(initial);
+  const date = todayIso();
+  const planQ = useDayPlan(date);
+  const schedQ = useSchedule(date);
+  const toggleItem = useToggleScheduleItem();
+  const saveItem = useSaveScheduleItem();
+  const deleteItem = useDeleteScheduleItem();
+  const setTimes = useSetItemTimes();
+  const generate = useGenerateDay();
+
+  const input = planQ.data ?? { disposicao: "normal" as const, tempo: "completo" as const, pausas: true, prioridade: "" };
+  const list: Activity[] = (schedQ.data ?? []).map((r) => ({
+    id: r.id, time: r.time, title: r.title, desc: r.description, tag: r.tag, color: r.color, icon: r.icon, kind: r.kind, done: r.done, task_id: r.task_id,
+  }));
   const [editing, setEditing] = useState<Activity | null>(null);
+  const [isNewItem, setIsNewItem] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
   const done = list.filter((a) => a.done).length;
   const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   const notify = (m: string) => { setFlash(m); setTimeout(() => setFlash(null), 2200); };
+  const fail = (e: Error) => toast.error(e.message);
 
   // Reorder keeps the time slots in place and moves activities between them.
   const move = (from: number, to: number) => {
@@ -43,15 +61,22 @@ function PlanoDia() {
     const next = [...list];
     const [it] = next.splice(from, 1);
     next.splice(to, 0, it!);
-    setList(next.map((a, i) => ({ ...a, time: times[i]! })));
-    notify("Atividades reorganizadas");
+    setTimes.mutate(next.map((a, i) => ({ id: a.id, time: times[i]!, position: i })), { onSuccess: () => notify("Atividades reorganizadas"), onError: fail });
   };
-  const toggle = (id: string) => setList((l) => l.map((a) => (a.id === id ? { ...a, done: !a.done } : a)));
+  const toggle = (id: string) => { const a = list.find((x) => x.id === id); if (a) toggleItem.mutate({ id: a.id, done: a.done, task_id: a.task_id }, { onError: fail }); };
   const save = (a: Activity) => {
-    setList((l) => sortByTime(l.some((x) => x.id === a.id) ? l.map((x) => (x.id === a.id ? a : x)) : [...l, a]));
-    setEditing(null); notify("Atividade salva");
+    saveItem.mutate(
+      { ...(isNewItem ? {} : { id: a.id }), plan_date: date, time: a.time, title: a.title, description: a.desc, tag: a.tag, color: a.color, icon: a.icon, kind: a.kind },
+      { onSuccess: () => { setEditing(null); notify("Atividade salva"); }, onError: fail },
+    );
   };
-  const remove = (id: string) => { setList((l) => l.filter((a) => a.id !== id)); setEditing(null); notify("Atividade removida"); };
+  const remove = (id: string) => deleteItem.mutate(id, { onSuccess: () => { setEditing(null); notify("Atividade removida"); }, onError: fail });
+  const restore = () => {
+    generate.mutate(
+      { mode: "planejamento", date, disposicao: input.disposicao, tempo: input.tempo, prioridade: input.prioridade, pausas: input.pausas },
+      { onSuccess: () => notify("Plano restaurado"), onError: fail },
+    );
+  };
 
   return (
     <PlanShell>
@@ -70,18 +95,22 @@ function PlanoDia() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <Panel c="cyan" style={{ animationDelay: ".1s" }}>
+          {schedQ.isPending && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-cyan" /></div>}
+          {schedQ.isSuccess && list.length === 0 && (
+            <p className="py-16 text-center text-sm text-muted-foreground">Ainda não há plano para hoje.<br /><Link to="/planejamento" className="mt-3 inline-block text-cyan">Gerar planejamento</Link></p>
+          )}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-display text-lg font-semibold">Timeline do dia</h2>
             <div className="flex gap-2">
-              <button type="button" onClick={() => { setList(initial); notify("Plano restaurado"); }} className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground"><RotateCcw size={14} /> Restaurar</button>
-              <button type="button" onClick={() => setEditing({ id: `n${Date.now()}`, time: "15:00", title: "", desc: "", tag: "Nova", color: "cyan", icon: "star", kind: "extra" })}
+              <button type="button" onClick={restore} disabled={generate.isPending} className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground"><RotateCcw size={14} /> Restaurar</button>
+              <button type="button" onClick={() => { setIsNewItem(true); setEditing({ id: "novo", time: "15:00", title: "", desc: "", tag: "Nova", color: "cyan", icon: "star", kind: "extra", done: false, task_id: null }); }}
                 className="flex items-center gap-2 rounded-full bg-cyan/15 px-4 py-2 text-sm text-cyan transition hover:bg-cyan/25"><Plus size={14} /> Adicionar</button>
             </div>
           </div>
 
           <ol className="relative space-y-2 before:absolute before:bottom-6 before:left-[7px] before:top-6 before:w-px before:bg-[linear-gradient(var(--cyan),var(--violet))] before:opacity-50">
             {list.map((a, i) => {
-              const I = icons[a.icon];
+              const I = getIcon(a.icon);
               const col = { "--glow": colorVar(a.color) } as CSSProperties;
               return (
                 <li key={a.id} draggable onDragStart={() => setDragId(a.id)} onDragEnd={() => setDragId(null)}
@@ -90,9 +119,9 @@ function PlanoDia() {
                   className={`group relative flex items-center gap-3 rounded-2xl py-2 pl-6 pr-2 transition hover:bg-secondary/40 ${dragId === a.id ? "opacity-40" : ""} ${a.done ? "opacity-60" : ""}`}>
                   <span className={`absolute left-0.5 h-3 w-3 rounded-full border-2 border-cyan transition ${a.done ? "bg-cyan shadow-[0_0_10px_var(--cyan)]" : "bg-background"}`} />
                   <GripVertical size={16} className="hidden shrink-0 cursor-grab text-muted-foreground/40 sm:block" />
-                  <span className="w-16 shrink-0 rounded-full border border-cyan/40 py-1.5 text-center text-sm font-semibold">{a.time}</span>
+                  <span className="w-16 shrink-0 rounded-full border border-cyan/40 py-1.5 text-center text-sm font-semibold">{hhmm(a.time)}</span>
                   <span className="icon-tile hidden h-10 w-10 shrink-0 !rounded-full sm:grid" style={col}><I size={17} /></span>
-                  <button type="button" onClick={() => setEditing(a)} className="min-w-0 flex-1 text-left">
+                  <button type="button" onClick={() => { setIsNewItem(false); setEditing(a); }} className="min-w-0 flex-1 text-left">
                     <span className={`block truncate text-[0.95rem] font-semibold ${a.done ? "line-through" : ""}`}>{a.title}</span>
                     <span className="block truncate text-xs text-muted-foreground">{a.desc}</span>
                   </button>
@@ -101,7 +130,7 @@ function PlanoDia() {
                     <button type="button" aria-label="Subir" onClick={() => move(i, i - 1)} className="text-muted-foreground hover:text-cyan"><ArrowUp size={14} /></button>
                     <button type="button" aria-label="Descer" onClick={() => move(i, i + 1)} className="text-muted-foreground hover:text-cyan"><ArrowDown size={14} /></button>
                   </span>
-                  <button type="button" aria-label="Editar" onClick={() => setEditing(a)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground"><Pencil size={14} /></button>
+                  <button type="button" aria-label="Editar" onClick={() => { setIsNewItem(false); setEditing(a); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground"><Pencil size={14} /></button>
                   <button type="button" aria-label={a.done ? "Desmarcar" : "Concluir"} onClick={() => toggle(a.id)}
                     className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border transition ${a.done ? "border-emerald bg-emerald text-primary-foreground" : "border-muted-foreground/50 hover:border-emerald"}`}>
                     {a.done && <Check size={15} strokeWidth={3} />}
@@ -124,7 +153,7 @@ function PlanoDia() {
           <Panel c="violet" style={{ animationDelay: ".28s" }}>
             <h2 className="mb-3 flex items-center gap-2.5 font-display text-lg font-semibold"><Sparkles size={20} className="text-violet" /> O que entrou no plano</h2>
             <ul className="space-y-2 text-sm">
-              {(Object.keys(kinds) as Activity["kind"][]).map((k) => {
+              {(Object.keys(kinds) as Kind[]).map((k) => {
                 const n = list.filter((a) => a.kind === k).length;
                 return n ? <li key={k} className="flex justify-between rounded-xl border border-border px-3 py-2"><span className="text-muted-foreground">{kinds[k]}</span><span className="font-semibold">{n}</span></li> : null;
               })}
@@ -135,7 +164,7 @@ function PlanoDia() {
         </div>
       </div>
 
-      {editing && <EditDialog a={editing} isNew={!list.some((x) => x.id === editing.id)} onClose={() => setEditing(null)} onSave={save} onRemove={remove} />}
+      {editing && <EditDialog a={{ ...editing, time: hhmm(editing.time) || "15:00" }} isNew={isNewItem} onClose={() => setEditing(null)} onSave={save} onRemove={remove} />}
       {flash && <div className="glass fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-5 py-2.5 text-sm animate-rise"><Check size={14} className="mr-2 inline text-emerald" />{flash}</div>}
     </PlanShell>
   );

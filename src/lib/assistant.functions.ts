@@ -20,11 +20,13 @@ export type AskResult =
 const SYSTEM_PROMPT = `Você é a Presence, assistente pessoal da usuária para rotina, saúde, foco, finanças e projetos.
 Fale sempre em português do Brasil, de forma calorosa, direta e breve (no máximo 3 parágrafos curtos, a menos que ela peça detalhes).
 
-Você tem acesso às demandas dela pelas ferramentas:
-- registrar_demanda: use quando ela pedir para anotar, registrar, lembrar ou criar uma demanda/pendência.
-- listar_demandas: use quando ela perguntar sobre demandas, pendências ou o que tem para fazer.
+Você tem acesso às demandas e às tarefas dela pelas ferramentas:
+- registrar_demanda / listar_demandas: demandas e pendências gerais que ela quer anotar para não esquecer.
+- criar_tarefa / listar_tarefas: tarefas com data e hora (ex.: "reunião amanhã às 15h", "o que tenho pra hoje?").
+  Use criar_tarefa quando houver uma data/hora ou quando ela falar em tarefa, compromisso ou lembrete; caso contrário, registrar_demanda.
+  Para datas relativas ("amanhã", "sexta"), calcule a data a partir de "Agora" e confirme a data que você usou.
 
-Ainda não há dados de tarefas, hábitos, agenda, treino ou financeiro neste app. Se ela perguntar sobre isso,
+Ainda não há dados de financeiro, agenda externa ou dieta neste app. Se ela perguntar sobre isso,
 diga com honestidade que esses módulos ainda não estão conectados e ofereça registrar o pedido como demanda.
 Nunca invente dados que não vieram das ferramentas.`;
 
@@ -60,7 +62,50 @@ const tools: Anthropic.Beta.BetaTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "criar_tarefa",
+    description: "Cria uma tarefa ou compromisso, opcionalmente com data e hora.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        titulo: { type: "string", description: "Título curto da tarefa." },
+        data: { type: ["string", "null"], description: "Data no formato AAAA-MM-DD, ou null se não houver." },
+        hora: { type: ["string", "null"], description: "Hora no formato HH:MM (24h), ou null." },
+        prioridade: { type: "string", enum: ["alta", "media", "baixa"], description: "Prioridade; use media se ela não disser." },
+        categoria: {
+          type: ["string", "null"],
+          enum: ["rotina", "comp", "auto", "saude", "trab", "casa", "fin", "pes", null],
+          description: "rotina, comp (compromisso), auto (autocuidado), saude, trab (trabalho/projetos), casa, fin (financeiro), pes (pessoal); null se não souber.",
+        },
+      },
+      required: ["titulo", "data", "hora", "prioridade", "categoria"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "listar_tarefas",
+    description: "Lista as tarefas da usuária (nunca inclui tarefas apagadas).",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        periodo: { type: "string", enum: ["hoje", "pendentes", "todas"], description: "hoje = com data de hoje; pendentes = ainda não concluídas; todas." },
+      },
+      required: ["periodo"],
+      additionalProperties: false,
+    },
+  },
 ];
+
+const criarTarefaInput = z.object({
+  titulo: z.string().trim().min(1).max(200),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  hora: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+  prioridade: z.enum(["alta", "media", "baixa"]),
+  categoria: z.enum(["rotina", "comp", "auto", "saude", "trab", "casa", "fin", "pes"]).nullable(),
+});
+const listarTarefasInput = z.object({ periodo: z.enum(["hoje", "pendentes", "todas"]) });
 
 const registrarInput = z.object({
   titulo: z.string().trim().min(1).max(300),
@@ -78,6 +123,7 @@ async function runTool(
   name: string,
   rawInput: unknown,
   created: Demand[],
+  today: string,
 ): Promise<{ content: string; isError: boolean }> {
   if (name === "registrar_demanda") {
     const input = registrarInput.safeParse(rawInput);
@@ -104,6 +150,37 @@ async function runTool(
     const { data, error } = await query;
     if (error) return { content: `Erro ao buscar: ${error.message}`, isError: true };
     return { content: JSON.stringify({ total: data.length, demandas: data }), isError: false };
+  }
+
+  if (name === "criar_tarefa") {
+    const input = criarTarefaInput.safeParse(rawInput);
+    if (!input.success) return { content: "Entrada inválida para criar_tarefa (data AAAA-MM-DD, hora HH:MM).", isError: true };
+    let categoryId: string | null = null;
+    if (input.data.categoria) {
+      const { data: cat } = await db.from("task_categories").select("id").eq("slug", input.data.categoria).maybeSingle();
+      categoryId = cat?.id ?? null;
+    }
+    const { data, error } = await db
+      .from("tasks")
+      .insert({
+        user_id: userId, title: input.data.titulo, priority: input.data.prioridade, due_date: input.data.data, due_time: input.data.hora,
+        category_id: categoryId, source: "assistente",
+      })
+      .select("title, priority, due_date, due_time")
+      .single();
+    if (error) return { content: `Erro ao salvar: ${error.message}`, isError: true };
+    return { content: JSON.stringify({ criada: true, tarefa: data }), isError: false };
+  }
+
+  if (name === "listar_tarefas") {
+    const input = listarTarefasInput.safeParse(rawInput);
+    if (!input.success) return { content: "Entrada inválida para listar_tarefas.", isError: true };
+    let query = db.from("tasks").select("title, priority, due_date, due_time, done").order("due_date", { nullsFirst: false }).order("due_time").limit(40);
+    if (input.data.periodo === "hoje") query = query.eq("due_date", today);
+    if (input.data.periodo === "pendentes") query = query.eq("done", false);
+    const { data, error } = await query;
+    if (error) return { content: `Erro ao buscar: ${error.message}`, isError: true };
+    return { content: JSON.stringify({ total: data.length, tarefas: data }), isError: false };
   }
 
   return { content: `Ferramenta desconhecida: ${name}`, isError: true };
@@ -148,6 +225,7 @@ export const askAssistant = createServerFn({ method: "POST" })
       timeZone: "America/Sao_Paulo",
     }).format(new Date());
     const name = profile?.display_name || "usuária";
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
     const { default: AnthropicClient } = await import("@anthropic-ai/sdk");
     const client = new AnthropicClient();
@@ -164,7 +242,7 @@ export const askAssistant = createServerFn({ method: "POST" })
           output_config: { effort: "low" },
           system: [
             { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-            { type: "text", text: `Agora: ${now} (horário de Brasília). Nome da usuária: ${name}.` },
+            { type: "text", text: `Agora: ${now} (horário de Brasília), data de hoje ${today}. Nome da usuária: ${name}.` },
           ],
           tools,
           messages,
@@ -193,7 +271,7 @@ export const askAssistant = createServerFn({ method: "POST" })
 
         const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
         for (const use of toolUses) {
-          const result = await runTool(db, userId, use.name, use.input, created);
+          const result = await runTool(db, userId, use.name, use.input, created, today);
           results.push({ type: "tool_result", tool_use_id: use.id, content: result.content, is_error: result.isError });
         }
         messages.push({ role: "user", content: results });

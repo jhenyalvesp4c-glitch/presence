@@ -1,11 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { addDays, format, startOfWeek, subWeeks } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
-  ArrowLeftRight, BarChart3, Calendar, Check, CheckCircle2, Clock, Dumbbell, Flame, Layers, Minus, Pause, Pencil, Play, Plus, Target, Timer,
+  ArrowLeftRight, BarChart3, Calendar, Check, CheckCircle2, Clock, Dumbbell, Flame, Layers, Loader2, Minus, Pause, Pencil, Play, Plus, Target, Timer,
 } from "lucide-react";
 import { PlanShell, Panel, tint } from "@/components/PlanShell";
 import orb from "@/assets/treino-orb.jpg";
 import musculos from "@/assets/treino-musculos.jpg";
+import { fromIsoDate, isoDate, todayIso } from "@/lib/dates";
+import {
+  useDoneCount, useFinishSession, useLoadHistory, useLogExercise, useRecentSessions, useSessionLogs, useSplit, useStartSession, useWeeklyGoal, useWorkouts,
+} from "@/lib/data/workouts";
 
 export const Route = createFileRoute("/treino")({
   head: () => ({
@@ -23,32 +29,8 @@ export const Route = createFileRoute("/treino")({
 
 const fade = { maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, black 62%, transparent 100%)", WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, black 62%, transparent 100%)" };
 
-const semana = [
-  { d: "Seg", t: "Glúteo + Posterior", done: true }, { d: "Ter", t: "Cardio + Abdômen" }, { d: "Qua", t: "Glúteo + Perna" },
-  { d: "Qui", t: "Cardio + Superiores (leve)" }, { d: "Sex", t: "Glúteo + Posterior", hoje: true }, { d: "Sáb", t: "Livre / Mobilidade" }, { d: "Dom", t: "Descanso" },
-];
-
-type Ex = { n: string; m: string; s: string; r: string };
-const fichas: Record<string, Ex[]> = {
-  "Glúteo e Posterior": [
-    { n: "Elevação de quadril", m: "Máquina / Glúteo", s: "3 x 12–15", r: "60s" },
-    { n: "Stiff", m: "Posterior de coxa", s: "3 x 10–12", r: "60s" },
-    { n: "Flexora", m: "Posterior de coxa", s: "3 x 12–15", r: "45s" },
-    { n: "Abdutora", m: "Glúteo (lateral)", s: "3 x 15–20", r: "45s" },
-    { n: "Adutora", m: "Parte interna da coxa", s: "3 x 15–20", r: "45s" },
-    { n: "Agachamento máquina", m: "Glúteo e quadríceps", s: "3 x 10–12", r: "60s" },
-  ],
-  "Glúteo e Perna": [
-    { n: "Agachamento livre", m: "Quadríceps e glúteo", s: "4 x 8–10", r: "90s" },
-    { n: "Leg press", m: "Quadríceps", s: "3 x 12", r: "60s" },
-    { n: "Afundo", m: "Glúteo e quadríceps", s: "3 x 10 cada", r: "60s" },
-    { n: "Cadeira extensora", m: "Quadríceps", s: "3 x 15", r: "45s" },
-    { n: "Panturrilha em pé", m: "Panturrilha", s: "4 x 15", r: "45s" },
-    { n: "Glúteo na polia", m: "Glúteo máximo", s: "3 x 12 cada", r: "45s" },
-  ],
-};
-
-const cargas = [62, 78, 90, 100, 110];
+const dayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 
 function Head({ Icon, t, d, right }: { Icon: typeof Dumbbell; t: string; d?: string; right?: ReactNode }) {
   return (
@@ -64,16 +46,70 @@ function Head({ Icon, t, d, right }: { Icon: typeof Dumbbell; t: string; d?: str
 }
 
 function Treino() {
-  const [ficha, setFicha] = useState<keyof typeof fichas>("Glúteo e Posterior");
-  const [done, setDone] = useState<Set<number>>(new Set());
+  const wq = useWorkouts();
+  const splitQ = useSplit();
+  const goalQ = useWeeklyGoal();
+  const sessQ = useRecentSessions();
+  const startSession = useStartSession();
+  const finishSession = useFinishSession();
+  const logEx = useLogExercise();
+
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [chartIdx, setChartIdx] = useState(0);
   const [open, setOpen] = useState<number | null>(null);
-  const [carga, setCarga] = useState<Record<number, string>>({});
   const [rest, setRest] = useState(90);
   const [left, setLeft] = useState(90);
   const [running, setRunning] = useState(false);
-  const [started, setStarted] = useState(false);
   const [toast, setToast] = useState("");
-  const exs = fichas[ficha]!;
+
+  const workouts = wq.data?.workouts ?? [];
+  const todayDow = new Date().getDay();
+  const todaySplit = splitQ.data?.find((x) => x.weekday === todayDow);
+  const workout = workouts.find((w) => w.id === pickedId) ?? workouts.find((w) => w.id === todaySplit?.workout_id) ?? workouts[0];
+  const exercises = workout ? (wq.data?.exercises ?? []).filter((e) => e.workout_id === workout.id) : [];
+  const exs = exercises.map((e) => ({ n: e.name, m: e.muscle, s: e.sets_reps, r: `${e.rest_seconds}s` }));
+  const ficha = workout?.name ?? "—";
+
+  const today = todayIso();
+  const sessions = sessQ.data ?? [];
+  const current = workout ? sessions.find((x) => x.session_date === today && x.workout_id === workout.id) : undefined;
+  const logs = useSessionLogs(current?.id).data ?? [];
+  const logByEx = new Map(logs.map((l) => [l.exercise_id, l]));
+  const done = new Set<number>(exercises.flatMap((e, i) => (logByEx.get(e.id)?.done ? [i] : [])));
+  const carga: Record<number, string> = {};
+  exercises.forEach((e, i) => { const kg = logByEx.get(e.id)?.load_kg; if (kg != null) carga[i] = String(Number(kg)); });
+  const started = !!current;
+  const finished = !!current?.finished_at;
+
+  // Semana (segunda a domingo)
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekDows = [1, 2, 3, 4, 5, 6, 0];
+  const weekDates = weekDows.map((_, i) => isoDate(addDays(weekStart, i)));
+  const finishedDates = new Set(sessions.filter((x) => x.finished_at).map((x) => x.session_date));
+  const semana = weekDows.map((dow, i) => ({
+    d: dayLabels[i]!, t: splitQ.data?.find((x) => x.weekday === dow)?.title ?? "—", done: finishedDates.has(weekDates[i]!), hoje: dow === todayDow,
+  }));
+  const weekDone = sessions.filter((x) => x.finished_at && x.session_date >= weekDates[0]! && x.session_date <= weekDates[6]!).length;
+  const goal = goalQ.data ?? 5;
+  const weekPct = Math.min(100, Math.round((weekDone / goal) * 100));
+
+  // Último treino concluído
+  const last = sessions.find((x) => x.finished_at);
+  const lastDone = useDoneCount(last?.id).data;
+
+  // Evolução de cargas: maior carga por semana nas últimas 5 semanas
+  const chartEx = exercises[chartIdx] ?? exercises[0];
+  const hist = useLoadHistory(chartEx?.name).data ?? [];
+  const weekStarts = [4, 3, 2, 1, 0].map((n) => startOfWeek(subWeeks(new Date(), n), { weekStartsOn: 1 }));
+  const buckets = weekStarts.map((st) => {
+    const from = isoDate(st), to = isoDate(addDays(st, 6));
+    const kgs = hist.filter((h) => h.date >= from && h.date <= to).map((h) => h.kg);
+    return kgs.length ? Math.max(...kgs) : null;
+  });
+  const withData = buckets.flatMap((v, i) => (v == null ? [] : [{ v, i }]));
+  const lastKg = withData.at(-1)?.v ?? null;
+
+  const fail = (e: Error) => setToast(`Erro: ${e.message}`);
 
   useEffect(() => {
     if (!running) return;
@@ -82,20 +118,30 @@ function Treino() {
   }, [running, rest]);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(""), 2800); return () => clearTimeout(id); }, [toast]);
 
-  const toggle = (i: number) => setDone((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
+  const toggle = (i: number) => { if (workout && exercises[i]) logEx.mutate({ workout, exercise: exercises[i]!, patch: { done: !done.has(i) } }, { onError: fail }); };
   const adj = (d: number) => { const v = Math.max(15, Math.min(300, rest + d)); setRest(v); setLeft(v); };
   const mm = String(Math.floor(left / 60)).padStart(2, "0"), ss = String(left % 60).padStart(2, "0");
-  const pct = Math.round((done.size / exs.length) * 100);
+  const pct = exs.length ? Math.round((done.size / exs.length) * 100) : 0;
 
   const stats = [
     { Icon: Dumbbell, t: "Treino de hoje", v: ficha, c: "cyan", hl: true },
-    { Icon: Clock, t: "Duração estimada", v: "60 min", c: "violet" },
+    { Icon: Clock, t: "Duração estimada", v: `${workout?.duration_min ?? 60} min`, c: "violet" },
     { Icon: Layers, t: "Exercícios", v: `${done.size}/${exs.length}`, c: "violet" },
   ];
 
-  const max = 120, min = 50, W = 300, H = 110;
-  const pts = cargas.map((c, i) => [10 + (i * (W - 20)) / (cargas.length - 1), H - ((c - min) / (max - min)) * H] as const);
+  const W = 300, H = 110;
+  const vals = withData.map((p) => p.v);
+  const lo = vals.length ? Math.min(...vals) * 0.8 : 0;
+  const hi = vals.length ? Math.max(Math.max(...vals) * 1.1, lo + 1) : 1;
+  const pts = withData.map((p) => [10 + (p.i * (W - 20)) / 4, H - ((p.v - lo) / (hi - lo)) * H] as const);
   const path = pts.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ");
+
+  if (wq.isPending || splitQ.isPending) {
+    return <PlanShell active={5}><div className="grid min-h-[60vh] place-items-center"><Loader2 className="animate-spin text-cyan" /></div></PlanShell>;
+  }
+  if (wq.isError || !workout) {
+    return <PlanShell active={5}><p className="py-24 text-center text-sm text-muted-foreground">{wq.isError ? `Não consegui carregar o treino: ${wq.error.message}` : "Nenhuma ficha de treino cadastrada ainda."}</p></PlanShell>;
+  }
 
   return (
     <PlanShell active={5}>
@@ -120,8 +166,8 @@ function Treino() {
             <BarChart3 size={22} className="text-cyan" />
             <p className="mt-2 text-xs text-muted-foreground">Progresso semanal</p>
             <div className="flex items-center gap-3">
-              <p className="font-display text-2xl font-semibold">{started ? 4 : 3}/5</p>
-              <div className="h-1.5 flex-1 rounded-full bg-secondary"><div className="h-full rounded-full bg-cyan shadow-[0_0_10px_var(--cyan)] transition-all" style={{ width: `${(started ? 4 : 3) * 20}%` }} /></div>
+              <p className="font-display text-2xl font-semibold">{weekDone}/{goal}</p>
+              <div className="h-1.5 flex-1 rounded-full bg-secondary"><div className="h-full rounded-full bg-cyan shadow-[0_0_10px_var(--cyan)] transition-all" style={{ width: `${weekPct}%` }} /></div>
             </div>
           </div>
         </div>
@@ -145,14 +191,14 @@ function Treino() {
           </Panel>
           <Panel c="violet">
             <Head Icon={Target} t="Meta da semana" />
-            <div className="flex justify-between text-sm"><span>{started ? 4 : 3} de 5 treinos</span><span>{(started ? 4 : 3) * 20}%</span></div>
-            <div className="mt-2 h-2 rounded-full bg-secondary"><div className="h-full rounded-full bg-gradient-brand transition-all" style={{ width: `${(started ? 4 : 3) * 20}%` }} /></div>
+            <div className="flex justify-between text-sm"><span>{weekDone} de {goal} treinos</span><span>{weekPct}%</span></div>
+            <div className="mt-2 h-2 rounded-full bg-secondary"><div className="h-full rounded-full bg-gradient-brand transition-all" style={{ width: `${weekPct}%` }} /></div>
           </Panel>
         </div>
 
         <Panel c="cyan">
-          <Head Icon={Dumbbell} t="Treino de hoje" d={`${ficha} · ${exs.length} exercícios · ~60 minutos · ${pct}% concluído`}
-            right={<button onClick={() => { setFicha((f) => (f === "Glúteo e Posterior" ? "Glúteo e Perna" : "Glúteo e Posterior")); setDone(new Set()); setCarga({}); setToast("Treino trocado."); }}
+          <Head Icon={Dumbbell} t="Treino de hoje" d={`${ficha} · ${exs.length} exercícios · ~${workout.duration_min} minutos · ${pct}% concluído`}
+            right={<button onClick={() => { const next = workouts[(workouts.findIndex((w) => w.id === workout.id) + 1) % workouts.length]!; setPickedId(next.id); setChartIdx(0); setOpen(null); setToast(`Treino trocado: ${next.name}.`); }}
               className="flex items-center gap-2 whitespace-nowrap rounded-full border border-border px-4 py-2 text-sm transition hover:border-cyan/60"><ArrowLeftRight size={15} /> Trocar treino</button>} />
           <ul className="divide-y divide-border/50">
             {exs.map((e, i) => (
@@ -173,8 +219,8 @@ function Treino() {
                 </div>
                 {open === i && <p className="ml-11 mt-2 rounded-xl border border-cyan/30 p-3 text-xs text-muted-foreground animate-rise">Execução: mantenha a postura neutra, controle a descida em 2–3s e contraia o músculo-alvo no topo. Respire na fase de esforço.</p>}
                 {open === i + 100 && (
-                  <form className="ml-11 mt-2 flex items-center gap-2 animate-rise" onSubmit={(ev) => { ev.preventDefault(); const v = new FormData(ev.currentTarget).get("kg"); if (v) { setCarga((c) => ({ ...c, [i]: String(v) })); setOpen(null); setToast(`Carga de ${v} kg registrada em ${e.n}.`); } }}>
-                    <input name="kg" type="number" min={0} max={500} autoFocus placeholder="kg" className="w-24 rounded-full border border-border bg-transparent px-3 py-1.5 text-sm outline-none focus:border-violet" />
+                  <form className="ml-11 mt-2 flex items-center gap-2 animate-rise" onSubmit={(ev) => { ev.preventDefault(); const v = new FormData(ev.currentTarget).get("kg"); const kg = Number(v); if (v && Number.isFinite(kg) && kg >= 0) { logEx.mutate({ workout, exercise: exercises[i]!, patch: { load_kg: kg } }, { onSuccess: () => { setChartIdx(i); setOpen(null); setToast(`Carga de ${kg} kg registrada em ${e.n}.`); }, onError: fail }); } }}>
+                    <input name="kg" type="number" step="0.5" min={0} max={500} autoFocus placeholder="kg" className="w-24 rounded-full border border-border bg-transparent px-3 py-1.5 text-sm outline-none focus:border-violet" />
                     <button className="rounded-full bg-violet px-3 py-1.5 text-xs text-primary-foreground">Salvar</button>
                   </form>
                 )}
@@ -189,29 +235,31 @@ function Treino() {
             <div className="flex flex-wrap items-center gap-2">
               <img src={musculos} alt="Mapa muscular com glúteos e posterior destacados" loading="lazy" width={816} height={816} className="h-40 w-40 shrink-0 object-contain" style={fade} />
               <ul className="space-y-2 text-xs">
-                {["Glúteos", "Posterior de coxa", "Lateral da coxa", "Adutores"].map((m, i) => (
+                {(workout.muscles.length ? workout.muscles : ["—"]).map((m, i) => (
                   <li key={m} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: i < 2 ? "var(--violet)" : "var(--cyan)" }} />{m}</li>
                 ))}
               </ul>
             </div>
           </Panel>
           <Panel c="cyan">
-            <Head Icon={Calendar} t="Último treino" d="Seg, 27 de Out" right={<span className="tag" style={tint("emerald")}><Check size={12} /> Concluído</span>} />
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              {[[Clock, "58 min"], [Dumbbell, "6 exercícios"], [Flame, "420 kcal"]].map(([I, t]) => {
+            <Head Icon={Calendar} t="Último treino" d={last ? cap(format(fromIsoDate(last.session_date), "EEE, d 'de' MMM", { locale: ptBR })) : "Nenhum ainda"} right={last ? <span className="tag" style={tint("emerald")}><Check size={12} /> Concluído</span> : undefined} />
+            {!last && <p className="text-xs text-muted-foreground">Conclua um treino para ver o resumo aqui.</p>}
+            {last && <div className="grid grid-cols-3 gap-2 text-xs">
+              {([[Clock, `${last.duration_min ?? "—"} min`], [Dumbbell, `${lastDone ?? "—"} exercícios`], ...(last.kcal ? [[Flame, `${last.kcal} kcal`]] : [])] as [unknown, string][]).map(([I, t]) => {
                 const Ic = I as typeof Clock;
                 return <span key={t as string} className="flex items-center justify-center gap-1.5 rounded-xl border border-border/60 py-2"><Ic size={13} className="text-cyan" />{t as string}</span>;
               })}
-            </div>
+            </div>}
           </Panel>
           <Panel c="violet">
-            <Head Icon={BarChart3} t="Evolução de cargas" d="Elevação de quadril (carga máxima)" right={<span className="tag" style={tint("violet")}>{carga[0] ?? 110} kg</span>} />
-            <svg viewBox={`-12 -10 ${W + 24} ${H + 30}`} className="h-36 w-full">
+            <Head Icon={BarChart3} t="Evolução de cargas" d={`${chartEx?.name ?? "—"} (carga máxima)`} right={<span className="tag" style={tint("violet")}>{lastKg != null ? `${lastKg} kg` : "— kg"}</span>} />
+            {pts.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">Registre a carga de {chartEx?.name ?? "um exercício"} para ver a evolução.</p>}
+            <svg viewBox={`-12 -10 ${W + 24} ${H + 30}`} className={`h-36 w-full ${pts.length === 0 ? "hidden" : ""}`}>
               <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="var(--violet)" stopOpacity=".35" /><stop offset="1" stopColor="var(--violet)" stopOpacity="0" /></linearGradient></defs>
-              <path d={`${path} L${pts.at(-1)![0]},${H} L${pts[0]![0]},${H} Z`} fill="url(#g)" />
+              {pts.length > 0 && <path d={`${path} L${pts.at(-1)![0]},${H} L${pts[0]![0]},${H} Z`} fill="url(#g)" />}
               <path d={path} fill="none" stroke="var(--violet)" strokeWidth="2.5" style={{ filter: "drop-shadow(0 0 4px var(--violet))" }} />
               {pts.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="4" fill="var(--foreground)" />)}
-              {pts.map(([x], i) => <text key={i} x={x} y={H + 18} textAnchor="middle" fontSize="10" fill="var(--muted-foreground)">Sem {i + 1}</text>)}
+              {[0, 1, 2, 3, 4].map((i) => <text key={i} x={10 + (i * (W - 20)) / 4} y={H + 18} textAnchor="middle" fontSize="10" fill="var(--muted-foreground)">Sem {i + 1}</text>)}
             </svg>
           </Panel>
         </div>
@@ -226,12 +274,17 @@ function Treino() {
           <button onClick={() => adj(15)} aria-label="Mais 15 segundos" className="grid h-9 w-9 place-items-center rounded-full border border-border"><Plus size={15} /></button>
           <button onClick={() => setRunning((r) => !r)} aria-label={running ? "Pausar" : "Iniciar"} className="grid h-12 w-12 place-items-center rounded-full border-2 border-cyan text-cyan shadow-[0_0_20px_-4px_var(--cyan)]">{running ? <Pause size={20} /> : <Play size={20} className="fill-cyan" />}</button>
         </div>
-        <button onClick={() => { setStarted(true); setToast("Treino iniciado! Bora 💪"); }} className="flex items-center justify-center gap-3 rounded-full py-4 font-display text-xl font-semibold text-primary-foreground shadow-[0_0_40px_-10px_var(--cyan)]" style={{ background: "linear-gradient(90deg, var(--cyan), var(--violet))" }}>
-          {started ? <><Check size={22} /> Treino em andamento</> : <><Play size={22} /> Iniciar treino</>}
+        <button disabled={finished || startSession.isPending || finishSession.isPending}
+          onClick={() => {
+            if (!started) startSession.mutate(workout, { onSuccess: () => setToast("Treino iniciado! Bora 💪"), onError: fail });
+            else if (current) finishSession.mutate(current, { onSuccess: () => setToast("Treino concluído! 🎉"), onError: fail });
+          }}
+          className="flex items-center justify-center gap-3 rounded-full py-4 font-display text-xl font-semibold text-primary-foreground shadow-[0_0_40px_-10px_var(--cyan)] disabled:opacity-70" style={{ background: "linear-gradient(90deg, var(--cyan), var(--violet))" }}>
+          {finished ? <><Check size={22} /> Treino concluído</> : started ? <><Check size={22} /> Finalizar treino</> : <><Play size={22} /> Iniciar treino</>}
         </button>
         <div className="flex gap-3">
           <button onClick={() => setToast("Edição da ficha disponível em breve (demonstração).")} className="glass flex items-center gap-2 rounded-2xl px-5 py-4 text-sm"><Pencil size={17} /> Editar ficha</button>
-          <button onClick={() => setToast("Histórico: 12 treinos neste mês (demonstração).")} className="glass flex items-center gap-2 rounded-2xl px-5 py-4 text-sm"><BarChart3 size={17} /> Histórico</button>
+          <button onClick={() => { const n = sessions.filter((x) => x.finished_at && x.session_date.startsWith(today.slice(0, 7))).length; setToast(`Histórico: ${n} treino${n === 1 ? "" : "s"} concluído${n === 1 ? "" : "s"} neste mês.`); }} className="glass flex items-center gap-2 rounded-2xl px-5 py-4 text-sm"><BarChart3 size={17} /> Histórico</button>
         </div>
       </div>
 

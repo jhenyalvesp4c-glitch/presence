@@ -1,11 +1,19 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import calendar3d from "@/assets/plan-calendar-3d.jpg";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { addDays, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 import {
   ArrowLeft, ArrowRight, Book, Calendar, CalendarCheck, Check, Database, Dumbbell, Flag, Flower2, GripVertical, Heart,
-  Home, Laptop, Layers, Moon, Plus, Scale, Sparkles, Sun, Target, Utensils, Wallet, Briefcase, User, CheckSquare,
+  Home, Layers, Loader2, Plus, Scale, Sparkles, Target, Wallet, Briefcase, User, CheckSquare,
 } from "lucide-react";
 import { PlanShell, Panel, tint, colorVar } from "@/components/PlanShell";
+import { isoDate, todayIso, hhmm } from "@/lib/dates";
+import { getIcon } from "@/lib/icons";
+import type { Priority } from "@/lib/types";
+import { useCategories, useCreateTask, useReorderTasks, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { kindToCat, useDayPlan, useGenerateDay, useRoutine, useSavePlanPrefs, useSchedule } from "@/lib/data/day";
 
 export const Route = createFileRoute("/organizar")({
   head: () => ({
@@ -21,21 +29,10 @@ export const Route = createFileRoute("/organizar")({
   component: Organizar,
 });
 
-type Prio = "alta" | "media" | "baixa";
-type Task = { id: number; t: string; tag: string; c: string; p: Prio; done: boolean };
+type Prio = Priority;
+type Row = { id: string; t: string; tag: string; c: string; p: Prio; done: boolean };
 
 const prioColor: Record<Prio, string> = { alta: "rose", media: "amber", baixa: "emerald" };
-
-const initialTasks: Task[] = [
-  { id: 1, t: "Finalizar ajustes da Presence", tag: "Projeto", c: "violet", p: "alta", done: false },
-  { id: 2, t: "Responder mensagens do suporte", tag: "Trabalho", c: "amber", p: "media", done: false },
-  { id: 3, t: "Gravar tutorial do novo módulo", tag: "Tutorial", c: "violet", p: "alta", done: false },
-  { id: 4, t: "Organizar demandas dos polos", tag: "P4C", c: "cyan", p: "media", done: false },
-  { id: 5, t: "Planejar cardápio da semana", tag: "Saúde", c: "emerald", p: "baixa", done: false },
-  { id: 6, t: "Revisar contrato do cliente", tag: "Trabalho", c: "amber", p: "alta", done: false },
-  { id: 7, t: "Atualizar planilha de metas", tag: "Projeto", c: "violet", p: "media", done: false },
-  { id: 8, t: "Comprar suplementos", tag: "Saúde", c: "emerald", p: "baixa", done: false },
-];
 
 const cats = [
   { k: "tarefas", Icon: CheckSquare, t: "Minhas tarefas", d: "Pendências, projetos e afazeres", c: "cyan" },
@@ -44,34 +41,6 @@ const cats = [
   { k: "treino", Icon: Dumbbell, t: "Treino", d: "Atividade física e bem-estar", c: "violet" },
   { k: "auto", Icon: Flower2, t: "Autocuidado", d: "Skincare, cabelo, leitura, etc.", c: "violet" },
   { k: "fin", Icon: Database, t: "Financeiro", d: "Contas e lembretes importantes", c: "cyan" },
-];
-
-const days = [
-  { label: "Qui, 30 de Out", items: [
-    { h: "08:00", Icon: Sun, t: "Rotina da manhã", d: "Higiene · Café", cat: "habitos" },
-    { h: "10:00", Icon: Laptop, t: "Reunião de equipe", d: "Planejamento semanal", cat: "comp" },
-    { h: "13:00", Icon: Utensils, t: "Almoço", d: "Pausa e descanso", cat: "habitos" },
-    { h: "15:00", Icon: Layers, t: "Projetos da Presence", d: "Revisão de telas", cat: "tarefas" },
-    { h: "19:00", Icon: Dumbbell, t: "Treino", d: "Superiores · ~50 min", cat: "treino" },
-    { h: "22:00", Icon: Moon, t: "Rotina noturna", d: "Planejar amanhã", cat: "habitos" },
-  ] },
-  { label: "Sex, 31 de Out", items: [
-    { h: "09:00", Icon: Sun, t: "Rotina da manhã", d: "Higiene · Skincare · Café", cat: "habitos" },
-    { h: "10:00", Icon: Laptop, t: "Trabalho e demandas", d: "Responder e-mails e suporte", cat: "tarefas" },
-    { h: "12:30", Icon: Utensils, t: "Almoço e pausa", d: "Alimentação e descanso", cat: "habitos" },
-    { h: "14:00", Icon: Layers, t: "Projetos da Presence", d: "Ajustes e novas implementações", cat: "tarefas" },
-    { h: "16:30", Icon: Dumbbell, t: "Treino", d: "Glúteos e Posterior · ~60 min", cat: "treino" },
-    { h: "18:00", Icon: Flower2, t: "Autocuidado", d: "Banho, cabelo e cuidados pessoais", cat: "auto" },
-    { h: "21:00", Icon: Book, t: "Tempo livre", d: "Leitura, série ou hobby", cat: "habitos" },
-    { h: "22:00", Icon: Moon, t: "Rotina noturna", d: "Planejar amanhã e descanso", cat: "habitos" },
-  ] },
-  { label: "Sáb, 1 de Nov", items: [
-    { h: "09:30", Icon: Sun, t: "Manhã tranquila", d: "Café sem pressa", cat: "habitos" },
-    { h: "11:00", Icon: Dumbbell, t: "Corrida leve", d: "5 km no parque", cat: "treino" },
-    { h: "14:00", Icon: Flower2, t: "Autocuidado", d: "Máscara capilar e skincare", cat: "auto" },
-    { h: "17:00", Icon: Wallet, t: "Revisar gastos", d: "Fechamento do mês", cat: "fin" },
-    { h: "20:00", Icon: Book, t: "Tempo livre", d: "Filme ou leitura", cat: "habitos" },
-  ] },
 ];
 
 const priorities = [
@@ -106,46 +75,110 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+const defaultCats: Record<string, boolean> = { tarefas: true, comp: true, habitos: true, treino: true, auto: true, fin: false };
+
 function Organizar() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const navigate = useNavigate();
+  const today = todayIso();
+  const tasksQ = useTasks();
+  const catsQ = useCategories();
+  const createTask = useCreateTask();
+  const toggleTask = useToggleTask();
+  const reorder = useReorderTasks();
+  const generate = useGenerateDay();
+  const planQ = useDayPlan(today);
+  const savePrefs = useSavePlanPrefs(today);
+  const routineQ = useRoutine();
+
   const [filter, setFilter] = useState<"todas" | Prio>("todas");
-  const [catOn, setCatOn] = useState<Record<string, boolean>>({ tarefas: true, comp: true, habitos: true, treino: true, auto: true, fin: false });
+  const [catOn, setCatOn] = useState<Record<string, boolean>>(defaultCats);
   const [prios, setPrios] = useState<string[]>(["Projetos"]);
   const [day, setDay] = useState(1);
   const [adding, setAdding] = useState(false);
   const [newT, setNewT] = useState("");
   const [newP, setNewP] = useState<Prio>("media");
-  const [dragId, setDragId] = useState<number | null>(null);
-  const [organized, setOrganized] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  // Preferências salvas do dia (categorias e áreas de foco).
+  const plan = planQ.data;
+  useEffect(() => {
+    if (!plan) return;
+    setCatOn(Object.fromEntries(Object.keys(defaultCats).map((k) => [k, plan.categories.includes(k)])));
+    setPrios(plan.focus_areas);
+  }, [plan?.id]);
+
+  const dates = [-1, 0, 1].map((n) => addDays(new Date(), n));
+  const dayIso = isoDate(dates[day]!);
+  const dayLabel = cap(format(dates[day]!, "EEE, d 'de' MMM", { locale: ptBR }));
+  const schedQ = useSchedule(dayIso);
+
+  const catById = useMemo(() => new Map((catsQ.data ?? []).map((c) => [c.id, c])), [catsQ.data]);
+  // Tarefas de hoje: pendentes sem data ou com data até hoje, e as concluídas hoje.
+  const tasks: Row[] = useMemo(
+    () =>
+      (tasksQ.data ?? [])
+        .filter((t) => (!t.done && (!t.due_date || t.due_date <= today)) || (t.done && t.done_at && isoDate(new Date(t.done_at)) === today))
+        .map((t) => {
+          const c = t.category_id ? catById.get(t.category_id) : undefined;
+          return { id: t.id, t: t.title, tag: c ? c.name.split(" ")[0]! : "Tarefa", c: c?.color ?? "cyan", p: t.priority, done: t.done };
+        }),
+    [tasksQ.data, catById, today],
+  );
+
+  // Agenda: o plano gerado do dia ou, se ainda não existir, a prévia da rotina-base.
+  const agendaAll = useMemo(() => {
+    const src = schedQ.data && schedQ.data.length ? schedQ.data : (routineQ.data ?? []);
+    return src.map((i) => ({ h: i.time, Icon: getIcon(i.icon), t: i.title, d: i.description, cat: kindToCat(i.kind), key: i.id }));
+  }, [schedQ.data, routineQ.data]);
 
   const count = (p: Prio) => tasks.filter((t) => t.p === p).length;
   const visible = catOn["tarefas"] ? tasks.filter((t) => filter === "todas" || t.p === filter) : [];
-  const agenda = days[day]!.items.filter((i) => catOn[i.cat]);
+  const agenda = agendaAll.filter((i) => catOn[i.cat]);
 
   const weights: Record<string, number> = { Trabalho: 38, Projetos: 24, Saúde: 24, Pessoal: 19 };
   prios.forEach((p) => { if (weights[p] !== undefined) weights[p] += 10; });
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   const balance = balanceBase.map((b) => ({ ...b, v: Math.round((weights[b.k]! / total) * 100) }));
 
+  const saveCats = (next: Record<string, boolean>) => {
+    setCatOn(next);
+    savePrefs.mutate({ categories: Object.keys(next).filter((k) => next[k]) }, { onError: (e) => toast.error(e.message) });
+  };
+  const savePrios = (next: string[]) => {
+    setPrios(next);
+    savePrefs.mutate({ focus_areas: next }, { onError: (e) => toast.error(e.message) });
+  };
+
   const add = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newT.trim()) return;
-    setTasks((l) => [{ id: Date.now(), t: newT.trim().slice(0, 80), tag: "Nova", c: "cyan", p: newP, done: false }, ...l]);
-    setNewT(""); setAdding(false);
+    if (!newT.trim() || createTask.isPending) return;
+    createTask.mutate(
+      { title: newT.trim(), priority: newP, due_date: today },
+      { onSuccess: () => { setNewT(""); setAdding(false); toast.success("Tarefa adicionada"); }, onError: (er) => toast.error(er.message) },
+    );
   };
-  const drop = (target: number) => {
+  const drop = (target: string) => {
     if (dragId === null || dragId === target) return;
-    setTasks((l) => {
-      const from = l.findIndex((t) => t.id === dragId), to = l.findIndex((t) => t.id === target);
-      const n = [...l]; const [m] = n.splice(from, 1); n.splice(to, 0, m!); return n;
-    });
+    const ids = tasks.map((t) => t.id);
+    const from = ids.indexOf(dragId), to = ids.indexOf(target);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]!);
+    reorder.mutate(ids, { onError: (er) => toast.error(er.message) });
+  };
+
+  const organize = () => {
+    generate.mutate(
+      { mode: "organizar", date: today, categories: Object.keys(catOn).filter((k) => catOn[k]), focusAreas: prios },
+      { onSuccess: () => navigate({ to: "/organizar/pronto" }), onError: (e) => toast.error(`Não consegui organizar: ${e.message}`) },
+    );
   };
 
   const stats = [
     { Icon: Check, n: tasks.filter((t) => !t.done).length, t: "Tarefas", c: "cyan" },
-    { Icon: Calendar, n: days[day]!.items.filter((i) => i.cat === "comp").length + 2, t: "Compromissos", c: "violet" },
-    { Icon: Heart, n: days[day]!.items.filter((i) => i.cat === "habitos").length, t: "Hábitos", c: "emerald" },
-    { Icon: Dumbbell, n: days[day]!.items.filter((i) => i.cat === "treino").length, t: "Treino", c: "violet" },
+    { Icon: Calendar, n: agendaAll.filter((i) => i.cat === "comp").length, t: "Compromissos", c: "violet" },
+    { Icon: Heart, n: agendaAll.filter((i) => i.cat === "habitos").length, t: "Hábitos", c: "emerald" },
+    { Icon: Dumbbell, n: agendaAll.filter((i) => i.cat === "treino").length, t: "Treino", c: "violet" },
   ];
 
   return (
@@ -189,7 +222,7 @@ function Organizar() {
                       <p className="text-sm font-medium">{t}</p>
                       <p className="truncate text-xs text-muted-foreground">{d}</p>
                     </div>
-                    <Toggle on={!!catOn[k]} label={t} onClick={() => setCatOn((s) => ({ ...s, [k]: !s[k] }))} />
+                    <Toggle on={!!catOn[k]} label={t} onClick={() => saveCats({ ...catOn, [k]: !catOn[k] })} />
                   </li>
                 ))}
               </ul>
@@ -220,10 +253,12 @@ function Organizar() {
               </div>
               <ul className="max-h-[300px] space-y-2 overflow-y-auto scroll-neon pr-2">
                 {!catOn["tarefas"] && <li className="py-8 text-center text-sm text-muted-foreground">Categoria "Minhas tarefas" desativada.</li>}
+                {catOn["tarefas"] && tasksQ.isPending && <li className="flex justify-center py-8"><Loader2 className="animate-spin text-cyan" /></li>}
+                {catOn["tarefas"] && tasksQ.isSuccess && visible.length === 0 && <li className="py-8 text-center text-sm text-muted-foreground">{tasks.length === 0 ? "Nenhuma tarefa para hoje. Adicione a primeira." : "Nenhuma tarefa com esta prioridade."}</li>}
                 {visible.map((t) => (
                   <li key={t.id} draggable onDragStart={() => setDragId(t.id)} onDragOver={(e) => e.preventDefault()} onDrop={() => drop(t.id)} onDragEnd={() => setDragId(null)}
                     className={`flex items-center gap-3 rounded-xl border border-border/60 bg-secondary/30 px-3 py-2.5 transition hover:border-cyan/40 ${dragId === t.id ? "opacity-40" : ""}`}>
-                    <button onClick={() => setTasks((l) => l.map((x) => x.id === t.id ? { ...x, done: !x.done } : x))} aria-label="Concluir"
+                    <button onClick={() => toggleTask.mutate({ id: t.id, done: !t.done }, { onError: (er) => toast.error(er.message) })} aria-label="Concluir"
                       className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${t.done ? "border-cyan bg-cyan text-background" : "border-muted-foreground/60"}`}>
                       {t.done && <Check size={12} />}
                     </button>
@@ -245,7 +280,7 @@ function Organizar() {
                 {priorities.map(({ Icon, t }) => {
                   const on = prios.includes(t);
                   return (
-                    <button key={t} onClick={() => setPrios((l) => on ? l.filter((x) => x !== t) : [...l, t])}
+                    <button key={t} onClick={() => savePrios(on ? prios.filter((x) => x !== t) : [...prios, t])}
                       className={`flex items-center justify-center gap-1.5 rounded-full border px-2 py-2.5 text-sm transition ${on ? "border-cyan bg-cyan/15 shadow-[0_0_16px_-4px_var(--cyan)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
                       {on ? <Check size={14} className="text-cyan" /> : <Icon size={14} />} {t}
                     </button>
@@ -279,16 +314,16 @@ function Organizar() {
               right={
                 <div className="flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-1 text-xs">
                   <button aria-label="Dia anterior" disabled={day === 0} onClick={() => setDay((d) => d - 1)} className="grid h-7 w-7 place-items-center rounded-full hover:bg-secondary disabled:opacity-30"><ArrowLeft size={14} /></button>
-                  <span className="w-24 text-center">{days[day]!.label}</span>
-                  <button aria-label="Próximo dia" disabled={day === days.length - 1} onClick={() => setDay((d) => d + 1)} className="grid h-7 w-7 place-items-center rounded-full hover:bg-secondary disabled:opacity-30"><ArrowRight size={14} /></button>
+                  <span className="w-28 text-center">{dayLabel}</span>
+                  <button aria-label="Próximo dia" disabled={day === dates.length - 1} onClick={() => setDay((d) => d + 1)} className="grid h-7 w-7 place-items-center rounded-full hover:bg-secondary disabled:opacity-30"><ArrowRight size={14} /></button>
                 </div>
               } />
             <ol key={day} className="relative space-y-2 pl-6 before:absolute before:left-[7px] before:top-3 before:bottom-3 before:w-0.5 before:bg-cyan/60 before:shadow-[0_0_8px_var(--cyan)]">
-              {agenda.length === 0 && <li className="py-8 text-center text-sm text-muted-foreground">Nenhuma categoria ativa para este dia.</li>}
-              {agenda.map(({ h, Icon, t, d }, i) => (
-                <li key={h + t} className="relative flex items-center gap-3 animate-rise" style={{ animationDelay: `${i * 0.05}s` }}>
+              {agenda.length === 0 && <li className="py-8 text-center text-sm text-muted-foreground">{agendaAll.length === 0 ? "Nada na agenda deste dia." : "Nenhuma categoria ativa para este dia."}</li>}
+              {agenda.map(({ h: hh, Icon, t, d, key }, i) => (
+                <li key={key} className="relative flex items-center gap-3 animate-rise" style={{ animationDelay: `${i * 0.05}s` }}>
                   <span className="absolute -left-[22px] h-3 w-3 rounded-full bg-cyan shadow-[0_0_10px_var(--cyan)]" />
-                  <span className="w-16 shrink-0 rounded-full border border-cyan/50 py-1.5 text-center text-sm">{h}</span>
+                  <span className="w-16 shrink-0 rounded-full border border-cyan/50 py-1.5 text-center text-sm">{hhmm(hh)}</span>
                   <div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-border/60 bg-secondary/30 px-3 py-2 transition hover:border-violet/50">
                     <span className="icon-tile h-9 w-9 shrink-0 !rounded-full" style={tint("violet")}><Icon size={16} /></span>
                     <div className="min-w-0">
@@ -301,12 +336,11 @@ function Organizar() {
             </ol>
           </Panel>
 
-          <Link to="/organizar/pronto" search={{ cats: Object.keys(catOn).filter((k) => catOn[k]).join(","), prios: prios.join(",") }}
-            onClick={() => setOrganized(true)}
-            className="flex items-center justify-center gap-3 rounded-full py-5 text-lg font-semibold text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)]"
+          <button onClick={organize} disabled={generate.isPending}
+            className="flex items-center justify-center gap-3 rounded-full py-5 text-lg font-semibold text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)] disabled:opacity-80"
             style={{ background: "linear-gradient(90deg, var(--cyan), oklch(0.66 0.19 265) 55%, var(--violet))" }}>
-            <Sparkles size={20} /> {organized ? "Organizando…" : "Organizar meu dia agora"} <ArrowRight size={18} />
-          </Link>
+            {generate.isPending ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />} {generate.isPending ? "Organizando…" : "Organizar meu dia agora"} <ArrowRight size={18} />
+          </button>
         </div>
       </div>
     </PlanShell>

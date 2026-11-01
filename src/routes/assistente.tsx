@@ -31,12 +31,12 @@ export const Route = createFileRoute("/assistente")({
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
-const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/demandas" }[] = [
+const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/demandas" | "/tarefas" | "/planejamento" }[] = [
   { Icon: Home, label: "Início", c: "cyan" },
   { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/demandas" },
-  { Icon: ListChecks, label: "Tarefas", c: "cyan" },
+  { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" },
   { Icon: Wallet, label: "Financeiro", c: "emerald" },
-  { Icon: Calendar, label: "Agenda", c: "cyan" },
+  { Icon: Calendar, label: "Agenda", c: "cyan", to: "/planejamento" },
   { Icon: BarChart3, label: "Progresso", c: "violet" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" },
   { Icon: Puzzle, label: "Integrações", c: "cyan" },
@@ -57,7 +57,7 @@ const prompts = [
 ];
 
 const cards = [
-  { img: imgRotina, Icon: Calendar, t: "Rotina do dia", d: ["Veja seus compromissos", "e tarefas de hoje"], c: "violet" },
+  { img: imgRotina, Icon: Calendar, t: "Rotina do dia", d: ["Veja seus compromissos", "e tarefas de hoje"], c: "violet", to: "/tarefas" as const },
   { img: imgSaude, Icon: Heart, t: "Saúde e bem-estar", d: ["Treino, dieta, hábitos", "e evolução"], c: "emerald", to: "/saude" as const },
   { img: imgFoco, Icon: Layers, t: "Foco e produtividade", d: ["Organize seus projetos", "e prioridades"], c: "cyan", to: "/demandas" as const },
   { img: imgFin, Icon: BarChart3, t: "Controle financeiro", d: ["Acompanhe seus gastos", "e metas"], c: "cyan" },
@@ -66,7 +66,7 @@ const cards = [
 
 function RailIcon({ Icon, label, c, on = false, to, onClick, delay = "0s" }: {
   Icon: typeof Home; label: string; c: string; on?: boolean;
-  to?: "/saude" | "/demandas" | undefined; onClick?: () => void; delay?: string;
+  to?: "/saude" | "/demandas" | "/tarefas" | "/planejamento" | undefined; onClick?: () => void; delay?: string;
 
 }) {
   const cls = `group relative grid h-10 w-10 place-items-center rounded-full transition duration-500 hover:-translate-y-0.5 hover:scale-[1.14] ${
