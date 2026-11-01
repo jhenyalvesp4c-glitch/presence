@@ -39,6 +39,9 @@
   --color-cyan: var(--cyan);
   --color-violet: var(--violet);
   --color-emerald: var(--emerald);
+  --color-amber: var(--amber);
+  --color-pink: var(--pink);
+  --animate-float: float 6s ease-in-out infinite;
   --animate-rise: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-pulse-ring: pulse-ring 2s ease-in-out infinite;
 }
@@ -48,6 +51,9 @@
   --cyan: oklch(0.82 0.14 210);
   --violet: oklch(0.68 0.2 295);
   --emerald: oklch(0.8 0.16 160);
+  --amber: oklch(0.8 0.15 75);
+  --pink: oklch(0.72 0.2 350);
+  --gradient-brand: linear-gradient(135deg, var(--cyan), var(--violet));
   --background: oklch(0.11 0.025 265);
   --foreground: oklch(0.96 0.01 250);
   --card: oklch(0.15 0.03 262);
@@ -135,6 +141,40 @@
   letter-spacing: 0.25em;
   text-transform: uppercase;
   color: var(--muted-foreground);
+}
+
+@utility glow-text {
+  color: var(--glow);
+  text-shadow: 0 0 18px color-mix(in oklab, var(--glow) 55%, transparent);
+}
+
+/* Faixa de luz que varre o elemento (precisa de um pai posicionado). */
+@utility scanline {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent 0%, color-mix(in oklab, var(--glow) 14%, transparent) 50%, transparent 100%);
+    background-size: 100% 60%;
+    background-repeat: no-repeat;
+    animation: scanline 3.2s linear infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(-4px); }
+  50% { transform: translateY(4px); }
+}
+
+@keyframes scanline {
+  from { background-position: 0 -60%; }
+  to { background-position: 0 160%; }
+}
+
+@keyframes shimmer {
+  from { background-position: -60% 0; }
+  to { background-position: 160% 0; }
 }
 
 @keyframes rise {
