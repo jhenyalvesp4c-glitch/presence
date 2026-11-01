@@ -55,6 +55,11 @@ Para outras plataformas, defina o preset do Nitro, por exemplo `NITRO_PRESET=ver
   com ferramentas para registrar e listar demandas. Precisa de `ANTHROPIC_API_KEY` no ambiente do servidor.
 - **Voz:** reconhecimento de fala do próprio navegador (pt-BR); onde não existir, cai para digitação.
 
+## Como o projeto é tocado
+
+O front-end é desenhado no Lovable e importado para cá; o back-end é feito aqui sob demanda. O passo a passo
+está em [`docs/FLUXO-LOVABLE.md`](docs/FLUXO-LOVABLE.md).
+
 ## Estrutura
 
 - `src/routes/` — rotas baseadas em arquivos (TanStack Router); `routeTree.gen.ts` é gerado automaticamente.
