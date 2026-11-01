@@ -1,14 +1,12 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 import {
   ArrowRight, AudioLines, BarChart3, Bookmark, Calendar, CalendarCheck, ClipboardList, Dumbbell, Heart, Home,
-  Layers, Lightbulb, ListChecks, LogOut, Mic, Puzzle, Settings, Sparkles, Sun, Sprout, SquarePlus, Wallet, CreditCard,
+  Layers, Lightbulb, ListChecks, Mic, Puzzle, Settings, Sparkles, Sun, Sprout, SquarePlus, Wallet, CreditCard,
   Workflow, Loader2, Trash2, X,
 } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
-import { supabase } from "@/lib/supabase";
-import { useSession } from "@/lib/auth";
 import { useHome } from "@/lib/use-home";
 import { useSpeech } from "@/lib/use-speech";
 import imgRotina from "@/assets/card-rotina.jpg";
@@ -104,19 +102,13 @@ function RailBits({ Icon, label, on }: { Icon: typeof Home; label: string; on: b
 
 function Assistente() {
 
-  const session = useSession();
-  const navigate = useNavigate();
-  const home = useHome(session);
+  const home = useHome();
   const [text, setText] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [demandDraft, setDemandDraft] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const voiceTarget = useRef<"chat" | "demand">("chat");
   const convoEnd = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (session === null) navigate({ to: "/entrar" });
-  }, [session, navigate]);
 
   useEffect(() => {
     convoEnd.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -152,18 +144,6 @@ function Assistente() {
     void home.ask(message);
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
-    navigate({ to: "/entrar" });
-  }
-
-  if (!session) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-background">
-        <Loader2 className="animate-spin text-cyan" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen p-3 [background:radial-gradient(60%_50%_at_50%_30%,color-mix(in_oklab,var(--cyan)_7%,transparent),transparent_70%),oklch(0.11_0.025_265)]">
@@ -178,7 +158,6 @@ function Assistente() {
                 onClick={() => setActive(i)} delay={`${(i % 5) * 0.7}s`} />
             ))}
           </div>
-          <RailIcon Icon={LogOut} label="Sair" c="violet" delay="2.4s" onClick={logout} />
         </aside>
 
 

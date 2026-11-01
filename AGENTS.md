@@ -3,3 +3,4 @@
 - Vite plugins are configured explicitly in `vite.config.ts` (tailwind, tsconfig paths, tanstackStart, nitro for build, react).
 - Supabase: o projeto "presence" é compartilhado com o assistente virtual da usuária. Este app usa **somente** o schema `presence_app` — nunca crie, altere ou leia tabelas em `public` (são do assistente). Toda tabela nova precisa de RLS habilitado. Migrations ficam em `supabase/migrations/`, com nomes prefixados por `presence_app_`.
 - O cliente fica em `src/lib/supabase.ts` (já configurado com `db.schema = "presence_app"`).
+- Login está desligado de propósito até o fim do projeto (modo `SINGLE_USER_ID`). Ao reativar: ver o comentário no topo de `supabase/migrations/20261101000300_presence_app_single_user_mode.sql` e voltar a validar o usuário em `askAssistant`.

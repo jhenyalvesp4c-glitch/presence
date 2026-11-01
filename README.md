@@ -41,7 +41,10 @@ Para outras plataformas, defina o preset do Nitro, por exemplo `NITRO_PRESET=ver
 - **Banco:** projeto Supabase `presence`, compartilhado com o assistente virtual. Este app usa só o schema
   `presence_app` (migrations em `supabase/migrations/`). Tabelas: `profiles`, `assistant_messages`, `demands`,
   todas com RLS por usuária.
-- **Login:** e-mail e senha pelo Supabase Auth (`/entrar`).
+- **Login:** desligado por enquanto (modo de uma usuária só). Os dados pertencem a um dono fixo
+  (`SINGLE_USER_ID` em `src/lib/supabase.ts`) e o papel `anon` acessa só as linhas dele; veja
+  `supabase/migrations/*_single_user_mode.sql`, que também explica como voltar ao modo com login.
+  **Não publique com dados reais antes de reativar o login** — a chave do navegador dá acesso a esses dados.
 - **Assistente:** server function `askAssistant` (`src/lib/assistant.functions.ts`) chama o Claude no servidor,
   com ferramentas para registrar e listar demandas. Precisa de `ANTHROPIC_API_KEY` no ambiente do servidor.
 - **Voz:** reconhecimento de fala do próprio navegador (pt-BR); onde não existir, cai para digitação.

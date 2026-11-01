@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as DemandasRouteImport } from './routes/demandas'
-import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as OrganizarRouteImport } from './routes/organizar'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
 import { Route as SaudeRouteImport } from './routes/saude'
@@ -34,11 +33,6 @@ const AssistenteRoute = AssistenteRouteImport.update({
 const DemandasRoute = DemandasRouteImport.update({
   id: '/demandas',
   path: '/demandas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EntrarRoute = EntrarRouteImport.update({
-  id: '/entrar',
-  path: '/entrar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizarRoute = OrganizarRouteImport.update({
@@ -81,7 +75,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistente': typeof AssistenteRoute
   '/demandas': typeof DemandasRoute
-  '/entrar': typeof EntrarRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
   '/saude': typeof SaudeRoute
@@ -94,7 +87,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistente': typeof AssistenteRoute
   '/demandas': typeof DemandasRoute
-  '/entrar': typeof EntrarRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
   '/saude': typeof SaudeRoute
@@ -108,7 +100,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/assistente': typeof AssistenteRoute
   '/demandas': typeof DemandasRoute
-  '/entrar': typeof EntrarRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
   '/saude': typeof SaudeRoute
@@ -123,7 +114,6 @@ export interface FileRouteTypes {
     | '/'
     | '/assistente'
     | '/demandas'
-    | '/entrar'
     | '/organizar'
     | '/planejamento'
     | '/saude'
@@ -136,7 +126,6 @@ export interface FileRouteTypes {
     | '/'
     | '/assistente'
     | '/demandas'
-    | '/entrar'
     | '/organizar'
     | '/planejamento'
     | '/saude'
@@ -149,7 +138,6 @@ export interface FileRouteTypes {
     | '/'
     | '/assistente'
     | '/demandas'
-    | '/entrar'
     | '/organizar'
     | '/planejamento'
     | '/saude'
@@ -163,7 +151,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssistenteRoute: typeof AssistenteRoute
   DemandasRoute: typeof DemandasRoute
-  EntrarRoute: typeof EntrarRoute
   OrganizarRoute: typeof OrganizarRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
   SaudeRoute: typeof SaudeRoute
@@ -194,13 +181,6 @@ declare module '@tanstack/react-router' {
       path: '/demandas'
       fullPath: '/demandas'
       preLoaderRoute: typeof DemandasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/entrar': {
-      id: '/entrar'
-      path: '/entrar'
-      fullPath: '/entrar'
-      preLoaderRoute: typeof EntrarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organizar': {
@@ -259,7 +239,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssistenteRoute: AssistenteRoute,
   DemandasRoute: DemandasRoute,
-  EntrarRoute: EntrarRoute,
   OrganizarRoute: OrganizarRoute,
   PlanejamentoRoute: PlanejamentoRoute,
   SaudeRoute: SaudeRoute,

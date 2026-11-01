@@ -25,13 +25,16 @@ export const supabase = createClient(url, key, {
 });
 
 /**
- * Cliente "em nome da usuária", para uso no servidor: toda query passa pelo RLS
- * com o token dela, então o servidor nunca enxerga dados de outra pessoa.
+ * MODO TEMPORÁRIO SEM LOGIN: todos os dados pertencem a este dono fixo
+ * (ver supabase/migrations/*_presence_app_single_user_mode.sql).
+ * Ao reativar o login, troque pelo id do usuário autenticado.
  */
-export function createUserClient(accessToken: string) {
+export const SINGLE_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+/** Cliente para uso no servidor (sem sessão). O acesso é limitado pelo RLS do papel `anon`. */
+export function createServerClient() {
   return createClient(url, key, {
     db: { schema: SUPABASE_SCHEMA },
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

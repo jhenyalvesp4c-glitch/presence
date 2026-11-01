@@ -2,14 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { createUserClient, type Demand } from "./supabase";
+import { createServerClient, SINGLE_USER_ID, type Demand } from "./supabase";
 
 const MODEL = "claude-opus-5-5";
 const HISTORY_LIMIT = 20;
 const MAX_TOOL_ROUNDS = 5;
 
 const askInput = z.object({
-  accessToken: z.string().min(1),
   message: z.string().trim().min(1).max(4000),
 });
 
@@ -71,7 +70,7 @@ const listarInput = z.object({
   status: z.enum(["nova", "em_andamento", "concluida"]).nullable(),
 });
 
-type UserClient = ReturnType<typeof createUserClient>;
+type UserClient = ReturnType<typeof createServerClient>;
 
 async function runTool(
   db: UserClient,
@@ -113,10 +112,8 @@ async function runTool(
 export const askAssistant = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => askInput.parse(data))
   .handler(async ({ data }): Promise<AskResult> => {
-    const db = createUserClient(data.accessToken);
-    const { data: auth, error: authError } = await db.auth.getUser(data.accessToken);
-    if (authError || !auth.user) return { ok: false, error: "Sessão expirada. Entre novamente." };
-    const user = auth.user;
+    const db = createServerClient();
+    const userId = SINGLE_USER_ID;
 
     if (!process.env["ANTHROPIC_API_KEY"]) {
       return { ok: false, error: "A assistente ainda não está configurada (falta ANTHROPIC_API_KEY no servidor)." };
@@ -129,12 +126,12 @@ export const askAssistant = createServerFn({ method: "POST" })
         .select("role, content")
         .order("created_at", { ascending: false })
         .limit(HISTORY_LIMIT),
-      db.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
+      db.from("profiles").select("display_name").eq("id", userId).maybeSingle(),
     ]);
 
     const { error: saveError } = await db
       .from("assistant_messages")
-      .insert({ user_id: user.id, role: "user", content: data.message });
+      .insert({ user_id: userId, role: "user", content: data.message });
     if (saveError) return { ok: false, error: `Não consegui salvar sua mensagem: ${saveError.message}` };
 
     const messages: Anthropic.Beta.BetaMessageParam[] = [];
@@ -150,7 +147,7 @@ export const askAssistant = createServerFn({ method: "POST" })
       timeStyle: "short",
       timeZone: "America/Sao_Paulo",
     }).format(new Date());
-    const name = profile?.display_name || user.email?.split("@")[0] || "usuária";
+    const name = profile?.display_name || "usuária";
 
     const { default: AnthropicClient } = await import("@anthropic-ai/sdk");
     const client = new AnthropicClient();
@@ -196,7 +193,7 @@ export const askAssistant = createServerFn({ method: "POST" })
 
         const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
         for (const use of toolUses) {
-          const result = await runTool(db, user.id, use.name, use.input, created);
+          const result = await runTool(db, userId, use.name, use.input, created);
           results.push({ type: "tool_result", tool_use_id: use.id, content: result.content, is_error: result.isError });
         }
         messages.push({ role: "user", content: results });
@@ -217,7 +214,7 @@ export const askAssistant = createServerFn({ method: "POST" })
 
     if (!reply) reply = "Pronto!";
 
-    await db.from("assistant_messages").insert({ user_id: user.id, role: "assistant", content: reply.slice(0, 20000) });
+    await db.from("assistant_messages").insert({ user_id: userId, role: "assistant", content: reply.slice(0, 20000) });
 
     return { ok: true, reply, demandsCreated: created };
   });
