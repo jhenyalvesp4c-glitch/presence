@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Check, CheckCircle2, Circle, ClipboardList, Clock, Flag, Loader2, Mic, Plus, Search, Sparkles, Trash2, Type } from "lucide-react";
+import { Check, CheckCircle2, Circle, ClipboardList, Clock, Flag, Loader2, Mic, Plus, Search, Sparkles, Trash2, Type, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -47,8 +47,10 @@ function Demandas() {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [prio, setPrio] = useState<Priority>("media");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const all = q.data ?? [];
+  const editing = all.find((d) => d.id === editingId);
   const count = (s: Status) => all.filter((d) => d.status === s).length;
   const shown = useMemo(
     () => all.filter((d) => (tab === "todas" || d.status === tab) && d.title.toLowerCase().includes(search.toLowerCase())),
@@ -120,12 +122,12 @@ function Demandas() {
                       className="grid h-7 w-7 place-items-center rounded-full border transition hover:scale-110" style={{ color: colorVar(st.c), borderColor: colorVar(st.c) }}>
                       {finished ? <Check size={15} strokeWidth={3} /> : d.status === "em_andamento" ? <Clock size={14} /> : <Circle size={12} />}
                     </button>
-                    <span className="min-w-0">
+                    <button type="button" onClick={() => setEditingId(d.id)} aria-label={`Editar demanda ${d.title}`} className="min-w-0 text-left">
                       <b className={`block truncate text-sm font-semibold ${finished ? "text-muted-foreground line-through" : ""}`}>{d.title}</b>
                       <span className="block truncate text-xs text-muted-foreground">
                         {d.description ? `${d.description} · ` : ""}{format(new Date(d.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                       </span>
-                    </span>
+                    </button>
                     <span className="flex items-center gap-2">
                       <span className="tag hidden sm:inline-flex" style={tint(st.c)}>{st.label}</span>
                       <span className="tag hidden items-center gap-1 md:inline-flex">{d.source === "voz" ? <Mic size={11} /> : d.source === "assistente" ? <Sparkles size={11} /> : <Type size={11} />}{sourceLabel[d.source]}</span>
@@ -163,6 +165,42 @@ function Demandas() {
           </div>
         </Panel>
       </div>
+      {editing && (
+        <EditDemand key={editing.id} d={editing} saving={update.isPending} onClose={() => setEditingId(null)}
+          onSave={(patch) => update.mutate({ id: editing.id, patch }, { onSuccess: () => { setEditingId(null); toast.success("Demanda atualizada"); }, onError: onErr })} />
+      )}
     </PlanShell>
+  );
+}
+
+function EditDemand({ d, saving, onClose, onSave }: {
+  d: DemandRow; saving: boolean; onClose: () => void; onSave: (patch: { title: string; description: string | null; priority: Priority }) => void;
+}) {
+  const [title, setTitle] = useState(d.title);
+  const [description, setDescription] = useState(d.description ?? "");
+  const [priority, setPriority] = useState<Priority>(d.priority);
+  const field = "w-full rounded-xl border border-border bg-background/40 px-4 py-2.5 text-sm outline-none focus:border-cyan";
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (title.trim()) onSave({ title: title.trim(), description: description.trim() || null, priority }); }}
+        className="glass w-full max-w-md space-y-4 rounded-3xl p-6 animate-rise">
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg font-semibold">Editar demanda</h3>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
+        </div>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} maxLength={300} autoFocus required placeholder="Título" />
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={5000} className={`${field} resize-none`} placeholder="Detalhes (opcional)" />
+        <div className="flex gap-2">
+          {(["alta", "media", "baixa"] as Priority[]).map((p) => (
+            <button type="button" key={p} onClick={() => setPriority(p)} aria-pressed={priority === p}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full border py-2 text-sm transition ${priority === p ? "border-current bg-secondary/60" : "border-border text-muted-foreground"}`}
+              style={priority === p ? { color: colorVar(prioColor[p]) } : undefined}><Flag size={13} /> {prioLabel[p]}</button>
+          ))}
+        </div>
+        <button type="submit" disabled={saving} className="ml-auto flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+          {saving && <Loader2 size={14} className="animate-spin" />} Salvar
+        </button>
+      </form>
+    </div>
   );
 }

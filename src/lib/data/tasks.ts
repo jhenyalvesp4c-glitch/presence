@@ -124,3 +124,14 @@ export function useCreateCategory() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["categories"] }),
   });
 }
+
+export function useUpdateTask() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<Task, "title" | "description" | "category_id" | "priority" | "due_date" | "due_time">> }) => {
+      const clean = { ...patch, ...(patch.title !== undefined ? { title: patch.title.trim().slice(0, 200) } : {}) };
+      must(await supabase.from("tasks").update(clean).eq("id", id).select("id"));
+    },
+    onSuccess: invalidate,
+  });
+}

@@ -141,3 +141,76 @@ export function useLogExercise() {
     onSuccess: invalidate,
   });
 }
+
+// ───────────── edição da ficha ─────────────
+
+function useInvalidateWorkoutConfig() {
+  const qc = useQueryClient();
+  return () =>
+    Promise.all(["workouts", "workout-split", "weekly-goal"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+}
+
+export type ExerciseDraft = { id?: string; name: string; muscle: string; sets_reps: string; rest_seconds: number };
+
+/** Cria uma ficha vazia e devolve o id (para abrir já no editor). */
+export function useCreateWorkout() {
+  const invalidate = useInvalidateWorkoutConfig();
+  return useMutation({
+    mutationFn: async () => {
+      const { data: last } = await supabase.from("workouts").select("position").order("position", { ascending: false }).limit(1).maybeSingle();
+      return must(
+        await supabase.from("workouts").insert({ name: "Nova ficha", duration_min: 60, muscles: [], position: (last?.position ?? 0) + 1 }).select("id").single(),
+      ) as { id: string };
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteWorkout() {
+  const invalidate = useInvalidateWorkoutConfig();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      must(await supabase.from("workouts").delete().eq("id", id).select("id"));
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Salva os dados da ficha e a lista completa de exercícios (cria, atualiza, reordena e apaga). */
+export function useSaveWorkout() {
+  const invalidate = useInvalidateWorkoutConfig();
+  return useMutation({
+    mutationFn: async ({ workoutId, name, durationMin, muscles, exercises, existingIds }: {
+      workoutId: string; name: string; durationMin: number; muscles: string[]; exercises: ExerciseDraft[]; existingIds: string[];
+    }) => {
+      must(await supabase.from("workouts").update({ name: name.trim().slice(0, 80), duration_min: durationMin, muscles }).eq("id", workoutId).select("id"));
+      const keep = new Set(exercises.flatMap((e) => (e.id ? [e.id] : [])));
+      const removed = existingIds.filter((id) => !keep.has(id));
+      if (removed.length) must(await supabase.from("workout_exercises").delete().in("id", removed).select("id"));
+      await Promise.all(
+        exercises.map(async (e, position) => {
+          const row = { name: e.name.trim().slice(0, 80), muscle: e.muscle.trim().slice(0, 80), sets_reps: e.sets_reps.trim().slice(0, 40) || "3 x 12", rest_seconds: e.rest_seconds, position };
+          if (e.id) must(await supabase.from("workout_exercises").update(row).eq("id", e.id).select("id"));
+          else must(await supabase.from("workout_exercises").insert({ ...row, workout_id: workoutId }).select("id"));
+        }),
+      );
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useSaveSplit() {
+  const invalidate = useInvalidateWorkoutConfig();
+  return useMutation({
+    mutationFn: async ({ days, goal }: { days: { weekday: number; title: string; workout_id: string | null }[]; goal: number }) => {
+      must(
+        await supabase
+          .from("workout_split")
+          .upsert(days.map((d) => ({ weekday: d.weekday, title: d.title.trim().slice(0, 80) || "Livre", workout_id: d.workout_id })), { onConflict: "user_id,weekday" })
+          .select("id"),
+      );
+      must(await supabase.from("profiles").update({ weekly_workout_goal: Math.min(14, Math.max(1, Math.round(goal))) }).eq("id", SINGLE_USER_ID).select("id"));
+    },
+    onSuccess: invalidate,
+  });
+}

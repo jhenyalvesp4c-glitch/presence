@@ -131,10 +131,14 @@ Fazer assim:
 | `/organizar/pronto` | Pronto | `schedule_items`, `day_priorities`, `day_plans`, `routine_items` |
 | `/planejamento` | Pronto | `day_plans`, `routine_items`, `schedule_items`, `tasks` |
 | `/planejamento/dia` | Pronto | `schedule_items`, `day_plans` |
-| `/treino` | Pronto (falta editar ficha) | `workouts`, `workout_exercises`, `workout_split`, `workout_sessions`, `exercise_logs`, `profiles.weekly_workout_goal` |
+| `/treino` | Pronto (inclui editar ficha, semana e meta) | `workouts`, `workout_exercises`, `workout_split`, `workout_sessions`, `exercise_logs`, `profiles.weekly_workout_goal` |
 | `/demandas` | Pronto | `demands` |
 | `/saude` | Hábitos e treino prontos. Dieta e medidas **não** | `habits`, `habit_completions` |
-| Financeiro, Progresso, Ajustes, Integrações | **Sem tela / sem back-end** | |
+| Financeiro, Progresso, Ajustes, Integrações, Fluxos, Dieta e medidas | **Sem tela.** Aguardam o front do Lovable (não inventar telas aqui) | |
+
+Edição pelas telas: tarefas (`/tarefas`, clicar no título), demandas (`/demandas`, clicar no título) e treino
+(`/treino` > "Editar ficha": exercícios, divisão da semana e meta). A conversa da assistente é gravada mesmo sem
+`ANTHROPIC_API_KEY`.
 
 ## 7. Registro de importações
 

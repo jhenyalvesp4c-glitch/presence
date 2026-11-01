@@ -192,10 +192,6 @@ export const askAssistant = createServerFn({ method: "POST" })
     const db = createServerClient();
     const userId = SINGLE_USER_ID;
 
-    if (!process.env["ANTHROPIC_API_KEY"]) {
-      return { ok: false, error: "A assistente ainda não está configurada (falta ANTHROPIC_API_KEY no servidor)." };
-    }
-
     // Histórico anterior + perfil, antes de salvar a nova mensagem.
     const [{ data: history }, { data: profile }] = await Promise.all([
       db
@@ -210,6 +206,11 @@ export const askAssistant = createServerFn({ method: "POST" })
       .from("assistant_messages")
       .insert({ user_id: userId, role: "user", content: data.message });
     if (saveError) return { ok: false, error: `Não consegui salvar sua mensagem: ${saveError.message}` };
+
+    // A mensagem já está salva; sem a chave da IA, avisa e para por aqui.
+    if (!process.env["ANTHROPIC_API_KEY"]) {
+      return { ok: false, error: "Mensagem salva, mas a assistente ainda não está configurada (falta ANTHROPIC_API_KEY no servidor)." };
+    }
 
     const messages: Anthropic.Beta.BetaMessageParam[] = [];
     for (const m of (history ?? []).reverse()) {

@@ -14,7 +14,8 @@ import { ptBR } from "date-fns/locale";
 import { fromIsoDate as fromIso, hhmm, isoDate as iso } from "@/lib/dates";
 import { getIcon } from "@/lib/icons";
 import type { Color, Priority } from "@/lib/types";
-import { useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
+import { TaskEditDialog } from "@/components/TaskEditDialog";
 
 const T0 = new Date(); T0.setHours(0, 0, 0, 0);
 
@@ -50,6 +51,8 @@ function TarefasPage() {
   const toggle = useToggleTask();
   const del = useDeleteTask();
   const createCat = useCreateCategory();
+  const updateTask = useUpdateTask();
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [tab, setTab] = useState(0);
   const [q, setQ] = useState("");
@@ -64,6 +67,7 @@ function TarefasPage() {
   const [catName, setCatName] = useState("");
 
   const categories = catsQ.data ?? [];
+  const editingTask = (tasksQ.data ?? []).find((t) => t.id === editingId);
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const compId = categories.find((c) => c.slug === "comp")?.id;
 
@@ -237,10 +241,10 @@ function TarefasPage() {
                     <span className="h-8 w-0.5 rounded-full bg-[color:var(--glow)] shadow-[0_0_8px_var(--glow)]" />
                     <tk.Icon size={20} className="text-[color:var(--glow)] transition group-hover:scale-110" />
                   </span>
-                  <span className="min-w-0">
+                  <button type="button" onClick={() => setEditingId(tk.id)} aria-label={`Editar tarefa ${tk.t}`} className="min-w-0 text-left">
                     <b className={`block truncate text-sm font-semibold transition ${tk.done ? "text-muted-foreground line-through" : ""}`}>{tk.t}</b>
                     <span className="block truncate text-xs text-muted-foreground">{tk.d}</span>
-                  </span>
+                  </button>
                   <span className="tag hidden sm:inline">{tk.tag}</span>
                   <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tab !== 0 && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
                   <span className="hidden items-center gap-2 text-muted-foreground sm:flex">
@@ -363,6 +367,11 @@ function TarefasPage() {
           </ol>
         </Panel>
       </div>
+      {editingTask && (
+        <TaskEditDialog task={editingTask} categories={categories} saving={updateTask.isPending} onClose={() => setEditingId(null)}
+          onSave={(patch) => updateTask.mutate({ id: editingTask.id, patch }, { onSuccess: () => { setEditingId(null); toast.success("Tarefa atualizada"); }, onError: (e) => toast.error(e.message) })}
+          onDelete={() => del.mutate(editingTask.id, { onSuccess: () => { setEditingId(null); toast.success("Tarefa excluída"); }, onError: (e) => toast.error(e.message) })} />
+      )}
     </PlanShell>
   );
 }

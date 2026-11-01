@@ -8,6 +8,7 @@ import {
 import { PlanShell, Panel, tint } from "@/components/PlanShell";
 import orb from "@/assets/treino-orb.jpg";
 import musculos from "@/assets/treino-musculos.jpg";
+import { WorkoutEditDialog } from "@/components/WorkoutEditDialog";
 import { fromIsoDate, isoDate, todayIso } from "@/lib/dates";
 import {
   useDoneCount, useFinishSession, useLoadHistory, useLogExercise, useRecentSessions, useSessionLogs, useSplit, useStartSession, useWeeklyGoal, useWorkouts,
@@ -56,6 +57,7 @@ function Treino() {
 
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [chartIdx, setChartIdx] = useState(0);
+  const [editOpen, setEditOpen] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const [rest, setRest] = useState(90);
   const [left, setLeft] = useState(90);
@@ -283,11 +285,15 @@ function Treino() {
           {finished ? <><Check size={22} /> Treino concluído</> : started ? <><Check size={22} /> Finalizar treino</> : <><Play size={22} /> Iniciar treino</>}
         </button>
         <div className="flex gap-3">
-          <button onClick={() => setToast("Edição da ficha disponível em breve (demonstração).")} className="glass flex items-center gap-2 rounded-2xl px-5 py-4 text-sm"><Pencil size={17} /> Editar ficha</button>
+          <button onClick={() => setEditOpen(true)} className="glass flex items-center gap-2 rounded-2xl px-5 py-4 text-sm"><Pencil size={17} /> Editar ficha</button>
           <button onClick={() => { const n = sessions.filter((x) => x.finished_at && x.session_date.startsWith(today.slice(0, 7))).length; setToast(`Histórico: ${n} treino${n === 1 ? "" : "s"} concluído${n === 1 ? "" : "s"} neste mês.`); }} className="glass flex items-center gap-2 rounded-2xl px-5 py-4 text-sm"><BarChart3 size={17} /> Histórico</button>
         </div>
       </div>
 
+      {editOpen && (
+        <WorkoutEditDialog workouts={workouts} exercises={wq.data?.exercises ?? []} split={splitQ.data ?? []} goal={goal} currentId={workout.id}
+          onClose={() => setEditOpen(false)} onSelect={(id) => { setPickedId(id); setChartIdx(0); setOpen(null); }} />
+      )}
       {toast && <div role="status" className="glass fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-5 py-2.5 text-sm text-cyan animate-rise">{toast}</div>}
     </PlanShell>
   );
