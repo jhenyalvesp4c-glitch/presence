@@ -51,6 +51,22 @@ function Spark({ seed, color }: { seed: number; color: string }) {
   );
 }
 
+function MiniSpark({ seed, color }: { seed: number; color: string }) {
+  // Arredondado para o servidor e o navegador gerarem exatamente o mesmo SVG (evita aviso de hidratação).
+  const pts = Array.from({ length: 16 }, (_, i) => Math.round((20 - (Math.sin(i * 0.8 + seed) * 5 + Math.cos(i * 1.4 + seed * 0.7) * 4)) * 100) / 100);
+  const d = pts.map((y, i) => `${i === 0 ? "M" : "L"}${(i / 15) * 120},${y.toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox="0 0 120 24" preserveAspectRatio="none" className="mt-2 h-6 w-full opacity-90">
+      <path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round"
+        style={{ filter: `drop-shadow(0 0 3px ${color})` }} />
+      {pts.map((y, i) => (
+        <circle key={i} cx={(i / 15) * 120} cy={y} r={1.3} fill={color} opacity={0.85}
+          style={{ animation: `pulse-ring ${2 + (i % 3) * 0.6}s ease-in-out infinite`, animationDelay: `${i * 0.12}s`, transformOrigin: `${(i / 15) * 120}px ${y}px` }} />
+      ))}
+    </svg>
+  );
+}
+
 function Orbit({ projects }: { projects: Project[] }) {
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[300px]">
@@ -91,23 +107,29 @@ function ProjetosPage() {
     <PlanShell active={2}>
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <Panel c="cyan" className="scan-line overflow-hidden">
-          <p className="mono-caps">Central de projetos</p>
-          <h1 className="mt-2 font-display text-4xl font-semibold">Seus <span className="text-gradient">projetos</span></h1>
-          <p className="mt-2 max-w-md text-muted-foreground">Escolha um projeto para abrir suas demandas, ou crie um novo universo de trabalho.</p>
-          <div className="mt-6 grid grid-cols-3 gap-3">
+          <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 h-24 w-full opacity-40"
+            style={{ background: "radial-gradient(60% 100% at 30% 100%, color-mix(in oklab, var(--violet) 18%, transparent), transparent 70%)" }} />
+          <p className="mono-caps relative">Central de projetos</p>
+          <h1 className="relative mt-2 font-display text-4xl font-semibold">Seus <span className="text-gradient">projetos</span></h1>
+          <p className="relative mt-2 max-w-md text-muted-foreground">Escolha um projeto para abrir suas demandas, ou crie um novo universo de trabalho.</p>
+          <div className="relative mt-6 grid grid-cols-3 gap-3">
             {[
-              { l: "Projetos", v: projects.length, I: FolderKanban, c: "cyan" },
-              { l: "Demandas", v: stats.total, I: Target, c: "violet" },
-              { l: "Concluídas", v: stats.done, I: Zap, c: "emerald" },
-            ].map(({ l, v, I, c }) => (
+              { l: "Projetos", v: projects.length, I: FolderKanban, c: "cyan", s: 1 },
+              { l: "Demandas", v: stats.total, I: Target, c: "violet", s: 2 },
+              { l: "Concluídas", v: stats.done, I: Zap, c: "emerald", s: 3 },
+            ].map(({ l, v, I, c, s }) => (
               <div key={l} className="accent-card p-4" style={tint(c)}>
-                <span className="icon-tile h-9 w-9"><I size={17} /></span>
+                <div className="flex items-center justify-between">
+                  <span className="icon-tile h-9 w-9"><I size={17} /></span>
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: colorVar(c), boxShadow: `0 0 10px ${colorVar(c)}`, animation: "pulse-ring 2.2s ease-in-out infinite" }} />
+                </div>
                 <p className="mt-3 font-display text-3xl font-semibold">{v}</p>
                 <p className="mono-caps !text-[0.6rem]">{l}</p>
+                <MiniSpark seed={s} color={colorVar(c)} />
               </div>
             ))}
           </div>
-          <button onClick={() => setOpen(true)} className="shine mt-6 inline-flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-3 font-medium text-primary-foreground shadow-[0_0_30px_-6px_var(--cyan)] transition hover:scale-105">
+          <button onClick={() => setOpen(true)} className="shine relative mt-6 inline-flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-3 font-medium text-primary-foreground shadow-[0_0_30px_-6px_var(--cyan)] transition hover:scale-105">
             <Plus size={18} /> Novo projeto
           </button>
         </Panel>
@@ -154,8 +176,12 @@ function ProjetosPage() {
             </Link>
           );
         })}
-        <button onClick={() => setOpen(true)} className="glass group grid min-h-[230px] place-items-center rounded-3xl border-dashed transition hover:shadow-[0_0_40px_-12px_var(--cyan)]">
-          <span className="flex flex-col items-center gap-3 text-muted-foreground group-hover:text-cyan">
+        <button onClick={() => setOpen(true)} className="glass group relative grid min-h-[230px] place-items-center overflow-hidden rounded-3xl border-dashed transition hover:shadow-[0_0_40px_-12px_var(--cyan)]">
+          <span aria-hidden className="pointer-events-none absolute inset-0 m-auto h-44 w-44 rounded-full border border-dashed opacity-25 transition group-hover:opacity-60"
+            style={{ borderColor: "color-mix(in oklab, var(--cyan) 45%, transparent)", animation: "rail-spin 24s linear infinite" }} />
+          <span aria-hidden className="pointer-events-none absolute inset-0 m-auto h-28 w-28 rounded-full border border-dashed opacity-20 transition group-hover:opacity-50"
+            style={{ borderColor: "color-mix(in oklab, var(--violet) 55%, transparent)", animation: "rail-spin 16s linear infinite reverse" }} />
+          <span className="relative flex flex-col items-center gap-3 text-muted-foreground group-hover:text-cyan">
             <span className="grid h-14 w-14 place-items-center rounded-full border border-dashed border-current transition group-hover:rotate-90"><Plus /></span>
             Criar projeto
           </span>
