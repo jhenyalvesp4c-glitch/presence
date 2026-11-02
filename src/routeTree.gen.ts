@@ -14,6 +14,7 @@ import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as DemandasRouteImport } from './routes/demandas'
 import { Route as OrganizarRouteImport } from './routes/organizar'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
+import { Route as ProjetosRouteImport } from './routes/projetos'
 import { Route as SaudeRouteImport } from './routes/saude'
 import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as TreinoRouteImport } from './routes/treino'
@@ -43,6 +44,11 @@ const OrganizarRoute = OrganizarRouteImport.update({
 const PlanejamentoRoute = PlanejamentoRouteImport.update({
   id: '/planejamento',
   path: '/planejamento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjetosRoute = ProjetosRouteImport.update({
+  id: '/projetos',
+  path: '/projetos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SaudeRoute = SaudeRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/demandas': typeof DemandasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/projetos': typeof ProjetosRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/demandas': typeof DemandasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/projetos': typeof ProjetosRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/demandas': typeof DemandasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/projetos': typeof ProjetosRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/demandas'
     | '/organizar'
     | '/planejamento'
+    | '/projetos'
     | '/saude'
     | '/tarefas'
     | '/treino'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/demandas'
     | '/organizar'
     | '/planejamento'
+    | '/projetos'
     | '/saude'
     | '/tarefas'
     | '/treino'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/demandas'
     | '/organizar'
     | '/planejamento'
+    | '/projetos'
     | '/saude'
     | '/tarefas'
     | '/treino'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   DemandasRoute: typeof DemandasRoute
   OrganizarRoute: typeof OrganizarRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
+  ProjetosRoute: typeof ProjetosRoute
   SaudeRoute: typeof SaudeRoute
   TarefasRoute: typeof TarefasRoute
   TreinoRoute: typeof TreinoRoute
@@ -195,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/planejamento'
       fullPath: '/planejamento'
       preLoaderRoute: typeof PlanejamentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projetos': {
+      id: '/projetos'
+      path: '/projetos'
+      fullPath: '/projetos'
+      preLoaderRoute: typeof ProjetosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/saude': {
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemandasRoute: DemandasRoute,
   OrganizarRoute: OrganizarRoute,
   PlanejamentoRoute: PlanejamentoRoute,
+  ProjetosRoute: ProjetosRoute,
   SaudeRoute: SaudeRoute,
   TarefasRoute: TarefasRoute,
   TreinoRoute: TreinoRoute,

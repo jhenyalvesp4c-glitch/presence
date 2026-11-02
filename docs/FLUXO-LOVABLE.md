@@ -114,6 +114,10 @@ Fazer assim:
 - A Vercel (time `jheny1`) recusou criar projeto pela conexão atual. O deploy é feito pela própria Jheny em vercel.com/new.
 - `ANTHROPIC_API_KEY` ainda não foi configurada, então a conversa com a IA não responde. O resto funciona sem ela.
 
+## 4.1. Buscar código direto do GitHub
+
+Além do zip, a Jheny pode pedir "pega do GitHub". As cópias dos projetos dela no Lovable ficam na conta `jhenyalvesp4c-glitch` (ex.: `project-transfer-studio`, `c-digo-integrado`, `TutoriaisP4C`). Dá para listá-las com `list_repos` e anexar **só para leitura** com `add_repo`, clonar em `/home/user/<repo>` e **importar pela Fase 1** como se fosse um zip (nunca sobrescrever os arquivos protegidos). **Não importar** o back-end que vier junto (login `/entrar`, `studio-auth`, schema `studio`, `supabase/`): ele é de outra tentativa e conflita com o nosso `presence_app`.
+
 ## 5. Regras de git e segurança
 
 - Desenvolver na branch combinada da sessão (`claude/busy-planck-p1i0im`, a menos que a sessão indique outra). **Nunca** criar PR sem ela pedir. Nunca force-push.
@@ -132,9 +136,12 @@ Fazer assim:
 | `/planejamento` | Pronto | `day_plans`, `routine_items`, `schedule_items`, `tasks` |
 | `/planejamento/dia` | Pronto | `schedule_items`, `day_plans` |
 | `/treino` | Pronto (inclui editar ficha, semana e meta) | `workouts`, `workout_exercises`, `workout_split`, `workout_sessions`, `exercise_logs`, `profiles.weekly_workout_goal` |
+| `/projetos` | **Front importado, back-end pendente.** Central de Projetos (cartões, filtros, criar projeto). Hoje os projetos ficam só no `localStorage` do navegador (`src/lib/projects.ts`), então não persistem no banco nem entre aparelhos | (a criar: `projects`; `demands.project_id`) |
 | `/demandas` | **Front P4C importado, back-end pendente** (dados de exemplo, nada persiste). A versão antiga, ligada à tabela `demands`, está no git (commit `f726f77`). A tabela e o hook `src/lib/data/demands.ts` continuam, para a Fase 2 | `demands` (a ampliar) |
 | `/saude` | Hábitos e treino prontos. Dieta e medidas **não** | `habits`, `habit_completions` |
 | Financeiro, Progresso, Ajustes, Integrações, Fluxos, Dieta e medidas | **Sem tela.** Aguardam o front do Lovable (não inventar telas aqui) | |
+
+Fluxo de navegação: a rail "Demandas" (e o card "Foco e produtividade") abre `/projetos`; cada projeto abre `/demandas?projeto=<id>` (o Kanban), e a seta volta para `/projetos`. O título do Kanban usa o nome do projeto, mas **as demandas mostradas ainda são as mesmas de exemplo para qualquer projeto** até a Fase 2 ligar `demands.project_id`.
 
 Edição pelas telas: tarefas (`/tarefas`, clicar no título), demandas (`/demandas`, clicar no título) e treino
 (`/treino` > "Editar ficha": exercícios, divisão da semana e meta). A conversa da assistente é gravada mesmo sem
@@ -146,5 +153,6 @@ Acrescente uma linha a cada importação do Lovable (data, o que veio, o que foi
 
 | Data | Origem | O que veio | Observações |
 |---|---|---|---|
+| 2026-11-02 | GitHub `project-transfer-studio` (commit `b76540a`) | `src/routes/projetos.tsx` (Central de Projetos) e `src/lib/projects.ts`; navegação: rail "Demandas" e card "Foco e produtividade" agora abrem `/projetos`; `/demandas` aceita `?projeto=` | **Não importado de propósito:** `entrar.tsx`, `studio-auth.ts`, `lovable-error-reporting.ts`, testes de auth e `supabase/` (schema `studio` e login: conflitam com o nosso back-end). Projetos ainda só no `localStorage`. **Fase 2:** tabela `projects`, `demands.project_id`, contadores calculados das demandas. |
 | 2026-11-02 | `demandas-documentacao` (zip, 2 arquivos) | `src/routes/demandas.tsx` (Kanban P4C: demandas gerais, por polo e multipolo, painel de detalhes, notas) e `src/components/DocsLibrary.tsx` (biblioteca de documentação, logins dos polos, busca "Orion") | Substituiu a `/demandas` antiga. Acrescentados ao `styles.css` o que o zip pedia do "pacote compartilhado-base": `glow-text`, `scanline`, `float` (`animate-float`), `shimmer`, cores `amber`/`pink` e `--gradient-brand`. **Fase 2 pendente:** modelar polos, execução por polo, histórico, notas, pastas/documentos e anexos; **os "logins dos polos" guardam senhas: só guardar cifradas e com login ligado, nunca com o acesso aberto atual.** A busca "Orion" é demonstrativa. |
 | 2026-11-01 | `seamless-project-migration` (zip) | Projeto inicial: 9 telas, componentes `ui/`, assets | Removidos `@lovable.dev/vite-tanstack-config`, `.lovable/`, telemetria do editor. Telas vinham com dados fixos; back-end feito depois, tela a tela. |

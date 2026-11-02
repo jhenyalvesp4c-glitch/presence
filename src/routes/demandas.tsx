@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { DocsLibrary } from "@/components/DocsLibrary";
+import { loadProjects, type Project } from "@/lib/projects";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowLeft, Atom, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Clock, FileText,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/demandas")({
+  validateSearch: (s: Record<string, unknown>): { projeto?: string | undefined } => ({ projeto: typeof s["projeto"] === "string" ? (s["projeto"] as string) : undefined }),
   head: () => ({
     meta: [
       { title: "Demandas · P4C" },
@@ -84,6 +86,9 @@ const seed: Demand[] = [
 
 /* ---------------- página ---------------- */
 function Demandas() {
+  const { projeto } = Route.useSearch();
+  const [project, setProject] = useState<Project | undefined>();
+  useEffect(() => setProject(loadProjects().find((x) => x.id === projeto)), [projeto]);
   const [items, setItems] = useState(seed);
   const [tab, setTab] = useState<"overview" | DType | "notas" | "docs">("overview");
   const [view, setView] = useState<"kanban" | "lista">("kanban");
@@ -165,10 +170,10 @@ function Demandas() {
         {/* topo */}
         <header className="flex flex-wrap items-center justify-between gap-6 animate-rise">
           <div className="flex items-center gap-5">
-            <Link to="/" className="icon-tile h-9 w-9 transition hover:scale-105" style={tint("cyan")} aria-label="Voltar"><ArrowLeft size={15} /></Link>
+            <Link to="/projetos" className="icon-tile h-9 w-9 transition hover:scale-105" style={tint("cyan")} aria-label="Voltar aos projetos" title="Voltar aos projetos"><ArrowLeft size={15} /></Link>
             <HexLogo />
             <div>
-              <h1 className="font-display text-4xl font-extrabold tracking-tight">P4C<span className="glow-text" style={tint("cyan")}>.</span></h1>
+              <h1 className="font-display text-4xl font-extrabold tracking-tight">{project?.name ?? "P4C"}<span className="glow-text" style={tint(project?.color ?? "cyan")}>.</span></h1>
               <p className="mono-caps !tracking-[0.4em]">Projeto</p>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald"><span className="h-1.5 w-1.5 animate-pulse-ring rounded-full bg-emerald shadow-[0_0_8px_var(--emerald)]" /> Ativo</p>
             </div>

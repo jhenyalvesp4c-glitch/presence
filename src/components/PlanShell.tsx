@@ -17,7 +17,7 @@ export const icons: Record<IconKey, typeof Home> = {
 const rail = [
   { Icon: Home, label: "Início", c: "cyan", to: "/assistente" as const },
   { Icon: CalendarCheck, label: "Planejamento", c: "cyan", to: "/planejamento" as const },
-  { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/demandas" as const },
+  { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/projetos" as const },
   { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" as const },
   { Icon: BarChart3, label: "Progresso", c: "violet" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" as const },
