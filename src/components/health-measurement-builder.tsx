@@ -244,7 +244,7 @@ function NovaFichaMedidasForm({ embedded = false, onCancel }: { embedded?: boole
                 <X className="h-4 w-4" /> Cancelar
               </Link>
               <Button variant="unstyled" size="unstyled"
-                onClick={() => { setMeasurements({ nome, data, altura, peso, valores, obs, fotos: fotosPrev }); navigate({ to: "/hoje" }); }}
+                onClick={() => { setMeasurements({ nome, data, altura, peso, valores, obs, fotos: fotosPrev }); navigate({ to: "/progresso" }); }}
                 className="relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-primary px-8 py-4 text-sm font-semibold text-primary-foreground shadow-glow transition hover:brightness-110"
               >
                 <span className="health-shine absolute inset-0" />

@@ -17,10 +17,12 @@ vi.mock("@/lib/data/health", () => ({
   healthKeys: keys,
   useHealthWorkout: () => useQuery({ queryKey: keys.workout, queryFn: async () => null }),
   useHealthDiet: () => useQuery({ queryKey: keys.diet, queryFn: async () => null }),
-  useHealthMeasurement: () => useQuery({ queryKey: keys.measurement, queryFn: async () => null }),
+  useHealthMeasurement: () => useQuery({ queryKey: keys.measurement, queryFn: async () => [] as unknown[] }),
   useTodayExerciseLogs: () => useQuery({ queryKey: keys.todayExercises, queryFn: async () => [] as string[] }),
   useTodayMealLogs: () => useQuery({ queryKey: keys.todayMeals, queryFn: async () => [] as string[] }),
   useToggleMeal: () => useMutation({ mutationFn: async () => {} }),
+  upsertEntry: (list: { measuredOn: string }[], entry: { measuredOn: string }) =>
+    [...list.filter((e) => e.measuredOn !== entry.measuredOn), entry].sort((a, b) => a.measuredOn.localeCompare(b.measuredOn)),
   saveWorkoutSheetDb: mocks.saveWorkout, saveDietDb: mocks.saveDiet, saveMeasurementDb: mocks.saveMeasurement,
 }));
 vi.mock("@/lib/data/workouts", () => ({ useLogExercise: () => ({ mutate: vi.fn() }) }));
@@ -98,6 +100,20 @@ describe("Health sheets backed by the database", () => {
     });
     await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledWith("Ficha de treino salva"));
     await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledWith("Ficha de dieta salva"));
+  });
+
+  it("keeps a measurement history: one entry per date, oldest first, replacing the same date", async () => {
+    mocks.saveMeasurement.mockReturnValue(new Promise(() => {}));
+    const { result } = setup();
+    await waitFor(() => expect(result.current[0].ready).toBe(true));
+    const check = (data: string, peso: string) => ({ nome: "N", data, altura: "1,70", peso, valores: {}, obs: "", fotos: {} });
+    act(() => result.current[0].setMeasurements(check("2026-11-10", "61")));
+    act(() => result.current[0].setMeasurements(check("2026-11-01", "63")));
+    await waitFor(() => expect(result.current[1].measurementHistory.map((m) => m.data)).toEqual(["2026-11-01", "2026-11-10"]));
+    expect(result.current[1].measurements?.peso).toBe("61");
+    act(() => result.current[0].setMeasurements(check("2026-11-10", "60,5")));
+    await waitFor(() => expect(result.current[1].measurementHistory).toHaveLength(2));
+    expect(result.current[1].measurements?.peso).toBe("60,5");
   });
 
   it("refuses invalid numbers instead of saving (and tells the user)", async () => {

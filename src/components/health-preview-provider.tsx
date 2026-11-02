@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { todayIso } from "@/lib/dates";
 import {
   healthKeys, saveDietDb, saveMeasurementDb, saveWorkoutSheetDb, useHealthDiet, useHealthMeasurement, useHealthWorkout, useTodayExerciseLogs, useTodayMealLogs,
-  useToggleMeal, type DietData, type MeasurementData, type WorkoutData,
+  useToggleMeal, upsertEntry, type DietData, type MeasurementEntry, type WorkoutData,
 } from "@/lib/data/health";
 import { useLogExercise } from "@/lib/data/workouts";
 import { dietToRow, measurementToRow } from "@/lib/health-db";
@@ -17,7 +17,7 @@ import type { DietSheet, MeasurementSheet, WorkoutSheet } from "@/lib/health-pre
  * acrescentados `ready` (carregou do banco) e `doneKeys`/`toggleDone` (feitos de hoje, também gravados).
  */
 type Preview = {
-  workout: WorkoutSheet | null; diet: DietSheet | null; measurements: MeasurementSheet | null;
+  workout: WorkoutSheet | null; diet: DietSheet | null; measurements: MeasurementSheet | null; measurementHistory: MeasurementSheet[];
   ready: boolean; doneKeys: string[]; toggleDone: (key: string) => void;
   setWorkout: (sheet: WorkoutSheet) => void; setDiet: (sheet: DietSheet) => void; setMeasurements: (sheet: MeasurementSheet) => void;
 };
@@ -58,9 +58,11 @@ export function useHealthPreview(): Preview {
 
   const setMeasurements = (sheet: MeasurementSheet) => {
     try { measurementToRow(sheet, todayIso()); } catch (e) { toast.error((e as Error).message); throw e; }
-    const current = qc.getQueryData<MeasurementData | null>(healthKeys.measurement) ?? null;
-    qc.setQueryData<MeasurementData | null>(healthKeys.measurement, (old) => ({ measuredOn: sheet.data || todayIso(), photoPaths: old?.photoPaths ?? {}, sheet }));
-    persist("Ficha de medidas", () => saveMeasurementDb(sheet, current), healthKeys.measurement);
+    const date = sheet.data || todayIso();
+    const dated = { ...sheet, data: date };
+    const current = (qc.getQueryData<MeasurementEntry[]>(healthKeys.measurement) ?? []).find((e) => e.measuredOn === date) ?? null;
+    qc.setQueryData<MeasurementEntry[]>(healthKeys.measurement, (old) => upsertEntry(old ?? [], { measuredOn: date, photoPaths: current?.photoPaths ?? {}, sheet: dated }));
+    persist("Medição", () => saveMeasurementDb(dated, current), healthKeys.measurement);
   };
 
   // Feitos de hoje, no formato de chave que a tela já usa: ex-<sessão>-<índice> e meal-<refeição>.
@@ -87,7 +89,8 @@ export function useHealthPreview(): Preview {
   };
 
   return {
-    workout: w.data?.sheet ?? null, diet: d.data?.diet ?? null, measurements: m.data?.sheet ?? null,
+    workout: w.data?.sheet ?? null, diet: d.data?.diet ?? null,
+    measurements: m.data?.at(-1)?.sheet ?? null, measurementHistory: (m.data ?? []).map((e) => e.sheet),
     ready: [w, d, m].every((q) => !q.isPending), doneKeys, toggleDone, setWorkout, setDiet, setMeasurements,
   };
 }

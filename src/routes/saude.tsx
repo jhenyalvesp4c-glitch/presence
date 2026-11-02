@@ -12,7 +12,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { NovaFichaTreino } from "@/components/health-workout-builder";
 import { DietBuilder } from "@/components/health-diet-builder";
-import { NovaFichaMedidas } from "@/components/health-measurement-builder";
+import { MedidasScreen } from "@/components/health-measurement-checkin";
 
 const treino = treinoAsset;
 const dieta = dietaAsset;
@@ -139,7 +139,7 @@ function Index() {
           <DialogTitle className="sr-only">{ficha ? fichaTitle[ficha] : "Ficha"}</DialogTitle>
           {ficha === "treino" && <NovaFichaTreino embedded onCancel={() => setFicha(null)} />}
           {ficha === "dieta" && <DietBuilder embedded onCancel={() => setFicha(null)} />}
-          {ficha === "medidas" && <NovaFichaMedidas embedded onCancel={() => setFicha(null)} />}
+          {ficha === "medidas" && <MedidasScreen embedded onCancel={() => setFicha(null)} />}
         </DialogContent>
       </Dialog>
     </div>

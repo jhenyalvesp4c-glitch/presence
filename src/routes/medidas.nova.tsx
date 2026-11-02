@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { NovaFichaMedidas } from "@/components/health-measurement-builder";
+import { MedidasScreen } from "@/components/health-measurement-checkin";
 import cover from "@/assets/medidas-hero.jpg";
 
 export const Route = createFileRoute("/medidas/nova")({
@@ -15,5 +15,5 @@ export const Route = createFileRoute("/medidas/nova")({
       { name: "twitter:image", content: cover },
     ],
   }),
-  component: NovaFichaMedidas,
+  component: () => <MedidasScreen />,
 });

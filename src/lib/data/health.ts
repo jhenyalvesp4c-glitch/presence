@@ -153,29 +153,35 @@ export function useToggleMeal() {
 }
 
 // ───────────── Peso e medidas (+ fotos) ─────────────
-export type MeasurementData = { measuredOn: string; photoPaths: Record<string, string>; sheet: MeasurementSheet };
+export type MeasurementEntry = { measuredOn: string; photoPaths: Record<string, string>; sheet: MeasurementSheet };
+type MeasurementRowDb = { name: string; measured_on: string; height_m: number | null; weight_kg: number | null; values: Record<string, string>; notes: string; photos: Record<string, string> };
 
-async function loadMeasurement(): Promise<MeasurementData | null> {
-  const row = must(
-    await supabase.from("body_measurements").select("name, measured_on, height_m, weight_kg, values, notes, photos").order("measured_on", { ascending: false }).limit(1).maybeSingle(),
-  ) as { name: string; measured_on: string; height_m: number | null; weight_kg: number | null; values: Record<string, string>; notes: string; photos: Record<string, string> } | null;
-  if (!row) return null;
-  const photoPaths = row.photos ?? {};
-  const slots = Object.keys(photoPaths);
-  const urls: Record<string, string> = {};
-  if (slots.length) {
-    const { data } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(slots.map((s) => photoPaths[s]!), 3600);
-    for (const s of slots) {
-      const hit = data?.find((d) => d.path === photoPaths[s]);
-      if (hit?.signedUrl) urls[s] = hit.signedUrl;
-    }
+/** Todos os registros (um por data), do mais antigo ao mais novo, com as fotos como links assinados. */
+async function loadMeasurements(): Promise<MeasurementEntry[]> {
+  const rows = must(
+    await supabase.from("body_measurements").select("name, measured_on, height_m, weight_kg, values, notes, photos").order("measured_on", { ascending: true }).limit(1000),
+  ) as MeasurementRowDb[];
+  const paths = [...new Set(rows.flatMap((r) => Object.values(r.photos ?? {})))];
+  const urlByPath = new Map<string, string>();
+  if (paths.length) {
+    const { data } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(paths, 3600);
+    for (const d of data ?? []) if (d.path && d.signedUrl) urlByPath.set(d.path, d.signedUrl);
   }
-  return { measuredOn: row.measured_on, photoPaths, sheet: measurementFromRow(row, urls) };
+  return rows.map((r) => {
+    const photoPaths = r.photos ?? {};
+    const urls = Object.fromEntries(Object.entries(photoPaths).flatMap(([slot, path]) => (urlByPath.has(path) ? [[slot, urlByPath.get(path)!]] : [])));
+    return { measuredOn: r.measured_on, photoPaths, sheet: measurementFromRow(r, urls) };
+  });
 }
 
 export function useHealthMeasurement() {
   // As fotos usam links assinados de 1 h; renova antes de vencer.
-  return useQuery({ queryKey: healthKeys.measurement, queryFn: loadMeasurement, staleTime: 30 * 60 * 1000 });
+  return useQuery({ queryKey: healthKeys.measurement, queryFn: loadMeasurements, staleTime: 30 * 60 * 1000 });
+}
+
+/** Coloca/substitui um registro (mesma data substitui) e mantém a lista do mais antigo ao mais novo. */
+export function upsertEntry(list: MeasurementEntry[], entry: MeasurementEntry): MeasurementEntry[] {
+  return [...list.filter((e) => e.measuredOn !== entry.measuredOn), entry].sort((a, b) => a.measuredOn.localeCompare(b.measuredOn));
 }
 
 async function uploadPhoto(slot: string, blobUrl: string, date: string): Promise<string> {
@@ -187,8 +193,8 @@ async function uploadPhoto(slot: string, blobUrl: string, date: string): Promise
   return path;
 }
 
-/** Salva um registro por data. Fotos novas (blob:) sobem ao Storage; as que já existem mantêm o caminho. */
-export async function saveMeasurementDb(m: MeasurementSheet, current: MeasurementData | null): Promise<void> {
+/** Salva um registro por data (`current` = o registro dessa mesma data, se já existir). Fotos novas (blob:) sobem ao Storage; as que já existem mantêm o caminho. */
+export async function saveMeasurementDb(m: MeasurementSheet, current: MeasurementEntry | null): Promise<void> {
   const row = measurementToRow(m, todayIso());
   const photos: Record<string, string> = {};
   for (const [slot, src] of Object.entries(m.fotos)) {

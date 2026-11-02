@@ -7,4 +7,9 @@ const weekdays = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 export function workoutsForDate(sheet: WorkoutSheet | null, date: Date) {
   const day = weekdays[date.getDay()];
   return sheet?.sessoes.filter(session => day !== undefined && session.dias.includes(day)) ?? [];
+}export const toNumber = (value: string | undefined) => { const n = parseFloat((value ?? "").replace(",", ".")); return Number.isFinite(n) ? n : null; };
+/** Adds a check-in to the history: same date replaces, sorted oldest → newest. */
+export function addToHistory(history: MeasurementSheet[], entry: MeasurementSheet) {
+  return [...history.filter(item => item.data !== entry.data), entry].sort((a, b) => a.data.localeCompare(b.data));
 }
+export function formatDate(iso: string) { return iso ? iso.split("-").reverse().slice(0, 2).join("/") : "—"; }
