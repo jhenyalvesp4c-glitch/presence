@@ -111,7 +111,10 @@ Fazer assim:
 
 - **Login desligado** de propósito até o fim do projeto (modo dono fixo `SINGLE_USER_ID` em `src/lib/supabase.ts`). Para reativar: ver o comentário no topo de `supabase/migrations/20261101000300_presence_app_single_user_mode.sql`, voltar a validar o usuário em `askAssistant` e trocar `SINGLE_USER_ID` pelo id do usuário autenticado.
 - Por causa disso, **não publicar na Vercel** com dados reais: a chave pública do navegador acessa as linhas do dono fixo.
-- A Vercel (time `jheny1`) recusou criar projeto pela conexão atual. O deploy é feito pela própria Jheny em vercel.com/new.
+- **Vercel (time `jheny1`):** a conexão **não consegue criar projeto**, mas consegue publicar em um projeto que já existe. Em 2026-11-02 o novo Presence foi publicado **dentro do projeto antigo `spark-mind-friend-htvx`** (a pedido da Jheny), no endereço `https://spark-mind-friend-htvx.vercel.app`. As variáveis do projeto antigo foram **mantidas** (só `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` são usadas; as de Google/Amazon OAuth, OpenAI, ElevenLabs, Perplexity, VAPID, cron e service role ficaram sem uso). A proteção **Vercel Authentication** está ligada para todos os deployments (só quem está logada na Vercel abre o site); desligar só quando o login do app voltar.
+  - **Publicar uma versão nova:** o projeto continua ligado ao GitHub antigo (`jhenyalvesc-lab/spark-mind-friend`), então um push no nosso repositório **não** publica sozinho. Para publicar: `create_deployment` com `project: "spark-mind-friend-htvx"`, `target: "production"` e `gitSource` github `jhenyalvesp4c-glitch/presence`, `ref` da branch atual.
+  - **Cuidado:** um push em `main` de `jhenyalvesc-lab/spark-mind-friend` publica o app **antigo** por cima do novo. Se isso acontecer, republicar como acima.
+  - **Voltar ao app antigo:** `request_rollback` para o deployment `dpl_GycoUfFGkMXam2EwcahUub8ZS3GM` (último de produção do antigo). Crons, login Google/Amazon e notificações do app antigo ficam fora do ar enquanto o novo ocupa o endereço.
 - `ANTHROPIC_API_KEY` ainda não foi configurada, então a conversa com a IA não responde. O resto funciona sem ela.
 
 ## 4.1. Buscar código direto do GitHub
