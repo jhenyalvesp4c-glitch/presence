@@ -1,170 +1,147 @@
+import { Button } from "@/components/ui/button";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { addDays, startOfWeek, subDays } from "date-fns";
-import { ArrowRight, Check, CheckCircle2, Dumbbell, Flame, Heart, Loader2, Plus, Salad, Scale, Sprout, Target, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { Panel, PlanShell, colorVar, tint } from "@/components/PlanShell";
-import { isoDate, todayIso } from "@/lib/dates";
-import { getIcon } from "@/lib/icons";
-import { useArchiveHabit, useCreateHabit, useHabitCompletions, useHabits, useToggleHabit } from "@/lib/data/habits";
-import { useRecentSessions, useSplit, useWeeklyGoal } from "@/lib/data/workouts";
+import {
+  ChevronRight, Heart, Home, ClipboardList, ListChecks, CalendarDays,
+  BarChart3, Dumbbell, Utensils, UserRound,
+} from "lucide-react";
+import treinoAsset from "@/assets/treino.jpg";
+import dietaAsset from "@/assets/dieta.jpg";
+import medidasAsset from "@/assets/medidas.jpg";
+import { HealthTabs } from "@/components/health-tabs";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { NovaFichaTreino } from "@/components/health-workout-builder";
+import { DietBuilder } from "@/components/health-diet-builder";
+import { NovaFichaMedidas } from "@/components/health-measurement-builder";
+
+const treino = treinoAsset;
+const dieta = dietaAsset;
+const medidas = medidasAsset;
+
+type Ficha = "treino" | "dieta" | "medidas";
+const fichaTitle: Record<Ficha, string> = { treino: "Ficha de treino", dieta: "Ficha de dieta", medidas: "Ficha de peso e medidas" };
 
 export const Route = createFileRoute("/saude")({
   head: () => ({
     meta: [
-      { title: "Presence · Saúde e bem-estar" },
-      { name: "description", content: "Treino, dieta, hábitos e evolução com a Presence." },
-      { property: "og:title", content: "Presence · Saúde e bem-estar" },
-      { property: "og:description", content: "Treino, dieta, hábitos e evolução." },
+      { title: "Presence Saúde — Fichas de treino, dieta e medidas" },
+      { name: "description", content: "Monte fichas de treino, dieta e peso e medidas em um painel futurista." },
+      { property: "og:title", content: "Presence Saúde — Fichas de treino, dieta e medidas" },
+      { property: "og:description", content: "Organize sua rotina e acompanhe sua evolução." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Saude,
+  component: Index,
 });
 
-const dow = ["D", "S", "T", "Q", "Q", "S", "S"];
+const cards = [
+  { tone: "violet", img: treino, icon: Dumbbell, tag: "01 · Performance", title: "Ficha de Treino",
+    desc: "Monte sua rotina de treinos, acompanhe seu desempenho e evolua ainda mais.", cta: "Criar ficha de treino" },
+  { tone: "emerald", img: dieta, icon: Utensils, tag: "02 · Nutrição", title: "Ficha de Dieta",
+    desc: "Planeje sua alimentação, controle suas calorias e mantenha o foco.", cta: "Criar ficha de dieta" },
+  { tone: "cyan", img: medidas, icon: UserRound, tag: "03 · Evolução", title: "Ficha de Peso e Medidas",
+    desc: "Registre seu peso, medidas corporais e acompanhe sua evolução com fotos.", cta: "Criar ficha de peso e medidas" },
+] as const;
 
-function Saude() {
-  const habitsQ = useHabits();
-  const compQ = useHabitCompletions();
-  const toggle = useToggleHabit();
-  const create = useCreateHabit();
-  const archive = useArchiveHabit();
-  const sessQ = useRecentSessions();
-  const splitQ = useSplit();
-  const goalQ = useWeeklyGoal();
-  const [name, setName] = useState("");
+const nav = [
+  { Icon: Home, label: "Início", to: "/assistente" },
+  { Icon: ClipboardList, label: "Projetos", to: "/projetos" },
+  { Icon: ListChecks, label: "Tarefas", to: "/tarefas" },
+  { Icon: CalendarDays, label: "Planejamento", to: "/planejamento" },
+  { Icon: BarChart3, label: "Progresso", to: "/progresso" },
+  { Icon: Heart, label: "Saúde", to: "/saude" },
+] as const;
 
-  const today = todayIso();
-  const habits = habitsQ.data ?? [];
-  const doneByHabit = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    for (const c of compQ.data ?? []) m.set(c.habit_id, (m.get(c.habit_id) ?? new Set()).add(c.completed_on));
-    return m;
-  }, [compQ.data]);
-
-  /** Dias seguidos até hoje (se hoje ainda não foi feito, conta a partir de ontem). */
-  const streak = (id: string) => {
-    const set = doneByHabit.get(id) ?? new Set<string>();
-    let d = set.has(today) ? new Date() : subDays(new Date(), 1);
-    let n = 0;
-    while (set.has(isoDate(d))) { n++; d = subDays(d, 1); }
-    return n;
-  };
-  const last7 = (id: string) => Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i)).map((d) => ({ d, on: doneByHabit.get(id)?.has(isoDate(d)) ?? false }));
-
-  const doneToday = habits.filter((h) => doneByHabit.get(h.id)?.has(today)).length;
-  const best = habits.reduce((m, h) => Math.max(m, streak(h.id)), 0);
-
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const from = isoDate(weekStart), to = isoDate(addDays(weekStart, 6));
-  const weekWorkouts = (sessQ.data ?? []).filter((s) => s.finished_at && s.session_date >= from && s.session_date <= to).length;
-  const goal = goalQ.data ?? 5;
-  const weekPct = Math.min(100, Math.round((weekWorkouts / goal) * 100));
-  const todaySplit = splitQ.data?.find((x) => x.weekday === new Date().getDay());
-  const onErr = (e: Error) => toast.error(e.message);
-
-  const add = () => {
-    if (!name.trim() || create.isPending) return;
-    create.mutate({ name, icon: "sprout", color: "emerald" }, { onSuccess: () => { setName(""); toast.success("Hábito criado"); }, onError: onErr });
-  };
-
-  const stats = [
-    { n: `${doneToday}/${habits.length}`, l: "Hábitos hoje", Icon: Sprout, c: "emerald" },
-    { n: `${best}`, l: best === 1 ? "Dia de sequência" : "Dias de sequência", Icon: Flame, c: "violet" },
-    { n: `${weekWorkouts}/${goal}`, l: "Treinos na semana", Icon: Dumbbell, c: "cyan" },
-  ];
-
+function Index() {
+  const [ficha, setFicha] = useState<Ficha | null>(null);
   return (
-    <PlanShell active={5}>
-      <section className="flex flex-wrap items-center justify-between gap-6 px-2">
-        <div className="animate-rise">
-          <p className="mono-caps">Saúde &amp; bem-estar</p>
-          <h1 className="mt-2 font-serif text-5xl leading-none md:text-6xl">Cuidar de <span className="text-gradient italic">você</span></h1>
-          <p className="mt-3 max-w-sm text-sm text-muted-foreground">Hábitos diários, treino da semana e sua evolução num só lugar.</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {stats.map(({ n, l, Icon, c }, i) => (
-            <div key={l} className="accent-card flex items-center gap-3 px-4 py-3 animate-rise" style={{ ...tint(c), animationDelay: `${i * 0.1}s` }}>
-              <span className="icon-tile h-11 w-11 rounded-full"><Icon size={20} /></span>
-              <span><b className="block font-display text-2xl leading-none">{n}</b><span className="text-xs text-muted-foreground">{l}</span></span>
-            </div>
+    <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
+      <div className="aurora pointer-events-none absolute inset-0" />
+      <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
+
+      <aside className="glass-h fixed inset-y-3 left-0 z-20 hidden w-[60px] flex-col items-center justify-between rounded-3xl py-6 md:flex">
+        <div className="flex flex-col items-center gap-3">
+          {nav.map(({ Icon, label, to }) => (
+            <Button asChild variant="ghost" size="icon" key={label} title={label} className={`h-11 w-11 rounded-2xl ${to === "/saude" ? "bg-primary/15 text-primary shadow-glow" : "text-muted-foreground"}`}>
+              <Link to={to} aria-label={label} aria-current={to === "/saude" ? "page" : undefined}><Icon className="h-5 w-5" /></Link>
+            </Button>
           ))}
         </div>
-      </section>
+        <Button variant="ghost" size="icon" title="Minha conta (em breve)" aria-label="Minha conta (em breve)" className="h-11 w-11 text-muted-foreground"><UserRound /></Button>
+      </aside>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <Panel c="emerald">
-          <div className="mb-4 flex items-center gap-3">
-            <span className="icon-tile h-10 w-10 rounded-full"><Heart size={18} /></span>
-            <span><b className="block font-display text-base">Hábitos de hoje</b><span className="text-xs text-muted-foreground">Marque o que você já fez e mantenha a sequência.</span></span>
+      <main className="relative z-10 px-5 py-6 md:pl-[88px] md:pr-5">
+        <HealthTabs active="saude" />
+
+        <header className="mb-10 flex items-center gap-5">
+          <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-primary shadow-glow">
+            <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />
+            <span className="absolute inset-0 animate-ping rounded-2xl bg-primary/20 [animation-duration:3s]" />
           </div>
-          <ul className="divide-y divide-border">
-            {habitsQ.isPending && <li className="flex justify-center py-10"><Loader2 className="animate-spin text-cyan" /></li>}
-            {habitsQ.isError && <li className="py-10 text-center text-sm text-destructive">Não consegui carregar: {habitsQ.error.message}</li>}
-            {habitsQ.isSuccess && habits.length === 0 && <li className="py-10 text-center text-sm text-muted-foreground">Você ainda não tem hábitos. Crie o primeiro abaixo (ex.: beber 2 L de água).</li>}
-            {habits.map((h) => {
-              const Icon = getIcon(h.icon);
-              const on = doneByHabit.get(h.id)?.has(today) ?? false;
-              const s = streak(h.id);
-              return (
-                <li key={h.id} className="group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 py-3" style={tint(h.color)}>
-                  <button aria-label={on ? "Desmarcar hábito" : "Concluir hábito"} onClick={() => toggle.mutate({ habitId: h.id, date: today, done: on }, { onError: onErr })}
-                    className={`grid h-7 w-7 place-items-center rounded-full border transition ${on ? "border-emerald bg-emerald text-background shadow-[0_0_12px_var(--emerald)]" : "border-muted-foreground/50 hover:border-emerald"}`}>
-                    {on && <Check size={15} strokeWidth={3} />}
-                  </button>
-                  <Icon size={20} className="text-[color:var(--glow)]" />
-                  <span className="min-w-0">
-                    <b className={`block truncate text-sm font-semibold ${on ? "text-muted-foreground line-through" : ""}`}>{h.name}</b>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      {s > 0 ? <><Flame size={12} className="text-violet" /> {s} {s === 1 ? "dia" : "dias"} seguidos</> : "Sem sequência ainda"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="hidden gap-1 sm:flex" aria-label="Últimos 7 dias">
-                      {last7(h.id).map(({ d, on: o }) => (
-                        <span key={d.toISOString()} title={isoDate(d)} className={`grid h-5 w-5 place-items-center rounded-full text-[0.6rem] ${o ? "bg-emerald text-background" : "bg-secondary text-muted-foreground"}`}>{dow[d.getDay()]}</span>
-                      ))}
-                    </span>
-                    <button aria-label="Arquivar hábito" onClick={() => archive.mutate(h.id, { onError: onErr })}
-                      className="text-muted-foreground opacity-40 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={15} /></button>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <form onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-4 flex items-center gap-2 rounded-full border border-border p-1.5 pl-4 focus-within:border-emerald">
-            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Novo hábito…" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-            <button type="submit" disabled={create.isPending || !name.trim()} className="flex items-center gap-1.5 rounded-full bg-gradient-brand px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"><Plus size={14} /> Adicionar</button>
-          </form>
-        </Panel>
+          <div className="min-w-0">
+            <p className="font-mono text-[11px] uppercase tracking-normal text-primary">Módulo · Bem-estar</p>
+            <h1 className="font-display-h text-4xl font-semibold tracking-normal md:text-5xl">
+              Saúde<span className="text-primary">.</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">Cuide do seu corpo, evolua seus hábitos, alcance seus objetivos.</p>
+          </div>
+        </header>
 
-        <div className="flex flex-col gap-5">
-          <Panel c="cyan">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="icon-tile h-10 w-10 rounded-full"><Dumbbell size={18} /></span>
-              <span><b className="block font-display text-base">Treino da semana</b><span className="text-xs text-muted-foreground">Hoje: {todaySplit?.title ?? "—"}</span></span>
+        <section className="glass-h relative rounded-[2rem] p-6 md:p-10">
+          <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <h2 className="font-display-h text-2xl font-medium md:text-3xl">
+                Escolha o tipo de ficha <span className="text-gradient-h">que deseja montar</span>
+              </h2>
+              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+                Organize sua rotina, acompanhe seu progresso e mantenha o foco em um só lugar.
+              </p>
             </div>
-            <div className="flex justify-between text-sm"><span>{weekWorkouts} de {goal} treinos</span><span>{weekPct}%</span></div>
-            <div className="mt-2 h-2 rounded-full bg-secondary"><div className="h-full rounded-full bg-gradient-brand transition-all" style={{ width: `${weekPct}%` }} /></div>
-            <Link to="/treino" className="glass mt-4 flex items-center justify-center gap-2 rounded-full py-2.5 text-sm transition hover:shadow-[0_0_24px_-8px_var(--cyan)]">Abrir meu treino <ArrowRight size={15} /></Link>
-          </Panel>
+            <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-normal text-muted-foreground">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-primary" /> Sistema ativo
+            </div>
+          </div>
 
-          <Panel c="violet">
-            <div className="mb-3 flex items-center gap-3">
-              <span className="icon-tile h-10 w-10 rounded-full"><Target size={18} /></span>
-              <span><b className="block font-display text-base">Em breve</b><span className="text-xs text-muted-foreground">O que ainda vamos conectar.</span></span>
-            </div>
-            <ul className="space-y-2 text-sm">
-              {[[Salad, "Dieta e cardápio da semana"], [Scale, "Medidas e peso"], [CheckCircle2, "Fotos de evolução"]].map(([I, t]) => {
-                const Ic = I as typeof Salad;
-                return <li key={t as string} className="flex items-center gap-3 rounded-xl border border-dashed border-border px-3 py-2 text-muted-foreground"><Ic size={15} style={{ color: colorVar("violet") }} /> {t as string}</li>;
-              })}
-            </ul>
-          </Panel>
-        </div>
-      </div>
-    </PlanShell>
+           <div className="grid gap-5 lg:grid-cols-3">
+            {cards.map((c) => (
+              <Button variant="unstyled" size="unstyled" type="button" key={c.title} data-tone={c.tone}
+                onClick={() => setFicha(c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino")}
+                aria-label={c.cta}
+                className="health-sheet-card tone group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card/60 transition-all duration-500 hover:-translate-y-1.5 hover:border-[var(--tone)] hover:shadow-[0_30px_80px_-30px_var(--tone)] focus-visible:outline-2 focus-visible:outline-primary">
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  <img src={c.img} alt={c.title} width={1024} height={768} loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/10 to-transparent" />
+                  <span className="glass-h absolute left-4 top-4 rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-normal text-[var(--tone)]">
+                    {c.tag}
+                  </span>
+                </div>
+                <div className="relative -mt-4 flex flex-1 flex-col p-6">
+                  <div className="mb-3 flex items-center gap-4">
+                    <div className="grid h-12 w-12 place-items-center rounded-2xl border border-[var(--tone)]/40 bg-[var(--tone)]/10 text-[var(--tone)] backdrop-blur">
+                      <c.icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="min-w-0 flex-1 font-display-h text-xl font-medium">{c.title}</h3>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+                  </div>
+                  <p className="flex-1 text-sm leading-relaxed text-muted-foreground">{c.desc}</p>
+                </div>
+              </Button>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <Dialog open={ficha !== null} onOpenChange={(o) => !o && setFicha(null)}>
+        <DialogContent className="health-area block h-[92vh] w-[96vw] max-w-[1400px] overflow-y-auto rounded-[2rem] border-primary/20 bg-background p-0 text-foreground shadow-glow sm:max-w-[1400px]">
+          <DialogDescription className="sr-only">Dados da ficha de saúde</DialogDescription>
+          <DialogTitle className="sr-only">{ficha ? fichaTitle[ficha] : "Ficha"}</DialogTitle>
+          {ficha === "treino" && <NovaFichaTreino embedded onCancel={() => setFicha(null)} />}
+          {ficha === "dieta" && <DietBuilder embedded onCancel={() => setFicha(null)} />}
+          {ficha === "medidas" && <NovaFichaMedidas embedded onCancel={() => setFicha(null)} />}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

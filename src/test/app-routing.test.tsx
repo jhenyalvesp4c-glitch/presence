@@ -14,4 +14,26 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
+
+  it.each([
+    ["/saude", "/saude"],
+    ["/saude/treino", "/saude_/treino"],
+    ["/saude/dieta", "/saude_/dieta"],
+    ["/treino", "/treino"],
+    ["/treino/nova", "/treino_/nova"],
+    ["/treino/exercicios", "/treino_/exercicios"],
+    ["/dieta/nova", "/dieta/nova"],
+    ["/medidas/nova", "/medidas/nova"],
+    ["/hoje", "/hoje"],
+    ["/progresso", "/progresso"],
+    ["/resumo", "/resumo"],
+    ["/calendario", "/calendario"],
+    ["/habitos", "/habitos"],
+    ["/analise", "/analise"],
+    ["/projetos", "/projetos"],
+    ["/demandas", "/demandas"],
+  ])("matches %s to its own screen", (path, expectedId) => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+    expect(router.matchRoutes(path).at(-1)?.routeId).toBe(expectedId);
+  });
 });

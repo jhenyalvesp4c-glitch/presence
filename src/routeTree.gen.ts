@@ -10,20 +10,37 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnaliseRouteImport } from './routes/analise'
 import { Route as AssistenteRouteImport } from './routes/assistente'
+import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as DemandasRouteImport } from './routes/demandas'
+import { Route as HabitosRouteImport } from './routes/habitos'
+import { Route as HojeRouteImport } from './routes/hoje'
 import { Route as OrganizarRouteImport } from './routes/organizar'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
+import { Route as ProgressoRouteImport } from './routes/progresso'
 import { Route as ProjetosRouteImport } from './routes/projetos'
+import { Route as ResumoRouteImport } from './routes/resumo'
 import { Route as SaudeRouteImport } from './routes/saude'
 import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as TreinoRouteImport } from './routes/treino'
+import { Route as DietaNovaRouteImport } from './routes/dieta.nova'
+import { Route as MedidasNovaRouteImport } from './routes/medidas.nova'
 import { Route as OrganizarProntoRouteImport } from './routes/organizar_.pronto'
 import { Route as PlanejamentoDiaRouteImport } from './routes/planejamento_.dia'
+import { Route as SaudeDietaRouteImport } from './routes/saude_.dieta'
+import { Route as SaudeTreinoRouteImport } from './routes/saude_.treino'
+import { Route as TreinoExerciciosRouteImport } from './routes/treino_.exercicios'
+import { Route as TreinoNovaRouteImport } from './routes/treino_.nova'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnaliseRoute = AnaliseRouteImport.update({
+  id: '/analise',
+  path: '/analise',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AssistenteRoute = AssistenteRouteImport.update({
@@ -31,9 +48,24 @@ const AssistenteRoute = AssistenteRouteImport.update({
   path: '/assistente',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CalendarioRoute = CalendarioRouteImport.update({
+  id: '/calendario',
+  path: '/calendario',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DemandasRoute = DemandasRouteImport.update({
   id: '/demandas',
   path: '/demandas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HabitosRoute = HabitosRouteImport.update({
+  id: '/habitos',
+  path: '/habitos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HojeRoute = HojeRouteImport.update({
+  id: '/hoje',
+  path: '/hoje',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizarRoute = OrganizarRouteImport.update({
@@ -46,9 +78,19 @@ const PlanejamentoRoute = PlanejamentoRouteImport.update({
   path: '/planejamento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgressoRoute = ProgressoRouteImport.update({
+  id: '/progresso',
+  path: '/progresso',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjetosRoute = ProjetosRouteImport.update({
   id: '/projetos',
   path: '/projetos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResumoRoute = ResumoRouteImport.update({
+  id: '/resumo',
+  path: '/resumo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SaudeRoute = SaudeRouteImport.update({
@@ -66,6 +108,16 @@ const TreinoRoute = TreinoRouteImport.update({
   path: '/treino',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DietaNovaRoute = DietaNovaRouteImport.update({
+  id: '/dieta/nova',
+  path: '/dieta/nova',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MedidasNovaRoute = MedidasNovaRouteImport.update({
+  id: '/medidas/nova',
+  path: '/medidas/nova',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrganizarProntoRoute = OrganizarProntoRouteImport.update({
   id: '/organizar_/pronto',
   path: '/organizar/pronto',
@@ -76,101 +128,205 @@ const PlanejamentoDiaRoute = PlanejamentoDiaRouteImport.update({
   path: '/planejamento/dia',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SaudeDietaRoute = SaudeDietaRouteImport.update({
+  id: '/saude_/dieta',
+  path: '/saude/dieta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SaudeTreinoRoute = SaudeTreinoRouteImport.update({
+  id: '/saude_/treino',
+  path: '/saude/treino',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TreinoExerciciosRoute = TreinoExerciciosRouteImport.update({
+  id: '/treino_/exercicios',
+  path: '/treino/exercicios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TreinoNovaRoute = TreinoNovaRouteImport.update({
+  id: '/treino_/nova',
+  path: '/treino/nova',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/analise': typeof AnaliseRoute
   '/assistente': typeof AssistenteRoute
+  '/calendario': typeof CalendarioRoute
   '/demandas': typeof DemandasRoute
+  '/habitos': typeof HabitosRoute
+  '/hoje': typeof HojeRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
+  '/resumo': typeof ResumoRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
+  '/dieta/nova': typeof DietaNovaRoute
+  '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
   '/planejamento/dia': typeof PlanejamentoDiaRoute
+  '/saude/dieta': typeof SaudeDietaRoute
+  '/saude/treino': typeof SaudeTreinoRoute
+  '/treino/exercicios': typeof TreinoExerciciosRoute
+  '/treino/nova': typeof TreinoNovaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/analise': typeof AnaliseRoute
   '/assistente': typeof AssistenteRoute
+  '/calendario': typeof CalendarioRoute
   '/demandas': typeof DemandasRoute
+  '/habitos': typeof HabitosRoute
+  '/hoje': typeof HojeRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
+  '/resumo': typeof ResumoRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
+  '/dieta/nova': typeof DietaNovaRoute
+  '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
   '/planejamento/dia': typeof PlanejamentoDiaRoute
+  '/saude/dieta': typeof SaudeDietaRoute
+  '/saude/treino': typeof SaudeTreinoRoute
+  '/treino/exercicios': typeof TreinoExerciciosRoute
+  '/treino/nova': typeof TreinoNovaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/analise': typeof AnaliseRoute
   '/assistente': typeof AssistenteRoute
+  '/calendario': typeof CalendarioRoute
   '/demandas': typeof DemandasRoute
+  '/habitos': typeof HabitosRoute
+  '/hoje': typeof HojeRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
+  '/resumo': typeof ResumoRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
+  '/dieta/nova': typeof DietaNovaRoute
+  '/medidas/nova': typeof MedidasNovaRoute
   '/organizar_/pronto': typeof OrganizarProntoRoute
   '/planejamento_/dia': typeof PlanejamentoDiaRoute
+  '/saude_/dieta': typeof SaudeDietaRoute
+  '/saude_/treino': typeof SaudeTreinoRoute
+  '/treino_/exercicios': typeof TreinoExerciciosRoute
+  '/treino_/nova': typeof TreinoNovaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/analise'
     | '/assistente'
+    | '/calendario'
     | '/demandas'
+    | '/habitos'
+    | '/hoje'
     | '/organizar'
     | '/planejamento'
+    | '/progresso'
     | '/projetos'
+    | '/resumo'
     | '/saude'
     | '/tarefas'
     | '/treino'
+    | '/dieta/nova'
+    | '/medidas/nova'
     | '/organizar/pronto'
     | '/planejamento/dia'
+    | '/saude/dieta'
+    | '/saude/treino'
+    | '/treino/exercicios'
+    | '/treino/nova'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/analise'
     | '/assistente'
+    | '/calendario'
     | '/demandas'
+    | '/habitos'
+    | '/hoje'
     | '/organizar'
     | '/planejamento'
+    | '/progresso'
     | '/projetos'
+    | '/resumo'
     | '/saude'
     | '/tarefas'
     | '/treino'
+    | '/dieta/nova'
+    | '/medidas/nova'
     | '/organizar/pronto'
     | '/planejamento/dia'
+    | '/saude/dieta'
+    | '/saude/treino'
+    | '/treino/exercicios'
+    | '/treino/nova'
   id:
     | '__root__'
     | '/'
+    | '/analise'
     | '/assistente'
+    | '/calendario'
     | '/demandas'
+    | '/habitos'
+    | '/hoje'
     | '/organizar'
     | '/planejamento'
+    | '/progresso'
     | '/projetos'
+    | '/resumo'
     | '/saude'
     | '/tarefas'
     | '/treino'
+    | '/dieta/nova'
+    | '/medidas/nova'
     | '/organizar_/pronto'
     | '/planejamento_/dia'
+    | '/saude_/dieta'
+    | '/saude_/treino'
+    | '/treino_/exercicios'
+    | '/treino_/nova'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnaliseRoute: typeof AnaliseRoute
   AssistenteRoute: typeof AssistenteRoute
+  CalendarioRoute: typeof CalendarioRoute
   DemandasRoute: typeof DemandasRoute
+  HabitosRoute: typeof HabitosRoute
+  HojeRoute: typeof HojeRoute
   OrganizarRoute: typeof OrganizarRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
+  ProgressoRoute: typeof ProgressoRoute
   ProjetosRoute: typeof ProjetosRoute
+  ResumoRoute: typeof ResumoRoute
   SaudeRoute: typeof SaudeRoute
   TarefasRoute: typeof TarefasRoute
   TreinoRoute: typeof TreinoRoute
+  DietaNovaRoute: typeof DietaNovaRoute
+  MedidasNovaRoute: typeof MedidasNovaRoute
   OrganizarProntoRoute: typeof OrganizarProntoRoute
   PlanejamentoDiaRoute: typeof PlanejamentoDiaRoute
+  SaudeDietaRoute: typeof SaudeDietaRoute
+  SaudeTreinoRoute: typeof SaudeTreinoRoute
+  TreinoExerciciosRoute: typeof TreinoExerciciosRoute
+  TreinoNovaRoute: typeof TreinoNovaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -182,6 +338,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/analise': {
+      id: '/analise'
+      path: '/analise'
+      fullPath: '/analise'
+      preLoaderRoute: typeof AnaliseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assistente': {
       id: '/assistente'
       path: '/assistente'
@@ -189,11 +352,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssistenteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/calendario': {
+      id: '/calendario'
+      path: '/calendario'
+      fullPath: '/calendario'
+      preLoaderRoute: typeof CalendarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/demandas': {
       id: '/demandas'
       path: '/demandas'
       fullPath: '/demandas'
       preLoaderRoute: typeof DemandasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/habitos': {
+      id: '/habitos'
+      path: '/habitos'
+      fullPath: '/habitos'
+      preLoaderRoute: typeof HabitosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hoje': {
+      id: '/hoje'
+      path: '/hoje'
+      fullPath: '/hoje'
+      preLoaderRoute: typeof HojeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organizar': {
@@ -210,11 +394,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanejamentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/progresso': {
+      id: '/progresso'
+      path: '/progresso'
+      fullPath: '/progresso'
+      preLoaderRoute: typeof ProgressoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projetos': {
       id: '/projetos'
       path: '/projetos'
       fullPath: '/projetos'
       preLoaderRoute: typeof ProjetosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resumo': {
+      id: '/resumo'
+      path: '/resumo'
+      fullPath: '/resumo'
+      preLoaderRoute: typeof ResumoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/saude': {
@@ -238,6 +436,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TreinoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dieta/nova': {
+      id: '/dieta/nova'
+      path: '/dieta/nova'
+      fullPath: '/dieta/nova'
+      preLoaderRoute: typeof DietaNovaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/medidas/nova': {
+      id: '/medidas/nova'
+      path: '/medidas/nova'
+      fullPath: '/medidas/nova'
+      preLoaderRoute: typeof MedidasNovaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/organizar_/pronto': {
       id: '/organizar_/pronto'
       path: '/organizar/pronto'
@@ -252,21 +464,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanejamentoDiaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/saude_/dieta': {
+      id: '/saude_/dieta'
+      path: '/saude/dieta'
+      fullPath: '/saude/dieta'
+      preLoaderRoute: typeof SaudeDietaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/saude_/treino': {
+      id: '/saude_/treino'
+      path: '/saude/treino'
+      fullPath: '/saude/treino'
+      preLoaderRoute: typeof SaudeTreinoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/treino_/exercicios': {
+      id: '/treino_/exercicios'
+      path: '/treino/exercicios'
+      fullPath: '/treino/exercicios'
+      preLoaderRoute: typeof TreinoExerciciosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/treino_/nova': {
+      id: '/treino_/nova'
+      path: '/treino/nova'
+      fullPath: '/treino/nova'
+      preLoaderRoute: typeof TreinoNovaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnaliseRoute: AnaliseRoute,
   AssistenteRoute: AssistenteRoute,
+  CalendarioRoute: CalendarioRoute,
   DemandasRoute: DemandasRoute,
+  HabitosRoute: HabitosRoute,
+  HojeRoute: HojeRoute,
   OrganizarRoute: OrganizarRoute,
   PlanejamentoRoute: PlanejamentoRoute,
+  ProgressoRoute: ProgressoRoute,
   ProjetosRoute: ProjetosRoute,
+  ResumoRoute: ResumoRoute,
   SaudeRoute: SaudeRoute,
   TarefasRoute: TarefasRoute,
   TreinoRoute: TreinoRoute,
+  DietaNovaRoute: DietaNovaRoute,
+  MedidasNovaRoute: MedidasNovaRoute,
   OrganizarProntoRoute: OrganizarProntoRoute,
   PlanejamentoDiaRoute: PlanejamentoDiaRoute,
+  SaudeDietaRoute: SaudeDietaRoute,
+  SaudeTreinoRoute: SaudeTreinoRoute,
+  TreinoExerciciosRoute: TreinoExerciciosRoute,
+  TreinoNovaRoute: TreinoNovaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

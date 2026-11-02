@@ -280,3 +280,135 @@
   position: relative;
   &::after { content: ""; position: absolute; bottom: 3px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 9999px; background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
 }
+
+/* ===== Saúde pages (scoped under .health-area) ===== */
+@theme inline {
+  --font-body: "Manrope", sans-serif;
+  --font-display-h: "Space Grotesk", sans-serif;
+  --color-primary-glow: var(--primary-glow);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+.health-area {
+  --background: oklch(0.13 0.03 255);
+  --primary-glow: oklch(0.6 0.2 290);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.17 0.03 258);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.8 0.14 210);
+  --primary-foreground: oklch(0.15 0.03 255);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+@utility font-display-h { font-family: var(--font-display-h); }
+@utility font-body { font-family: var(--font-body); }
+@utility bg-gradient-primary { background: linear-gradient(135deg, var(--primary), var(--primary-glow)); }
+@utility text-gradient-h { background: linear-gradient(90deg, var(--primary), var(--primary-glow)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@utility shadow-glow { box-shadow: 0 0 40px -8px color-mix(in oklab, var(--primary) 60%, transparent); }
+@utility glass-h {
+  background: color-mix(in oklab, var(--card) 55%, transparent);
+  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+  backdrop-filter: blur(20px);
+}
+@utility aurora {
+  background:
+    radial-gradient(40% 35% at 15% 10%, color-mix(in oklab, var(--primary-glow) 35%, transparent), transparent 70%),
+    radial-gradient(35% 30% at 85% 20%, color-mix(in oklab, var(--primary) 25%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 50% 100%, color-mix(in oklab, var(--primary) 15%, transparent), transparent 70%);
+}
+@utility grid-bg {
+  background-image: linear-gradient(color-mix(in oklab, var(--foreground) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--foreground) 5%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at top, black 30%, transparent 75%);
+}
+@utility health-shine {
+  background: linear-gradient(110deg, transparent 30%, color-mix(in oklab, var(--foreground) 12%, transparent) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.9s ease;
+  .group:hover & { transform: translateX(100%); }
+}
+.health-area .tone[data-tone="violet"] { --tone: var(--violet); }
+.health-area .tone[data-tone="emerald"] { --tone: var(--emerald); }
+.health-area .tone[data-tone="cyan"] { --tone: var(--cyan); }
+
+@theme inline {
+  --color-nutrition-protein: var(--nutrition-protein);
+  --color-nutrition-carb: var(--nutrition-carb);
+  --color-nutrition-fat: var(--nutrition-fat);
+}
+.nutrition-page {
+  --nutrition-protein: var(--primary);
+  --nutrition-carb: var(--primary-glow);
+  --nutrition-fat: var(--foreground);
+  letter-spacing: 0;
+}
+.nutrition-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--card) 60%, transparent);
+  padding: 14px 16px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 180ms ease;
+}
+.nutrition-input:focus { border-color: var(--primary); }
+.nutrition-input::placeholder { color: var(--muted-foreground); opacity: 0.65; }
+.nutrition-art { mask-image: linear-gradient(to bottom, black 75%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .nutrition-page *, .nutrition-page *::before, .nutrition-page *::after { animation: none !important; transition: none !important; }
+}
+
+@keyframes muscle-glow { 0% { opacity: 0; transform: scale(.85); } 60% { opacity: 1; transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes muscle-breathe { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
+.muscle-glow { transform-box: fill-box; transform-origin: center; animation: muscle-glow .6s cubic-bezier(.2,.7,.2,1) both, muscle-breathe 2.4s ease-in-out .6s infinite; }
+@keyframes muscle-pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.muscle-pop { animation: muscle-pop .45s cubic-bezier(.2,.7,.2,1) both; }
+@media (prefers-reduced-motion: reduce) { .muscle-glow, .muscle-pop { animation: none; } }
+
+/* Barras de rolagem neon nas páginas de saúde */
+.health-area, .health-area * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--primary) 55%, transparent) transparent; }
+.health-area ::-webkit-scrollbar { width: 6px; height: 6px; }
+.health-area ::-webkit-scrollbar-track { background: transparent; }
+.health-area ::-webkit-scrollbar-thumb { border-radius: 999px; background: linear-gradient(180deg, var(--primary), var(--primary-glow)); box-shadow: 0 0 8px color-mix(in oklab, var(--primary) 60%, transparent); }
+.health-area ::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+
+.health-area { letter-spacing: 0; }
+.health-area .health-sheet-card { text-align: left; align-items: stretch; gap: 0; }
+.health-area .health-sheet-card > div { width: 100%; }
+.health-area h1, .health-area h2, .health-area h3 { overflow-wrap: anywhere; }
+.health-area .nutrition-input { letter-spacing: 0; }
+.health-dialog-overlay { background: color-mix(in oklab, var(--background) 85%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+ .health-area *, .health-area *::before, .health-area *::after { animation: none !important; transition: none !important; }
+}
