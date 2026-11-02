@@ -8,6 +8,7 @@ import {
 import { BodyMap } from "@/components/body-map";
 import { HealthTabs } from "@/components/health-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
+import { HealthLoading } from "@/components/health-loading";
 
 
 export const Route = createFileRoute("/treino_/exercicios")({
@@ -82,7 +83,13 @@ function novaSessao(id: number, indice: number): Sessao {
   return { id, nome: `Treino ${LETRAS[indice] ?? indice + 1}`, dias: [], exercicios: [] };
 }
 
+/** Espera as fichas carregarem do banco antes de montar o formulário (que lê os valores iniciais uma única vez). */
 function MontarTreinos() {
+  const { ready } = useHealthPreview();
+  return ready ? <MontarTreinosForm /> : <HealthLoading />;
+}
+
+function MontarTreinosForm() {
   const { workout, setWorkout } = useHealthPreview();
   const navigate = useNavigate();
   const { nome: searchName } = Route.useSearch();

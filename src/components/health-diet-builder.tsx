@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import dietAthleteAsset from "@/assets/dieta-atleta.jpg";
 import { HealthTabs } from "@/components/health-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
+import { HealthLoading } from "@/components/health-loading";
 
 const dietAthlete = dietAthleteAsset;
 
@@ -32,7 +33,14 @@ function SectionHeading({ number, icon: Icon, title, optional }: { number: strin
   return <div className="mb-5 flex items-center gap-3"><span className="font-mono text-xs text-primary/60">{number}</span><Icon className="h-4 w-4 text-primary" /><h2 className="font-display-h text-base font-medium">{title}</h2>{optional && <span className="ml-auto text-xs text-muted-foreground">Opcional</span>}</div>;
 }
 
-export function DietBuilder({ embedded = false, onCancel }: { embedded?: boolean; onCancel?: () => void } = {}) {
+type DietBuilderProps = { embedded?: boolean; onCancel?: () => void };
+/** Espera as fichas carregarem do banco antes de montar o formulário (que lê os valores iniciais uma única vez). */
+export function DietBuilder(props: DietBuilderProps) {
+  const { ready } = useHealthPreview();
+  return ready ? <DietBuilderForm {...props} /> : <HealthLoading />;
+}
+
+function DietBuilderForm({ embedded = false, onCancel }: { embedded?: boolean; onCancel?: () => void } = {}) {
   const { diet, setDiet } = useHealthPreview();
   const navigate = useNavigate();
   const [name, setName] = useState(diet?.name ?? "");

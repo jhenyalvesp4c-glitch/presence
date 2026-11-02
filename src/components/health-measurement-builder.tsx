@@ -11,6 +11,7 @@ import {
 import heroAsset from "@/assets/medidas-hero.jpg";
 import { HealthTabs } from "@/components/health-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
+import { HealthLoading } from "@/components/health-loading";
 
 const hero = heroAsset;
 
@@ -59,7 +60,14 @@ function Field({
   );
 }
 
-export function NovaFichaMedidas({ embedded = false, onCancel }: { embedded?: boolean; onCancel?: () => void } = {}) {
+type NovaFichaMedidasProps = { embedded?: boolean; onCancel?: () => void };
+/** Espera as fichas carregarem do banco antes de montar o formulário (que lê os valores iniciais uma única vez). */
+export function NovaFichaMedidas(props: NovaFichaMedidasProps) {
+  const { ready } = useHealthPreview();
+  return ready ? <NovaFichaMedidasForm {...props} /> : <HealthLoading />;
+}
+
+function NovaFichaMedidasForm({ embedded = false, onCancel }: { embedded?: boolean; onCancel?: () => void } = {}) {
   const { measurements, setMeasurements } = useHealthPreview();
   const navigate = useNavigate();
   const [nome, setNome] = useState(measurements?.nome ?? "");

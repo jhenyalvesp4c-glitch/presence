@@ -94,7 +94,7 @@ function useInvalidateWorkouts() {
   const qc = useQueryClient();
   return () =>
     Promise.all(
-      ["sessions-recent", "session-logs", "session-done-count", "load-history"].map((k) => qc.invalidateQueries({ queryKey: [k] })),
+      ["sessions-recent", "session-logs", "session-done-count", "load-history", "health"].map((k) => qc.invalidateQueries({ queryKey: [k] })),
     );
 }
 

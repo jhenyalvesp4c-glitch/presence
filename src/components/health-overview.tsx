@@ -4,6 +4,7 @@ import { Sun, Dumbbell, Utensils, ScanLine, ArrowUpRight, Moon, Check, Pencil, F
 import { HealthTabs } from "@/components/health-tabs";
 import { HealthSheetTabs, type SheetTab } from "@/components/health-sheet-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
+import { HealthLoading } from "@/components/health-loading";
 import { Button } from "@/components/ui/button";
 import { measurementLabels, workoutsForDate } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
@@ -16,17 +17,16 @@ function Action({ to, children }: { to: "/treino/nova" | "/treino/exercicios" | 
   return <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-muted-foreground"><Link to={to}>{children}<ArrowUpRight /></Link></Button>;
 }
 export function HealthOverview({ tab }: { tab: SheetTab }) {
-  const { workout, diet, measurements } = useHealthPreview();
+  const { workout, diet, measurements, ready, doneKeys: done, toggleDone: toggle } = useHealthPreview();
   const [now, setNow] = useState<Date | null>(null);
-  const [done, setDone] = useState<string[]>([]);
   useEffect(() => { setNow(new Date()); }, []);
   const todayWorkouts = now ? workoutsForDate(workout, now) : [];
   const sessions = tab === "treino" ? workout?.sessoes ?? [] : todayWorkouts;
   const title = { hoje: "Hoje", treino: "Seus treinos", dieta: "Sua alimentação", progresso: "Seu progresso" }[tab];
-  const toggle = (key: string) => setDone(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
   const showWorkout = tab === "hoje" || tab === "treino";
   const showDiet = tab === "hoje" || tab === "dieta";
   const showBody = tab === "hoje" || tab === "progresso";
+  if (!ready) return <HealthLoading />;
   return <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
     <div className="aurora pointer-events-none absolute inset-0" /><div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
     <main className="relative z-10 mx-auto max-w-[1440px] px-5 py-6 sm:px-8 lg:px-12">

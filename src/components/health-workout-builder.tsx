@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { TreinoBuilder, novaSessao } from "@/components/treino-builder";
 import { useHealthPreview } from "@/components/health-preview-provider";
+import { HealthLoading } from "@/components/health-loading";
 import type { WorkoutSession } from "@/lib/health-preview";
 import { useState } from "react";
 import {
@@ -53,7 +54,14 @@ function SectionTitle({ icon: Icon, title, hint }: { icon: typeof Tag; title: st
   );
 }
 
-export function NovaFichaTreino({ embedded = false, onCancel }: { embedded?: boolean; onCancel?: () => void } = {}) {
+type NovaFichaTreinoProps = { embedded?: boolean; onCancel?: () => void };
+/** Espera as fichas carregarem do banco antes de montar o formulário (que lê os valores iniciais uma única vez). */
+export function NovaFichaTreino(props: NovaFichaTreinoProps) {
+  const { ready } = useHealthPreview();
+  return ready ? <NovaFichaTreinoForm {...props} /> : <HealthLoading />;
+}
+
+function NovaFichaTreinoForm({ embedded = false, onCancel }: { embedded?: boolean; onCancel?: () => void } = {}) {
   const { workout, setWorkout } = useHealthPreview();
   const [nome, setNome] = useState(workout?.nome ?? "");
   const [tipo, setTipo] = useState("Musculação");
