@@ -852,13 +852,13 @@ function PolosPanel({ items, state, active, onPick, onChange, usage, onRename, o
         <Search size={12} className="text-muted-foreground" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar ${L.singular.toLowerCase()}…`} className="w-full bg-transparent text-xs outline-none" />
       </label>
-      <div className="mt-3 max-h-[520px] space-y-0.5 overflow-y-auto pr-1">
+      <div className="mt-3 grid max-h-40 grid-cols-2 gap-x-2 gap-y-0.5 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-5 2xl:max-h-[520px] 2xl:grid-cols-1" data-testid="lista-dossies">
         {state.dossiers.filter((x) => x.name.toLowerCase().includes(q.toLowerCase())).map((x) => {
           const p = x.name;
           const s = stat(p);
           if (ed.edit?.id === x.id) {
             return (
-              <form key={x.id} onSubmit={(e) => { e.preventDefault(); ed.save(); }} className="space-y-1.5 rounded-lg border border-cyan/40 bg-secondary/30 p-2">
+              <form key={x.id} onSubmit={(e) => { e.preventDefault(); ed.save(); }} className="col-span-full space-y-1.5 rounded-lg border border-cyan/40 bg-secondary/30 p-2">
                 <input autoFocus value={ed.edit.name} onChange={(e) => ed.setEdit({ ...ed.edit!, name: e.target.value })} className="w-full rounded-md border border-border bg-secondary/40 px-2 py-1 text-xs outline-none" />
                 <input value={ed.edit.desc} onChange={(e) => ed.setEdit({ ...ed.edit!, desc: e.target.value })} placeholder="Descrição" className="w-full rounded-md border border-border bg-secondary/40 px-2 py-1 text-xs outline-none" />
                 {ed.err && <p className="text-[0.65rem] text-destructive">{ed.err}</p>}
@@ -881,9 +881,9 @@ function PolosPanel({ items, state, active, onPick, onChange, usage, onRename, o
             </div>
           );
         })}
-        {!state.dossiers.length && <p className="p-3 text-center text-xs text-muted-foreground">Nenhum cadastrado. Use “Novo”.</p>}
+        {!state.dossiers.length && <p className="col-span-full p-3 text-center text-xs text-muted-foreground">Nenhum cadastrado. Use “Novo”.</p>}
       </div>
-      <div className="relative mt-4 overflow-hidden rounded-2xl border border-border p-4">
+      <div className="relative mt-4 hidden overflow-hidden rounded-2xl border border-border p-4 2xl:block">
         <Atom size={34} className="mb-2 animate-[spin_12s_linear_infinite] text-cyan drop-shadow-[0_0_10px_var(--cyan)]" />
         <p className="text-xs leading-relaxed text-muted-foreground">Grandes resultados são construídos com organização, foco e trabalho em equipe.</p>
         <p className="mt-2 mono-caps">— P4C</p>
