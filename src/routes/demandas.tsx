@@ -327,7 +327,7 @@ function Demandas() {
                   ))}
                 </div>
               </section>
-              <PolosPanel items={items} names={names} active={poloF} onPick={(p) => setPoloF(p === poloF ? null : p)} />
+              <PolosPanel items={items} state={ds} active={poloF} onPick={(p) => setPoloF(p === poloF ? null : p)} onChange={changeDs} usage={usage} onRename={renameDossier} onRemove={removeDossier} />
             </div>
           ) : (
             <FullBoard type={tab} items={filtered.filter((i) => i.type === tab)} selId={selId} onOpen={setSelId} onCreate={(s) => setNewOpen({ type: tab, status: s })} />
@@ -468,20 +468,20 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
 }
 
 /* ---------------- cadastro de dossiês ---------------- */
-function DossierManager({ state, onChange, usage, onRename, onRemove }: {
-  state: DossierState; onChange: (s: DossierState) => void; usage: (name: string) => number;
-  onRename: (o: string, n: string) => void; onRemove: (name: string) => void;
-}) {
+type DossierActions = Pick<Parameters<typeof DossierManager>[0], "state" | "onChange" | "usage" | "onRename" | "onRemove">;
+/** Adicionar, editar e excluir dossiês (usado no cadastro e no painel lateral). */
+function useDossierEditor({ state, onChange, usage, onRename, onRemove }: DossierActions) {
   const L = state.label;
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [err, setErr] = useState("");
   const [edit, setEdit] = useState<{ id: string; name: string; desc: string } | null>(null);
   const taken = (n: string, except?: string) => state.dossiers.some((x) => x.id !== except && x.name.trim().toLowerCase() === n.trim().toLowerCase());
+  const dup = () => `Já existe ${gender(L).um.toLowerCase()} ${L.singular.toLowerCase()} com esse nome.`;
   const add = () => {
     const n = name.trim();
     if (!n) return;
-    if (taken(n)) return setErr(`Já existe ${gender(L).um.toLowerCase()} ${L.singular.toLowerCase()} com esse nome.`);
+    if (taken(n)) return setErr(dup());
     onChange({ ...state, dossiers: [...state.dossiers, { id: `d${Date.now()}`, name: n, desc: desc.trim() }] });
     setName(""); setDesc(""); setErr("");
   };
@@ -490,7 +490,7 @@ function DossierManager({ state, onChange, usage, onRename, onRemove }: {
     const n = edit.name.trim();
     const old = state.dossiers.find((x) => x.id === edit.id);
     if (!old || !n) return;
-    if (taken(n, edit.id)) return setErr(`Já existe ${gender(L).um.toLowerCase()} ${L.singular.toLowerCase()} com esse nome.`);
+    if (taken(n, edit.id)) return setErr(dup());
     if (old.name !== n) onRename(old.name, n);
     onChange({ ...state, dossiers: state.dossiers.map((x): Dossier => (x.id === edit.id ? { ...x, name: n, desc: edit.desc.trim() } : x)) });
     setEdit(null); setErr("");
@@ -502,6 +502,15 @@ function DossierManager({ state, onChange, usage, onRename, onRemove }: {
     onRemove(x.name);
     onChange({ ...state, dossiers: state.dossiers.filter((d) => d.id !== x.id) });
   };
+  return { name, setName, desc, setDesc, err, setErr, edit, setEdit, add, save, del };
+}
+
+function DossierManager({ state, onChange, usage, onRename, onRemove }: {
+  state: DossierState; onChange: (s: DossierState) => void; usage: (name: string) => number;
+  onRename: (o: string, n: string) => void; onRemove: (name: string) => void;
+}) {
+  const L = state.label;
+  const { name, setName, desc, setDesc, err, setErr, edit, setEdit, add, save, del } = useDossierEditor({ state, onChange, usage, onRename, onRemove });
   return (
     <section className="glass space-y-5 rounded-3xl p-5 animate-rise" style={tint("pink")}>
       <div className="flex flex-wrap items-center gap-3">
@@ -807,9 +816,15 @@ function ListView({ items, selId, onOpen }: { items: Demand[]; selId: string | n
   );
 }
 
-function PolosPanel({ items, names, active, onPick }: { items: Demand[]; names: string[]; active: string | null; onPick: (p: string) => void }) {
-  const L = useLabel();
+function PolosPanel({ items, state, active, onPick, onChange, usage, onRename, onRemove }: {
+  items: Demand[]; state: DossierState; active: string | null; onPick: (p: string) => void;
+  onChange: (s: DossierState) => void; usage: (name: string) => number; onRename: (o: string, n: string) => void; onRemove: (name: string) => void;
+}) {
+  const L = state.label;
+  const names = state.dossiers.map((x) => x.name);
   const [q, setQ] = useState("");
+  const [adding, setAdding] = useState(false);
+  const ed = useDossierEditor({ state, onChange, usage, onRename, onRemove });
   const stat = (p: string) => {
     const e = items.flatMap((i) => (i.polo === p ? [i.status] : i.polos?.filter((x) => x.name === p).map((x) => x.status) ?? []));
     return { d: e.filter((s) => s === "done").length, t: e.length };
@@ -818,26 +833,55 @@ function PolosPanel({ items, names, active, onPick }: { items: Demand[]; names: 
     <aside className="glass rounded-3xl p-4 animate-rise" style={{ animationDelay: ".1s" }}>
       <div className="flex items-center gap-2">
         <Folder size={16} className="text-cyan" />
-        <h3 className="font-display font-semibold">{L.plural}</h3>
+        <h3 className="flex-1 font-display font-semibold">{L.plural}</h3>
+        <button onClick={() => { setAdding((a) => !a); ed.setErr(""); }} data-testid="painel-novo" className="tag flex items-center gap-1" style={tint("cyan")}><Plus size={10} /> Novo</button>
       </div>
-      <p className="text-[0.68rem] text-muted-foreground">Clique para filtrar o Kanban.</p>
+      <p className="text-[0.68rem] text-muted-foreground">Clique para filtrar o Kanban. Lápis edita, lixeira exclui.</p>
+      {adding && (
+        <form onSubmit={(e) => { e.preventDefault(); ed.add(); }} className="mt-3 space-y-2 rounded-xl border border-border bg-secondary/25 p-2">
+          <input autoFocus value={ed.name} onChange={(e) => { ed.setName(e.target.value); ed.setErr(""); }} placeholder={`Nome d${gender(L).um === "Uma" ? "a" : "o"} ${L.singular.toLowerCase()}`} data-testid="painel-nome" className="w-full rounded-lg border border-border bg-secondary/40 px-2 py-1.5 text-xs outline-none focus:border-cyan/60" />
+          <input value={ed.desc} onChange={(e) => ed.setDesc(e.target.value)} placeholder="Descrição (opcional)" className="w-full rounded-lg border border-border bg-secondary/40 px-2 py-1.5 text-xs outline-none focus:border-cyan/60" />
+          {ed.err && <p className="text-[0.65rem] text-destructive">{ed.err}</p>}
+          <div className="flex gap-2">
+            <button disabled={!ed.name.trim()} data-testid="painel-salvar" className="flex-1 rounded-lg border border-cyan/60 bg-cyan/10 py-1.5 text-xs text-cyan transition hover:bg-cyan/20 disabled:opacity-40">Adicionar</button>
+            <button type="button" onClick={() => { setAdding(false); ed.setErr(""); }} className="rounded-lg border border-border px-3 text-xs">Cancelar</button>
+          </div>
+        </form>
+      )}
       <label className="mt-3 flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-1.5">
         <Search size={12} className="text-muted-foreground" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar ${L.singular.toLowerCase()}…`} className="w-full bg-transparent text-xs outline-none" />
       </label>
       <div className="mt-3 max-h-[520px] space-y-0.5 overflow-y-auto pr-1">
-        {names.filter((p) => p.toLowerCase().includes(q.toLowerCase())).map((p) => {
+        {state.dossiers.filter((x) => x.name.toLowerCase().includes(q.toLowerCase())).map((x) => {
+          const p = x.name;
           const s = stat(p);
+          if (ed.edit?.id === x.id) {
+            return (
+              <form key={x.id} onSubmit={(e) => { e.preventDefault(); ed.save(); }} className="space-y-1.5 rounded-lg border border-cyan/40 bg-secondary/30 p-2">
+                <input autoFocus value={ed.edit.name} onChange={(e) => ed.setEdit({ ...ed.edit!, name: e.target.value })} className="w-full rounded-md border border-border bg-secondary/40 px-2 py-1 text-xs outline-none" />
+                <input value={ed.edit.desc} onChange={(e) => ed.setEdit({ ...ed.edit!, desc: e.target.value })} placeholder="Descrição" className="w-full rounded-md border border-border bg-secondary/40 px-2 py-1 text-xs outline-none" />
+                {ed.err && <p className="text-[0.65rem] text-destructive">{ed.err}</p>}
+                <div className="flex gap-1.5">
+                  <button className="flex-1 rounded-md border border-emerald/50 py-1 text-[0.65rem] text-emerald">Salvar</button>
+                  <button type="button" onClick={() => { ed.setEdit(null); ed.setErr(""); }} className="rounded-md border border-border px-2 text-[0.65rem]">Cancelar</button>
+                </div>
+              </form>
+            );
+          }
           return (
-            <button key={p} onClick={() => onPick(p)} style={tint(dossierColor(names, p))}
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition hover:bg-secondary/60 ${active === p ? "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)]" : ""}`}>
-              <FolderOpen size={14} className="text-[var(--glow)]" />
-              <span className="flex-1 truncate text-left">{p}</span>
-              <span className="font-mono text-[0.6rem] text-muted-foreground">{s.d}/{s.t}</span>
-              <ChevronRight size={12} className="text-muted-foreground" />
-            </button>
+            <div key={x.id} style={tint(dossierColor(names, p))} className={`group flex items-center rounded-lg transition hover:bg-secondary/60 ${active === p ? "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)]" : ""}`}>
+              <button onClick={() => onPick(p)} title={x.desc || undefined} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-xs">
+                <FolderOpen size={14} className="shrink-0 text-[var(--glow)]" />
+                <span className="flex-1 truncate text-left">{p}</span>
+                <span className="font-mono text-[0.6rem] text-muted-foreground">{s.d}/{s.t}</span>
+              </button>
+              <button onClick={() => ed.setEdit({ id: x.id, name: x.name, desc: x.desc })} aria-label={`Editar ${p}`} className="p-1 text-muted-foreground transition hover:text-cyan"><Pencil size={12} /></button>
+              <button onClick={() => ed.del(x)} aria-label={`Excluir ${p}`} className="p-1 pr-2 text-muted-foreground transition hover:text-destructive"><Trash2 size={12} /></button>
+            </div>
           );
         })}
+        {!state.dossiers.length && <p className="p-3 text-center text-xs text-muted-foreground">Nenhum cadastrado. Use “Novo”.</p>}
       </div>
       <div className="relative mt-4 overflow-hidden rounded-2xl border border-border p-4">
         <Atom size={34} className="mb-2 animate-[spin_12s_linear_infinite] text-cyan drop-shadow-[0_0_10px_var(--cyan)]" />
