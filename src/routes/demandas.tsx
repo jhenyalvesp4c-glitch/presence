@@ -424,12 +424,13 @@ function TargetPicker({ names, value, onChange, single }: { names: string[]; val
         )}
       </div>
       {except && !single && <p className="mt-2 text-[0.65rem] text-violet">{g.todos} marcados: desmarque {g.um.toLowerCase() === "uma" ? "as" : "os"} que ficam de fora.</p>}
-      <div className="mt-2 grid max-h-52 gap-1 overflow-y-auto pr-1 sm:grid-cols-2">
+      <div className="scroll-neon mt-2 grid max-h-48 gap-1.5 overflow-y-auto pr-1.5 sm:grid-cols-2">
         {shown.map((n) => {
           const on = value.includes(n);
           return (
-            <label key={n} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition ${on ? "border-cyan/50 bg-cyan/10 text-cyan" : "border-border hover:bg-secondary/50"}`}>
-              <input type={single ? "radio" : "checkbox"} name="alvo" checked={on} onChange={() => toggle(n)} className="accent-[var(--cyan)]" />
+            <label key={n} className={`group/opt flex cursor-pointer items-center gap-2 rounded-xl border px-2.5 py-2 text-xs transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cyan/50 ${on ? "border-cyan/60 bg-cyan/10 text-cyan shadow-[0_0_16px_-8px_var(--cyan)]" : "border-border bg-secondary/20 hover:border-cyan/30 hover:bg-secondary/50"}`}>
+              <input type={single ? "radio" : "checkbox"} name="alvo" checked={on} onChange={() => toggle(n)} className="sr-only" />
+              <span className={`grid h-4 w-4 shrink-0 place-items-center border transition ${single ? "rounded-full" : "rounded-md"} ${on ? "border-cyan bg-cyan text-background" : "border-muted-foreground/40"}`}>{on && <Check size={11} strokeWidth={3} />}</span>
               <span className="truncate">{n}</span>
             </label>
           );
@@ -457,53 +458,55 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const deadline = date ? date.split("-").reverse().slice(0, 2).join("/") : "";
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-background/70 p-4 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" onClick={onClose}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status }); }}
-        className="glass relative w-full max-w-2xl space-y-4 rounded-3xl p-5 animate-in zoom-in-95" role="dialog" aria-label="Nova demanda">
-        <div className="flex items-center gap-3">
+        className="glass relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label="Nova demanda">
+        <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10" style={tint("cyan")}><Plus size={18} /></span>
           <h2 className="flex-1 font-display text-xl font-bold">Nova demanda</h2>
           <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary" aria-label="Fechar"><X size={18} /></button>
         </div>
 
-        <div>
-          <p className="mono-caps mb-2">Para quem?</p>
-          <div className="grid grid-cols-3 gap-2">
-            {(["geral", "polo", "multi"] as DType[]).map((t) => (
-              <button key={t} type="button" onClick={() => pick(t)} style={tint(tm[t].color)} data-testid={`alvo-${t}`}
-                className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs transition ${type === t ? "border-[var(--glow)] bg-[color-mix(in_oklab,var(--glow)_14%,transparent)] text-[var(--glow)] shadow-[0_0_20px_-6px_var(--glow)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
-                {(() => { const I = tm[t].icon; return <I size={18} />; })()}
-                <span className="font-medium">{tm[t].short}</span>
-              </button>
-            ))}
+        <div className="scroll-neon min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <label className="block">
+            <span className="mono-caps">Título</span>
+            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="O que precisa ser feito?" data-testid="demanda-titulo"
+              className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-cyan/60" />
+          </label>
+          <label className="block">
+            <span className="mono-caps">Descrição</span>
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="Detalhes (opcional)"
+              className="mt-1 w-full resize-none rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mono-caps">Prioridade</span>
+              <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60 [&>option]:bg-popover">
+                {(Object.keys(prio) as Priority[]).map((p) => <option key={p} value={p}>{prio[p].label}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mono-caps">Prazo</span>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]" />
+            </label>
           </div>
+
+          <div>
+            <p className="mono-caps mb-2">Para quem?</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(["geral", "polo", "multi"] as DType[]).map((t) => (
+                <button key={t} type="button" onClick={() => pick(t)} style={tint(tm[t].color)} data-testid={`alvo-${t}`}
+                  className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs transition ${type === t ? "border-[var(--glow)] bg-[color-mix(in_oklab,var(--glow)_14%,transparent)] text-[var(--glow)] shadow-[0_0_20px_-6px_var(--glow)]" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                  {(() => { const I = tm[t].icon; return <I size={18} />; })()}
+                  <span className="font-medium">{tm[t].short}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {needs && <TargetPicker names={dossiers} value={targets} onChange={setTargets} single={type === "polo"} />}
         </div>
 
-        {needs && <TargetPicker names={dossiers} value={targets} onChange={setTargets} single={type === "polo"} />}
-
-        <label className="block">
-          <span className="mono-caps">Título</span>
-          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="O que precisa ser feito?" data-testid="demanda-titulo"
-            className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
-        </label>
-        <label className="block">
-          <span className="mono-caps">Descrição</span>
-          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Detalhes (opcional)"
-            className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mono-caps">Prioridade</span>
-            <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none [&>option]:bg-popover">
-              {(Object.keys(prio) as Priority[]).map((p) => <option key={p} value={p}>{prio[p].label}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mono-caps">Prazo</span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none" />
-          </label>
-        </div>
-        <div className="flex gap-2 pt-1">
+        <div className="flex shrink-0 gap-2 border-t border-border px-5 py-4">
           <button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2.5 text-sm transition hover:border-cyan/40">Cancelar</button>
           <button disabled={!ok} data-testid="criar-demanda" className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-cyan/60 bg-cyan/10 py-2.5 text-sm text-cyan shadow-[0_0_24px_-8px_var(--cyan)] transition hover:bg-cyan/20 disabled:opacity-40">
             <Check size={15} /> {type === "multi" && targets.length ? `Criar para ${targets.length} ${targets.length === 1 ? "selecionado" : "selecionados"}` : "Criar demanda"}
@@ -639,7 +642,7 @@ function Matrix({ items, names, selId, onOpen, onCell }: { items: Demand[]; name
           <span className="flex items-center gap-1"><Circle size={13} /> A fazer</span>
         </span>
       </div>
-      <div className="overflow-x-auto">
+      <div className="scroll-neon overflow-x-auto">
         <table className="w-max min-w-full border-collapse text-xs" data-testid="matriz">
           <thead>
             <tr>
@@ -909,7 +912,7 @@ function PolosPanel({ items, state, active, onPick, onChange, usage, onRename, o
         <Search size={12} className="text-muted-foreground" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar ${L.singular.toLowerCase()}…`} className="w-full bg-transparent text-xs outline-none" />
       </label>
-      <div className="mt-3 grid max-h-40 grid-cols-2 gap-x-2 gap-y-0.5 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-5 2xl:max-h-[520px] 2xl:grid-cols-1" data-testid="lista-dossies">
+      <div className="scroll-neon mt-3 grid max-h-40 grid-cols-2 gap-x-2 gap-y-0.5 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-5 2xl:max-h-[520px] 2xl:grid-cols-1" data-testid="lista-dossies">
         {state.dossiers.filter((x) => x.name.toLowerCase().includes(q.toLowerCase())).map((x) => {
           const p = x.name;
           const s = stat(p);
@@ -1031,7 +1034,7 @@ function DetailPanel({ demand: d, autoEdit, dossiers, onClose, onStatus, onPolo,
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(60%_100%_at_30%_0%,color-mix(in_oklab,var(--glow)_22%,transparent),transparent)]" />
         <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[var(--glow)] to-transparent opacity-70" />
 
-        <div className="relative flex-1 space-y-4 overflow-y-auto p-5">
+        <div className="scroll-neon relative flex-1 space-y-4 overflow-y-auto p-5">
           {/* cabeçalho */}
           <div className="flex gap-4">
             <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[color-mix(in_oklab,var(--glow)_40%,transparent)] bg-[color-mix(in_oklab,var(--glow)_14%,transparent)] text-[var(--glow)] shadow-[0_0_30px_-8px_var(--glow)]">
