@@ -124,7 +124,7 @@ function Demandas() {
   const [newOpen, setNewOpen] = useState<{ type: DType; status: Status } | null>(null);
   const [notes, setNotes] = useState<Note[]>([
     { id: 1, text: "Tefé vai virar polo de Itanhaém", date: "30/09", tag: "Geral", color: "violet" },
-    { id: 2, text: "Reforçar treinamento BH Centro", date: "28/09", tag: "Polo", color: "cyan" },
+    { id: 2, text: "Reforçar treinamento BH Centro", date: "28/09", tag: "Dossiê", color: "cyan" },
     { id: 3, text: "Revisar documentação API", date: "25/09", tag: "Geral", color: "emerald" },
   ]);
 

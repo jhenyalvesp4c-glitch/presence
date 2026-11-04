@@ -32,7 +32,7 @@ const seedFolders: FolderT[] = [
     mk("d5", "Criação de usuários", "Passo a passo para criar, editar e gerenciar usuários.", "Tutorial", "violet"),
     mk("d6", "Configurações do sistema", "Ajustes importantes, permissões e integrações.", "Guia", "cyan"),
   ] },
-  { id: "log", name: "Logins dos Polos", icon: KeyRound, color: "amber", docs: [
+  { id: "log", name: "Logins dos Dossiês", icon: KeyRound, color: "amber", docs: [
     login("Barra da Tijuca", "fernando@p4c.com", "Fernando"), login("Maceió", "laura@p4c.com", "Laura"),
     login("Niterói", "niteroi@p4c.com", "Equipe Niterói"), login("BH Centro", "bhcentro@p4c.com", "Marcos"),
     login("Santos", "santos@p4c.com", "Juliana"), login("Fortaleza", "fortaleza@p4c.com", "Rafael"),
@@ -238,8 +238,8 @@ export function DocsLibrary() {
             <div className="flex items-center gap-3">
               <span className="icon-tile h-11 w-11 !rounded-2xl" style={tint("violet")}><KeyRound size={19} /></span>
               <div className="mr-auto">
-                <h3 className="font-display text-lg font-semibold">Logins dos Polos</h3>
-                <p className="text-[0.7rem] text-muted-foreground">Acesso de usuários por polo · {findFolder(folders, "log")?.docs.length ?? 0} itens</p>
+                <h3 className="font-display text-lg font-semibold">Logins dos Dossiês</h3>
+                <p className="text-[0.7rem] text-muted-foreground">Acesso de usuários por dossiê · {findFolder(folders, "log")?.docs.length ?? 0} itens</p>
               </div>
               <button onClick={() => { setCur("log"); setOpen((o) => ({ ...o, log: true })); }} className="glass flex items-center gap-1 rounded-full px-3 py-1.5 text-xs transition hover:text-cyan">Ver tudo <ArrowRight size={12} /></button>
             </div>

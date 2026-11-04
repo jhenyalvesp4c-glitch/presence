@@ -4,16 +4,18 @@
  */
 export type Dossier = { id: string; name: string; desc: string };
 export type DossierLabel = { singular: string; plural: string };
-export type DossierState = { label: DossierLabel; dossiers: Dossier[] };
+export type DossierState = { label: DossierLabel; dossiers: Dossier[]; v?: number };
+/** Versão do formato salvo. Sem `v` (primeira versão), o nome volta ao padrão "Dossiês". */
+const VERSION = 2;
 
 /** Projeto padrão da página de Demandas (quando não vem `?projeto=`). */
 export const P4C_ID = "p4c";
 export const DEFAULT_LABEL: DossierLabel = { singular: "Dossiê", plural: "Dossiês" };
 export const LABEL_PRESETS: DossierLabel[] = [
+  { singular: "Dossiê", plural: "Dossiês" },
   { singular: "Polo", plural: "Polos" },
   { singular: "Cliente", plural: "Clientes" },
   { singular: "Turma", plural: "Turmas" },
-  { singular: "Dossiê", plural: "Dossiês" },
 ];
 
 const P4C_NAMES = [
@@ -24,7 +26,7 @@ const P4C_NAMES = [
 
 export const seedDossiers = (projectId: string): DossierState =>
   projectId === P4C_ID
-    ? { label: { singular: "Polo", plural: "Polos" }, dossiers: P4C_NAMES.map((name, i) => ({ id: `d${i + 1}`, name, desc: "" })) }
+    ? { label: DEFAULT_LABEL, dossiers: P4C_NAMES.map((name, i) => ({ id: `d${i + 1}`, name, desc: "" })) }
     : { label: DEFAULT_LABEL, dossiers: [] };
 
 const key = (projectId: string) => `presence.dossiers.${projectId}`;
@@ -35,7 +37,7 @@ export function loadDossierState(projectId: string): DossierState {
     if (!raw) return seedDossiers(projectId);
     const s = JSON.parse(raw) as DossierState;
     if (!Array.isArray(s.dossiers) || !s.label?.plural) return seedDossiers(projectId);
-    return s;
+    return s.v === VERSION ? s : { ...s, label: DEFAULT_LABEL };
   } catch {
     return seedDossiers(projectId);
   }
@@ -43,7 +45,7 @@ export function loadDossierState(projectId: string): DossierState {
 
 export function saveDossierState(projectId: string, state: DossierState) {
   try {
-    localStorage.setItem(key(projectId), JSON.stringify(state));
+    localStorage.setItem(key(projectId), JSON.stringify({ ...state, v: VERSION }));
   } catch {
     /* sem armazenamento: segue só em memória */
   }
