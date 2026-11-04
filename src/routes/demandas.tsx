@@ -56,6 +56,17 @@ const typeBase: Record<DType, { color: string; icon: typeof Globe; prefix: strin
 /** Os textos seguem o nome que o projeto dá aos dossiês (Polos, Clientes, Turmas…). */
 const LabelCtx = createContext<DossierLabel>(DEFAULT_LABEL);
 const useLabel = () => useContext(LabelCtx);
+/** Lápis e lixeira dos cartões: abrir para editar e excluir (com confirmação). */
+const ActionsCtx = createContext<{ edit: (id: string) => void; del: (id: string) => void }>({ edit: () => {}, del: () => {} });
+function CardActions({ id, pos = "right-1.5 top-1.5" }: { id: string; pos?: string }) {
+  const a = useContext(ActionsCtx);
+  return (
+    <span className={`absolute ${pos} z-10 flex gap-0.5 opacity-100 transition md:opacity-0 md:group-hover/card:opacity-100 md:focus-within:opacity-100`}>
+      <button onClick={(e) => { e.stopPropagation(); a.edit(id); }} aria-label={`Editar ${id}`} title="Editar" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-cyan"><Pencil size={11} /></button>
+      <button onClick={(e) => { e.stopPropagation(); a.del(id); }} aria-label={`Excluir ${id}`} title="Excluir" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-destructive"><Trash2 size={11} /></button>
+    </span>
+  );
+}
 type TypeMeta = { label: string; short: string; sub: string; color: string; icon: typeof Globe; prefix: string };
 const useTM = () => typeMetaFor(useLabel());
 function typeMetaFor(L: DossierLabel): Record<DType, TypeMeta> {
@@ -122,6 +133,8 @@ function Demandas() {
   const [q, setQ] = useState("");
   const [selId, setSelId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState<{ type: DType; status: Status } | null>(null);
+  const [editOnOpen, setEditOnOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [notes, setNotes] = useState<Note[]>([
     { id: 1, text: "Tefé vai virar polo de Itanhaém", date: "30/09", tag: "Geral", color: "violet" },
     { id: 2, text: "Reforçar treinamento BH Centro", date: "28/09", tag: "Dossiê", color: "cyan" },
@@ -198,7 +211,28 @@ function Demandas() {
     setTab(f.type);
     setSelId(d.id);
   };
-  const remove = (id: string) => { setItems((xs) => xs.filter((x) => x.id !== id)); setSelId(null); };
+  const remove = (id: string) => { setItems((xs) => xs.filter((x) => x.id !== id)); setSelId((c) => (c === id ? null : c)); };
+  const openCard = (id: string) => { setEditOnOpen(false); setSelId(id); };
+  const editCard = (id: string) => { setEditOnOpen(true); setSelId(id); };
+  const deleteCard = (id: string) => {
+    const d = items.find((x) => x.id === id);
+    if (d && window.confirm(`Excluir a demanda "${d.title}"?`)) remove(id);
+  };
+  /** Ação em massa nas demandas que estão na tela (aba atual e filtros). */
+  const bulk = (kind: "reset" | "done" | "delete") => {
+    const ids = new Set(boardItems(tab).map((d) => d.id));
+    if (!ids.size) return;
+    const verb = kind === "delete" ? "Apagar" : kind === "done" ? "Marcar como concluídas" : "Zerar (voltar para A fazer)";
+    if (!window.confirm(`${verb} ${ids.size} demanda${ids.size === 1 ? "" : "s"}? ${kind === "delete" ? "Isso não pode ser desfeito." : ""}`.trim())) return;
+    setBulkOpen(false);
+    if (kind === "delete") { setItems((xs) => xs.filter((x) => !ids.has(x.id))); setSelId((c) => (c && ids.has(c) ? null : c)); return; }
+    const st: Status = kind === "done" ? "done" : "todo";
+    setItems((xs) => xs.map((d) => (!ids.has(d.id) ? d : {
+      ...d, status: st,
+      polos: d.polos?.map((p) => ({ ...p, status: st, date: st === "done" ? p.date ?? today() : undefined })),
+      history: [...d.history, { d: today(), text: kind === "done" ? "Marcada como concluída (ação em massa)" : "Zerada: voltou para A fazer (ação em massa)", s: st }],
+    })));
+  };
 
   // Cadastro de dossiês: renomear e excluir se refletem nas demandas.
   const renameDossier = (o: string, n: string) => {
@@ -230,6 +264,7 @@ function Demandas() {
 
   return (
     <LabelCtx.Provider value={L}>
+    <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard }}>
     <div className="relative min-h-screen overflow-x-hidden">
       <BgFx />
       <div className={`relative mx-auto max-w-[1500px] px-4 py-6 transition-[padding] duration-500 md:px-8 ${sel ? "xl:pr-[500px]" : ""}`}>
@@ -284,7 +319,7 @@ function Demandas() {
         </nav>
 
         {filterBar && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 animate-rise" style={{ animationDelay: ".1s" }}>
+          <div className="relative z-30 mt-4 flex flex-wrap items-center gap-2 animate-rise" style={{ animationDelay: ".1s" }}>
             <div className="glass flex rounded-xl p-1">
               {([["kanban", "Kanban", LayoutGrid], ["lista", "Lista", List], ["matriz", "Matriz", Table2]] as const).map(([k, l, I]) => (
                 <button key={k} onClick={() => setView(k)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition ${view === k ? "bg-cyan/15 text-cyan shadow-[0_0_16px_-6px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}><I size={13} /> {l}</button>
@@ -294,6 +329,17 @@ function Demandas() {
             <Pick label="Status" value={statusF} onChange={(v) => setStatusF(v as typeof statusF)} options={[["todos", "Todos"], ["pend", "Só pendentes"], ["todo", "A fazer"], ["doing", "Em andamento"], ["done", "Concluídas"]]} />
             <Pick label={L.singular} value={poloF ?? ""} onChange={(v) => setPoloF(v || null)} options={[["", "Todos"], ...names.map((n): [string, string] => [n, n])]} />
             {poloF && <button onClick={() => setPoloF(null)} className="tag flex items-center gap-1" style={tint(dossierColor(names, poloF))}><MapPin size={10} /> {poloF} <X size={10} /></button>}
+            <div className="relative">
+              <button onClick={() => setBulkOpen((o) => !o)} data-testid="acoes-massa" className="glass flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition hover:border-cyan/40"><Layers size={13} /> Ações em massa <ChevronDown size={12} className={`transition ${bulkOpen ? "rotate-180" : ""}`} /></button>
+              {bulkOpen && (
+                <div className="glass absolute left-0 top-full z-30 mt-2 w-72 rounded-xl p-1 animate-in fade-in zoom-in-95">
+                  <p className="px-2 py-1.5 text-[0.65rem] text-muted-foreground">Vale para as <b className="text-foreground">{boardItems(tab).length}</b> demandas que estão na tela agora (respeita aba e filtros).</p>
+                  <button onClick={() => bulk("reset")} data-testid="massa-zerar" className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs hover:bg-secondary"><History size={13} className="text-amber" /> Zerar: voltar tudo para “A fazer”</button>
+                  <button onClick={() => bulk("done")} data-testid="massa-concluir" className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs hover:bg-secondary"><CheckCircle2 size={13} className="text-emerald" /> Marcar tudo como concluído</button>
+                  <button onClick={() => bulk("delete")} data-testid="massa-apagar" className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs text-destructive hover:bg-secondary"><Trash2 size={13} /> Apagar tudo</button>
+                </div>
+              )}
+            </div>
             <label className="glass ml-auto flex min-w-[220px] flex-1 items-center gap-2 rounded-xl px-3 py-2 sm:max-w-sm">
               <Search size={14} className="text-muted-foreground" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar demanda, ${sing} ou código…`} className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground" />
@@ -310,9 +356,9 @@ function Demandas() {
           ) : tab === "dossies" ? (
             <DossierManager state={ds} onChange={changeDs} usage={usage} onRename={renameDossier} onRemove={removeDossier} />
           ) : view === "lista" ? (
-            <ListView items={boardItems(tab)} selId={selId} onOpen={setSelId} />
+            <ListView items={boardItems(tab)} selId={selId} onOpen={openCard} />
           ) : view === "matriz" ? (
-            <Matrix items={boardItems(tab)} names={names} selId={selId} onOpen={setSelId} onCell={cycleCell} />
+            <Matrix items={boardItems(tab)} names={names} selId={selId} onOpen={openCard} onCell={cycleCell} />
           ) : tab === "overview" ? (
             <div className="grid gap-4 2xl:grid-cols-[1fr_270px]">
               <section className="glass relative overflow-hidden rounded-3xl p-4 animate-rise">
@@ -323,14 +369,14 @@ function Demandas() {
                 </div>
                 <div className={`grid gap-4 ${sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`}>
                   {(["geral", "polo", "multi"] as DType[]).map((t) => (
-                    <TypeBoard key={t} type={t} items={filtered.filter((i) => i.type === t)} selId={selId} onOpen={setSelId} onCreate={() => setNewOpen({ type: t, status: "todo" })} />
+                    <TypeBoard key={t} type={t} items={filtered.filter((i) => i.type === t)} selId={selId} onOpen={openCard} onCreate={() => setNewOpen({ type: t, status: "todo" })} />
                   ))}
                 </div>
               </section>
               <PolosPanel items={items} state={ds} active={poloF} onPick={(p) => setPoloF(p === poloF ? null : p)} onChange={changeDs} usage={usage} onRename={renameDossier} onRemove={removeDossier} />
             </div>
           ) : (
-            <FullBoard type={tab} items={filtered.filter((i) => i.type === tab)} selId={selId} onOpen={setSelId} onCreate={(s) => setNewOpen({ type: tab, status: s })} />
+            <FullBoard type={tab} items={filtered.filter((i) => i.type === tab)} selId={selId} onOpen={openCard} onCreate={(s) => setNewOpen({ type: tab, status: s })} />
           )}
         </main>
 
@@ -338,7 +384,7 @@ function Demandas() {
       </div>
 
       <DetailPanel
-        key={sel?.id ?? "none"} demand={sel} dossiers={names} onClose={() => setSelId(null)}
+        key={`${sel?.id ?? "none"}-${editOnOpen}`} demand={sel} autoEdit={editOnOpen} dossiers={names} onClose={() => setSelId(null)}
         onStatus={(s) => sel && setStatus(sel.id, s)} onPolo={(p) => sel && cyclePolo(sel.id, p)}
         onAddPolos={(a) => sel && addPolos(sel.id, a)} onPoloNote={(p, t) => sel && setPoloNote(sel.id, p, t)}
         onEdit={(patch) => sel && update(sel.id, (d) => ({ ...d, ...patch }))}
@@ -347,6 +393,7 @@ function Demandas() {
       />
       {newOpen && <NewDemandDialog start={newOpen} dossiers={names} onClose={() => setNewOpen(null)} onCreate={createDemand} />}
     </div>
+    </ActionsCtx.Provider>
     </LabelCtx.Provider>
   );
 }
@@ -706,7 +753,7 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
         })}
       </div>
       <button onClick={onCreate} className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] py-2 text-xs text-[var(--glow)] transition hover:bg-[color-mix(in_oklab,var(--glow)_10%,transparent)] hover:shadow-[0_0_24px_-8px_var(--glow)]">
-        <Plus size={13} /> Nova {m.label.toLowerCase().replace("demandas", "demanda")}
+        <Plus size={13} /> Nova {m.label.toLowerCase().replace("demandas", "demanda").replace("gerais", "geral")}
       </button>
     </div>
   );
@@ -715,6 +762,7 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
 function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; onClick: () => void; delay: number }) {
   const L = useLabel();
   return (
+    <div className="group/card relative">
     <button onClick={onClick} style={{ ...tint(typeBase[d.type].color), animationDelay: `${delay * 0.05}s` }}
       className={`group relative w-full overflow-hidden rounded-xl border bg-secondary/40 p-2 text-left transition animate-rise hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
       {active && <span className="scanline absolute inset-0" />}
@@ -725,6 +773,8 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
         {d.type === "geral" ? <><Calendar size={9} /> {d.deadline}</> : d.type === "polo" ? <><MapPin size={9} /> {d.polo}</> : <><Network size={9} /> {d.polos!.length} {L.plural.toLowerCase()} · {progress(d)}%</>}
       </p>
     </button>
+    <CardActions id={d.id} />
+    </div>
   );
 }
 
@@ -769,6 +819,7 @@ function BigCard({ d, active, onClick, delay }: { d: Demand; active: boolean; on
   const pct = progress(d);
   const dn = d.polos?.filter((p) => p.status === "done").length ?? 0;
   return (
+    <div className="group/card relative">
     <button onClick={onClick} style={{ ...tint(prio[d.priority].color), animationDelay: `${delay * 0.06}s` }}
       className={`group relative w-full overflow-hidden rounded-2xl border bg-secondary/40 p-4 text-left transition animate-rise hover:-translate-y-0.5 hover:shadow-[0_12px_30px_-14px_var(--cyan)] ${active ? "border-cyan shadow-[0_0_30px_-6px_var(--cyan)]" : "border-border hover:border-cyan/40"}`}>
       <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" />
@@ -790,6 +841,8 @@ function BigCard({ d, active, onClick, delay }: { d: Demand; active: boolean; on
         <span className="font-mono">{pct}%</span>
       </div>
     </button>
+    <CardActions id={d.id} pos="right-9 top-3" />
+    </div>
   );
 }
 
@@ -797,19 +850,23 @@ function ListView({ items, selId, onOpen }: { items: Demand[]; selId: string | n
   const tm = useTM();
   return (
     <section className="glass overflow-hidden rounded-3xl animate-rise">
-      <div className="grid grid-cols-[90px_1fr_130px_110px_90px_80px] gap-3 border-b border-border px-5 py-3 mono-caps max-md:hidden">
-        <span>Código</span><span>Demanda</span><span>Tipo</span><span>Status</span><span>Prazo</span><span>Progresso</span>
+      <div className="grid grid-cols-[90px_1fr_130px_110px_90px_80px_56px] gap-3 border-b border-border px-5 py-3 mono-caps max-md:hidden">
+        <span>Código</span><span>Demanda</span><span>Tipo</span><span>Status</span><span>Prazo</span><span>Progresso</span><span />
       </div>
       {items.map((d, i) => (
-        <button key={d.id} onClick={() => onOpen(d.id)} style={{ animationDelay: `${i * 0.03}s` }}
-          className={`grid w-full grid-cols-2 gap-3 border-b border-border/60 px-5 py-3 text-left text-sm transition animate-rise hover:bg-secondary/50 md:grid-cols-[90px_1fr_130px_110px_90px_80px] ${selId === d.id ? "bg-cyan/10" : ""}`}>
+        <div key={d.id} className="group/card relative">
+        <button onClick={() => onOpen(d.id)} style={{ animationDelay: `${i * 0.03}s` }}
+          className={`grid w-full grid-cols-2 gap-3 border-b border-border/60 px-5 py-3 text-left text-sm transition animate-rise hover:bg-secondary/50 md:grid-cols-[90px_1fr_130px_110px_90px_80px_56px] ${selId === d.id ? "bg-cyan/10" : ""}`}>
           <span className="font-mono text-xs text-muted-foreground">{d.id}</span>
           <span className="truncate font-medium">{d.title}</span>
           <span className="text-xs" style={{ color: `var(--${tm[d.type].color})` }}>{tm[d.type].short}</span>
           <span className="text-xs" style={{ color: `var(--${statusMeta[d.status].color})` }}>{statusMeta[d.status].label}</span>
           <span className="text-xs text-muted-foreground">{d.deadline}</span>
           <span className="font-mono text-xs">{progress(d)}%</span>
+          <span className="max-md:hidden" />
         </button>
+        <CardActions id={d.id} pos="right-4 top-1/2 -translate-y-1/2" />
+        </div>
       ))}
       {!items.length && <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma demanda encontrada.</p>}
     </section>
@@ -944,8 +1001,8 @@ function NotesBoard({ notes, setNotes }: { notes: Note[]; setNotes: (f: (n: Note
 }
 
 /* ---------------- painel lateral ---------------- */
-function DetailPanel({ demand: d, dossiers, onClose, onStatus, onPolo, onAddPolos, onPoloNote, onEdit, onNote, onDelete }: {
-  demand: Demand | null; dossiers: string[]; onClose: () => void; onStatus: (s: Status) => void; onPolo: (p: string) => void;
+function DetailPanel({ demand: d, autoEdit, dossiers, onClose, onStatus, onPolo, onAddPolos, onPoloNote, onEdit, onNote, onDelete }: {
+  demand: Demand | null; autoEdit: boolean; dossiers: string[]; onClose: () => void; onStatus: (s: Status) => void; onPolo: (p: string) => void;
   onAddPolos: (names: string[]) => void; onPoloNote: (p: string, t: string) => void;
   onEdit: (p: Partial<Demand>) => void; onNote: (t: string) => void; onDelete: () => void;
 }) {
@@ -957,7 +1014,7 @@ function DetailPanel({ demand: d, dossiers, onClose, onStatus, onPolo, onAddPolo
   const [toAdd, setToAdd] = useState<string[]>([]);
   const [noteOpen, setNoteOpen] = useState<string | null>(null);
   const [histOpen, setHistOpen] = useState(true);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(autoEdit);
   const [note, setNote] = useState("");
   const [menu, setMenu] = useState(false);
   if (!d) return null;
