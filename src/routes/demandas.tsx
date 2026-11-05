@@ -5,9 +5,13 @@ import {
   DEFAULT_LABEL, LABEL_PRESETS, P4C_ID, dossierColor, gender, loadDossierState, saveDossierState, seedDossiers,
   type Dossier, type DossierLabel, type DossierState,
 } from "@/lib/dossiers";
+import {
+  NOTE_COLORS, addNote, deleteNote, editNote, loadNotes, noteDossierName, saveNotes, seedNotes, unlinkDossier,
+  type Note, type NoteDraft,
+} from "@/lib/notes";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  ArrowLeft, Atom, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Clock, FileText,
+  ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
   Filter, Folder, FolderOpen, Globe, Hexagon, History, LayoutGrid, Layers, List, Loader, MapPin,
   MessageSquare, MoreHorizontal, Network, Pencil, Plus, Search, Send, SquareCheck, StickyNote, Table2, Trash2, X,
 } from "lucide-react";
@@ -37,7 +41,6 @@ type Demand = {
   id: string; type: DType; title: string; desc: string; priority: Priority; status: Status;
   deadline: string; polo?: string | undefined; polos?: PoloExec[] | undefined; history: Hist[]; notes: string[];
 };
-type Note = { id: number; text: string; date: string; tag: string; color: string };
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 const statusMeta: Record<Status, { label: string; color: string; poloLabel: string }> = {
@@ -57,9 +60,21 @@ const typeBase: Record<DType, { color: string; icon: typeof Globe; prefix: strin
 const LabelCtx = createContext<DossierLabel>(DEFAULT_LABEL);
 const useLabel = () => useContext(LabelCtx);
 /** Lápis e lixeira dos cartões: abrir para editar e excluir (com confirmação). */
-const ActionsCtx = createContext<{ edit: (id: string) => void; del: (id: string) => void }>({ edit: () => {}, del: () => {} });
+type Actions = { edit: (id: string) => void; del: (id: string) => void; selecting: boolean; picked: Set<string>; toggle: (id: string) => void };
+const ActionsCtx = createContext<Actions>({ edit: () => {}, del: () => {}, selecting: false, picked: new Set(), toggle: () => {} });
 function CardActions({ id, pos = "right-1.5 top-1.5" }: { id: string; pos?: string }) {
   const a = useContext(ActionsCtx);
+  if (a.selecting) {
+    const on = a.picked.has(id);
+    return (
+      <span className={`absolute ${pos} z-10`}>
+        <button onClick={(e) => { e.stopPropagation(); a.toggle(id); }} role="checkbox" aria-checked={on} aria-label={`Selecionar ${id}`}
+          className={`grid h-5 w-5 place-items-center rounded-md border transition ${on ? "border-cyan bg-cyan text-background" : "border-border bg-background/70 text-transparent hover:border-cyan"}`}>
+          <Check size={12} />
+        </button>
+      </span>
+    );
+  }
   return (
     <span className={`absolute ${pos} z-10 flex gap-0.5 opacity-100 transition md:opacity-0 md:group-hover/card:opacity-100 md:focus-within:opacity-100`}>
       <button onClick={(e) => { e.stopPropagation(); a.edit(id); }} aria-label={`Editar ${id}`} title="Editar" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-cyan"><Pencil size={11} /></button>
@@ -135,15 +150,25 @@ function Demandas() {
   const [newOpen, setNewOpen] = useState<{ type: DType; status: Status } | null>(null);
   const [editOnOpen, setEditOnOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [notes, setNotes] = useState<Note[]>([
-    { id: 1, text: "Tefé vai virar polo de Itanhaém", date: "30/09", tag: "Geral", color: "violet" },
-    { id: 2, text: "Reforçar treinamento BH Centro", date: "28/09", tag: "Dossiê", color: "cyan" },
-    { id: 3, text: "Revisar documentação API", date: "25/09", tag: "Geral", color: "emerald" },
-  ]);
+  // Notas: salvas por projeto; cada uma pode estar ligada a um dossiê ou ser geral.
+  const [notes, setNotes] = useState<Note[]>(() => seedNotes(pid));
+  useEffect(() => setNotes(loadNotes(pid)), [pid]);
+  const changeNotes = (f: (n: Note[]) => Note[]) => setNotes((xs) => { const n = f(xs); saveNotes(pid, n); return n; });
+  const [noteEdit, setNoteEdit] = useState<Note | "new" | null>(null);
+  const saveNote = (d: NoteDraft) => {
+    if (noteEdit === "new") changeNotes((xs) => addNote(xs, d, today()));
+    else if (noteEdit) changeNotes((xs) => editNote(xs, noteEdit.id, d));
+    setNoteEdit(null);
+  };
+  const removeNote = (n: Note) => {
+    if (!window.confirm(`Excluir a nota "${n.text.slice(0, 40) || "Nota vazia"}"?`)) return;
+    changeNotes((xs) => deleteNote(xs, n.id));
+  };
+  const noteProps = { notes, dossiers: ds.dossiers, onNew: () => setNoteEdit("new" as const), onEdit: setNoteEdit, onDelete: removeNote };
 
   const sel = items.find((i) => i.id === selId) ?? null;
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { setSelId(null); setNewOpen(null); } };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") { setSelId(null); setNewOpen(null); setNoteEdit(null); } };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, []);
@@ -212,7 +237,18 @@ function Demandas() {
     setSelId(d.id);
   };
   const remove = (id: string) => { setItems((xs) => xs.filter((x) => x.id !== id)); setSelId((c) => (c === id ? null : c)); };
-  const openCard = (id: string) => { setEditOnOpen(false); setSelId(id); };
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const stopSelecting = () => { setSelecting(false); setPicked(new Set()); };
+  const deletePicked = () => {
+    if (!picked.size) return;
+    if (!window.confirm(`Excluir ${picked.size} demanda${picked.size === 1 ? "" : "s"}? Isso não pode ser desfeito.`)) return;
+    setItems((xs) => xs.filter((x) => !picked.has(x.id)));
+    setSelId((c) => (c && picked.has(c) ? null : c));
+    stopSelecting();
+  };
+  const openCard = (id: string) => { if (selecting) { toggle(id); return; } setEditOnOpen(false); setSelId(id); };
   const editCard = (id: string) => { setEditOnOpen(true); setSelId(id); };
   const deleteCard = (id: string) => {
     const d = items.find((x) => x.id === id);
@@ -245,6 +281,8 @@ function Demandas() {
       return { ...d, polo: d.polo === name ? undefined : d.polo, polos, status: d.type === "multi" && polos ? multiStatus(polos) : d.status };
     }));
     setPoloF((f) => (f === name ? null : f));
+    const gone = ds.dossiers.find((x) => x.name === name);
+    if (gone) changeNotes((xs) => unlinkDossier(xs, gone.id));
   };
   const usage = (name: string) => items.filter((d) => d.polo === name || d.polos?.some((p) => p.name === name)).length;
 
@@ -264,7 +302,7 @@ function Demandas() {
 
   return (
     <LabelCtx.Provider value={L}>
-    <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard }}>
+    <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard, selecting, picked, toggle }}>
     <div className="relative min-h-screen overflow-x-hidden">
       <BgFx />
       <div className={`relative mx-auto max-w-[1500px] px-4 py-6 transition-[padding] duration-500 md:px-8 ${sel ? "xl:pr-[500px]" : ""}`}>
@@ -329,6 +367,7 @@ function Demandas() {
             <Pick label="Status" value={statusF} onChange={(v) => setStatusF(v as typeof statusF)} options={[["todos", "Todos"], ["pend", "Só pendentes"], ["todo", "A fazer"], ["doing", "Em andamento"], ["done", "Concluídas"]]} />
             <Pick label={L.singular} value={poloF ?? ""} onChange={(v) => setPoloF(v || null)} options={[["", "Todos"], ...names.map((n): [string, string] => [n, n])]} />
             {poloF && <button onClick={() => setPoloF(null)} className="tag flex items-center gap-1" style={tint(dossierColor(names, poloF))}><MapPin size={10} /> {poloF} <X size={10} /></button>}
+            <button onClick={() => (selecting ? stopSelecting() : (setSelecting(true), setSelId(null)))} data-testid="selecionar" className={`glass flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition hover:border-cyan/40 ${selecting ? "border-cyan/60 text-cyan" : ""}`}><CheckSquare size={13} /> {selecting ? "Cancelar seleção" : "Selecionar"}</button>
             <div className="relative">
               <button onClick={() => setBulkOpen((o) => !o)} data-testid="acoes-massa" className="glass flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition hover:border-cyan/40"><Layers size={13} /> Ações em massa <ChevronDown size={12} className={`transition ${bulkOpen ? "rotate-180" : ""}`} /></button>
               {bulkOpen && (
@@ -352,7 +391,7 @@ function Demandas() {
           {tab === "docs" ? (
             <DocsLibrary />
           ) : tab === "notas" ? (
-            <NotesBoard notes={notes} setNotes={setNotes} />
+            <NotesBoard {...noteProps} />
           ) : tab === "dossies" ? (
             <DossierManager state={ds} onChange={changeDs} usage={usage} onRename={renameDossier} onRemove={removeDossier} />
           ) : view === "lista" ? (
@@ -380,7 +419,7 @@ function Demandas() {
           )}
         </main>
 
-        {tab === "overview" && <NotesStrip notes={notes} onMore={() => setTab("notas")} />}
+        {tab === "overview" && <NotesStrip {...noteProps} onMore={() => setTab("notas")} />}
       </div>
 
       <DetailPanel
@@ -391,7 +430,16 @@ function Demandas() {
         onNote={(t) => sel && update(sel.id, (d) => ({ ...d, notes: [...d.notes, t], history: [...d.history, { d: today(), text: "Observação adicionada", s: d.status }] }))}
         onDelete={() => sel && remove(sel.id)}
       />
+      {selecting && (
+        <div className="glass fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl px-4 py-3 shadow-lg animate-rise">
+          <span className="text-xs"><b>{picked.size}</b> selecionada{picked.size === 1 ? "" : "s"}</span>
+          <button onClick={() => setPicked(new Set(boardItems(tab).map((d) => d.id)))} className="rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">Selecionar todas da tela</button>
+          <button onClick={deletePicked} disabled={!picked.size} data-testid="excluir-selecionadas" className="flex items-center gap-1.5 rounded-lg bg-destructive/15 px-3 py-1.5 text-xs text-destructive transition hover:bg-destructive/25 disabled:opacity-40"><Trash2 size={13} /> Excluir</button>
+          <button onClick={stopSelecting} aria-label="Cancelar seleção" className="text-muted-foreground hover:text-foreground"><X size={14} /></button>
+        </div>
+      )}
       {newOpen && <NewDemandDialog start={newOpen} dossiers={names} onClose={() => setNewOpen(null)} onCreate={createDemand} />}
+      {noteEdit && <NoteDialog note={noteEdit === "new" ? null : noteEdit} dossiers={ds.dossiers} onClose={() => setNoteEdit(null)} onSave={saveNote} />}
     </div>
     </ActionsCtx.Provider>
     </LabelCtx.Provider>
@@ -896,7 +944,7 @@ function PolosPanel({ items, state, active, onPick, onChange, usage, onRename, o
         <h3 className="flex-1 font-display font-semibold">{L.plural}</h3>
         <button onClick={() => { setAdding((a) => !a); ed.setErr(""); }} data-testid="painel-novo" className="tag flex items-center gap-1" style={tint("cyan")}><Plus size={10} /> Novo</button>
       </div>
-      <p className="text-[0.68rem] text-muted-foreground">Clique para filtrar o Kanban. Lápis edita, lixeira exclui.</p>
+      <p className="text-[0.68rem] text-muted-foreground">Clique para filtrar. Passe o mouse para editar.</p>
       {adding && (
         <form onSubmit={(e) => { e.preventDefault(); ed.add(); }} className="mt-3 space-y-2 rounded-xl border border-border bg-secondary/25 p-2">
           <input autoFocus value={ed.name} onChange={(e) => { ed.setName(e.target.value); ed.setErr(""); }} placeholder={`Nome d${gender(L).um === "Uma" ? "a" : "o"} ${L.singular.toLowerCase()}`} data-testid="painel-nome" className="w-full rounded-lg border border-border bg-secondary/40 px-2 py-1.5 text-xs outline-none focus:border-cyan/60" />
@@ -930,14 +978,16 @@ function PolosPanel({ items, state, active, onPick, onChange, usage, onRename, o
             );
           }
           return (
-            <div key={x.id} style={tint(dossierColor(names, p))} className={`group flex items-center rounded-lg transition hover:bg-secondary/60 ${active === p ? "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)]" : ""}`}>
-              <button onClick={() => onPick(p)} title={x.desc || undefined} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-xs">
-                <FolderOpen size={14} className="shrink-0 text-[var(--glow)]" />
-                <span className="flex-1 truncate text-left">{p}</span>
-                <span className="font-mono text-[0.6rem] text-muted-foreground">{s.d}/{s.t}</span>
+            <div key={x.id} style={tint(dossierColor(names, p))} className={`group relative flex items-center rounded-xl transition-all duration-300 hover:translate-x-0.5 hover:bg-secondary/50 ${active === p ? "bg-[color-mix(in_oklab,var(--glow)_12%,transparent)] shadow-[inset_2px_0_0_var(--glow)]" : ""}`}>
+              <button onClick={() => onPick(p)} title={x.desc || undefined} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-xs">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)] transition-transform duration-300 group-hover:scale-125" />
+                <span className="flex-1 truncate text-left font-medium">{p}</span>
+                <span className="font-mono text-[0.6rem] text-muted-foreground transition-opacity duration-200 group-hover:opacity-0">{s.d}/{s.t}</span>
               </button>
-              <button onClick={() => ed.setEdit({ id: x.id, name: x.name, desc: x.desc })} aria-label={`Editar ${p}`} className="p-1 text-muted-foreground transition hover:text-cyan"><Pencil size={12} /></button>
-              <button onClick={() => ed.del(x)} aria-label={`Excluir ${p}`} className="p-1 pr-2 text-muted-foreground transition hover:text-destructive"><Trash2 size={12} /></button>
+              <div className="absolute right-1.5 flex items-center gap-0.5 opacity-0 translate-x-1 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0 focus-within:opacity-100 focus-within:translate-x-0">
+                <button onClick={() => ed.setEdit({ id: x.id, name: x.name, desc: x.desc })} aria-label={`Editar ${p}`} className="rounded-md p-1 text-muted-foreground transition hover:scale-110 hover:bg-cyan/10 hover:text-cyan"><Pencil size={11} /></button>
+                <button onClick={() => ed.del(x)} aria-label={`Excluir ${p}`} className="rounded-md p-1 text-muted-foreground transition hover:scale-110 hover:bg-destructive/10 hover:text-destructive"><Trash2 size={11} /></button>
+              </div>
             </div>
           );
         })}
@@ -953,52 +1003,149 @@ function PolosPanel({ items, state, active, onPick, onChange, usage, onRename, o
 }
 
 /* ---------------- notas ---------------- */
-function NotesStrip({ notes, onMore }: { notes: Note[]; onMore: () => void }) {
+type NotesProps = {
+  notes: Note[]; dossiers: Dossier[]; onNew: () => void; onEdit: (n: Note) => void; onDelete: (n: Note) => void;
+};
+
+/** Etiqueta da nota: nome do dossiê ou "Geral". */
+function NoteTag({ n, dossiers }: { n: Note; dossiers: Dossier[] }) {
+  const name = noteDossierName(n, dossiers);
+  return name
+    ? <span className="tag inline-flex items-center gap-1" style={tint(dossierColor(dossiers.map((d) => d.name), name))}><MapPin size={9} /> {name}</span>
+    : <span className="tag inline-flex items-center gap-1"><Globe size={9} /> Geral</span>;
+}
+
+/** Lápis e lixeira de uma nota. */
+function NoteActions({ n, onEdit, onDelete }: { n: Note; onEdit: (n: Note) => void; onDelete: (n: Note) => void }) {
+  return (
+    <span className="flex gap-0.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+      <button onClick={(e) => { e.stopPropagation(); onEdit(n); }} aria-label="Editar nota" title="Editar" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-cyan"><Pencil size={11} /></button>
+      <button onClick={(e) => { e.stopPropagation(); onDelete(n); }} aria-label="Excluir nota" title="Excluir" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-destructive"><Trash2 size={11} /></button>
+    </span>
+  );
+}
+
+function NotesStrip({ notes, dossiers, onNew, onEdit, onDelete, onMore }: NotesProps & { onMore: () => void }) {
   return (
     <section className="glass mt-4 rounded-3xl p-4 animate-rise">
       <div className="mb-3 flex items-center gap-3">
         <span className="icon-tile h-8 w-8" style={tint("violet")}><StickyNote size={14} /></span>
         <div className="flex-1"><h3 className="font-display font-semibold">Anotações</h3><p className="text-[0.68rem] text-muted-foreground">Lembretes e informações importantes.</p></div>
-        <button onClick={onMore} className="tag flex items-center gap-1" style={tint("cyan")}><Plus size={10} /> Ver / criar</button>
+        <button onClick={onNew} data-testid="nova-nota" className="tag flex items-center gap-1" style={tint("cyan")}><Plus size={10} /> Nova nota</button>
+        {notes.length > 3 && <button onClick={onMore} className="tag flex items-center gap-1">Ver todas ({notes.length}) <ChevronRight size={10} /></button>}
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {notes.slice(0, 3).map((n) => (
-          <div key={n.id} className="accent-card !rounded-2xl p-3" style={tint(n.color)}>
+          <div key={n.id} onClick={() => onEdit(n)} className="accent-card group relative cursor-pointer !rounded-2xl p-3" style={tint(n.color)}>
+            <span className="absolute right-2 top-2"><NoteActions n={n} onEdit={onEdit} onDelete={onDelete} /></span>
             <p className="font-mono text-xs text-[var(--glow)]">{n.date}</p>
-            <p className="mt-1 text-sm">{n.text || "Nota vazia"}</p>
-            <span className="tag mt-2 inline-block">{n.tag}</span>
+            <p className="mt-1 whitespace-pre-wrap text-sm">{n.text || "Nota vazia"}</p>
+            <div className="mt-2"><NoteTag n={n} dossiers={dossiers} /></div>
           </div>
         ))}
+        {!notes.length && (
+          <button onClick={onNew} className="col-span-full rounded-2xl border border-dashed border-border p-4 text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">
+            Nenhuma nota ainda. Clique para criar a primeira.
+          </button>
+        )}
       </div>
     </section>
   );
 }
 
-function NotesBoard({ notes, setNotes }: { notes: Note[]; setNotes: (f: (n: Note[]) => Note[]) => void }) {
-  const colors = ["violet", "cyan", "emerald", "amber", "pink"];
+function NotesBoard({ notes, dossiers, onNew, onEdit, onDelete }: NotesProps) {
+  const L = useLabel();
+  // Filtro: todas, só gerais, ou de um dossiê.
+  const [f, setF] = useState<string>("todas");
+  const shown = notes.filter((n) => {
+    const linked = noteDossierName(n, dossiers) ? n.dossierId : undefined;
+    return f === "todas" || (f === "geral" ? !linked : linked === f);
+  });
   return (
-    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
-      {notes.map((n, i) => (
-        <div key={n.id} style={{ ...tint(n.color), transform: `rotate(${(i % 3) - 1}deg)` }}
-          className="group relative min-h-36 rounded-md p-3 pt-5 transition hover:!rotate-0 hover:-translate-y-1 animate-rise"
-        >
-          <div className="absolute inset-0 rounded-md bg-[color-mix(in_oklab,var(--glow)_22%,var(--card))] shadow-[0_14px_30px_-14px_var(--glow)]" />
-          <span className="absolute -top-2 left-1/2 h-4 w-12 -translate-x-1/2 rotate-[-3deg] rounded-sm bg-foreground/15 backdrop-blur" />
-          <div className="relative">
-            <p className="font-mono text-[0.6rem] text-[var(--glow)]">{n.date} · {n.tag}</p>
-            <textarea value={n.text} onChange={(e) => setNotes((xs) => xs.map((x) => (x.id === n.id ? { ...x, text: e.target.value } : x)))}
-              placeholder="Escreva…" rows={3} className="mt-1 w-full resize-none bg-transparent text-sm outline-none" />
-            <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
-              {colors.map((c) => <button key={c} onClick={() => setNotes((xs) => xs.map((x) => (x.id === n.id ? { ...x, color: c } : x)))} className="h-3 w-3 rounded-full" style={{ background: `var(--${c})` }} />)}
-              <button onClick={() => setNotes((xs) => xs.filter((x) => x.id !== n.id))} className="ml-auto text-muted-foreground hover:text-destructive"><Trash2 size={12} /></button>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mono-caps">Mostrar</span>
+        <select value={f} onChange={(e) => setF(e.target.value)} aria-label="Filtrar notas"
+          className="rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-xs outline-none focus:border-cyan/60 [&>option]:bg-popover">
+          <option value="todas">Todas as notas</option>
+          <option value="geral">Gerais (sem {L.singular.toLowerCase()})</option>
+          {dossiers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <span className="text-xs text-muted-foreground">{shown.length} nota{shown.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
+        <button onClick={onNew} data-testid="nova-nota-quadro"
+          className="grid min-h-36 place-items-center rounded-md border border-dashed border-border text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">
+          <span className="flex items-center gap-1"><Plus size={13} /> Nova nota</span>
+        </button>
+        {shown.map((n, i) => (
+          <div key={n.id} onClick={() => onEdit(n)} style={{ ...tint(n.color), transform: `rotate(${(i % 3) - 1}deg)` }}
+            className="group relative min-h-36 cursor-pointer rounded-md p-3 pt-5 transition hover:!rotate-0 hover:-translate-y-1 animate-rise">
+            <div className="absolute inset-0 rounded-md bg-[color-mix(in_oklab,var(--glow)_22%,var(--card))] shadow-[0_14px_30px_-14px_var(--glow)]" />
+            <span className="absolute -top-2 left-1/2 h-4 w-12 -translate-x-1/2 rotate-[-3deg] rounded-sm bg-foreground/15 backdrop-blur" />
+            <span className="absolute right-1.5 top-1.5 z-10"><NoteActions n={n} onEdit={onEdit} onDelete={onDelete} /></span>
+            <div className="relative">
+              <p className="font-mono text-[0.6rem] text-[var(--glow)]">{n.date}</p>
+              <p className="mt-1 line-clamp-5 whitespace-pre-wrap text-sm">{n.text || "Nota vazia"}</p>
+              <div className="mt-2"><NoteTag n={n} dossiers={dossiers} /></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Criar ou editar uma nota: texto, cor e (opcional) o dossiê ligado. */
+function NoteDialog({ note, dossiers, onClose, onSave }: {
+  note: Note | null; dossiers: Dossier[]; onClose: () => void; onSave: (d: NoteDraft) => void;
+}) {
+  const L = useLabel();
+  const [text, setText] = useState(note?.text ?? "");
+  const [color, setColor] = useState<string>(note?.color ?? NOTE_COLORS[0]);
+  const [dossierId, setDossierId] = useState<string>(note?.dossierId && dossiers.some((d) => d.id === note.dossierId) ? note.dossierId : "");
+  const ok = text.trim().length > 0;
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onSave({ text, color, dossierId: dossierId || undefined }); }}
+        className="glass relative flex w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label={note ? "Editar nota" : "Nova nota"}>
+        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+          <span className="icon-tile h-10 w-10" style={tint(color)}><StickyNote size={18} /></span>
+          <h2 className="flex-1 font-display text-xl font-bold">{note ? "Editar nota" : "Nova nota"}</h2>
+          <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary" aria-label="Fechar"><X size={18} /></button>
+        </div>
+        <div className="space-y-4 px-5 py-4">
+          <label className="block">
+            <span className="mono-caps">Nota</span>
+            <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="Escreva o lembrete…" data-testid="nota-texto"
+              className="mt-1 w-full resize-none rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
+          </label>
+          <label className="block">
+            <span className="mono-caps">Vincular a {L.singular.toLowerCase()}</span>
+            <select value={dossierId} onChange={(e) => setDossierId(e.target.value)} data-testid="nota-dossie"
+              className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60 [&>option]:bg-popover">
+              <option value="">Nenhum (nota geral)</option>
+              {dossiers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </label>
+          <div>
+            <span className="mono-caps">Cor</span>
+            <div className="mt-2 flex gap-2">
+              {NOTE_COLORS.map((c) => (
+                <button key={c} type="button" onClick={() => setColor(c)} aria-label={`Cor ${c}`} aria-pressed={color === c}
+                  className={`h-6 w-6 rounded-full transition ${color === c ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : "opacity-70 hover:opacity-100"}`}
+                  style={{ background: `var(--${c})` }} />
+              ))}
             </div>
           </div>
         </div>
-      ))}
-      <button onClick={() => setNotes((xs) => [...xs, { id: Date.now(), text: "", date: today(), tag: "Geral", color: colors[xs.length % 5]! }])}
-        className="grid min-h-36 place-items-center rounded-md border border-dashed border-border text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">
-        <span className="flex items-center gap-1"><Plus size={13} /> Nova nota</span>
-      </button>
+        <div className="flex gap-2 border-t border-border px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2.5 text-sm transition hover:border-cyan/40">Cancelar</button>
+          <button disabled={!ok} data-testid="salvar-nota" className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-cyan/60 bg-cyan/10 py-2.5 text-sm text-cyan shadow-[0_0_24px_-8px_var(--cyan)] transition hover:bg-cyan/20 disabled:opacity-40">
+            <Check size={15} /> {note ? "Salvar alterações" : "Criar nota"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
