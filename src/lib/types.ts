@@ -16,6 +16,12 @@ export type Task = {
   done_at: string | null;
   position: number;
   created_at: string;
+  // Campos usados pelos compromissos do calendário (tarefas da categoria "Compromissos").
+  end_time?: string | null;
+  place?: string | null;
+  color?: string | null;
+  project_id?: string | null;
+  dossier_id?: string | null;
 };
 
 export type RoutineItem = {

@@ -13,6 +13,7 @@ import { isoDate, todayIso, hhmm } from "@/lib/dates";
 import { getIcon } from "@/lib/icons";
 import type { Priority } from "@/lib/types";
 import { useCategories, useCreateTask, useReorderTasks, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { compromissosForDay, showInTodayTasks } from "@/lib/appointments";
 import { kindToCat, useDayPlan, useGenerateDay, useRoutine, useSavePlanPrefs, useSchedule } from "@/lib/data/day";
 
 export const Route = createFileRoute("/organizar")({
@@ -114,23 +115,27 @@ function Organizar() {
   const schedQ = useSchedule(dayIso);
 
   const catById = useMemo(() => new Map((catsQ.data ?? []).map((c) => [c.id, c])), [catsQ.data]);
+  // Compromissos do calendário (categoria "Compromissos").
+  const compId = (catsQ.data ?? []).find((c) => c.slug === "comp")?.id;
   // Tarefas de hoje: pendentes sem data ou com data até hoje, e as concluídas hoje.
   const tasks: Row[] = useMemo(
     () =>
       (tasksQ.data ?? [])
-        .filter((t) => (!t.done && (!t.due_date || t.due_date <= today)) || (t.done && t.done_at && isoDate(new Date(t.done_at)) === today))
+        .filter((t) => showInTodayTasks(t, compId, today))
         .map((t) => {
           const c = t.category_id ? catById.get(t.category_id) : undefined;
           return { id: t.id, t: t.title, tag: c ? c.name.split(" ")[0]! : "Tarefa", c: c?.color ?? "cyan", p: t.priority, done: t.done };
         }),
-    [tasksQ.data, catById, today],
+    [tasksQ.data, catById, today, compId],
   );
 
-  // Agenda: o plano gerado do dia ou, se ainda não existir, a prévia da rotina-base.
+  // Agenda: o plano gerado do dia ou, se ainda não existir, a prévia da rotina-base + compromissos do calendário.
   const agendaAll = useMemo(() => {
-    const src = schedQ.data && schedQ.data.length ? schedQ.data : (routineQ.data ?? []);
+    const src = schedQ.data && schedQ.data.length
+      ? schedQ.data
+      : [...(routineQ.data ?? []), ...compromissosForDay(tasksQ.data ?? [], compId, dayIso)].sort((a, b) => a.time.localeCompare(b.time));
     return src.map((i) => ({ h: i.time, Icon: getIcon(i.icon), t: i.title, d: i.description, cat: kindToCat(i.kind), key: i.id }));
-  }, [schedQ.data, routineQ.data]);
+  }, [schedQ.data, routineQ.data, tasksQ.data, compId, dayIso]);
 
   const count = (p: Prio) => tasks.filter((t) => t.p === p).length;
   const visible = catOn["tarefas"] ? tasks.filter((t) => filter === "todas" || t.p === filter) : [];

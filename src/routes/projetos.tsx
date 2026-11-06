@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, CalendarClock, FolderKanban, Plus, Sparkles, Target, X, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowUpRight, CalendarClock, FolderKanban, Pencil, Plus, Sparkles, Trash2, Target, X, Zap } from "lucide-react";
 import { PlanShell, Panel, colorVar, tint } from "@/components/PlanShell";
-import { loadProjects, saveProjects, seedProjects, type Project } from "@/lib/projects";
+import type { Project } from "@/lib/projects";
+import { loadProjects, saveProjects } from "@/lib/data/project-data";
+import { useDbState } from "@/lib/data/use-db-state";
 
 export const Route = createFileRoute("/projetos")({
   head: () => ({
@@ -87,12 +89,12 @@ function Orbit({ projects }: { projects: Project[] }) {
 }
 
 function ProjetosPage() {
-  const [projects, setProjects] = useState<Project[]>(seedProjects);
+  // Projetos no banco; `update` troca a lista inteira e envia só a diferença.
+  const [projects, update, ready] = useDbState<Project[]>("projetos", [], loadProjects, saveProjects);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Project | null>(null);
   const [filter, setFilter] = useState<"Todos" | Project["status"]>("Todos");
 
-  useEffect(() => setProjects(loadProjects()), []);
-  const update = (l: Project[]) => { setProjects(l); saveProjects(l); };
 
   const stats = useMemo(() => {
     const total = projects.reduce((a, p) => a + p.demands, 0);
@@ -129,7 +131,7 @@ function ProjetosPage() {
               </div>
             ))}
           </div>
-          <button onClick={() => setOpen(true)} className="shine relative mt-6 inline-flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-3 font-medium text-primary-foreground shadow-[0_0_30px_-6px_var(--cyan)] transition hover:scale-105">
+          <button onClick={() => setOpen(true)} disabled={!ready} className="shine relative mt-6 disabled:opacity-60 inline-flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-3 font-medium text-primary-foreground shadow-[0_0_30px_-6px_var(--cyan)] transition hover:scale-105">
             <Plus size={18} /> Novo projeto
           </button>
         </Panel>
@@ -148,6 +150,7 @@ function ProjetosPage() {
         ))}
       </div>
 
+      {!ready && <p className="text-sm text-muted-foreground" data-testid="carregando">Carregando seus projetos…</p>}
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {shown.map((p, i) => {
           const col = colorVar(p.color);
@@ -165,6 +168,10 @@ function ProjetosPage() {
                   <span className="absolute font-display text-sm font-semibold">{p.progress}%</span>
                 </div>
               </div>
+              <div className="absolute right-4 top-24 z-10 flex gap-1.5 opacity-0 transition group-hover:opacity-100 max-sm:opacity-100">
+                <button type="button" aria-label="Editar projeto" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditing(p); }} className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background/70 text-muted-foreground backdrop-blur transition hover:scale-110 hover:text-foreground"><Pencil size={14} /></button>
+                <button type="button" aria-label="Excluir projeto" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (confirm(`Excluir o projeto "${p.name}"?`)) update(projects.filter((x) => x.id !== p.id)); }} className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background/70 text-muted-foreground backdrop-blur transition hover:scale-110 hover:text-destructive"><Trash2 size={14} /></button>
+              </div>
               <div className="relative mt-4"><Spark seed={i + 1} color={col} /></div>
               <div className="relative mt-3 flex items-center justify-between text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5"><Target size={14} style={{ color: col }} /> {p.done}/{p.demands} demandas</span>
@@ -176,7 +183,7 @@ function ProjetosPage() {
             </Link>
           );
         })}
-        <button onClick={() => setOpen(true)} className="glass group relative grid min-h-[230px] place-items-center overflow-hidden rounded-3xl border-dashed transition hover:shadow-[0_0_40px_-12px_var(--cyan)]">
+        <button onClick={() => setOpen(true)} disabled={!ready} className="glass group relative grid min-h-[230px] disabled:opacity-60 place-items-center overflow-hidden rounded-3xl border-dashed transition hover:shadow-[0_0_40px_-12px_var(--cyan)]">
           <span aria-hidden className="pointer-events-none absolute inset-0 m-auto h-44 w-44 rounded-full border border-dashed opacity-25 transition group-hover:opacity-60"
             style={{ borderColor: "color-mix(in oklab, var(--cyan) 45%, transparent)", animation: "rail-spin 24s linear infinite" }} />
           <span aria-hidden className="pointer-events-none absolute inset-0 m-auto h-28 w-28 rounded-full border border-dashed opacity-20 transition group-hover:opacity-50"
@@ -189,26 +196,27 @@ function ProjetosPage() {
       </div>
 
       {open && <NewProject onClose={() => setOpen(false)} onCreate={(p) => { update([p, ...projects]); setOpen(false); }} />}
+      {editing && <NewProject initial={editing} onClose={() => setEditing(null)} onCreate={(p) => { update(projects.map((x) => (x.id === p.id ? p : x))); setEditing(null); }} />}
     </PlanShell>
   );
 }
 
-function NewProject({ onClose, onCreate }: { onClose: () => void; onCreate: (p: Project) => void }) {
-  const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
-  const [due, setDue] = useState("");
-  const [color, setColor] = useState<Project["color"]>("cyan");
-  const [status, setStatus] = useState<Project["status"]>("Planejando");
+function NewProject({ onClose, onCreate, initial }: { onClose: () => void; onCreate: (p: Project) => void; initial?: Project }) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [desc, setDesc] = useState(initial?.desc ?? "");
+  const [due, setDue] = useState(initial?.due ?? "");
+  const [color, setColor] = useState<Project["color"]>(initial?.color ?? "cyan");
+  const [status, setStatus] = useState<Project["status"]>(initial?.status ?? "Planejando");
   const input = "w-full rounded-xl border border-input bg-background/40 px-4 py-2.5 outline-none transition focus:border-[color:var(--cyan)] focus:shadow-[0_0_16px_-6px_var(--cyan)]";
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        onCreate({ id: crypto.randomUUID(), name: name.trim(), desc: desc.trim() || "Novo projeto", color, status, progress: 0, demands: 0, done: 0, due: due || new Date().toISOString().slice(0, 10) });
+        onCreate(initial ? { ...initial, name: name.trim(), desc: desc.trim() || initial.desc, color, status, due: due || initial.due } : { id: crypto.randomUUID(), name: name.trim(), desc: desc.trim() || "Novo projeto", color, status, progress: 0, demands: 0, done: 0, due: due || new Date().toISOString().slice(0, 10) });
       }} className="glass w-full max-w-md rounded-3xl p-6 animate-rise" style={tint(color)}>
         <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 font-display text-xl font-semibold"><Sparkles size={18} className="text-[color:var(--glow)]" /> Novo projeto</h2>
+          <h2 className="flex items-center gap-2 font-display text-xl font-semibold"><Sparkles size={18} className="text-[color:var(--glow)]" /> {initial ? "Editar projeto" : "Novo projeto"}</h2>
           <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X /></button>
         </div>
         <div className="mt-5 space-y-3">
@@ -227,7 +235,7 @@ function NewProject({ onClose, onCreate }: { onClose: () => void; onCreate: (p: 
             ))}
           </div>
         </div>
-        <button type="submit" className="shine mt-6 w-full rounded-full bg-gradient-brand py-3 font-medium text-primary-foreground">Criar projeto</button>
+        <button type="submit" className="shine mt-6 w-full rounded-full bg-gradient-brand py-3 font-medium text-primary-foreground">{initial ? "Salvar" : "Criar projeto"}</button>
       </form>
     </div>
   );

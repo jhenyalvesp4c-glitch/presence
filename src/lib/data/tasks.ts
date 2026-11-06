@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Category, Color, Priority, Task } from "../types";
 import { must, supabase } from "./db";
 
-const TASK_COLS = "id, title, description, category_id, priority, due_date, due_time, done, done_at, position, created_at";
+const TASK_COLS = "id, title, description, category_id, priority, due_date, due_time, done, done_at, position, created_at, end_time, place, color, project_id, dossier_id";
 
 export function useCategories() {
   return useQuery({

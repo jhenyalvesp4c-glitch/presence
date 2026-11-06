@@ -176,11 +176,20 @@ const AREA_SLUGS: Record<string, string[]> = {
 };
 const RANK = { alta: 0, media: 1, baixa: 2 } as const;
 
+const COLORS: Color[] = ["cyan", "violet", "emerald", "amber", "rose"];
+/** Cor escolhida no calendário (o calendário chama o rosa de "pink"). */
+const taskColor = (c: string | null | undefined): Color | undefined => {
+  const x = c === "pink" ? "rose" : c;
+  return COLORS.includes(x as Color) ? (x as Color) : undefined;
+};
+
 function taskDraft(t: Task, cat: Category | undefined): Draft {
   const comp = cat?.slug === "comp";
+  // Compromisso do calendário: horário de fim e local entram na descrição.
+  const extra = comp ? [t.end_time ? `até ${hhmm(t.end_time)}` : "", t.place ?? ""].filter(Boolean).join(" · ") : "";
   return {
-    time: hhmm(t.due_time), title: t.title, description: t.description ?? cat?.name ?? "Tarefa",
-    tag: comp ? "Compromisso" : (cat?.name.split(" ")[0] ?? "Tarefa"), color: cat?.color ?? "cyan", icon: cat?.icon ?? "check",
+    time: hhmm(t.due_time), title: t.title, description: extra || t.description || cat?.name || "Tarefa",
+    tag: comp ? "Compromisso" : (cat?.name.split(" ")[0] ?? "Tarefa"), color: taskColor(t.color) ?? cat?.color ?? "cyan", icon: cat?.icon ?? "check",
     kind: comp ? "compromisso" : "tarefa", task_id: t.id,
   };
 }
@@ -189,7 +198,7 @@ export async function generateDay(opts: GenerateOptions) {
   const { date } = opts;
   const [routine, tasks, cats, existing] = await Promise.all([
     supabase.from("routine_items").select(ROUTINE_COLS).order("time").order("position").then((r) => (must(r) as RoutineItem[]).map(norm)),
-    supabase.from("tasks").select("id, title, description, category_id, priority, due_date, due_time, done, position").then((r) => must(r) as Task[]),
+    supabase.from("tasks").select("id, title, description, category_id, priority, due_date, due_time, done, position, end_time, place, color").then((r) => must(r) as Task[]),
     supabase.from("task_categories").select("id, slug, name, icon, color, position").then((r) => must(r) as Category[]),
     supabase.from("schedule_items").select("title, done").eq("plan_date", date).then((r) => must(r) as { title: string; done: boolean }[]),
   ]);

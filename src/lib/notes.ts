@@ -7,14 +7,8 @@ import { P4C_ID } from "@/lib/dossiers";
 export type Note = { id: number; text: string; date: string; color: string; dossierId?: string | undefined };
 export const NOTE_COLORS = ["violet", "cyan", "emerald", "amber", "pink"] as const;
 
-export const seedNotes = (projectId: string): Note[] =>
-  projectId === P4C_ID
-    ? [
-        { id: 1, text: "Tefé vai virar polo de Itanhaém", date: "30/09", color: "violet" },
-        { id: 2, text: "Reforçar treinamento BH Centro", date: "28/09", color: "cyan", dossierId: "d3" },
-        { id: 3, text: "Revisar documentação API", date: "25/09", color: "emerald" },
-      ]
-    : [];
+/** As notas começam vazias (as 3 de exemplo do desenho foram retiradas ao ligar o banco). */
+export const seedNotes = (_projectId: string): Note[] => [];
 
 const key = (projectId: string) => `presence.notes.${projectId}`;
 

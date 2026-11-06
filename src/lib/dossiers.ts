@@ -21,7 +21,6 @@ export const LABEL_PRESETS: DossierLabel[] = [
 const P4C_NAMES = [
   "Alagoinhas", "Barra da Tijuca", "BH Centro", "Cachoeiro", "Caxias RJ", "Floresta", "Fortaleza", "Itanhaém",
   "Juiz de Fora", "Lauro", "Maceió", "Niterói", "Petrolina", "Santos", "São Vicente", "Volta Redonda",
-  "Campinas", "Recife", "Salvador", "Vitória",
 ];
 
 export const seedDossiers = (projectId: string): DossierState =>

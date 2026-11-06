@@ -1,15 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { DocsLibrary } from "@/components/DocsLibrary";
-import { loadProjects, type Project } from "@/lib/projects";
+import type { Project } from "@/lib/projects";
+import { nextCode, type DType, type Demand, type Hist, type Priority, type PoloExec, type Status } from "@/lib/demands";
+import { loadDemands, loadProjectState, loadProjects, saveDemands, saveDossiers, saveNotesDb, type ProjectState } from "@/lib/data/project-data";
+import { useDbState } from "@/lib/data/use-db-state";
 import {
-  DEFAULT_LABEL, LABEL_PRESETS, P4C_ID, dossierColor, gender, loadDossierState, saveDossierState, seedDossiers,
+  DEFAULT_LABEL, LABEL_PRESETS, P4C_ID, dossierColor, gender,
   type Dossier, type DossierLabel, type DossierState,
 } from "@/lib/dossiers";
 import {
-  NOTE_COLORS, addNote, deleteNote, editNote, loadNotes, noteDossierName, saveNotes, seedNotes, unlinkDossier,
+  NOTE_COLORS, addNote, deleteNote, editNote, noteDossierName, unlinkDossier,
   type Note, type NoteDraft,
 } from "@/lib/notes";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  calendarItems, clearLegacyAppointments, takeLegacyAppointments, type AppointmentDraft, type CalItem,
+} from "@/lib/appointments";
+import { importAppointments, unlinkDossierAppointments, useDeleteCalendarItem, useSaveAppointment } from "@/lib/data/appointments";
+import { useCategories, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { DemandCalendar } from "@/components/demand-calendar";
+import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
   Filter, Folder, FolderOpen, Globe, Hexagon, History, LayoutGrid, Layers, List, Loader, MapPin,
@@ -32,15 +43,6 @@ export const Route = createFileRoute("/demandas")({
 });
 
 /* ---------------- tipos ---------------- */
-type Status = "todo" | "doing" | "done";
-type Priority = "alta" | "media" | "baixa";
-type DType = "geral" | "polo" | "multi";
-type PoloExec = { name: string; status: Status; date?: string | undefined; note?: string | undefined };
-type Hist = { d: string; text: string; s: Status };
-type Demand = {
-  id: string; type: DType; title: string; desc: string; priority: Priority; status: Status;
-  deadline: string; polo?: string | undefined; polos?: PoloExec[] | undefined; history: Hist[]; notes: string[];
-};
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 const statusMeta: Record<Status, { label: string; color: string; poloLabel: string }> = {
@@ -95,52 +97,39 @@ function typeMetaFor(L: DossierLabel): Record<DType, TypeMeta> {
   };
 }
 const STATUSES: Status[] = ["todo", "doing", "done"];
-const ps = (list: [string, Status, string?][]): PoloExec[] => list.map(([name, status, date]) => ({ name, status, date }));
 const multiStatus = (p: PoloExec[]): Status => (!p.length ? "todo" : p.every((x) => x.status === "done") ? "done" : p.some((x) => x.status !== "todo") ? "doing" : "todo");
 const today = () => new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-
-const seed: Demand[] = [
-  { id: "#G024", type: "geral", title: "Criar tutorial de uso do sistema", desc: "Gravar e documentar um passo a passo do sistema para novos colaboradores.", priority: "media", status: "todo", deadline: "12/11", history: [{ d: "28/10", text: "Demanda criada", s: "todo" }], notes: ["Usar a identidade visual nova."] },
-  { id: "#G018", type: "geral", title: "Revisar mensagens padrão", desc: "Revisar todas as mensagens automáticas de atendimento.", priority: "alta", status: "todo", deadline: "10/11", history: [{ d: "26/10", text: "Demanda criada", s: "todo" }], notes: [] },
-  { id: "#G012", type: "geral", title: "Atualizar landing page", desc: "Novo texto de apresentação e depoimentos na página principal.", priority: "alta", status: "doing", deadline: "14/11", history: [{ d: "20/10", text: "Demanda criada", s: "todo" }, { d: "27/10", text: "Layout aprovado", s: "doing" }], notes: ["Aguardando fotos novas."] },
-  { id: "#G010", type: "geral", title: "Analisar relatórios mensais", desc: "Consolidar indicadores do mês e preparar apresentação.", priority: "media", status: "doing", deadline: "13/11", history: [{ d: "22/10", text: "Coleta de dados iniciada", s: "doing" }], notes: [] },
-  { id: "#G009", type: "geral", title: "Configurar integração API", desc: "Conectar o CRM ao sistema de agendamento.", priority: "baixa", status: "done", deadline: "05/11", history: [{ d: "15/10", text: "Iniciada", s: "doing" }, { d: "02/11", text: "Integração validada", s: "done" }], notes: [] },
-  { id: "#P034", type: "polo", polo: "Niterói", title: "Corrigir fluxo Niterói", desc: "Ajustar o fluxo de triagem que está duplicando cadastros.", priority: "alta", status: "todo", deadline: "11/11", history: [{ d: "29/10", text: "Problema reportado pelo polo", s: "todo" }], notes: [] },
-  { id: "#P032", type: "polo", polo: "BH Centro", title: "Criar template BH Centro", desc: "Template de boas-vindas personalizado para BH Centro.", priority: "media", status: "todo", deadline: "15/11", history: [{ d: "30/10", text: "Demanda criada", s: "todo" }], notes: [] },
-  { id: "#P028", type: "polo", polo: "Santos", title: "Verificar leads Santos", desc: "Conferir origem dos leads da última campanha.", priority: "baixa", status: "todo", deadline: "18/11", history: [{ d: "30/10", text: "Demanda criada", s: "todo" }], notes: [] },
-  { id: "#P027", type: "polo", polo: "Fortaleza", title: "Ajustar permissões", desc: "Liberar acesso de coordenação para a nova equipe.", priority: "alta", status: "doing", deadline: "13/11", history: [{ d: "25/10", text: "Levantamento de acessos", s: "doing" }], notes: [] },
-  { id: "#P025", type: "polo", polo: "Caxias RJ", title: "Revisar campanhas RJ", desc: "Revisar textos e públicos das campanhas ativas.", priority: "media", status: "doing", deadline: "16/11", history: [{ d: "24/10", text: "Revisão iniciada", s: "doing" }], notes: [] },
-  { id: "#P021", type: "polo", polo: "Barra da Tijuca", title: "Ajustar formulários", desc: "Novos campos obrigatórios no formulário de inscrição.", priority: "media", status: "done", deadline: "08/11", history: [{ d: "18/10", text: "Iniciada", s: "doing" }, { d: "01/11", text: "Publicado", s: "done" }], notes: [] },
-  { id: "#P018", type: "polo", polo: "Niterói", title: "Configurar bot", desc: "Respostas rápidas do bot de WhatsApp.", priority: "baixa", status: "done", deadline: "08/11", history: [{ d: "31/10", text: "Bot ativo", s: "done" }], notes: [] },
-  { id: "#M003", type: "multi", title: "Atualizar configurações de polos", desc: "Padronizar horários, contatos e regras de cada polo no sistema.", priority: "alta", status: "todo", deadline: "20/11",
-    polos: ps([["Alagoinhas", "todo"], ["Cachoeiro", "todo"], ["Floresta", "todo"], ["Petrolina", "todo"], ["Santos", "todo"], ["São Vicente", "todo"]]), history: [{ d: "31/10", text: "Demanda criada para 6 polos", s: "todo" }], notes: [] },
-  { id: "#M024", type: "multi", title: "Criar templates para os polos", desc: "Criar e configurar os templates de atendimento nos polos: Barra da Tijuca, Lauro, Niterói e Maceió.", priority: "alta", status: "doing", deadline: "15/11",
-    polos: ps([["Barra da Tijuca", "done", "30/10"], ["Lauro", "done", "30/10"], ["Niterói", "doing"], ["Maceió", "todo"]]),
-    history: [{ d: "30/10", text: "Templates configurados no polo Barra da Tijuca.", s: "done" }, { d: "30/10", text: "Templates configurados no polo Lauro.", s: "done" }, { d: "31/10", text: "Iniciado no polo Niterói.", s: "doing" }], notes: ["Maceió depende da aprovação do coordenador."] },
-  { id: "#M025", type: "multi", title: "Habilitar assinatura do usuário", desc: "Ativar assinatura digital nos contratos de cada polo.", priority: "media", status: "doing", deadline: "22/11",
-    polos: ps([["Alagoinhas", "done", "28/10"], ["BH Centro", "done", "29/10"], ["Caxias RJ", "done", "31/10"], ["Fortaleza", "doing"], ["Itanhaém", "todo"], ["Juiz de Fora", "todo"], ["Santos", "todo"], ["Volta Redonda", "todo"]]),
-    history: [{ d: "28/10", text: "Concluído em Alagoinhas", s: "done" }, { d: "29/10", text: "Concluído em BH Centro", s: "done" }, { d: "31/10", text: "Concluído em Caxias RJ", s: "done" }], notes: [] },
-  { id: "#M010", type: "multi", title: "Verificar criação de contas", desc: "Auditar contas criadas no último trimestre.", priority: "baixa", status: "doing", deadline: "25/11",
-    polos: ps([["Niterói", "doing"], ["Petrolina", "todo"], ["Floresta", "done", "27/10"]]), history: [{ d: "27/10", text: "Concluído em Floresta", s: "done" }], notes: [] },
-  { id: "#M018", type: "multi", title: "Padronizar mensagens de atendimento", desc: "Mesma linguagem de atendimento em todos os polos.", priority: "baixa", status: "done", deadline: "05/11",
-    polos: ps([["Lauro", "done", "20/10"], ["Maceió", "done", "22/10"], ["Niterói", "done", "24/10"], ["Santos", "done", "25/10"], ["São Vicente", "done", "28/10"]]), history: [{ d: "28/10", text: "Todos os polos concluídos", s: "done" }], notes: [] },
-];
 
 /* ---------------- página ---------------- */
 function Demandas() {
   const { projeto } = Route.useSearch();
-  const pid = projeto ?? P4C_ID;
-  const [project, setProject] = useState<Project | undefined>();
-  useEffect(() => setProject(loadProjects().find((x) => x.id === projeto)), [projeto]);
-  // Dossiês (polos no P4C): lista e nome próprios de cada projeto.
-  const [ds, setDs] = useState<DossierState>(() => seedDossiers(pid));
-  useEffect(() => setDs(loadDossierState(pid)), [pid]);
-  const changeDs = (n: DossierState) => { setDs(n); saveDossierState(pid, n); };
+  // Projeto atual: o do `?projeto=` se existir no banco; senão o padrão (P4C).
+  const [known, setKnown] = useState<Project[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadProjects().then((l) => alive && setKnown(l)).catch(() => alive && setKnown([]));
+    return () => { alive = false; };
+  }, []);
+  const pid: string | null = known === null ? null : projeto && known.some((p) => p.id === projeto) ? projeto : P4C_ID;
+  const project = known?.find((x) => x.id === pid);
+  // Dossiês (polos no P4C) e notas do projeto: no banco.
+  const [st, setSt, stReady] = useDbState<ProjectState>(
+    pid, { ds: { label: DEFAULT_LABEL, dossiers: [] }, notes: [] },
+    () => loadProjectState(pid!),
+    async (prev, next) => {
+      if (prev.ds !== next.ds) await saveDossiers(pid!, prev.ds, next.ds);
+      if (prev.notes !== next.notes) await saveNotesDb(pid!, prev.notes, next.notes);
+    },
+  );
+  const ds = st.ds;
+  const notes = st.notes;
+  const changeDs = (n: DossierState) => setSt((s) => ({ ...s, ds: n }));
   const L = ds.label;
   const names = ds.dossiers.map((x) => x.name);
   const tm = typeMetaFor(L);
-  const [items, setItems] = useState(seed);
-  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies">("overview");
+  const [items, setItems, itemsReady] = useDbState<Demand[]>(pid, [], () => loadDemands(pid!), (p, n) => saveDemands(pid!, p, n));
+  const ready = pid !== null && stReady && itemsReady;
+  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda">("overview");
   const [view, setView] = useState<"kanban" | "lista" | "matriz">("kanban");
   const [prioF, setPrioF] = useState<"todas" | Priority>("todas");
   const [statusF, setStatusF] = useState<"todos" | "pend" | Status>("todos");
@@ -150,10 +139,8 @@ function Demandas() {
   const [newOpen, setNewOpen] = useState<{ type: DType; status: Status } | null>(null);
   const [editOnOpen, setEditOnOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  // Notas: salvas por projeto; cada uma pode estar ligada a um dossiê ou ser geral.
-  const [notes, setNotes] = useState<Note[]>(() => seedNotes(pid));
-  useEffect(() => setNotes(loadNotes(pid)), [pid]);
-  const changeNotes = (f: (n: Note[]) => Note[]) => setNotes((xs) => { const n = f(xs); saveNotes(pid, n); return n; });
+  // Notas: salvas no banco por projeto; cada uma pode estar ligada a um dossiê ou ser geral.
+  const changeNotes = (f: (n: Note[]) => Note[]) => setSt((s) => ({ ...s, notes: f(s.notes) }));
   const [noteEdit, setNoteEdit] = useState<Note | "new" | null>(null);
   const saveNote = (d: NoteDraft) => {
     if (noteEdit === "new") changeNotes((xs) => addNote(xs, d, today()));
@@ -164,6 +151,31 @@ function Demandas() {
     if (!window.confirm(`Excluir a nota "${n.text.slice(0, 40) || "Nota vazia"}"?`)) return;
     changeNotes((xs) => deleteNote(xs, n.id));
   };
+  // Calendário: compromissos salvos por projeto; cada um pode estar ligado a um dossiê ou ser geral.
+  // Ficam no banco como tarefas da categoria Compromissos, por isso entram no "Organize/Planeje meu dia".
+  const qc = useQueryClient();
+  const tasksQ = useTasks();
+  const catsQ = useCategories();
+  const compId = (catsQ.data ?? []).find((c) => c.slug === "comp")?.id;
+  const appts = useMemo(() => calendarItems(tasksQ.data ?? [], compId), [tasksQ.data, compId]);
+  const saveApptM = useSaveAppointment(compId, pid ?? P4C_ID);
+  const delTask = useDeleteCalendarItem();
+  const toggleTask = useToggleTask();
+  // Compromissos antigos que estavam só neste navegador sobem para o banco uma única vez.
+  useEffect(() => {
+    if (!compId || !pid) return;
+    const legacy = takeLegacyAppointments(pid);
+    if (!legacy.length) return;
+    clearLegacyAppointments(pid);
+    importAppointments(legacy, compId, pid).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch((e: Error) => toast.error(`Não consegui salvar os compromissos antigos: ${e.message}`));
+  }, [compId, pid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const saveAppt = (draft: AppointmentDraft, id?: string) =>
+    saveApptM.mutate({ draft, id }, { onSuccess: () => toast.success(id ? "Compromisso atualizado" : "Compromisso marcado"), onError: (e) => toast.error(`Não consegui salvar: ${e.message}`) });
+  const removeAppt = (a: CalItem) => {
+    if (!window.confirm(`Excluir ${a.kind === "compromisso" ? "o compromisso" : "a tarefa"} "${a.title}"?`)) return;
+    delTask.mutate(a.id, { onError: (e) => toast.error(`Não consegui excluir: ${e.message}`) });
+  };
+  const toggleAppt = (a: CalItem) => toggleTask.mutate({ id: a.id, done: !a.done }, { onError: (e) => toast.error(e.message) });
   const noteProps = { notes, dossiers: ds.dossiers, onNew: () => setNoteEdit("new" as const), onEdit: setNoteEdit, onDelete: removeNote };
 
   const sel = items.find((i) => i.id === selId) ?? null;
@@ -223,10 +235,9 @@ function Demandas() {
   });
   const setPoloNote = (id: string, name: string, note: string) => update(id, (d) => ({ ...d, polos: d.polos?.map((p) => (p.name === name ? { ...p, note } : p)) }));
   const createDemand = (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status }) => {
-    const n = items.filter((i) => i.type === f.type).length + 40;
     const multi = f.type === "multi";
     const d: Demand = {
-      id: `#${typeBase[f.type].prefix}0${n}`, type: f.type, title: f.title, desc: f.desc || "Sem descrição.", priority: f.priority, status: f.status,
+      id: nextCode(items, f.type), type: f.type, title: f.title, desc: f.desc || "Sem descrição.", priority: f.priority, status: f.status,
       deadline: f.deadline || "—", polo: f.type === "polo" ? f.targets[0] : undefined,
       polos: multi ? f.targets.map((name) => ({ name, status: "todo" as Status })) : undefined,
       history: [{ d: today(), text: multi ? `Demanda criada para ${f.targets.length} ${f.targets.length === 1 ? sing : L.plural.toLowerCase()}` : "Demanda criada", s: "todo" }], notes: [],
@@ -282,7 +293,7 @@ function Demandas() {
     }));
     setPoloF((f) => (f === name ? null : f));
     const gone = ds.dossiers.find((x) => x.name === name);
-    if (gone) changeNotes((xs) => unlinkDossier(xs, gone.id));
+    if (gone) { changeNotes((xs) => unlinkDossier(xs, gone.id)); unlinkDossierAppointments(pid ?? P4C_ID, gone.id).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch(() => {}); }
   };
   const usage = (name: string) => items.filter((d) => d.polo === name || d.polos?.some((p) => p.name === name)).length;
 
@@ -293,11 +304,12 @@ function Demandas() {
   const tabs = [
     { k: "overview" as const, label: "Visão geral", sub: "Todos os tipos", icon: LayoutGrid, color: "cyan", n: items.length },
     ...(["geral", "polo", "multi"] as DType[]).map((t) => ({ k: t, label: tm[t].short, sub: tm[t].sub, icon: tm[t].icon, color: tm[t].color, n: count(t) })),
+    { k: "agenda" as const, label: "Calendário", sub: "Compromissos", icon: Calendar, color: "emerald", n: appts.length },
     { k: "dossies" as const, label: L.plural, sub: "Cadastro", icon: Folder, color: "pink", n: ds.dossiers.length },
     { k: "docs" as const, label: "Documentação", sub: "Biblioteca", icon: FolderOpen, color: "violet", n: 19 },
     { k: "notas" as const, label: "Notas", sub: "Lembretes", icon: StickyNote, color: "amber", n: notes.length },
   ];
-  const filterBar = tab !== "notas" && tab !== "docs" && tab !== "dossies";
+  const filterBar = tab !== "notas" && tab !== "docs" && tab !== "dossies" && tab !== "agenda";
   const boardItems = (t: typeof tab) => filtered.filter((i) => t === "overview" || i.type === t);
 
   return (
@@ -322,8 +334,8 @@ function Demandas() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <button onClick={() => setNewOpen({ type: "geral", status: "todo" })} data-testid="nova-demanda"
-              className="flex items-center gap-2 rounded-2xl border border-cyan/60 bg-cyan/10 px-4 py-3 text-sm font-medium text-cyan shadow-[0_0_30px_-8px_var(--cyan)] transition hover:bg-cyan/20">
+            <button onClick={() => setNewOpen({ type: "geral", status: "todo" })} data-testid="nova-demanda" disabled={!ready}
+              className="disabled:opacity-50 flex items-center gap-2 rounded-2xl border border-cyan/60 bg-cyan/10 px-4 py-3 text-sm font-medium text-cyan shadow-[0_0_30px_-8px_var(--cyan)] transition hover:bg-cyan/20">
               <Plus size={16} /> Nova demanda
             </button>
             <div className="glass grid grid-cols-4 divide-x divide-border rounded-2xl py-3">
@@ -338,7 +350,7 @@ function Demandas() {
         </header>
 
         {/* abas de tipo */}
-        <nav className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 animate-rise" style={{ animationDelay: ".05s" }}>
+        <nav className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 animate-rise" style={{ animationDelay: ".05s" }}>
           {tabs.map((t) => {
             const on = tab === t.k;
             return (
@@ -388,8 +400,14 @@ function Demandas() {
         )}
 
         <main className="mt-5">
-          {tab === "docs" ? (
+          {!ready && tab !== "docs" ? (
+            <div className="glass grid place-items-center gap-3 rounded-3xl p-16 text-sm text-muted-foreground animate-rise" data-testid="carregando">
+              <Loader size={22} className="animate-[spin_3s_linear_infinite] text-cyan" /> Carregando suas demandas…
+            </div>
+          ) : tab === "docs" ? (
             <DocsLibrary />
+          ) : tab === "agenda" ? (
+            <DemandCalendar items={appts} dossiers={ds.dossiers} label={L} onSave={saveAppt} onDelete={removeAppt} onToggle={toggleAppt} saving={saveApptM.isPending} />
           ) : tab === "notas" ? (
             <NotesBoard {...noteProps} />
           ) : tab === "dossies" ? (
@@ -419,7 +437,7 @@ function Demandas() {
           )}
         </main>
 
-        {tab === "overview" && <NotesStrip {...noteProps} onMore={() => setTab("notas")} />}
+        {ready && tab === "overview" && <NotesStrip {...noteProps} onMore={() => setTab("notas")} />}
       </div>
 
       <DetailPanel
@@ -503,12 +521,6 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const [targets, setTargets] = useState<string[]>([]);
   const needs = type !== "geral";
   const ok = title.trim().length > 0 && (!needs || targets.length > 0);
-  // Foco explícito no título (além do autoFocus) para navegadores/janelas que ignoram o atributo.
-  const titleRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    const t = window.setTimeout(() => titleRef.current?.focus(), 60);
-    return () => window.clearTimeout(t);
-  }, []);
   const deadline = date ? date.split("-").reverse().slice(0, 2).join("/") : "";
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
@@ -524,7 +536,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
         <div className="scroll-neon min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <label className="block">
             <span className="mono-caps">Título</span>
-            <input ref={titleRef} autoFocus autoComplete="off" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="O que precisa ser feito?" data-testid="demanda-titulo"
+            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="O que precisa ser feito?" data-testid="demanda-titulo"
               className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-cyan/60" />
           </label>
           <label className="block">

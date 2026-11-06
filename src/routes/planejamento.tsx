@@ -9,6 +9,7 @@ import { hhmm, todayIso } from "@/lib/dates";
 import { getIcon } from "@/lib/icons";
 import { useCategories, useTasks } from "@/lib/data/tasks";
 import { useDayPlan, useGenerateDay, useRoutine, useSchedule } from "@/lib/data/day";
+import { compromissosForDay } from "@/lib/appointments";
 import { useSplit } from "@/lib/data/workouts";
 
 export const Route = createFileRoute("/planejamento")({
@@ -61,15 +62,20 @@ function Planejamento() {
 
   // Prévia do dia: o plano já gerado ou, antes disso, a rotina-base + tarefas de hoje.
   const generated = (schedQ.data?.length ?? 0) > 0;
-  const agenda = useMemo(() => (generated ? schedQ.data! : (routineQ.data ?? [])), [generated, schedQ.data, routineQ.data]);
   const compId = (catsQ.data ?? []).find((c) => c.slug === "comp")?.id;
   const allTasks = tasksQ.data ?? [];
+  // Compromissos do calendário com horário já aparecem na prévia, no meio da rotina.
+  const compPreview = useMemo(() => compromissosForDay(allTasks, compId, today), [allTasks, compId, today]);
+  const agenda = useMemo(
+    () => (generated ? schedQ.data! : [...(routineQ.data ?? []), ...compPreview].sort((a, b) => a.time.localeCompare(b.time))),
+    [generated, schedQ.data, routineQ.data, compPreview],
+  );
   const pending = allTasks.filter((t) => !t.done);
   const compToday = pending.filter((t) => t.category_id === compId && t.due_date === today).length;
   const overdue = pending.filter((t) => t.due_date && t.due_date < today).length;
   const count = (k: string) => agenda.filter((a) => a.kind === k).length;
   const nTarefas = count("tarefa") + (generated ? 0 : pending.filter((t) => t.category_id !== compId && t.due_date === today).length);
-  const nComp = count("compromisso") + (generated ? 0 : compToday);
+  const nComp = count("compromisso") + (generated ? 0 : compToday - compPreview.length);
   const nHabitos = count("habito");
   const todaySplit = splitQ.data?.find((x) => x.weekday === new Date().getDay());
   const doneCount = generated ? schedQ.data!.filter((a) => a.done).length : 0;
