@@ -9,7 +9,7 @@ import {
   NOTE_COLORS, addNote, deleteNote, editNote, loadNotes, noteDossierName, saveNotes, seedNotes, unlinkDossier,
   type Note, type NoteDraft,
 } from "@/lib/notes";
-import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
   Filter, Folder, FolderOpen, Globe, Hexagon, History, LayoutGrid, Layers, List, Loader, MapPin,
@@ -503,6 +503,12 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const [targets, setTargets] = useState<string[]>([]);
   const needs = type !== "geral";
   const ok = title.trim().length > 0 && (!needs || targets.length > 0);
+  // Foco explícito no título (além do autoFocus) para navegadores/janelas que ignoram o atributo.
+  const titleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const t = window.setTimeout(() => titleRef.current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, []);
   const deadline = date ? date.split("-").reverse().slice(0, 2).join("/") : "";
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
@@ -518,7 +524,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
         <div className="scroll-neon min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <label className="block">
             <span className="mono-caps">Título</span>
-            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="O que precisa ser feito?" data-testid="demanda-titulo"
+            <input ref={titleRef} autoFocus autoComplete="off" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="O que precisa ser feito?" data-testid="demanda-titulo"
               className="mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-cyan/60" />
           </label>
           <label className="block">
