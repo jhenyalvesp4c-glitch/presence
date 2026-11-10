@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { backdropProps } from "@/lib/backdrop";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, CalendarClock, FolderKanban, Pencil, Plus, Sparkles, Trash2, Target, X, Zap } from "lucide-react";
 import { PlanShell, Panel, colorVar, tint } from "@/components/PlanShell";
@@ -209,7 +210,7 @@ function NewProject({ onClose, onCreate, initial }: { onClose: () => void; onCre
   const [status, setStatus] = useState<Project["status"]>(initial?.status ?? "Planejando");
   const input = "w-full rounded-xl border border-input bg-background/40 px-4 py-2.5 outline-none transition focus:border-[color:var(--cyan)] focus:shadow-[0_0_16px_-6px_var(--cyan)]";
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;

@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { backdropProps } from "@/lib/backdrop";
 import { DocsLibrary } from "@/components/DocsLibrary";
 import type { Project } from "@/lib/projects";
 import { nextCode, type DType, type Demand, type Hist, type Priority, type PoloExec, type Status } from "@/lib/demands";
@@ -524,7 +525,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const deadline = date ? date.split("-").reverse().slice(0, 2).join("/") : "";
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status }); }}
         className="glass relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label="Nova demanda">
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
@@ -1124,7 +1125,7 @@ function NoteDialog({ note, dossiers, onClose, onSave }: {
   const [dossierId, setDossierId] = useState<string>(note?.dossierId && dossiers.some((d) => d.id === note.dossierId) ? note.dossierId : "");
   const ok = text.trim().length > 0;
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onSave({ text, color, dossierId: dossierId || undefined }); }}
         className="glass relative flex w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label={note ? "Editar nota" : "Nova nota"}>
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
@@ -1193,7 +1194,7 @@ function DetailPanel({ demand: d, autoEdit, dossiers, onClose, onStatus, onPolo,
 
   return (
     <>
-      <div onClick={onClose} className="fixed inset-0 z-40 bg-background/50 backdrop-blur-[2px] animate-in fade-in xl:hidden" />
+      <div {...backdropProps(onClose)} className="fixed inset-0 z-40 bg-background/50 backdrop-blur-[2px] animate-in fade-in xl:hidden" />
       <aside style={tint(m.color)}
         className="fixed bottom-3 right-3 top-3 z-50 flex w-[min(470px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-3xl border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[linear-gradient(170deg,oklch(0.19_0.045_262/0.96),oklch(0.13_0.03_262/0.97))] shadow-[0_0_80px_-20px_var(--glow)] backdrop-blur-2xl animate-in slide-in-from-right-12 fade-in duration-500">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(60%_100%_at_30%_0%,color-mix(in_oklab,var(--glow)_22%,transparent),transparent)]" />

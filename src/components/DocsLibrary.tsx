@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
+import { backdropProps } from "@/lib/backdrop";
 import {
   BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Download, Eye, EyeOff, FileText, FileVideo, Folder,
   FolderOpen, FolderPlus, GraduationCap, KeyRound, LayoutGrid, Lightbulb, List, MoreHorizontal, Plus, Search, Send,
@@ -417,7 +418,7 @@ function DocDetail({ d, onFav, onDelete }: { d?: Doc & { folder: string }; onFav
       )}
 
       {preview && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-6 backdrop-blur-md" onClick={() => setPreview(null)}>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-6 backdrop-blur-md" {...backdropProps(() => setPreview(null))}>
           <div className="glass w-full max-w-lg rounded-3xl p-5 animate-rise" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between"><p className="font-semibold">{preview}</p><button onClick={() => setPreview(null)}><X size={16} /></button></div>
             <div className="relative mt-4 grid aspect-video place-items-center overflow-hidden rounded-2xl border border-border bg-secondary/40 scanline" style={tint("cyan")}>

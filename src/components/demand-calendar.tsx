@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { backdropProps } from "@/lib/backdrop";
 import {
   CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock, ListChecks, MapPin, Pencil, Plus, Sparkles, Trash2, X,
 } from "lucide-react";
@@ -323,7 +324,7 @@ function AppointmentDialog({ appt, date: startDate, dossiers, label, saving, onC
   const ok = title.trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date);
   const field = "mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none transition focus:border-cyan/60 [color-scheme:dark]";
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => { e.preventDefault(); if (ok) onSave({ title, date, time: allDay ? undefined : time, end: allDay ? undefined : end, place, notes, color, dossierId }); }}
         className="glass relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label={appt ? "Editar compromisso" : "Novo compromisso"}>

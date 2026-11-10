@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { backdropProps } from "@/lib/backdrop";
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,7 +22,7 @@ export function WorkoutEditDialog({ workouts, exercises, split, goal, currentId,
   const selected = workouts.find((w) => w.id === selectedId) ?? workouts[0];
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" {...backdropProps(onClose)}>
       <div onClick={(e) => e.stopPropagation()} className="glass flex max-h-[90vh] w-full max-w-2xl flex-col gap-4 overflow-hidden rounded-3xl p-6 animate-rise">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold">Editar treino</h3>

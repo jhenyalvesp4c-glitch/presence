@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { backdropProps } from "@/lib/backdrop";
 import { toast } from "sonner";
 import { BookOpen, ImageIcon, Layers, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { COLORS, newId, type Block, type Example, type Faq, type Script, type Visual } from "@/lib/training-library";
@@ -21,7 +22,7 @@ function Modal({ title, subtitle, icon, color, onClose, onSubmit, onDelete, dele
   }, [onClose]);
   const submit = (e: FormEvent) => { e.preventDefault(); onSubmit(); };
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} onClick={onClose}
+    <div role="dialog" aria-modal="true" aria-label={title} {...backdropProps(onClose)}
       className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-md animate-rise">
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={tint(color)} className="glass flex max-h-full w-full max-w-2xl flex-col rounded-3xl">
         <div className="flex items-start gap-3 border-b border-border p-5 pb-3">

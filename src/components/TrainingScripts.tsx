@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { backdropProps } from "@/lib/backdrop";
 import { toast } from "sonner";
 import { useCategories, useToggleTask } from "@/lib/data/tasks";
 import { useDeleteTraining, useSaveTraining, useTrainings } from "@/lib/data/trainings";
@@ -534,7 +535,7 @@ function Lightbox({ visual, onClose }: { visual: Visual; onClose: () => void }) 
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
   return (
-    <div role="dialog" aria-modal="true" aria-label={visual.title} onClick={onClose}
+    <div role="dialog" aria-modal="true" aria-label={visual.title} {...backdropProps(onClose)}
       className="fixed inset-0 z-50 grid place-items-center bg-background/85 p-4 backdrop-blur-md animate-rise">
       <div onClick={(e) => e.stopPropagation()} className="glass grid max-h-full w-full max-w-7xl gap-4 overflow-auto rounded-3xl p-4 lg:grid-cols-[1fr_320px]">
         <div className="relative self-start overflow-hidden rounded-xl border border-border">
@@ -581,7 +582,7 @@ function TrainingForm({ initial, scripts, defaultScript, saving, onClose, onSave
     onSave(f);
   };
   return (
-    <div role="dialog" aria-modal="true" aria-label={initial ? "Editar turma" : "Agendar turma"} onClick={onClose}
+    <div role="dialog" aria-modal="true" aria-label={initial ? "Editar turma" : "Agendar turma"} {...backdropProps(onClose)}
       className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-md animate-rise">
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={tint("amber")} className="glass max-h-full w-full max-w-lg space-y-3 overflow-auto rounded-3xl p-5">
         <div className="flex items-start gap-3">

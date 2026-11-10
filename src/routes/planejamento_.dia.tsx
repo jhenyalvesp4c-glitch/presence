@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { backdropProps } from "@/lib/backdrop";
 import { useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 import { ArrowDown, ArrowLeft, ArrowUp, Check, GripVertical, Loader2, Pencil, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
@@ -174,7 +175,7 @@ function EditDialog({ a, isNew, onClose, onSave, onRemove }: { a: Activity; isNe
   const [f, setF] = useState(a);
   const field = "w-full rounded-xl border border-border bg-background/40 px-4 py-2.5 text-sm outline-none focus:border-cyan";
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (f.title.trim()) onSave(f); }}
         className="glass w-full max-w-md space-y-4 rounded-3xl p-6 animate-rise">
         <div className="flex items-center justify-between">

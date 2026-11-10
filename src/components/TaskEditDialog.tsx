@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { backdropProps } from "@/lib/backdrop";
 import { Flag, Loader2, Trash2, X } from "lucide-react";
 
 import { colorVar } from "@/components/PlanShell";
@@ -23,7 +24,7 @@ export function TaskEditDialog({ task, categories, saving, onClose, onSave, onDe
   const field = "w-full rounded-xl border border-border bg-background/40 px-4 py-2.5 text-sm outline-none focus:border-cyan [color-scheme:dark]";
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
