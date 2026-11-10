@@ -29,7 +29,7 @@ export function useTasks() {
 
 function useInvalidate() {
   const qc = useQueryClient();
-  return () => Promise.all([qc.invalidateQueries({ queryKey: ["tasks"] }), qc.invalidateQueries({ queryKey: ["schedule"] }), qc.invalidateQueries({ queryKey: ["pending-count"] })]);
+  return () => Promise.all(["tasks", "schedule", "pending-count", "trainings"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
 }
 
 export type NewTask = {

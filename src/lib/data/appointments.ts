@@ -10,6 +10,7 @@ function useInvalidate() {
       qc.invalidateQueries({ queryKey: ["tasks"] }),
       qc.invalidateQueries({ queryKey: ["schedule"] }),
       qc.invalidateQueries({ queryKey: ["pending-count"] }),
+      qc.invalidateQueries({ queryKey: ["trainings"] }),
     ]);
 }
 
@@ -17,7 +18,7 @@ function useInvalidate() {
  * Mantém a agenda do dia em sincronia: se o dia do compromisso já tem plano gerado
  * ("Organize/Planeje meu dia"), o compromisso entra (ou sai) dele na hora.
  */
-async function syncSchedule(taskId: string, d: AppointmentDraft | null) {
+export async function syncSchedule(taskId: string, d: AppointmentDraft | null) {
   must(await supabase.from("schedule_items").delete().eq("task_id", taskId).select("id"));
   const row = d ? compromissoScheduleRow(d, taskId) : null;
   if (!row) return;
@@ -25,21 +26,27 @@ async function syncSchedule(taskId: string, d: AppointmentDraft | null) {
   if (planned?.length) must(await supabase.from("schedule_items").insert(row).select("id"));
 }
 
+/** Grava o compromisso (tarefa da categoria Compromissos) e devolve o id da tarefa. */
+export async function saveAppointment(draft: AppointmentDraft, compId: string | undefined, projectId: string, id?: string): Promise<string> {
+  if (!compId) throw new Error("A categoria Compromissos ainda não carregou.");
+  let taskId = id;
+  if (id) {
+    const { project_id: _p, ...patch } = appointmentRow(draft, compId, projectId);
+    must(await supabase.from("tasks").update(patch).eq("id", id).select("id"));
+  } else {
+    const row = must(await supabase.from("tasks").insert(appointmentRow(draft, compId, projectId)).select("id").single()) as { id: string };
+    taskId = row.id;
+  }
+  await syncSchedule(taskId!, draft);
+  return taskId!;
+}
+
 /** Cria ou edita um compromisso (guardado como tarefa da categoria Compromissos). */
 export function useSaveAppointment(compId: string | undefined, projectId: string) {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async ({ draft, id }: { draft: AppointmentDraft; id?: string | undefined }) => {
-      if (!compId) throw new Error("A categoria Compromissos ainda não carregou.");
-      let taskId = id;
-      if (id) {
-        const { project_id: _p, ...patch } = appointmentRow(draft, compId, projectId);
-        must(await supabase.from("tasks").update(patch).eq("id", id).select("id"));
-      } else {
-        const row = must(await supabase.from("tasks").insert(appointmentRow(draft, compId, projectId)).select("id").single()) as { id: string };
-        taskId = row.id;
-      }
-      await syncSchedule(taskId!, draft);
+      await saveAppointment(draft, compId, projectId, id);
     },
     onSuccess: invalidate,
   });

@@ -400,12 +400,12 @@ function Demandas() {
         )}
 
         <main className="mt-5">
-          {!ready && tab !== "docs" ? (
+          {!ready ? (
             <div className="glass grid place-items-center gap-3 rounded-3xl p-16 text-sm text-muted-foreground animate-rise" data-testid="carregando">
               <Loader size={22} className="animate-[spin_3s_linear_infinite] text-cyan" /> Carregando suas demandas…
             </div>
           ) : tab === "docs" ? (
-            <DocsLibrary />
+            <DocsLibrary projectId={pid ?? P4C_ID} />
           ) : tab === "agenda" ? (
             <DemandCalendar items={appts} dossiers={ds.dossiers} label={L} onSave={saveAppt} onDelete={removeAppt} onToggle={toggleAppt} saving={saveApptM.isPending} />
           ) : tab === "notas" ? (

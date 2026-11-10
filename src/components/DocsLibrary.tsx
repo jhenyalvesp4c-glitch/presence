@@ -4,6 +4,7 @@ import {
   FolderOpen, FolderPlus, GraduationCap, KeyRound, LayoutGrid, Lightbulb, List, MoreHorizontal, Plus, Search, Send,
   Sparkles, Star, Trash2, User, X, LayoutTemplate, Files, Paperclip, ArrowRight,
 } from "lucide-react";
+import { TrainingScripts } from "@/components/TrainingScripts";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
@@ -65,7 +66,24 @@ const findFolder = (fs: FolderT[], id: string): FolderT | undefined => {
 const mapFolders = (fs: FolderT[], id: string, fn: (f: FolderT) => FolderT): FolderT[] =>
   fs.map((f) => (f.id === id ? fn(f) : { ...f, subs: f.subs && mapFolders(f.subs, id, fn) }));
 
-export function DocsLibrary() {
+export function DocsLibrary({ projectId }: { projectId: string }) {
+  const [section, setSection] = useState<"lib" | "tre">("lib");
+  return (
+    <div className="space-y-4">
+      <div className="glass inline-flex rounded-2xl p-1 animate-rise">
+        {([["lib", "Biblioteca", BookOpen, "cyan"], ["tre", "Treinamentos", GraduationCap, "pink"]] as const).map(([k, l, I, c]) => (
+          <button key={k} onClick={() => setSection(k)} style={tint(c)}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition ${section === k ? "bg-[color-mix(in_oklab,var(--glow)_15%,transparent)] text-[var(--glow)] shadow-[0_0_20px_-8px_var(--glow)]" : "text-muted-foreground hover:text-foreground"}`}>
+            <I size={15} /> {l}
+          </button>
+        ))}
+      </div>
+      {section === "lib" ? <Library /> : <TrainingScripts projectId={projectId} />}
+    </div>
+  );
+}
+
+function Library() {
   const [folders, setFolders] = useState(seedFolders);
   const [open, setOpen] = useState<Record<string, boolean>>({ tut: true, log: true });
   const [cur, setCur] = useState("tut");
