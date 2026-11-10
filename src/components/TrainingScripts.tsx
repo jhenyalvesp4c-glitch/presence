@@ -4,140 +4,26 @@ import { useCategories, useToggleTask } from "@/lib/data/tasks";
 import { useDeleteTraining, useSaveTraining, useTrainings } from "@/lib/data/trainings";
 import { sortTrainings, trainingStatus, type Training, type TrainingDraft } from "@/lib/trainings";
 import { todayIso } from "@/lib/dates";
-import { loadTrainingScripts, saveTrainingScripts } from "@/lib/data/training-scripts";
 import { useDbState } from "@/lib/data/use-db-state";
-import imgEtiquetasLead from "@/assets/treino-etiquetas-lead.jpg";
-import imgEtiquetasFiltro from "@/assets/treino-etiquetas-filtro.jpg";
+import { loadLibrary, saveLibrary } from "@/lib/data/training-library";
+import {
+  moveBlock, removeBlock, removeExample, removeScript, seedLibrary, setShowItem, upsertBlock, upsertExample, upsertScript,
+  type Block, type Example, type Pin, type Script, type Visual,
+} from "@/lib/training-library";
+import { BlockEditor, ExampleEditor, ScriptEditor } from "./training-editors";
+import { visualSrc } from "./training-images";
 import {
   ArrowRight, CalendarDays, Check, ChevronDown, Clock, Copy, GraduationCap, Lightbulb, MessageCircleQuestion,
-  Play, Plus, RotateCcw, Search, Sparkles, Square, Target, Users, X, ImageIcon, Maximize2, MapPin, Pencil, Trash2, CalendarPlus, ThumbsUp, ArrowDown, CheckCircle2,
+  Play, Plus, RotateCcw, Search, Sparkles, Square, Target, Users, X, ImageIcon, Maximize2, MapPin, Pencil, Trash2, CalendarPlus, ThumbsUp, ArrowDown, ArrowUp, CheckCircle2,
 } from "lucide-react";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
-type Pin = { x: number; y: number; label: string; text: string };
-type Visual = { src: string; key?: string | undefined; title: string; caption: string; pins: Pin[] };
-type Example = { id: string; title: string; situation: string; text: string; cat: string; color: string; visual?: Visual };
-type Block = {
-  id: string; title: string; minutes: number; show: string[]; examples: string[]; tip?: string; faq?: { q: string; a: string }[];
-  visuals?: Visual[]; why?: string[]; scenario?: { situation: string; before: string; after: string };
-};
-type Script = { id: string; title: string; audience: string; goal: string; color: string; lastClass: string; blocks: Block[] };
-
-// Dados de demonstração (apenas visual, nada é salvo)
-const visualTagsLead: Visual = {
-  src: imgEtiquetasLead, key: "lead", title: "Onde colocar", caption: "Tela do lead aberta: conversa à esquerda, dados e etiquetas à direita.",
-  pins: [
-    { x: 16, y: 30, label: "Leia a conversa", text: "A Ana disse que quer saber de Enfermagem. É isso que vira etiqueta." },
-    { x: 71, y: 43, label: "Etiquetas do lead", text: "Ficam no painel \"Dados do lead\". Sempre visíveis para qualquer consultor que abrir o contato." },
-    { x: 71, y: 55, label: "Adicionar etiqueta", text: "Clique em \"+ Adicionar etiqueta\" e escolha da lista. O × na etiqueta remove." },
-    { x: 91, y: 63, label: "Lista padrão do polo", text: "Use sempre as etiquetas da lista; não invente nomes novos, senão o filtro não encontra." },
-  ],
-};
-const visualTagsFiltro: Visual = {
-  src: imgEtiquetasFiltro, key: "filtro", title: "Pra que serve", caption: "Lista de leads filtrada pela etiqueta \"Aguardando valores\".",
-  pins: [
-    { x: 14, y: 18, label: "Filtro por etiqueta", text: "Em Leads, escolha \"Todas as etiquetas\" → \"Aguardando valores\". Um clique." },
-    { x: 39, y: 18, label: "Quantos são", text: "Na hora você sabe: 12 pessoas esperando valores. Sem contar na mão." },
-    { x: 57.5, y: 29, label: "Etiquetas na lista", text: "Dá para ver curso e situação de cada um sem abrir a conversa." },
-    { x: 81, y: 5, label: "Ação em grupo", text: "Com o filtro aplicado, envie os valores para todos de uma vez." },
-  ],
-};
-
-const seedExamples: Example[] = [
-  { id: "e1", title: "Etiqueta bem aplicada", cat: "Etiquetas", color: "amber",
-    situation: "Lead pediu informações sobre o curso de Enfermagem, mas ainda não falou de valores.",
-    text: "Etiquetas: [Enfermagem] [Interesse] [Aguardando valores]. Assim qualquer consultor que abrir o contato entende em 2 segundos onde ele está.",
-    visual: visualTagsLead },
-  { id: "e2", title: "Mover no funil", cat: "Funil", color: "cyan",
-    situation: "Lead enviou documentos para matrícula.",
-    text: "Arraste o card de \"Negociação\" para \"Documentação\" e registre uma nota: \"RG e comprovante recebidos em 10/11, falta histórico escolar\"." },
-  { id: "e3", title: "Primeira resposta", cat: "Atendimento", color: "emerald",
-    situation: "Lead novo chegou pelo anúncio do Instagram às 21h.",
-    text: "\"Oi, Ana! Aqui é a Laura do polo Maceió 😊 Vi que você se interessou pelo curso de Administração. Posso te mandar as opções de turma?\"" },
-  { id: "e4", title: "Template com botões", cat: "Disparo", color: "violet",
-    situation: "Disparo de reengajamento para quem não respondeu há 7 dias.",
-    text: "Use o template \"Reengajamento 7 dias\" (com botões Sim / Mais tarde). Após o envio, arquive todos; quem clicar em um botão volta automaticamente." },
-  { id: "e5", title: "Nota de atendimento", cat: "Atendimento", color: "emerald",
-    situation: "Ligação com o lead que tem dúvida sobre bolsa.",
-    text: "Nota: \"Ligação 10/11 14h · quer bolsa de 50% · trabalha de manhã, prefere turma noturna · retornar sexta com simulação\"." },
-  { id: "e6", title: "Lead sem resposta", cat: "Funil", color: "cyan",
-    situation: "Lead está há 3 dias em \"Contato feito\" sem responder.",
-    text: "Crie uma tarefa de retorno para amanhã, aplique a etiqueta [Sem resposta] e, depois de 7 dias, inclua no disparo de reengajamento." },
-  { id: "e7", title: "Criar usuário", cat: "Configurações", color: "pink",
-    situation: "Novo consultor entrou no polo Santos.",
-    text: "Configurações → Usuários → Novo. Perfil \"Consultor\", equipe \"Santos\", e marque só as caixas de entrada do polo dele." },
-];
-
-const seedScripts: Script[] = [
-  { id: "s1", title: "Primeiros passos no CRM", audience: "Consultores novos", color: "cyan", lastClass: "05/11",
-    goal: "Ao final, o consultor consegue atender um lead do início ao fim sem ajuda.",
-    blocks: [
-      { id: "b1", title: "Boas-vindas e visão geral", minutes: 10,
-        show: ["Tela inicial e menu lateral", "Caixa de entrada do polo", "Onde ficam as notificações"], examples: [],
-        tip: "Pergunte quem já usou outro CRM; ajuda a calibrar o ritmo." },
-      { id: "b2", title: "Atendendo o primeiro lead", minutes: 20,
-        show: ["Abrir uma conversa nova", "Responder em até 5 minutos", "Registrar nota de atendimento", "Ver o histórico do contato"], examples: ["e3", "e5"],
-        faq: [{ q: "E se o lead chegar fora do horário?", a: "Responda no primeiro horário do dia seguinte e marque a etiqueta [Fora do horário]." }] },
-      { id: "b3", title: "Etiquetas nos leads", minutes: 15,
-        show: ["Onde ficam as etiquetas no lead", "Adicionar e remover uma etiqueta", "Filtrar a lista por etiqueta", "Fazer uma ação em grupo a partir do filtro"],
-        examples: ["e1", "e6"],
-        visuals: [visualTagsLead, visualTagsFiltro],
-        why: [
-          "Qualquer consultor entende o lead em 2 segundos, sem reler a conversa inteira.",
-          "Você acha todo mundo que está na mesma situação com um clique (ex.: 12 leads aguardando valores).",
-          "Dá para agir em grupo: mandar valores, reengajar ou passar para outro consultor de uma vez.",
-          "Os relatórios mostram onde os leads travam — por curso, interesse ou motivo.",
-        ],
-        scenario: {
-          situation: "Segunda de manhã, a coordenadora pergunta: \"Quantos leads de Enfermagem estão esperando valores?\"",
-          before: "Abrir conversa por conversa e contar na mão. Meia hora, e ainda escapa alguém.",
-          after: "Filtrar [Enfermagem] + [Aguardando valores], ver os 12 leads e mandar os valores para todos de uma vez.",
-        },
-        tip: "Mostre a imagem 1 enquanto explica onde clicar, e a imagem 2 quando perguntarem \"mas pra quê?\".",
-        faq: [
-          { q: "Por que não escrever isso numa nota?", a: "A nota explica o detalhe de um lead; a etiqueta serve para achar e agrupar vários. Use os dois." },
-          { q: "Quantas etiquetas devo colocar?", a: "De 2 a 4: curso, momento e algo especial (bolsa, fora do horário). Mais que isso vira bagunça." },
-        ] },
-      { id: "b3f", title: "Funil e retorno", minutes: 10,
-        show: ["Mover o card no funil", "Criar tarefa de retorno"], examples: ["e2", "e6"],
-        tip: "Faça eles aplicarem as etiquetas e moverem um lead de teste antes de seguir." },
-      { id: "b4", title: "Prática guiada", minutes: 15,
-        show: ["Cada um atende um lead de teste", "Revisar juntos as notas", "Tirar dúvidas finais"], examples: [] },
-    ] },
-  { id: "s2", title: "Disparo em massa", audience: "Coordenadores de polo", color: "violet", lastClass: "28/10",
-    goal: "Fazer um disparo correto e não deixar nenhum lead esquecido no arquivo.",
-    blocks: [
-      { id: "b5", title: "Escolha do template", minutes: 10, show: ["Biblioteca de templates", "Diferença entre com e sem botões"], examples: ["e4"] },
-      { id: "b6", title: "Executar o disparo", minutes: 15, show: ["Selecionar a lista", "Agendar horário", "Arquivar após o envio"], examples: ["e4"],
-        tip: "Mostre o erro comum: disparo sem botões e leads esquecidos no arquivo." },
-      { id: "b7", title: "Acompanhar respostas", minutes: 10, show: ["Desarquivar quem respondeu", "Relatório do disparo"], examples: ["e6"] },
-    ] },
-  { id: "s3", title: "Administração do polo", audience: "Gestores", color: "pink", lastClass: "—",
-    goal: "Gestor consegue criar usuários e acompanhar a equipe sozinho.",
-    blocks: [
-      { id: "b8", title: "Usuários e permissões", minutes: 15, show: ["Criar usuário", "Definir perfil e equipe", "Desativar acesso"], examples: ["e7"] },
-      { id: "b9", title: "Relatórios da equipe", minutes: 15, show: ["Tempo de resposta", "Leads por consultor", "Exportar relatório"], examples: [] },
-    ] },
-];
-
-// No banco, as imagens dos roteiros ficam guardadas pela chave (o endereço do arquivo muda a cada publicação).
-const VISUAL_BY_KEY: Record<string, string> = { lead: imgEtiquetasLead, filtro: imgEtiquetasFiltro };
-const mapVisuals = (s: Script, f: (v: Visual) => Visual): Script => ({ ...s, blocks: s.blocks.map((b) => (b.visuals ? { ...b, visuals: b.visuals.map(f) } : b)) });
-const encodeScript = (s: Script): unknown => mapVisuals(s, (v) => ({ ...v, src: "" }));
-const decodeScript = (raw: unknown): Script => mapVisuals(raw as Script, (v) => ({ ...v, src: (v.key && VISUAL_BY_KEY[v.key]) || v.src }));
-const EMPTY_SCRIPT: Script = { id: "", title: "", audience: "", goal: "", color: "cyan", lastClass: "—", blocks: [] };
-
 const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 export function TrainingScripts({ projectId }: { projectId: string }) {
-  // Roteiros salvos no banco por projeto (os 3 de exemplo entram na primeira vez).
-  const [scripts, setScripts, scriptsReady] = useDbState<Script[]>(
-    projectId, [],
-    () => loadTrainingScripts(projectId, seedScripts, encodeScript, decodeScript),
-    (p, n) => saveTrainingScripts(projectId, p, n, encodeScript),
-  );
-  const [examples] = useState(seedExamples);
+  const [lib, setLib, ready] = useDbState(`training-library-${projectId}`, seedLibrary(), () => loadLibrary(projectId), (p, n) => saveLibrary(projectId, p, n));
+  const { scripts, examples } = lib;
   const [selId, setSelId] = useState("s1");
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [openB, setOpenB] = useState<Record<string, boolean>>({ b3: true });
@@ -149,6 +35,10 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
   const [adding, setAdding] = useState<{ block: string; text: string } | null>(null);
   const [zoom, setZoom] = useState<Visual | null>(null);
   const [editing, setEditing] = useState<Training | "new" | null>(null);
+  const [editScript, setEditScript] = useState<Script | "new" | null>(null);
+  const [editBlock, setEditBlock] = useState<Block | "new" | null>(null);
+  const [editExample, setEditExample] = useState<Example | "new" | null>(null);
+  const [editItem, setEditItem] = useState<{ block: string; i: number; text: string } | null>(null);
 
   // Turmas: salvas de verdade, como compromissos do calendário.
   const today = todayIso();
@@ -161,7 +51,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
   const turmas = useMemo(() => sortTrainings(trainingsQ.data ?? [], today), [trainingsQ.data, today]);
   const lastClassOf = (s: Script) => {
     const past = turmas.filter((t) => t.scriptKey === s.id && t.date <= today).map((t) => t.date).sort();
-    return past.length ? ddmm(past[past.length - 1]!) : s.lastClass;
+    return past.length ? ddmm(past[past.length - 1]!) : "—";
   };
   const saveTraining = (draft: TrainingDraft, existing?: Training) =>
     saveT.mutate({ draft, existing }, {
@@ -173,11 +63,11 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
     delT.mutate(t, { onSuccess: () => { toast.success("Turma excluída"); setEditing(null); }, onError: (e) => toast.error(`Não consegui excluir: ${e.message}`) });
   };
 
-  const sel = scripts.find((s) => s.id === selId) ?? scripts[0] ?? EMPTY_SCRIPT;
-  const items = sel.blocks.flatMap((b) => b.show.map((_, i) => `${b.id}:${i}`));
+  const sel: Script | undefined = scripts.find((s) => s.id === selId) ?? scripts[0];
+  const items = (sel?.blocks ?? []).flatMap((b) => b.show.map((_, i) => `${b.id}:${i}`));
   const doneCount = items.filter((k) => shown[k]).length;
   const pct = items.length ? Math.round((doneCount / items.length) * 100) : 0;
-  const totalMin = sel.blocks.reduce((a, b) => a + b.minutes, 0);
+  const totalMin = (sel?.blocks ?? []).reduce((a, b) => a + b.minutes, 0);
   const cats = ["Todos", ...Array.from(new Set(examples.map((e) => e.cat)))];
   const exFiltered = useMemo(() => examples.filter((e) =>
     (cat === "Todos" || e.cat === cat) && (e.title + e.situation + e.text).toLowerCase().includes(q.toLowerCase())), [examples, cat, q]);
@@ -191,15 +81,56 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
     setTimeout(() => setHl((h) => (h === id ? null : h)), 2200);
   };
   const addItem = () => {
-    if (!adding?.text.trim()) return setAdding(null);
-    setScripts((ss) => ss.map((s) => s.id !== sel.id ? s : { ...s, blocks: s.blocks.map((b) => b.id === adding.block ? { ...b, show: [...b.show, adding.text.trim()] } : b) }));
+    if (sel && adding?.text.trim()) setLib((l) => setShowItem(l, sel.id, adding.block, Number.MAX_SAFE_INTEGER, adding.text));
     setAdding(null);
   };
-  const newScript = () => {
-    const id = `s${Date.now()}`;
-    setScripts((ss) => [...ss, { id, title: "Novo roteiro", audience: "Defina o público", color: "emerald", lastClass: "—", goal: "Descreva o que a turma deve saber fazer ao final.",
-      blocks: [{ id: `b${Date.now()}`, title: "Abertura", minutes: 10, show: [], examples: [] }] }]);
-    setSelId(id); setLesson(false);
+  const saveItem = () => {
+    if (!sel || !editItem) return;
+    if (editItem.text.trim()) setLib((l) => setShowItem(l, sel.id, editItem.block, editItem.i, editItem.text));
+    setEditItem(null);
+  };
+  const deleteItem = (bid: string, i: number) => {
+    if (!sel) return;
+    setLib((l) => setShowItem(l, sel.id, bid, i, null));
+    // os itens de baixo sobem uma posição; o "já mostrado" acompanha
+    setShown((sh) => {
+      const out: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(sh)) {
+        const [b, n] = k.split(":"); const idx = Number(n);
+        if (b !== bid) out[k] = v; else if (idx < i) out[k] = v; else if (idx > i) out[`${b}:${idx - 1}`] = v;
+      }
+      return out;
+    });
+  };
+  const saveScript = (sc: Script) => {
+    setLib((l) => upsertScript(l, sc));
+    if (editScript === "new") { setSelId(sc.id); setLesson(false); toast.success("Roteiro criado"); } else toast.success("Roteiro salvo");
+    setEditScript(null);
+  };
+  const deleteScript = (sc: Script) => {
+    if (!window.confirm(`Excluir o roteiro "${sc.title}" com todos os blocos? As turmas já agendadas continuam no calendário.`)) return;
+    setLib((l) => removeScript(l, sc.id));
+    setEditScript(null); toast.success("Roteiro excluído");
+  };
+  const saveBlock = (b: Block) => {
+    if (!sel) return;
+    setLib((l) => upsertBlock(l, sel.id, b));
+    if (editBlock === "new") setOpenB((o) => ({ ...o, [b.id]: true }));
+    setEditBlock(null); toast.success(editBlock === "new" ? "Bloco criado" : "Bloco salvo");
+  };
+  const deleteBlock = (b: Block) => {
+    if (!sel || !window.confirm(`Excluir o bloco "${b.title}"?`)) return;
+    setLib((l) => removeBlock(l, sel.id, b.id));
+    setEditBlock(null); toast.success("Bloco excluído");
+  };
+  const saveExample = (e: Example) => {
+    setLib((l) => upsertExample(l, e));
+    setEditExample(null); toast.success(editExample === "new" ? "Exemplo criado" : "Exemplo salvo");
+  };
+  const deleteExample = (e: Example) => {
+    if (!window.confirm(`Excluir o exemplo "${e.title}"? Ele sai também dos blocos que o usam.`)) return;
+    setLib((l) => removeExample(l, e.id));
+    setEditExample(null); toast.success("Exemplo excluído");
   };
 
   const stats = [
@@ -209,11 +140,9 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
     { l: "Pessoas treinadas", v: turmas.filter((t) => t.done).reduce((a, t) => a + t.people, 0), c: "emerald", I: Users },
   ];
 
-  if (!scriptsReady) return <p className="glass rounded-3xl p-10 text-center text-sm text-muted-foreground" data-testid="carregando-roteiros">Carregando os roteiros…</p>;
-
   return (
     <div className="space-y-4">
-      <p className="mono-caps flex items-center gap-2 !text-[0.6rem]"><Sparkles size={10} /> Roteiros e turmas ficam salvos · as frases de exemplo são de demonstração</p>
+      <p className="mono-caps flex items-center gap-2 !text-[0.6rem]"><Sparkles size={10} /> {ready ? "Tudo aqui pode ser editado e excluído · salva sozinho" : "Carregando…"}</p>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s, i) => (
@@ -230,11 +159,12 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
           <div className="glass rounded-3xl p-4 animate-rise">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold">Roteiros</h2>
-              <button onClick={newScript} className="flex items-center gap-1 rounded-full border border-cyan/60 px-3 py-1 text-xs text-cyan transition hover:bg-cyan/10"><Plus size={12} /> Novo</button>
+              <button onClick={() => setEditScript("new")} className="flex items-center gap-1 rounded-full border border-cyan/60 px-3 py-1 text-xs text-cyan transition hover:bg-cyan/10"><Plus size={12} /> Novo</button>
             </div>
             <div className="mt-3 space-y-2">
+              {scripts.length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">Nenhum roteiro. Crie o primeiro em "Novo".</p>}
               {scripts.map((s) => {
-                const on = s.id === sel.id;
+                const on = s.id === sel?.id;
                 const its = s.blocks.flatMap((b) => b.show.map((_, i) => `${b.id}:${i}`));
                 const p = its.length ? Math.round((its.filter((k) => shown[k]).length / its.length) * 100) : 0;
                 return (
@@ -291,6 +221,15 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
         </aside>
 
         {/* roteiro selecionado */}
+        {!sel ? (
+          <section className="glass grid place-items-center rounded-3xl p-10 text-center animate-rise">
+            <div>
+              <GraduationCap size={28} className="mx-auto text-muted-foreground" />
+              <p className="mt-2 text-sm text-muted-foreground">Nenhum roteiro ainda.</p>
+              <button onClick={() => setEditScript("new")} className="mt-3 rounded-xl bg-gradient-brand px-4 py-2 text-xs font-semibold text-primary-foreground">Criar roteiro</button>
+            </div>
+          </section>
+        ) : (
         <section className="glass rounded-3xl p-5 animate-rise" style={{ ...tint(sel.color), animationDelay: ".05s" }}>
           <div className="flex flex-wrap items-start gap-3">
             <span className="icon-tile h-12 w-12 shrink-0 !rounded-2xl shadow-[0_0_24px_-6px_var(--glow)]"><GraduationCap size={22} /></span>
@@ -302,6 +241,8 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                 <span>Última turma: {lastClassOf(sel)}</span>
               </p>
             </div>
+            <button onClick={() => setEditScript(sel)} aria-label="Editar roteiro" title="Editar roteiro" className="glass grid h-8 w-8 place-items-center rounded-xl text-muted-foreground transition hover:text-foreground"><Pencil size={13} /></button>
+            <button onClick={() => deleteScript(sel)} aria-label="Excluir roteiro" title="Excluir roteiro" className="glass grid h-8 w-8 place-items-center rounded-xl text-muted-foreground transition hover:text-pink"><Trash2 size={13} /></button>
             <button onClick={reset} className="glass flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs text-muted-foreground transition hover:text-foreground"><RotateCcw size={12} /> Reiniciar</button>
             <button onClick={() => { setLesson((l) => !l); if (!lesson) setOpenB(Object.fromEntries(sel.blocks.map((b) => [b.id, true]))); }}
               className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition hover:scale-105 ${lesson ? "border border-emerald/60 bg-emerald/15 text-emerald" : "bg-gradient-brand text-primary-foreground"}`}>
@@ -311,7 +252,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
 
           <div className="mt-4 rounded-2xl border border-border bg-secondary/30 p-3">
             <p className="flex items-center gap-2 text-sm font-semibold"><Target size={14} className="text-[var(--glow)]" /> Objetivo</p>
-            <p className="mt-1 text-[0.8rem] text-muted-foreground">{sel.goal}</p>
+            <p className="mt-1 text-[0.8rem] text-muted-foreground">{sel.goal || "Sem objetivo definido."}</p>
           </div>
 
           <div className="mt-4">
@@ -336,13 +277,23 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                     {complete ? <Check size={10} /> : bi + 1}
                   </span>
                   <div className="rounded-2xl border border-border bg-card/40">
-                    <button onClick={() => setOpenB((o) => ({ ...o, [b.id]: !o[b.id] }))} className="flex w-full items-center gap-3 p-3 text-left">
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold">{b.title}</span>
-                        <span className="text-[0.68rem] text-muted-foreground">{b.minutes} min · {bDone}/{b.show.length} mostrados{b.examples.length ? ` · ${b.examples.length} exemplo(s)` : ""}</span>
-                      </span>
-                      <ChevronDown size={14} className={`text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`} />
-                    </button>
+                    <div className="group/b flex items-center gap-1 pr-2">
+                      <button onClick={() => setOpenB((o) => ({ ...o, [b.id]: !o[b.id] }))} className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left">
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold">{b.title}</span>
+                          <span className="text-[0.68rem] text-muted-foreground">{b.minutes} min · {bDone}/{b.show.length} mostrados{b.examples.length ? ` · ${b.examples.length} exemplo(s)` : ""}</span>
+                        </span>
+                        <ChevronDown size={14} className={`text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                      </button>
+                      {!lesson && (
+                        <span className="flex items-center opacity-60 transition group-hover/b:opacity-100">
+                          <button onClick={() => setLib((l) => moveBlock(l, sel.id, b.id, -1))} disabled={bi === 0} aria-label="Subir bloco" title="Subir" className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-30"><ArrowUp size={12} /></button>
+                          <button onClick={() => setLib((l) => moveBlock(l, sel.id, b.id, 1))} disabled={bi === sel.blocks.length - 1} aria-label="Descer bloco" title="Descer" className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-30"><ArrowDown size={12} /></button>
+                          <button onClick={() => setEditBlock(b)} aria-label={`Editar bloco ${b.title}`} title="Editar bloco" className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"><Pencil size={12} /></button>
+                          <button onClick={() => deleteBlock(b)} aria-label={`Excluir bloco ${b.title}`} title="Excluir bloco" className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-pink"><Trash2 size={12} /></button>
+                        </span>
+                      )}
+                    </div>
                     {isOpen && (
                       <div className="space-y-3 border-t border-border px-3 pb-3 pt-2 animate-rise">
                         <div>
@@ -351,11 +302,26 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                             {b.show.map((s, i) => {
                               const k = `${b.id}:${i}`; const ok = !!shown[k];
                               return (
-                                <li key={k}>
-                                  <button onClick={() => toggle(k)} className={`flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-[0.8rem] transition hover:bg-secondary/50 ${lesson ? "py-1.5 text-sm" : ""}`}>
-                                    <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition ${ok ? "border-emerald bg-emerald/20 text-emerald" : "border-muted-foreground/50"}`}>{ok && <Check size={11} />}</span>
-                                    <span className={ok ? "text-muted-foreground line-through" : ""}>{s}</span>
-                                  </button>
+                                <li key={k} className="group/i flex items-center gap-1">
+                                  {editItem?.block === b.id && editItem.i === i ? (
+                                    <form onSubmit={(e) => { e.preventDefault(); saveItem(); }} className="flex flex-1 items-center gap-2 rounded-lg border border-cyan/50 px-2 py-1">
+                                      <input autoFocus value={editItem.text} onChange={(e) => setEditItem({ ...editItem, text: e.target.value })} onBlur={saveItem}
+                                        onKeyDown={(e) => e.key === "Escape" && setEditItem(null)} aria-label="Editar item" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
+                                    </form>
+                                  ) : (
+                                    <>
+                                      <button onClick={() => toggle(k)} className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-[0.8rem] transition hover:bg-secondary/50 ${lesson ? "py-1.5 text-sm" : ""}`}>
+                                        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition ${ok ? "border-emerald bg-emerald/20 text-emerald" : "border-muted-foreground/50"}`}>{ok && <Check size={11} />}</span>
+                                        <span className={ok ? "text-muted-foreground line-through" : ""}>{s}</span>
+                                      </button>
+                                      {!lesson && (
+                                        <span className="flex opacity-0 transition focus-within:opacity-100 group-hover/i:opacity-100">
+                                          <button onClick={() => setEditItem({ block: b.id, i, text: s })} aria-label={`Editar item ${s}`} title="Editar" className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"><Pencil size={11} /></button>
+                                          <button onClick={() => deleteItem(b.id, i)} aria-label={`Excluir item ${s}`} title="Excluir" className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-pink"><Trash2 size={11} /></button>
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
                                 </li>
                               );
                             })}
@@ -371,25 +337,25 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
 
                         {b.visuals?.length ? <VisualGuide visuals={b.visuals} onZoom={setZoom} /> : null}
 
-                        {b.why && (
+                        {b.why?.length ? (
                           <div className="rounded-xl border border-emerald/40 bg-emerald/5 p-3">
                             <p className="flex items-center gap-1.5 text-[0.8rem] font-semibold"><ThumbsUp size={13} className="text-emerald" /> Por que isso ajuda no dia a dia</p>
                             <ul className="mt-2 space-y-1.5">
-                              {b.why.map((w) => (
-                                <li key={w} className="flex gap-2 text-[0.75rem] leading-snug"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-emerald" /> {w}</li>
+                              {b.why.map((w, wi) => (
+                                <li key={wi} className="flex gap-2 text-[0.75rem] leading-snug"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-emerald" /> {w}</li>
                               ))}
                             </ul>
                           </div>
-                        )}
+                        ) : null}
 
                         {b.scenario && (
                           <div className="rounded-xl border border-border p-3">
                             <p className="mono-caps !text-[0.58rem]">Situação para contar</p>
                             <p className="mt-1 text-[0.8rem] font-medium leading-snug">{b.scenario.situation}</p>
                             <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-stretch">
-                              <div className="rounded-lg border border-pink/40 bg-pink/5 p-2 text-[0.72rem] leading-snug"><b className="text-pink">Sem etiquetas</b><br />{b.scenario.before}</div>
+                              <div className="rounded-lg border border-pink/40 bg-pink/5 p-2 text-[0.72rem] leading-snug"><b className="text-pink">{b.scenario.beforeLabel || "Antes"}</b><br />{b.scenario.before}</div>
                               <span className="grid place-items-center text-muted-foreground"><ArrowRight size={14} className="hidden sm:block" /><ArrowDown size={14} className="sm:hidden" /></span>
-                              <div className="rounded-lg border border-emerald/40 bg-emerald/5 p-2 text-[0.72rem] leading-snug"><b className="text-emerald">Com etiquetas</b><br />{b.scenario.after}</div>
+                              <div className="rounded-lg border border-emerald/40 bg-emerald/5 p-2 text-[0.72rem] leading-snug"><b className="text-emerald">{b.scenario.afterLabel || "Depois"}</b><br />{b.scenario.after}</div>
                             </div>
                           </div>
                         )}
@@ -416,8 +382,8 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                           </p>
                         )}
 
-                        {b.faq?.map((f) => (
-                          <div key={f.q} className="rounded-xl border border-border p-2.5 text-[0.75rem]">
+                        {b.faq?.map((f, fi) => (
+                          <div key={fi} className="rounded-xl border border-border p-2.5 text-[0.75rem]">
                             <p className="flex items-center gap-1.5 font-medium"><MessageCircleQuestion size={13} className="text-cyan" /> {f.q}</p>
                             <p className="mt-1 pl-5 text-muted-foreground">{f.a}</p>
                           </div>
@@ -429,16 +395,23 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
               );
             })}
           </ol>
+          {!lesson && (
+            <button onClick={() => setEditBlock("new")} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border py-2.5 text-xs text-muted-foreground transition hover:border-[var(--glow)] hover:text-foreground">
+              <Plus size={12} /> Adicionar bloco
+            </button>
+          )}
         </section>
+        )}
 
         {/* banco de exemplos */}
         <aside className="glass flex flex-col rounded-3xl p-4 animate-rise xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:self-start" style={{ animationDelay: ".1s" }}>
           <div className="flex items-start gap-3">
             <span className="icon-tile h-10 w-10 shrink-0 !rounded-2xl" style={tint("violet")}><Sparkles size={18} /></span>
-            <div>
+            <div className="mr-auto">
               <h3 className="font-display text-lg font-semibold">Banco de exemplos</h3>
               <p className="text-[0.7rem] leading-snug text-muted-foreground">Bons exemplos prontos para quando a equipe perguntar.</p>
             </div>
+            <button onClick={() => setEditExample("new")} className="flex shrink-0 items-center gap-1 rounded-full border border-violet/60 px-3 py-1 text-xs text-violet transition hover:bg-violet/10"><Plus size={12} /> Novo</button>
           </div>
           <label className="glass mt-3 flex items-center gap-2 rounded-xl px-3 py-2">
             <Search size={13} className="text-muted-foreground" />
@@ -458,12 +431,14 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold">{e.title}</span>
                   <span className="tag !text-[0.58rem]">{e.cat}</span>
+                  <button onClick={() => setEditExample(e)} aria-label={`Editar exemplo ${e.title}`} title="Editar" className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"><Pencil size={11} /></button>
+                  <button onClick={() => deleteExample(e)} aria-label={`Excluir exemplo ${e.title}`} title="Excluir" className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-pink"><Trash2 size={11} /></button>
                 </div>
-                <p className="mt-1.5 text-[0.7rem] text-muted-foreground"><b className="text-foreground/80">Situação:</b> {e.situation}</p>
+                {e.situation && <p className="mt-1.5 text-[0.7rem] text-muted-foreground"><b className="text-foreground/80">Situação:</b> {e.situation}</p>}
                 <div className="mt-2 rounded-lg bg-secondary/50 p-2 text-[0.72rem] leading-snug">{e.text}</div>
-                {e.visual && (
+                {e.visual && visualSrc(e.visual) && (
                   <button onClick={() => setZoom(e.visual!)} className="group relative mt-2 block w-full overflow-hidden rounded-lg border border-border">
-                    <img src={e.visual.src} alt={e.visual.caption} loading="lazy" width={1536} height={960} className="aspect-[16/7] w-full object-cover object-right transition group-hover:scale-105" />
+                    <img src={visualSrc(e.visual)} alt={e.visual.caption} loading="lazy" width={1536} height={960} className="aspect-[16/7] w-full object-cover object-right transition group-hover:scale-105" />
                     <span className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-[0.6rem] backdrop-blur"><ImageIcon size={10} /> Ver imagem</span>
                   </button>
                 )}
@@ -476,6 +451,18 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
         </aside>
       </div>
       {zoom && <Lightbox visual={zoom} onClose={() => setZoom(null)} />}
+      {editScript && (
+        <ScriptEditor initial={editScript === "new" ? undefined : editScript} onClose={() => setEditScript(null)} onSave={saveScript}
+          onDelete={editScript === "new" ? undefined : () => deleteScript(editScript)} />
+      )}
+      {editBlock && sel && (
+        <BlockEditor initial={editBlock === "new" ? undefined : editBlock} color={sel.color} examples={examples} onClose={() => setEditBlock(null)} onSave={saveBlock}
+          onDelete={editBlock === "new" ? undefined : () => deleteBlock(editBlock)} />
+      )}
+      {editExample && (
+        <ExampleEditor initial={editExample === "new" ? undefined : editExample} categories={cats.filter((c) => c !== "Todos")} onClose={() => setEditExample(null)} onSave={saveExample}
+          onDelete={editExample === "new" ? undefined : () => deleteExample(editExample)} />
+      )}
       {editing && (
         <TrainingForm key={editing === "new" ? "new" : editing.id} initial={editing === "new" ? undefined : editing} scripts={scripts} defaultScript={sel}
           saving={saveT.isPending || delT.isPending} onClose={() => setEditing(null)}
@@ -501,7 +488,7 @@ function PinLegend({ pins, active, onHover, large }: { pins: Pin[]; active: numb
   return (
     <ol className="space-y-1.5">
       {pins.map((p, i) => (
-        <li key={p.label} onMouseEnter={() => onHover(i + 1)} onMouseLeave={() => onHover(null)}
+        <li key={i} onMouseEnter={() => onHover(i + 1)} onMouseLeave={() => onHover(null)}
           className={`flex gap-2 rounded-lg p-1.5 transition ${active === i + 1 ? "bg-cyan/10" : ""} ${large ? "text-sm" : "text-[0.75rem]"}`}>
           <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gradient-brand text-[0.62rem] font-bold text-primary-foreground">{i + 1}</span>
           <span className="leading-snug"><b>{p.label}.</b> <span className="text-muted-foreground">{p.text}</span></span>
@@ -520,15 +507,15 @@ function VisualGuide({ visuals, onZoom }: { visuals: Visual[]; onZoom: (v: Visua
       <div className="flex flex-wrap items-center gap-2">
         <p className="mr-auto flex items-center gap-1.5 text-[0.8rem] font-semibold"><ImageIcon size={13} className="text-cyan" /> Imagem de apoio</p>
         {visuals.length > 1 && visuals.map((x, i) => (
-          <button key={x.title} onClick={() => { setIdx(i); setActive(null); }}
+          <button key={i} onClick={() => { setIdx(i); setActive(null); }}
             className={`rounded-full border px-2.5 py-0.5 text-[0.65rem] transition ${i === idx ? "border-cyan/60 bg-cyan/15 text-cyan" : "border-border text-muted-foreground hover:text-foreground"}`}>
             {i + 1}. {x.title}
           </button>
         ))}
       </div>
       <div className="relative mt-2 overflow-hidden rounded-lg border border-border">
-        <img src={v.src} alt={v.caption} loading="lazy" width={1536} height={960} className="block w-full" />
-        {v.pins.map((p, i) => <PinDot key={p.label} n={i + 1} pin={p} active={active === i + 1} onHover={setActive} />)}
+        <img src={visualSrc(v)} alt={v.caption} loading="lazy" width={1536} height={960} className="block w-full" />
+        {v.pins.map((p, i) => <PinDot key={i} n={i + 1} pin={p} active={active === i + 1} onHover={setActive} />)}
         <button onClick={() => onZoom(v)} className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-background/85 px-2.5 py-1 text-[0.65rem] backdrop-blur transition hover:text-cyan">
           <Maximize2 size={11} /> Ampliar
         </button>
@@ -551,8 +538,8 @@ function Lightbox({ visual, onClose }: { visual: Visual; onClose: () => void }) 
       className="fixed inset-0 z-50 grid place-items-center bg-background/85 p-4 backdrop-blur-md animate-rise">
       <div onClick={(e) => e.stopPropagation()} className="glass grid max-h-full w-full max-w-7xl gap-4 overflow-auto rounded-3xl p-4 lg:grid-cols-[1fr_320px]">
         <div className="relative self-start overflow-hidden rounded-xl border border-border">
-          <img src={visual.src} alt={visual.caption} width={1536} height={960} className="block w-full" />
-          {visual.pins.map((p, i) => <PinDot key={p.label} n={i + 1} pin={p} active={active === i + 1} onHover={setActive} />)}
+          <img src={visualSrc(visual)} alt={visual.caption} width={1536} height={960} className="block w-full" />
+          {visual.pins.map((p, i) => <PinDot key={i} n={i + 1} pin={p} active={active === i + 1} onHover={setActive} />)}
         </div>
         <div>
           <div className="flex items-start gap-2">
@@ -571,11 +558,11 @@ function Lightbox({ visual, onClose }: { visual: Visual; onClose: () => void }) 
 
 
 function TrainingForm({ initial, scripts, defaultScript, saving, onClose, onSave, onDelete, onOpenScript }: {
-  initial?: Training | undefined; scripts: Script[]; defaultScript: Script; saving: boolean;
+  initial?: Training | undefined; scripts: Script[]; defaultScript?: Script | undefined; saving: boolean;
   onClose: () => void; onSave: (d: TrainingDraft) => void; onDelete?: (() => void) | undefined; onOpenScript: (id: string) => void;
 }) {
   const [f, setF] = useState<TrainingDraft>(() => initial ?? {
-    group: "", people: 0, scriptKey: defaultScript.id, scriptTitle: defaultScript.title, date: todayIso(), time: "", end: "", place: "", notes: "",
+    group: "", people: 0, scriptKey: defaultScript?.id ?? "", scriptTitle: defaultScript?.title ?? "", date: todayIso(), time: "", end: "", place: "", notes: "",
   });
   const set = <K extends keyof TrainingDraft>(k: K, v: TrainingDraft[K]) => setF((x) => ({ ...x, [k]: v }));
   const known = scripts.some((s) => s.id === f.scriptKey);
