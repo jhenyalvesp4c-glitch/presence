@@ -537,7 +537,7 @@ function Lightbox({ visual, onClose }: { visual: Visual; onClose: () => void }) 
   return (
     <div role="dialog" aria-modal="true" aria-label={visual.title} {...backdropProps(onClose)}
       className="fixed inset-0 z-50 grid place-items-center bg-background/85 p-4 backdrop-blur-md animate-rise">
-      <div onClick={(e) => e.stopPropagation()} className="glass grid max-h-full w-full max-w-7xl gap-4 overflow-auto rounded-3xl p-4 lg:grid-cols-[1fr_320px]">
+      <div onClick={(e) => e.stopPropagation()} className="glass scroll-neon grid max-h-[92dvh] w-full max-w-7xl gap-4 overflow-auto rounded-3xl p-4 lg:grid-cols-[1fr_320px]">
         <div className="relative self-start overflow-hidden rounded-xl border border-border">
           <img src={visualSrc(visual)} alt={visual.caption} width={1536} height={960} className="block w-full" />
           {visual.pins.map((p, i) => <PinDot key={i} n={i + 1} pin={p} active={active === i + 1} onHover={setActive} />)}
@@ -584,7 +584,7 @@ function TrainingForm({ initial, scripts, defaultScript, saving, onClose, onSave
   return (
     <div role="dialog" aria-modal="true" aria-label={initial ? "Editar turma" : "Agendar turma"} {...backdropProps(onClose)}
       className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-md animate-rise">
-      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={tint("amber")} className="glass max-h-full w-full max-w-lg space-y-3 overflow-auto rounded-3xl p-5">
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={tint("amber")} className="glass scroll-neon max-h-[92dvh] w-full max-w-lg space-y-3 overflow-auto rounded-3xl p-5">
         <div className="flex items-start gap-3">
           <span className="icon-tile h-10 w-10 shrink-0 !rounded-2xl"><CalendarDays size={18} /></span>
           <div className="mr-auto">

@@ -24,7 +24,7 @@ function Modal({ title, subtitle, icon, color, onClose, onSubmit, onDelete, dele
   return (
     <div role="dialog" aria-modal="true" aria-label={title} {...backdropProps(onClose)}
       className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-md animate-rise">
-      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={tint(color)} className="glass flex max-h-full w-full max-w-2xl flex-col rounded-3xl">
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={tint(color)} className="glass flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl">
         <div className="flex items-start gap-3 border-b border-border p-5 pb-3">
           <span className="icon-tile h-10 w-10 shrink-0 !rounded-2xl">{icon}</span>
           <div className="mr-auto">
@@ -33,7 +33,7 @@ function Modal({ title, subtitle, icon, color, onClose, onSubmit, onDelete, dele
           </div>
           <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"><X size={16} /></button>
         </div>
-        <div className="space-y-4 overflow-y-auto p-5">{children}</div>
+        <div className="scroll-neon min-h-0 flex-1 space-y-4 overflow-y-auto p-5">{children}</div>
         <div className="flex items-center gap-2 border-t border-border p-4">
           {onDelete && <button type="button" onClick={onDelete} className="flex items-center gap-1 rounded-xl px-3 py-2 text-xs text-pink transition hover:bg-pink/10"><Trash2 size={13} /> {deleteLabel}</button>}
           <button type="button" onClick={onClose} className="ml-auto rounded-xl px-3 py-2 text-xs text-muted-foreground hover:text-foreground">Cancelar</button>
