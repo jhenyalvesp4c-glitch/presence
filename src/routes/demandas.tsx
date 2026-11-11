@@ -21,6 +21,8 @@ import { useCategories, useTasks, useToggleTask } from "@/lib/data/tasks";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DemandCalendar } from "@/components/demand-calendar";
+import { DemandMaterials, NewDemandMaterials } from "@/components/demand-materials";
+import { EMPTY_MATERIALS, deleteMaterials, materialsKey, putMaterials, type Materials } from "@/lib/demand-materials";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
@@ -235,7 +237,8 @@ function Demandas() {
     };
   });
   const setPoloNote = (id: string, name: string, note: string) => update(id, (d) => ({ ...d, polos: d.polos?.map((p) => (p.name === name ? { ...p, note } : p)) }));
-  const createDemand = (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status }) => {
+  const dropMaterials = (codes: Iterable<string>) => { if (pid) for (const c of codes) deleteMaterials(materialsKey(pid, c)).catch(() => undefined); };
+  const createDemand = (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials }) => {
     const multi = f.type === "multi";
     const d: Demand = {
       id: nextCode(items, f.type), type: f.type, title: f.title, desc: f.desc || "Sem descrição.", priority: f.priority, status: f.status,
@@ -244,11 +247,14 @@ function Demandas() {
       history: [{ d: today(), text: multi ? `Demanda criada para ${f.targets.length} ${f.targets.length === 1 ? sing : L.plural.toLowerCase()}` : "Demanda criada", s: "todo" }], notes: [],
     };
     setItems((xs) => [d, ...xs]);
+    if (pid && (f.materials.body.trim() || f.materials.files.length)) {
+      putMaterials(materialsKey(pid, d.id), f.materials).catch((e: Error) => toast.error(`Não consegui guardar os anexos: ${e.message}`));
+    }
     setNewOpen(null);
     setTab(f.type);
     setSelId(d.id);
   };
-  const remove = (id: string) => { setItems((xs) => xs.filter((x) => x.id !== id)); setSelId((c) => (c === id ? null : c)); };
+  const remove = (id: string) => { dropMaterials([id]); setItems((xs) => xs.filter((x) => x.id !== id)); setSelId((c) => (c === id ? null : c)); };
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -256,6 +262,7 @@ function Demandas() {
   const deletePicked = () => {
     if (!picked.size) return;
     if (!window.confirm(`Excluir ${picked.size} demanda${picked.size === 1 ? "" : "s"}? Isso não pode ser desfeito.`)) return;
+    dropMaterials(picked);
     setItems((xs) => xs.filter((x) => !picked.has(x.id)));
     setSelId((c) => (c && picked.has(c) ? null : c));
     stopSelecting();
@@ -273,7 +280,7 @@ function Demandas() {
     const verb = kind === "delete" ? "Apagar" : kind === "done" ? "Marcar como concluídas" : "Zerar (voltar para A fazer)";
     if (!window.confirm(`${verb} ${ids.size} demanda${ids.size === 1 ? "" : "s"}? ${kind === "delete" ? "Isso não pode ser desfeito." : ""}`.trim())) return;
     setBulkOpen(false);
-    if (kind === "delete") { setItems((xs) => xs.filter((x) => !ids.has(x.id))); setSelId((c) => (c && ids.has(c) ? null : c)); return; }
+    if (kind === "delete") { dropMaterials(ids); setItems((xs) => xs.filter((x) => !ids.has(x.id))); setSelId((c) => (c && ids.has(c) ? null : c)); return; }
     const st: Status = kind === "done" ? "done" : "todo";
     setItems((xs) => xs.map((d) => (!ids.has(d.id) ? d : {
       ...d, status: st,
@@ -442,7 +449,7 @@ function Demandas() {
       </div>
 
       <DetailPanel
-        key={`${sel?.id ?? "none"}-${editOnOpen}`} demand={sel} autoEdit={editOnOpen} dossiers={names} onClose={() => setSelId(null)}
+        key={`${sel?.id ?? "none"}-${editOnOpen}`} demand={sel} autoEdit={editOnOpen} storageKey={pid && sel ? materialsKey(pid, sel.id) : null} dossiers={names} onClose={() => setSelId(null)}
         onStatus={(s) => sel && setStatus(sel.id, s)} onPolo={(p) => sel && cyclePolo(sel.id, p)}
         onAddPolos={(a) => sel && addPolos(sel.id, a)} onPoloNote={(p, t) => sel && setPoloNote(sel.id, p, t)}
         onEdit={(patch) => sel && update(sel.id, (d) => ({ ...d, ...patch }))}
@@ -511,8 +518,9 @@ function TargetPicker({ names, value, onChange, single }: { names: string[]; val
 
 function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   start: { type: DType; status: Status }; dossiers: string[]; onClose: () => void;
-  onCreate: (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status }) => void;
+  onCreate: (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials }) => void;
 }) {
+  const [materials, setMaterials] = useState<Materials>(EMPTY_MATERIALS);
   const tm = useTM();
   const [type, setType] = useState<DType>(start.type);
   const [title, setTitle] = useState("");
@@ -526,7 +534,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" {...backdropProps(onClose)}>
-      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status }); }}
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials }); }}
         className="glass relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label="Nova demanda">
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10" style={tint("cyan")}><Plus size={18} /></span>
@@ -571,6 +579,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
             </div>
           </div>
           {needs && <TargetPicker names={dossiers} value={targets} onChange={setTargets} single={type === "polo"} />}
+          <NewDemandMaterials value={materials} onChange={setMaterials} />
         </div>
 
         <div className="flex shrink-0 gap-2 border-t border-border px-5 py-4">
@@ -1170,8 +1179,8 @@ function NoteDialog({ note, dossiers, onClose, onSave }: {
 }
 
 /* ---------------- painel lateral ---------------- */
-function DetailPanel({ demand: d, autoEdit, dossiers, onClose, onStatus, onPolo, onAddPolos, onPoloNote, onEdit, onNote, onDelete }: {
-  demand: Demand | null; autoEdit: boolean; dossiers: string[]; onClose: () => void; onStatus: (s: Status) => void; onPolo: (p: string) => void;
+function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onStatus, onPolo, onAddPolos, onPoloNote, onEdit, onNote, onDelete }: {
+  demand: Demand | null; autoEdit: boolean; storageKey: string | null; dossiers: string[]; onClose: () => void; onStatus: (s: Status) => void; onPolo: (p: string) => void;
   onAddPolos: (names: string[]) => void; onPoloNote: (p: string, t: string) => void;
   onEdit: (p: Partial<Demand>) => void; onNote: (t: string) => void; onDelete: () => void;
 }) {
@@ -1236,6 +1245,8 @@ function DetailPanel({ demand: d, autoEdit, dossiers, onClose, onStatus, onPolo,
             ) : d.polo ?? "—"}</Meta>
             <Meta icon={Clock} label="Atualização">{d.history.at(-1)?.d ?? "—"}</Meta>
           </div>
+
+          <DemandMaterials storageKey={storageKey} />
 
           {/* status */}
           <Block title="Status">

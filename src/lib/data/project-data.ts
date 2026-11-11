@@ -7,6 +7,7 @@ import { demandToRows, diffDemands, rowsToDemands, type Demand, type DemandRows 
 import { DEFAULT_LABEL, P4C_ID, loadDossierState, seedDossiers, type Dossier, type DossierState } from "../dossiers";
 import { loadNotes, type Note } from "../notes";
 import { loadProjects as loadLocalProjects, seedProjects, type Project } from "../projects";
+import { deleteProjectMaterials } from "../demand-materials";
 import { must, supabase } from "./db";
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -57,6 +58,8 @@ export async function saveProjects(prev: Project[], next: Project[]) {
   if (gone.length) {
     // Compromissos do calendário são tarefas com o id do projeto; o resto some por cascade.
     must(await supabase.from("tasks").delete().in("project_id", gone).select("id"));
+    // Anexos das demandas (arquivos no Storage e linhas) não têm cascade: apaga antes do projeto.
+    for (const id of gone) await deleteProjectMaterials(id).catch(() => undefined);
     must(await supabase.from("projects").delete().in("id", gone).select("id"));
   }
   const before = new Map(prev.map((p, i) => [p.id, JSON.stringify(projectRow(p, i))]));
