@@ -72,7 +72,7 @@ import type { BrainEntry } from "@/lib/data/brain";
 const entry = (o: Partial<BrainEntry>): BrainEntry => ({ id: "1", title: "", text: "", date: "2026-11-12", dossiers: [], source: "orion", refId: null, summary: "", attachments: [], createdAt: "", ...o });
 describe("Mapa do segundo cérebro", () => {
   it("acha códigos de demanda no texto", () => {
-    expect(codesIn("Ver #P048 e G42, também m7")).toEqual(["#P048", "#G042", "#M007"]);
+    expect(codesIn("Ver #P048 e G42, também m07")).toEqual(["#P048", "#G042", "#M007"]);
     expect(codesIn("sem códigos aqui")).toEqual([]);
   });
   it("liga anotações a dossiês e demandas", () => {
