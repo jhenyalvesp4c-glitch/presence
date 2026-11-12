@@ -9,48 +9,16 @@ import { visualSrc } from "./training-images";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
-type Slide =
-  | { k: "title" }
-  | { k: "block"; bi: number; block: Block }
-  | { k: "show"; bi: number; block: Block }
-  | { k: "visual"; bi: number; block: Block; visual: Visual; vi: number }
-  | { k: "why"; bi: number; block: Block }
-  | { k: "scenario"; bi: number; block: Block }
-  | { k: "example"; bi: number; block: Block; ex: Example }
-  | { k: "faq"; bi: number; block: Block; faq: Faq; fi: number }
-  | { k: "end" };
+type Slide = { k: "title" } | { k: "block"; bi: number; block: Block } | { k: "end" };
 
-const KIND_LABEL: Record<Slide["k"], string> = { title: "Abertura", block: "Bloco", show: "O que mostrar", visual: "Imagem", why: "Por que ajuda", scenario: "Situação", example: "Exemplo", faq: "Pergunta", end: "Encerramento" };
+const KIND_LABEL: Record<Slide["k"], string> = { title: "Abertura", block: "Bloco", end: "Encerramento" };
 
-/** Transforma o roteiro em uma sequência de slides (só entram os que têm conteúdo). */
-export function buildSlides(script: Script, examples: Example[]): Slide[] {
-  const out: Slide[] = [{ k: "title" }];
-  script.blocks.forEach((block, bi) => {
-    out.push({ k: "block", bi, block });
-    if (block.show.length) out.push({ k: "show", bi, block });
-    (block.visuals ?? []).forEach((visual, vi) => out.push({ k: "visual", bi, block, visual, vi }));
-    if (block.why?.length) out.push({ k: "why", bi, block });
-    if (block.scenario) out.push({ k: "scenario", bi, block });
-    for (const id of block.examples) { const ex = examples.find((e) => e.id === id); if (ex) out.push({ k: "example", bi, block, ex }); }
-    (block.faq ?? []).forEach((faq, fi) => out.push({ k: "faq", bi, block, faq, fi }));
-  });
-  out.push({ k: "end" });
-  return out;
+/** Abertura, um slide COMPLETO por bloco (tudo do bloco numa página só, com rolagem) e o encerramento. */
+export function buildSlides(script: Script, _examples: Example[]): Slide[] {
+  return [{ k: "title" }, ...script.blocks.map((block, bi): Slide => ({ k: "block", bi, block })), { k: "end" }];
 }
 
-export const slideTitle = (s: Slide, script: Script): string => {
-  switch (s.k) {
-    case "title": return script.title;
-    case "block": return s.block.title;
-    case "show": return `${s.block.title} · o que mostrar`;
-    case "visual": return s.visual.title;
-    case "why": return `${s.block.title} · por que ajuda`;
-    case "scenario": return `${s.block.title} · situação`;
-    case "example": return s.ex.title;
-    case "faq": return s.faq.q;
-    case "end": return "Encerramento";
-  }
-};
+export const slideTitle = (s: Slide, script: Script): string => (s.k === "title" ? script.title : s.k === "block" ? s.block.title : "Encerramento");
 
 const delay = (i: number) => ({ animationDelay: `${120 + i * 90}ms` }) as CSSProperties;
 const rise = "animate-rise [animation-fill-mode:both]";
@@ -86,23 +54,138 @@ function Legend({ v, active, setActive }: { v: Visual; active: number | null; se
   );
 }
 
-function SlideBody({ s, script, shown, onToggle, pct, onRestart, onClose }: {
-  s: Slide; script: Script; shown: Record<string, boolean>; onToggle: (k: string) => void; pct: number; onRestart: () => void; onClose: () => void;
-}) {
-  const [pin, setPin] = useState<number | null>(null);
-  const [reveal, setReveal] = useState(false);
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (/^[1-9]$/.test(e.key) && (s.k === "visual" || (s.k === "example" && s.ex.visual))) setPin((p) => (p === Number(e.key) ? null : Number(e.key)));
-      if ((e.key === "ArrowDown" || e.key === "Enter") && s.k === "faq") { e.preventDefault(); setReveal(true); }
-      if (e.key === "ArrowUp" && s.k === "faq") setReveal(false);
-    };
-    window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
-  }, [s]);
+function Section({ icon: Icon, title, color = "cyan", i = 0, className = "", children }: { icon: typeof Eye; title: string; color?: string; i?: number; className?: string; children: React.ReactNode }) {
+  return (
+    <section style={{ ...tint(color), ...delay(i) }} className={`${rise} relative overflow-hidden rounded-3xl border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[linear-gradient(150deg,color-mix(in_oklab,var(--glow)_8%,transparent),transparent_65%)] p-5 ${className}`}>
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent opacity-70" />
+      <h3 className="mono-caps mb-4 flex items-center gap-2 !text-[clamp(.68rem,.95vw,.85rem)] text-[var(--glow)]"><Icon size={15} /> {title}</h3>
+      {children}
+    </section>
+  );
+}
 
+const big = "text-[clamp(1rem,1.65vw,1.45rem)] leading-snug";
+
+function VisualPanel({ v, i }: { v: Visual; i: number }) {
+  const [pin, setPin] = useState<number | null>(null);
+  return (
+    <Section icon={Eye} title={`Imagem · ${v.title}`} color="cyan" i={i} className="lg:col-span-2">
+      <div className="grid items-start gap-5 xl:grid-cols-[1.5fr_1fr]">
+        <div><Pins v={v} active={pin} setActive={setPin} /><p className="mt-2 text-center text-sm italic text-muted-foreground">{v.caption}</p></div>
+        <Legend v={v} active={pin} setActive={setPin} />
+      </div>
+    </Section>
+  );
+}
+
+function ExamplePanel({ e, i }: { e: Example; i: number }) {
+  const [pin, setPin] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+  return (
+    <Section icon={Sparkles} title={`Exemplo · ${e.title}`} color={e.color || "violet"} i={i} className={e.visual ? "lg:col-span-2" : ""}>
+      <div className={`grid items-start gap-5 ${e.visual ? "xl:grid-cols-[1fr_1fr]" : ""}`}>
+        <div>
+          <p className="rounded-2xl border border-border bg-secondary/25 p-3 text-[clamp(.9rem,1.35vw,1.2rem)] leading-snug"><b className="mono-caps mr-2 !text-[0.7em]">Situação</b>{e.situation}</p>
+          <blockquote className={`relative mt-3 rounded-2xl border border-[color-mix(in_oklab,var(--glow)_50%,transparent)] bg-[color-mix(in_oklab,var(--glow)_8%,transparent)] p-4 ${big}`}>
+            {e.text}
+            <button onClick={() => { navigator.clipboard?.writeText(e.text).catch(() => undefined); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
+              className="mt-3 flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition hover:border-[var(--glow)] hover:text-[var(--glow)]">{copied ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar exemplo</>}</button>
+          </blockquote>
+        </div>
+        {e.visual && <div><Pins v={e.visual} active={pin} setActive={setPin} /><div className="mt-3"><Legend v={e.visual} active={pin} setActive={setPin} /></div></div>}
+      </div>
+    </Section>
+  );
+}
+
+/** Um bloco inteiro numa página só: o que mostrar, por que ajuda, imagens, situação, exemplos e perguntas. */
+function BlockPage({ s, script, examples, shown, onToggle }: { s: Extract<Slide, { k: "block" }>; script: Script; examples: Example[]; shown: Record<string, boolean>; onToggle: (k: string) => void }) {
+  const b = s.block;
+  const exs = b.examples.map((id) => examples.find((e) => e.id === id)).filter((e): e is Example => !!e);
+  let n = 1;
+  const next = () => n++;
+  return (
+    <div data-testid="bloco-completo">
+      <div className="relative mb-6">
+        <span aria-hidden className={`${rise} pointer-events-none absolute -left-1 -top-6 select-none font-display text-[clamp(4.5rem,10vw,8.5rem)] font-bold leading-none text-transparent [-webkit-text-stroke:2px_color-mix(in_oklab,var(--glow)_30%,transparent)]`}>{String(s.bi + 1).padStart(2, "0")}</span>
+        <div className="relative pl-[clamp(5.5rem,13vw,11.5rem)]">
+          <p className="mono-caps flex items-center gap-2 !text-[clamp(.65rem,.9vw,.85rem)] text-[var(--glow)]"><span className="h-px w-8 bg-[var(--glow)]" />Bloco {s.bi + 1} de {script.blocks.length}</p>
+          <h1 className={`font-display text-[clamp(1.8rem,3.8vw,3.4rem)] font-semibold leading-[1.05] tracking-tight ${rise}`} style={delay(1)}>{b.title}</h1>
+          <div className={`${rise} mt-3 flex flex-wrap gap-2`} style={delay(2)}>
+            <span className="flex items-center gap-1.5 rounded-full border border-border bg-secondary/30 px-3 py-1 text-sm"><Clock size={14} className="text-[var(--glow)]" /> {b.minutes} min</span>
+            {b.show.length > 0 && <span className="flex items-center gap-1.5 rounded-full border border-border bg-secondary/30 px-3 py-1 text-sm"><Eye size={14} className="text-[var(--glow)]" /> {b.show.filter((_, i) => shown[`${b.id}:${i}`]).length}/{b.show.length} mostrados</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {b.show.length > 0 && (
+          <Section icon={Eye} title="O que vamos mostrar" color="cyan" i={next()} className={b.why?.length ? "" : "lg:col-span-2"}>
+            <ul className="space-y-2">
+              {b.show.map((t, i) => {
+                const k = `${b.id}:${i}`, ok = !!shown[k];
+                return (
+                  <li key={k}>
+                    <button onClick={() => onToggle(k)} data-testid="item-mostrar"
+                      className={`group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition duration-300 hover:-translate-y-0.5 ${ok ? "border-emerald/60 bg-emerald/10" : "border-border bg-secondary/25 hover:border-[var(--glow)] hover:shadow-[0_0_26px_-14px_var(--glow)]"}`}>
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-base font-bold transition ${ok ? "border-emerald bg-emerald/20 text-emerald" : "border-[var(--glow)] text-[var(--glow)]"}`}>{ok ? <Check size={17} style={{ animation: "pres-pop .35s both" }} /> : i + 1}</span>
+                      <span className={`${big} transition ${ok ? "text-muted-foreground line-through decoration-emerald/60" : ""}`}>{t}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><MousePointerClick size={12} /> Clique num item para marcar como já mostrado.</p>
+          </Section>
+        )}
+
+        {b.why?.length ? (
+          <Section icon={ThumbsUp} title="Por que isso ajuda no dia a dia" color="emerald" i={next()} className={b.show.length ? "" : "lg:col-span-2"}>
+            <ul className="space-y-2.5">
+              {b.why.map((w, i) => <li key={i} className="flex items-start gap-3 rounded-2xl border border-emerald/30 bg-emerald/5 p-3"><CheckCircle2 size={22} className="mt-0.5 shrink-0 text-emerald" /><span className={big}>{w}</span></li>)}
+            </ul>
+          </Section>
+        ) : null}
+
+        {(b.visuals ?? []).map((v, vi) => <VisualPanel key={vi} v={v} i={next()} />)}
+
+        {b.scenario && (
+          <Section icon={Lightbulb} title="Situação para contar" color="amber" i={next()} className="lg:col-span-2">
+            <p className="mb-4 text-[clamp(1.1rem,2vw,1.8rem)] font-medium leading-snug">{b.scenario.situation}</p>
+            <div className="grid items-stretch gap-3 md:grid-cols-[1fr_auto_1fr]">
+              <div className="rounded-2xl border border-pink/50 bg-pink/5 p-4"><p className="mono-caps mb-1.5 !text-pink">{b.scenario.beforeLabel || "Antes"}</p><p className={big}>{b.scenario.before}</p></div>
+              <span className="grid place-items-center text-[var(--glow)]"><ArrowRight size={32} className="hidden animate-pulse md:block" /></span>
+              <div className="rounded-2xl border border-emerald/60 bg-emerald/10 p-4 shadow-[0_0_40px_-20px_var(--emerald)]"><p className="mono-caps mb-1.5 !text-emerald">{b.scenario.afterLabel || "Depois"}</p><p className={big}>{b.scenario.after}</p></div>
+            </div>
+          </Section>
+        )}
+
+        {exs.map((e) => <ExamplePanel key={e.id} e={e} i={next()} />)}
+
+        {(b.faq ?? []).length > 0 && (
+          <Section icon={MessageCircleQuestion} title="Perguntas que podem aparecer" color="cyan" i={next()} className="lg:col-span-2">
+            <div className="grid gap-3 md:grid-cols-2">
+              {(b.faq ?? []).map((f, i) => (
+                <div key={i} className="rounded-2xl border border-border bg-secondary/25 p-4 transition hover:border-cyan/50">
+                  <p className="flex gap-2 text-[clamp(1rem,1.6vw,1.4rem)] font-semibold leading-snug"><MessageCircleQuestion size={20} className="mt-0.5 shrink-0 text-cyan" /> {f.q}</p>
+                  <p className={`mt-2 pl-7 text-muted-foreground ${big}`}>{f.a}</p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SlideBody({ s, script, examples, shown, onToggle, pct, onRestart, onClose }: {
+  s: Slide; script: Script; examples: Example[]; shown: Record<string, boolean>; onToggle: (k: string) => void; pct: number; onRestart: () => void; onClose: () => void;
+}) {
   const label = (t: string) => <p className="mono-caps mb-3 flex items-center gap-2 !text-[clamp(.65rem,.9vw,.85rem)] text-[var(--glow)]"><span className="h-px w-8 bg-[var(--glow)]" />{t}</p>;
   const h1 = "font-display text-[clamp(1.9rem,4.4vw,4.2rem)] font-semibold leading-[1.05] tracking-tight";
+
+  if (s.k === "block") return <BlockPage s={s} script={script} examples={examples} shown={shown} onToggle={onToggle} />;
 
   if (s.k === "title") {
     const mins = script.blocks.reduce((a, b) => a + b.minutes, 0);
@@ -122,7 +205,10 @@ function SlideBody({ s, script, shown, onToggle, pct, onRestart, onClose }: {
               <p className="text-[clamp(1rem,1.7vw,1.5rem)] leading-snug">{script.goal}</p>
             </div>
           )}
-          <p className={`${rise} mt-10 flex items-center gap-2 text-sm text-muted-foreground`} style={delay(6)}><span className="rounded-md border border-border px-2 py-0.5 font-mono">→</span> para começar · <span className="rounded-md border border-border px-2 py-0.5 font-mono">G</span> ver todos os slides</p>
+          <ol className={`${rise} mt-6 flex flex-wrap gap-2`} style={delay(5)}>
+            {script.blocks.map((b, i) => <li key={b.id} className="rounded-full border border-border bg-secondary/30 px-3 py-1 text-sm"><span className="mr-1.5 font-mono text-[var(--glow)]">{String(i + 1).padStart(2, "0")}</span>{b.title}</li>)}
+          </ol>
+          <p className={`${rise} mt-8 flex items-center gap-2 text-sm text-muted-foreground`} style={delay(6)}><span className="rounded-md border border-border px-2 py-0.5 font-mono">→</span> para começar · <span className="rounded-md border border-border px-2 py-0.5 font-mono">G</span> ver todos os blocos</p>
         </div>
         <div className="relative hidden h-72 w-72 place-items-center lg:grid" aria-hidden>
           <span className="absolute inset-0 animate-[spin_26s_linear_infinite] rounded-full border border-dashed border-[var(--glow)] opacity-60" />
@@ -130,142 +216,6 @@ function SlideBody({ s, script, shown, onToggle, pct, onRestart, onClose }: {
           <span className="absolute inset-12 animate-pulse-ring rounded-full bg-[var(--glow)] opacity-10 blur-xl" />
           <span className="relative grid h-28 w-28 animate-float place-items-center rounded-3xl bg-gradient-brand text-primary-foreground shadow-[0_0_80px_-6px_var(--glow)]"><GraduationCap size={52} /></span>
         </div>
-      </div>
-    );
-  }
-
-  if (s.k === "block") {
-    return (
-      <div className="relative">
-        <span aria-hidden className={`${rise} pointer-events-none absolute -left-2 -top-10 select-none font-display text-[clamp(8rem,22vw,20rem)] font-bold leading-none text-transparent [-webkit-text-stroke:2px_color-mix(in_oklab,var(--glow)_35%,transparent)]`}>{String(s.bi + 1).padStart(2, "0")}</span>
-        <div className="relative pt-[clamp(4rem,12vw,10rem)]">
-          {label(`Bloco ${s.bi + 1} de ${script.blocks.length}`)}
-          <h1 className={`${h1} ${rise}`} style={delay(1)}>{s.block.title}</h1>
-          <div className={`${rise} mt-6 flex flex-wrap gap-3`} style={delay(3)}>
-            {[[Clock, `${s.block.minutes} min`], [Eye, `${s.block.show.length} para mostrar`], ...(s.block.examples.length ? [[Sparkles, `${s.block.examples.length} exemplo${s.block.examples.length > 1 ? "s" : ""}`]] : [])].map(([I, t], i) => {
-              const Icon = I as typeof Clock;
-              return <span key={i} className="flex items-center gap-2 rounded-full border border-border bg-secondary/30 px-4 py-2 text-[clamp(.85rem,1.2vw,1.1rem)]"><Icon size={16} className="text-[var(--glow)]" /> {t as string}</span>;
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (s.k === "show") {
-    return (
-      <div>
-        {label(`Bloco ${s.bi + 1} · ${s.block.title}`)}
-        <h2 className={`${h1} ${rise}`}>O que vamos mostrar</h2>
-        <ul className="mt-8 grid gap-3 md:grid-cols-2">
-          {s.block.show.map((t, i) => {
-            const k = `${s.block.id}:${i}`, ok = !!shown[k];
-            return (
-              <li key={k} style={delay(i)} className={rise}>
-                <button onClick={() => onToggle(k)} data-testid="item-mostrar"
-                  className={`group flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition duration-300 hover:-translate-y-0.5 ${ok ? "border-emerald/60 bg-emerald/10 shadow-[0_0_30px_-12px_var(--emerald)]" : "border-border bg-secondary/25 hover:border-[var(--glow)] hover:shadow-[0_0_30px_-14px_var(--glow)]"}`}>
-                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border text-lg font-bold transition ${ok ? "border-emerald bg-emerald/20 text-emerald" : "border-[var(--glow)] text-[var(--glow)]"}`}>
-                    {ok ? <Check size={20} style={{ animation: "pres-pop .35s both" }} /> : i + 1}
-                  </span>
-                  <span className={`text-[clamp(1.05rem,1.9vw,1.7rem)] leading-snug transition ${ok ? "text-muted-foreground line-through decoration-emerald/60" : ""}`}>{t}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="mt-5 flex items-center gap-2 text-xs text-muted-foreground"><MousePointerClick size={13} /> Clique num item para marcar como já mostrado.</p>
-      </div>
-    );
-  }
-
-  if (s.k === "visual") {
-    return (
-      <div>
-        {label(`Bloco ${s.bi + 1} · ${s.block.title}`)}
-        <div className="grid items-start gap-6 xl:grid-cols-[1.55fr_1fr]">
-          <div className={rise}><Pins v={s.visual} active={pin} setActive={setPin} /><p className="mt-2 text-center text-sm italic text-muted-foreground">{s.visual.caption}</p></div>
-          <div>
-            <h2 className={`${h1} !text-[clamp(1.5rem,2.8vw,2.6rem)] ${rise}`}>{s.visual.title}</h2>
-            <div className="mt-5"><Legend v={s.visual} active={pin} setActive={setPin} /></div>
-            <p className="mt-4 text-xs text-muted-foreground">Passe o mouse, clique nos pontos ou use as teclas 1 a {Math.min(9, s.visual.pins.length)}.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (s.k === "why") {
-    return (
-      <div>
-        {label(`Bloco ${s.bi + 1} · ${s.block.title}`)}
-        <h2 className={`${h1} ${rise}`}><ThumbsUp className="mr-3 inline text-emerald" size={44} />Por que isso ajuda no dia a dia</h2>
-        <ul className="mt-8 space-y-3.5">
-          {(s.block.why ?? []).map((w, i) => (
-            <li key={i} style={delay(i)} className={`${rise} flex items-start gap-4 rounded-2xl border border-emerald/40 bg-emerald/5 p-4 transition hover:-translate-y-0.5 hover:shadow-[0_0_30px_-12px_var(--emerald)]`}>
-              <CheckCircle2 size={28} className="mt-0.5 shrink-0 text-emerald" />
-              <span className="text-[clamp(1.05rem,1.9vw,1.7rem)] leading-snug">{w}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-
-  if (s.k === "scenario") {
-    const sc = s.block.scenario!;
-    return (
-      <div>
-        {label(`Bloco ${s.bi + 1} · ${s.block.title}`)}
-        <p className="mono-caps mb-2">Situação para contar</p>
-        <h2 className={`${h1} !text-[clamp(1.5rem,3.2vw,3rem)] ${rise}`}>{sc.situation}</h2>
-        <div className="mt-8 grid items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr]">
-          <div style={delay(2)} className={`${rise} rounded-3xl border border-pink/50 bg-pink/5 p-6`}>
-            <p className="mono-caps mb-2 !text-pink">{sc.beforeLabel || "Antes"}</p>
-            <p className="text-[clamp(1.05rem,1.9vw,1.7rem)] leading-snug">{sc.before}</p>
-          </div>
-          <span className="grid place-items-center text-[var(--glow)]"><ArrowRight size={44} className="hidden animate-pulse lg:block" /></span>
-          <div style={delay(5)} className={`${rise} rounded-3xl border border-emerald/60 bg-emerald/10 p-6 shadow-[0_0_50px_-20px_var(--emerald)]`}>
-            <p className="mono-caps mb-2 !text-emerald">{sc.afterLabel || "Depois"}</p>
-            <p className="text-[clamp(1.05rem,1.9vw,1.7rem)] leading-snug">{sc.after}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (s.k === "example") {
-    const e = s.ex;
-    return (
-      <div>
-        {label(`Exemplo · ${e.cat}`)}
-        <h2 className={`${h1} ${rise}`}>{e.title}</h2>
-        <div className={`mt-6 grid items-start gap-6 ${e.visual ? "xl:grid-cols-[1fr_1fr]" : ""}`}>
-          <div>
-            <p className={`${rise} rounded-2xl border border-border bg-secondary/25 p-4 text-[clamp(.95rem,1.5vw,1.3rem)] leading-snug`} style={delay(1)}><b className="mono-caps mr-2 !text-[0.7em]">Situação</b>{e.situation}</p>
-            <blockquote className={`${rise} relative mt-4 rounded-2xl border border-[color-mix(in_oklab,var(--glow)_50%,transparent)] bg-[color-mix(in_oklab,var(--glow)_8%,transparent)] p-6 text-[clamp(1.05rem,1.9vw,1.7rem)] leading-snug shadow-[0_0_50px_-22px_var(--glow)]`} style={delay(3)}>
-              <span aria-hidden className="absolute -top-4 left-4 font-display text-6xl leading-none text-[var(--glow)]">“</span>
-              {e.text}
-              <button onClick={() => { navigator.clipboard?.writeText(e.text).catch(() => undefined); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
-                className="mt-4 flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition hover:border-[var(--glow)] hover:text-[var(--glow)]">{copied ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar exemplo</>}</button>
-            </blockquote>
-          </div>
-          {e.visual && <div className={rise} style={delay(2)}><Pins v={e.visual} active={pin} setActive={setPin} /><div className="mt-4"><Legend v={e.visual} active={pin} setActive={setPin} /></div></div>}
-        </div>
-      </div>
-    );
-  }
-
-  if (s.k === "faq") {
-    return (
-      <div>
-        {label(`Bloco ${s.bi + 1} · pergunta frequente`)}
-        <MessageCircleQuestion size={44} className="mb-3 text-cyan" />
-        <h2 className={`${h1} ${rise}`}>{s.faq.q}</h2>
-        {reveal ? (
-          <p className={`${rise} mt-8 max-w-4xl rounded-3xl border border-cyan/50 bg-cyan/5 p-6 text-[clamp(1.1rem,2vw,1.8rem)] leading-snug shadow-[0_0_50px_-22px_var(--cyan)]`}>{s.faq.a}</p>
-        ) : (
-          <button onClick={() => setReveal(true)} className="mt-8 flex items-center gap-2 rounded-2xl border border-dashed border-cyan/60 px-6 py-4 text-cyan transition hover:bg-cyan/10 hover:shadow-[0_0_30px_-10px_var(--cyan)]"><Eye size={18} /> Mostrar a resposta <span className="rounded-md border border-cyan/40 px-1.5 font-mono text-xs">↓</span></button>
-        )}
       </div>
     );
   }
@@ -299,6 +249,8 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
   const [full, setFull] = useState(false);
   const touch = useRef<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLElement>(null);
+  useEffect(() => { stage.current?.scrollTo({ top: 0 }); }, [i]);
 
   const go = useCallback((n: number) => setI((cur) => { const t = Math.max(0, Math.min(slides.length - 1, n)); if (t !== cur) setDir(t > cur ? 1 : -1); return t; }), [slides.length]);
   const next = useCallback(() => setI((c) => { const t = Math.min(slides.length - 1, c + 1); if (t !== c) setDir(1); return t; }), [slides.length]);
@@ -330,8 +282,8 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
   const s = slides[i]!;
   const items = script.blocks.flatMap((b) => b.show.map((_, k) => `${b.id}:${k}`));
   const pct = items.length ? Math.round((items.filter((k) => shown[k]).length / items.length) * 100) : 0;
-  const bi = "bi" in s ? s.bi : s.k === "end" ? script.blocks.length - 1 : -1;
-  const tip = "block" in s ? s.block.tip : undefined;
+  const bi = s.k === "block" ? s.bi : -1;
+  const tip = s.k === "block" ? s.block.tip : undefined;
   const slideKey = `${i}`;
 
   return (
@@ -362,9 +314,9 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
       </header>
 
       {/* palco */}
-      <main className="scroll-neon relative z-10 flex flex-1 items-center overflow-y-auto px-4 pb-4 sm:px-10 lg:px-16">
-        <div key={slideKey} data-testid="slide" data-kind={s.k} className="mx-auto w-full max-w-7xl py-4" style={{ animation: `${dir === 1 ? "pres-in-r" : "pres-in-l"} .55s cubic-bezier(.2,.7,.2,1) both` }}>
-          <SlideBody s={s} script={script} shown={shown} onToggle={onToggle} pct={pct} onRestart={() => go(0)} onClose={onClose} />
+      <main ref={stage} className="scroll-neon relative z-10 flex flex-1 overflow-y-auto px-4 pb-4 sm:px-10 lg:px-16">
+        <div key={slideKey} data-testid="slide" data-kind={s.k} className="mx-auto my-auto w-full max-w-7xl py-4" style={{ animation: `${dir === 1 ? "pres-in-r" : "pres-in-l"} .55s cubic-bezier(.2,.7,.2,1) both` }}>
+          <SlideBody s={s} script={script} examples={examples} shown={shown} onToggle={onToggle} pct={pct} onRestart={() => go(0)} onClose={onClose} />
         </div>
       </main>
 
@@ -372,7 +324,7 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
       {notes && (
         <div className="relative z-10 mx-4 mb-2 flex items-start gap-3 rounded-2xl border border-amber/50 bg-amber/10 p-3 text-sm backdrop-blur sm:mx-6" data-testid="notas">
           <Lightbulb size={16} className="mt-0.5 shrink-0 text-amber" />
-          <p className="min-w-0 flex-1"><b className="mono-caps mr-2 !text-amber">Nota do apresentador</b>{tip || "Este bloco não tem dica. Você pode escrevê-la ao editar o bloco."}{"block" in s ? <span className="ml-2 text-muted-foreground">· {s.block.minutes} min previstos</span> : null}</p>
+          <p className="min-w-0 flex-1"><b className="mono-caps mr-2 !text-amber">Nota do apresentador</b>{s.k === "block" ? tip || "Este bloco não tem dica. Você pode escrevê-la ao editar o bloco." : "As dicas aparecem aqui nos slides dos blocos."}{s.k === "block" ? <span className="ml-2 text-muted-foreground">· {s.block.minutes} min previstos</span> : null}</p>
         </div>
       )}
 
@@ -381,24 +333,23 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
       <button onClick={next} disabled={i === slides.length - 1} aria-label="Próximo slide" data-testid="slide-proximo" className="absolute right-2 top-1/2 z-20 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-[var(--glow)] bg-[color-mix(in_oklab,var(--glow)_12%,transparent)] text-[var(--glow)] backdrop-blur transition hover:scale-110 hover:shadow-[0_0_28px_-4px_var(--glow)] disabled:opacity-0 sm:right-4"><ChevronRight size={22} /></button>
 
       <footer className="relative z-10 flex items-center gap-1.5 px-4 pb-4 sm:px-6" aria-label="Progresso">
-        {slides.map((sl, k) => {
-          const first = k === 0 || ("bi" in sl ? ("bi" in slides[k - 1]! ? (slides[k - 1] as { bi: number }).bi : -1) !== sl.bi : false);
-          return <button key={k} onClick={() => go(k)} aria-label={`Ir para o slide ${k + 1}: ${slideTitle(sl, script)}`} title={slideTitle(sl, script)}
-            className={`h-1.5 flex-1 rounded-full transition-all duration-300 hover:h-2.5 ${k === i ? "bg-[var(--glow)] shadow-[0_0_12px_var(--glow)]" : k < i ? "bg-[color-mix(in_oklab,var(--glow)_55%,transparent)]" : "bg-secondary"} ${first && k > 0 ? "ml-2" : ""}`} />;
-        })}
+        {slides.map((sl, k) => (
+          <button key={k} onClick={() => go(k)} aria-label={`Ir para ${k + 1}: ${slideTitle(sl, script)}`} title={slideTitle(sl, script)}
+            className={`h-1.5 flex-1 rounded-full transition-all duration-300 hover:h-2.5 ${k === i ? "bg-[var(--glow)] shadow-[0_0_12px_var(--glow)]" : k < i ? "bg-[color-mix(in_oklab,var(--glow)_55%,transparent)]" : "bg-secondary"}`} />
+        ))}
       </footer>
 
       {/* todos os slides */}
       {overview && (
         <div className="absolute inset-0 z-30 overflow-y-auto bg-background/92 p-4 backdrop-blur-xl sm:p-8" data-testid="visao-geral" onClick={() => setOverview(false)}>
           <div className="mx-auto max-w-6xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-5 flex items-center gap-3"><h2 className="mr-auto font-display text-2xl font-semibold">Todos os slides</h2><button onClick={() => setOverview(false)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground hover:text-foreground"><X size={16} /></button></div>
+            <div className="mb-5 flex items-center gap-3"><h2 className="mr-auto font-display text-2xl font-semibold">Todos os blocos</h2><button onClick={() => setOverview(false)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground hover:text-foreground"><X size={16} /></button></div>
             <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {slides.map((sl, k) => (
                 <li key={k}><button onClick={() => { go(k); setOverview(false); }} style={{ animationDelay: `${Math.min(k, 14) * 25}ms` }}
                   className={`${rise} group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition duration-300 hover:-translate-y-1 hover:border-[var(--glow)] hover:shadow-[0_10px_30px_-14px_var(--glow)] ${k === i ? "border-[var(--glow)] bg-[color-mix(in_oklab,var(--glow)_10%,transparent)]" : "border-border bg-secondary/20"}`}>
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary/60 font-mono text-sm tabular-nums transition group-hover:bg-[var(--glow)] group-hover:text-background">{k + 1}</span>
-                  <span className="min-w-0"><span className="mono-caps block !text-[0.55rem]">{KIND_LABEL[sl.k]}{"bi" in sl ? ` · bloco ${sl.bi + 1}` : ""}</span><span className="block truncate text-sm font-medium">{slideTitle(sl, script)}</span></span>
+                  <span className="min-w-0"><span className="mono-caps block !text-[0.55rem]">{sl.k === "block" ? `Bloco ${sl.bi + 1}` : KIND_LABEL[sl.k]}{sl.k === "block" ? ` · ${sl.block.minutes} min` : ""}</span><span className="block truncate text-sm font-medium">{slideTitle(sl, script)}</span></span>
                 </button></li>
               ))}
             </ol>
