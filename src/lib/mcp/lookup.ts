@@ -2,9 +2,8 @@
  * Consultas ao Presence para o MCP (somente leitura) e resolução de nomes em registros reais.
  * Usa o mesmo cliente e as mesmas tabelas das telas; nada de acesso livre ao banco.
  */
-import { loadDemands, ensureProject } from "../data/project-data";
+import { loadDemands } from "../data/project-data";
 import { must, supabase } from "../data/db";
-import { P4C_ID } from "../dossiers";
 import { normalize } from "./records";
 import type { Demand } from "../demands";
 
@@ -18,7 +17,6 @@ export class NeedsChoice extends Error {
 
 /* ───────────── projetos e dossiês ───────────── */
 export async function listProjects(): Promise<(ProjectInfo & { dossies: number; demandas_abertas: number })[]> {
-  await ensureProject(P4C_ID); // o projeto padrão (P4C) passa a existir no banco na primeira consulta
   const [pr, dr, mr] = await Promise.all([
     supabase.from("projects").select("id, name, description, status, label_singular, label_plural, position").order("position").order("created_at"),
     supabase.from("dossiers").select("project_id"),

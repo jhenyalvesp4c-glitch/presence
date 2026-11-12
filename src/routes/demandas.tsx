@@ -106,14 +106,15 @@ const today = () => new Date().toLocaleDateString("pt-BR", { day: "2-digit", mon
 /* ---------------- página ---------------- */
 function Demandas() {
   const { projeto } = Route.useSearch();
-  // Projeto atual: o do `?projeto=` se existir no banco; senão o padrão (P4C).
+  // Projeto atual: o do `?projeto=` se existir no banco; senão o primeiro da tela de projetos (só cai no
+  // padrão "p4c" se não houver nenhum projeto, para não recriar um P4C vazio duplicado).
   const [known, setKnown] = useState<Project[] | null>(null);
   useEffect(() => {
     let alive = true;
     loadProjects().then((l) => alive && setKnown(l)).catch(() => alive && setKnown([]));
     return () => { alive = false; };
   }, []);
-  const pid: string | null = known === null ? null : projeto && known.some((p) => p.id === projeto) ? projeto : P4C_ID;
+  const pid: string | null = known === null ? null : projeto && known.some((p) => p.id === projeto) ? projeto : (known[0]?.id ?? P4C_ID);
   const project = known?.find((x) => x.id === pid);
   // Dossiês (polos no P4C) e notas do projeto: no banco.
   const [st, setSt, stReady] = useDbState<ProjectState>(

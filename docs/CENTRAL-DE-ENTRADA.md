@@ -10,13 +10,14 @@ Na tela inicial (`/assistente`), o botão quadrado com o **+** ao lado de "Regis
    - **Mover para outro destino:** o seletor na etiqueta do cartão reclassifica aproveitando o que já estava preenchido.
    - **Remover** (lixeira) tira o cartão.
    - **Dúvidas e pendências:** o que a IA não soube decidir (projeto, polo, data…) aparece numa caixa amarela; campos obrigatórios que faltam ficam em vermelho no cartão.
+   - **Demanda:** além de prazo e responsável, aceita **status** (a fazer, em andamento, concluída), **categoria** (texto livre, ex.: "Disparo em massa") e **subtarefas**; a que já foi feita começa com `[x] ` e entra marcada na descrição e no histórico. Um lembrete pedido junto vira um cartão de Lembrete ligado à demanda.
    - **Anexar como evidência:** nos cartões de demanda, marque quais dos arquivos enviados viram evidência dela.
    - **Duplicado:** se já existe algo equivalente, o cartão avisa e o ignora, a menos que você marque "criar mesmo assim".
    - **Adicionar registro** cria um cartão em branco; **Copiar registros** copia tudo organizado (Markdown); **Interpretar de novo** refaz.
 4. **Confirmar e distribuir:** só habilita quando não há pendências. Depois mostra o que foi criado, em qual módulo, com link para abrir, e **Desfazer tudo**.
 
 ## Como funciona por baixo
-- `interpretInbox` (função de servidor) manda o conteúdo à **OpenAI** (API Responses, chamada de função `organizar_informacoes`) junto com os **projetos, polos e categorias reais** do Presence. O prompt proíbe inventar ou "aproximar" nomes: o que não está claro vira dúvida. Imagens vão como `input_image`, PDFs como `input_file` e TXT/CSV/MD/JSON como texto.
+- `interpretInbox` (função de servidor) manda o conteúdo à **OpenAI** (API Responses, chamada de função `organizar_informacoes`) junto com os **projetos, polos e categorias reais** do Presence. O prompt proíbe inventar ou "aproximar" nomes: o que não está claro vira dúvida. Imagens vão como `input_image`, PDFs como `input_file` e TXT/CSV/MD/JSON como texto. **Excel, Word e PowerPoint** (`.xlsx`/`.xlsm`, `.docx`, `.pptx`) viram texto no próprio navegador (`src/lib/office.ts`, sem biblioteca externa: o arquivo é um zip com XML) e seguem como TXT: planilha vira CSV (uma seção por aba, datas em dd/mm/aaaa), documento vira texto com tabelas em linhas "a | b", apresentação vira texto por slide. Limite de 60 mil caracteres por arquivo (o resto é cortado, com aviso no próprio texto).
 - A IA devolve **rascunhos** (só o `tipo` é obrigatório). `validateInbox` roda a validação completa a cada edição: formato, projeto/polo/demanda reais e duplicidade — **a mesma validação do MCP** (`src/lib/mcp/plan.ts`).
 - `distributeInbox` grava com `commitRecords` (`src/lib/mcp/commit.ts`), **a mesma gravação do `confirmar_registros` do MCP**, que reutiliza os serviços de cada módulo (`saveDemands`, `saveAppointment`, `createTaskRow`, `saveNotesDb`, `loadLibrary/saveLibrary`, `putMaterials`). O histórico fica em `mcp_operations` (cliente "Presence · Central de entrada") e `undoInbox` desfaz.
 - Nada é gravado antes do seu "Confirmar e distribuir".
@@ -35,7 +36,7 @@ Variáveis novas só valem depois de **republicar** (Redeploy). A chamada usa `r
 **Modificados:** `src/routes/assistente.tsx` (botão + abre a Central; voz alimenta a Central; o campo antigo de uma linha saiu), `src/lib/mcp/{tools,plan,lookup,ops,records}.ts` (gravação extraída para `commit.ts`, `rascunhoSchema`, consultas em paralelo), `vite.config.ts` (tempo máximo da função).
 
 ## Limites
-- **Áudio:** arquivos de áudio ainda **não são transcritos**; use **Ditar** (microfone) ou cole a transcrição. **Word/Excel/PowerPoint** ainda não são lidos: salve como PDF.
+- **Áudio:** arquivos de áudio ainda **não são transcritos**; use **Ditar** (microfone) ou cole a transcrição. Formatos **antigos** do Office (`.xls`, `.doc`, `.ppt`) não são lidos: salve como `.xlsx`/`.docx`/`.pptx` ou PDF. Arquivo do Office anexado como evidência de uma demanda é guardado como o texto extraído, não como o arquivo original.
 - **Tamanho:** até 6 arquivos e ~3 MB no total por envio (limite de 4,5 MB do corpo da função na Vercel). Prints são reduzidos automaticamente (máx. 1600 px, JPEG); PDFs até 3 MB.
 - **Qualidade:** a IA pode errar a classificação; por isso tudo passa pela sua revisão. Quando faltar projeto ou polo, ela pergunta em vez de chutar.
 - **Anotações exigem projeto** (as notas do Presence são por projeto).
