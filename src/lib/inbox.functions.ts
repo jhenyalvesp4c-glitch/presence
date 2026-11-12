@@ -90,19 +90,19 @@ export const interpretInbox = createServerFn({ method: "POST" })
     if (!data.text.trim() && !data.files.length) return { ok: false, error: "Escreva, cole ou anexe algo para interpretar." };
     const empty: CheckResult = { problems: [], warnings: [], perItem: [], general: [] };
 
-    if (!process.env["ANTHROPIC_API_KEY"]) {
+    if (!process.env["OPENAI_API_KEY"]) {
       return {
         ok: true, source: "manual", resumo: "", itens: [], pendencias: [], check: empty,
-        duvidas: ["A interpretação por IA ainda não está ligada (falta ANTHROPIC_API_KEY no servidor). Você pode criar os registros à mão com “Adicionar registro”."],
+        duvidas: ["A interpretação por IA ainda não está ligada (falta OPENAI_API_KEY no servidor). Você pode criar os registros à mão com “Adicionar registro”."],
       };
     }
 
     const ctx = await loadContext();
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const { interpret } = await import("./mcp/interpret");
-    const client = new Anthropic();
+    const { interpret, DEFAULT_MODEL } = await import("./mcp/interpret");
+    const { makeCreate, OpenAIError, explain } = await import("./mcp/openai");
+    const model = process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
     try {
-      const res = await interpret((p) => client.beta.messages.create(p as never) as never, { text: data.text, files: data.files }, ctx);
+      const res = await interpret(makeCreate(), { text: data.text, files: data.files, model }, ctx);
       if (!res.ok) return { ok: false, error: res.error };
       const { newKey } = await import("./inbox");
       const itens: InboxItem[] = res.output.itens.map((i) => ({
@@ -112,9 +112,8 @@ export const interpretInbox = createServerFn({ method: "POST" })
       const { check } = await checkRecords(records, owner, itens.length);
       return { ok: true, source: "ia", resumo: res.output.resumo, itens, duvidas: res.output.duvidas, pendencias: res.output.pendencias, check };
     } catch (error) {
-      if (error instanceof Anthropic.RateLimitError) return { ok: false, error: "Muitas solicitações seguidas. Tente de novo em instantes." };
-      if (error instanceof Anthropic.AuthenticationError) return { ok: false, error: "A chave da IA (ANTHROPIC_API_KEY) é inválida." };
-      if (error instanceof Anthropic.APIError) { console.error("Claude API error", error.status, error.message); return { ok: false, error: "A IA está indisponível agora. Tente novamente." }; }
+      if (error instanceof OpenAIError) { console.error("OpenAI error", error.status, error.code, error.message); return { ok: false, error: explain(error, model) }; }
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return { ok: false, error: "A IA demorou demais. Envie menos arquivos ou um texto menor." };
       throw error;
     }
   });

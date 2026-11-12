@@ -1,13 +1,15 @@
 /**
- * Interpretação da Central de entrada: manda o texto, os prints, PDFs e documentos para o Claude junto com
- * os projetos, polos (dossiês) e categorias REAIS do Presence, e recebe de volta registros estruturados.
- * Nada é gravado aqui. O cliente do Claude entra por parâmetro (`create`), o que deixa o fluxo testável.
+ * Interpretação da Central de entrada: manda o texto, os prints, PDFs e documentos para a IA (OpenAI, API Responses)
+ * junto com os projetos, polos (dossiês) e categorias REAIS do Presence, e recebe de volta registros estruturados
+ * por uma chamada de função. Nada é gravado aqui. O cliente HTTP entra por parâmetro (`create`), o que deixa o
+ * fluxo testável sem rede.
  */
 import { z } from "zod/v4";
 import { rascunhoSchema } from "./records";
 import type { ProjectInfo, DossierInfo, CategoryInfo } from "./lookup";
 
-export const MODEL = "claude-opus-5-5";
+/** Modelo padrão; troque com a variável OPENAI_MODEL (sem mexer no código). */
+export const DEFAULT_MODEL = "gpt-6.1-terra";
 export const MAX_ROUNDS = 3;
 
 export const itemSchema = z.object({
@@ -29,7 +31,7 @@ const toolSchema = () => { const { $schema: _s, ...rest } = z.toJSONSchema(outpu
 export type InputFile = { name: string; mime: string; data: string };
 export type Context = { today: string; weekday: string; projects: (ProjectInfo & { dossiers: DossierInfo[] })[]; categories: CategoryInfo[] };
 
-export const SYSTEM = `Você é o classificador de entrada do Presence, o assistente pessoal e de projetos da usuária. Ela cola textos e envia prints, imagens, PDFs e documentos. Você transforma isso em REGISTROS estruturados para os módulos do Presence. Você NÃO grava nada: chame a ferramenta ${TOOL_NAME}; a usuária revisa, edita e confirma tudo antes.
+export const SYSTEM = `Você é o classificador de entrada do Presence, o assistente pessoal e de projetos da usuária. Ela cola textos e envia prints, imagens, PDFs e documentos. Você transforma isso em REGISTROS estruturados para os módulos do Presence. Você NÃO grava nada: chame a função ${TOOL_NAME}; a usuária revisa, edita e confirma tudo antes.
 
 COMO DECIDIR O DESTINO
 - demanda: pedido de trabalho a executar dentro de um projeto. escopo "geral" (sem polo), "polo" (um polo/dossiê) ou "multipolo" (vários, cada um com andamento próprio). Passos a cumprir vão em "checklist"; quem deve fazer em "responsavel".
@@ -48,7 +50,7 @@ REGRAS DE OURO
 - Datas em AAAA-MM-DD e horas em HH:MM (24h, fuso de São Paulo). Resolva "amanhã", "sexta" etc. a partir de "Hoje". Se a data for ambígua, pergunte.
 - Leia os prints e documentos com atenção: o texto dentro das imagens também é conteúdo.
 - Não registre senhas, tokens ou dados de acesso; avise nas pendências se aparecerem.
-- Responda SEMPRE chamando a ferramenta ${TOOL_NAME}, mesmo que só haja dúvidas (itens vazio). Escreva em português do Brasil.`;
+- Responda SEMPRE chamando a função ${TOOL_NAME}, mesmo que só haja dúvidas (itens vazio). Escreva em português do Brasil.`;
 
 export function contextText(c: Context): string {
   const projs = c.projects.map((p) => {
@@ -63,44 +65,62 @@ Categorias de tarefa (slug): ${c.categories.map((x) => `${x.slug} (${x.nome})`).
 }
 
 type Block = { type: string; [k: string]: unknown };
-export type Message = { stop_reason: string | null; content: Block[] };
+/** O que usamos da resposta da API Responses. */
+export type Message = { status?: string; incomplete_details?: { reason?: string } | null; output: Block[] };
 export type Create = (params: Record<string, unknown>) => Promise<Message>;
 
+/** Conteúdo da mensagem da usuária no formato da API Responses (input_text, input_image, input_file). */
 export function userContent(text: string, files: InputFile[]): Block[] {
-  const blocks: Block[] = [];
+  const parts: Block[] = [];
   for (const f of files) {
-    if (f.mime.startsWith("image/")) blocks.push({ type: "image", source: { type: "base64", media_type: f.mime, data: f.data } });
-    else if (f.mime === "application/pdf") blocks.push({ type: "document", title: f.name, source: { type: "base64", media_type: "application/pdf", data: f.data } });
-    else blocks.push({ type: "text", text: `Arquivo "${f.name}":\n${Buffer.from(f.data, "base64").toString("utf-8").slice(0, 60_000)}` });
+    if (f.mime.startsWith("image/")) parts.push({ type: "input_image", image_url: `data:${f.mime};base64,${f.data}`, detail: "high" });
+    else if (f.mime === "application/pdf") parts.push({ type: "input_file", filename: f.name, file_data: `data:application/pdf;base64,${f.data}` });
+    else parts.push({ type: "input_text", text: `Arquivo "${f.name}":\n${Buffer.from(f.data, "base64").toString("utf-8").slice(0, 60_000)}` });
   }
   const names = files.map((f) => f.name);
-  blocks.push({ type: "text", text: `${names.length ? `Arquivos enviados: ${names.join(", ")}.\n\n` : ""}${text.trim() || "(sem texto digitado: considere só os arquivos)"}` });
-  return blocks;
+  parts.push({ type: "input_text", text: `${names.length ? `Arquivos enviados: ${names.join(", ")}.\n\n` : ""}${text.trim() || "(sem texto digitado: considere só os arquivos)"}` });
+  return parts;
 }
 
 export type Interpreted = { ok: true; output: Output } | { ok: false; error: string };
 
-export async function interpret(create: Create, input: { text: string; files: InputFile[] }, ctx: Context): Promise<Interpreted> {
-  const messages: { role: "user" | "assistant"; content: unknown }[] = [{ role: "user", content: userContent(input.text, input.files) }];
+/** Parâmetros da chamada (sem `input`, que muda a cada rodada). */
+export function requestBase(model: string, ctx: Context) {
+  return {
+    model,
+    instructions: `${SYSTEM}\n\n${contextText(ctx)}`,
+    tools: [{ type: "function", name: TOOL_NAME, description: "Devolve os registros identificados, dúvidas e pendências para a usuária revisar.", parameters: toolSchema(), strict: false }],
+    tool_choice: { type: "function", name: TOOL_NAME },
+    max_output_tokens: 12000,
+    reasoning: { effort: "low" },
+    store: false,
+  };
+}
+
+export async function interpret(create: Create, input: { text: string; files: InputFile[]; model?: string }, ctx: Context): Promise<Interpreted> {
+  const base = requestBase(input.model ?? DEFAULT_MODEL, ctx);
+  const first = { role: "user", content: userContent(input.text, input.files) };
+  const retries: { role: "user"; content: Block[] }[] = [];
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const res = await create({
-      model: MODEL, max_tokens: 16000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "low" },
-      system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }, { type: "text", text: contextText(ctx) }],
-      tools: [{ type: "custom", name: TOOL_NAME, description: "Devolve os registros identificados, dúvidas e pendências para a usuária revisar.", input_schema: toolSchema() }],
-      messages,
-    });
-    if (res.stop_reason === "refusal") return { ok: false, error: "A IA recusou interpretar este conteúdo." };
-    if (res.stop_reason === "max_tokens") return { ok: false, error: "O conteúdo é grande demais para interpretar de uma vez. Envie em partes." };
-    const use = res.content.find((b) => b.type === "tool_use" && b["name"] === TOOL_NAME);
-    messages.push({ role: "assistant", content: res.content });
-    if (!use) {
-      messages.push({ role: "user", content: `Responda chamando a ferramenta ${TOOL_NAME}.` });
-      continue;
+    const res = await create({ ...base, input: [first, ...retries] });
+    if (res.status === "incomplete") {
+      return { ok: false, error: res.incomplete_details?.reason === "max_output_tokens" ? "O conteúdo é grande demais para interpretar de uma vez. Envie em partes." : "A IA não terminou de interpretar. Tente de novo." };
     }
-    const parsed = outputSchema.safeParse(use["input"]);
-    if (parsed.success) return { ok: true, output: parsed.data };
-    const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`).join("; ");
-    messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: use["id"], is_error: true, content: `Formato inválido: ${issues}. Corrija e chame a ferramenta de novo.` }] });
+    const refusal = res.output.flatMap((o) => (Array.isArray(o["content"]) ? (o["content"] as Block[]) : [])).find((c) => c.type === "refusal");
+    if (refusal) return { ok: false, error: "A IA recusou interpretar este conteúdo." };
+    const call = res.output.find((o) => o.type === "function_call" && o["name"] === TOOL_NAME);
+    let problem = "";
+    if (!call) problem = `Você não chamou a função ${TOOL_NAME}. Responda chamando a função.`;
+    else {
+      let args: unknown;
+      try { args = JSON.parse(String(call["arguments"])); } catch { problem = "Os argumentos da função não eram JSON válido."; }
+      if (!problem) {
+        const parsed = outputSchema.safeParse(args);
+        if (parsed.success) return { ok: true, output: parsed.data };
+        problem = `Formato inválido: ${parsed.error.issues.map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`).join("; ")}.`;
+      }
+    }
+    retries.push({ role: "user", content: [{ type: "input_text", text: `${problem} Corrija e chame a função ${TOOL_NAME} de novo.` }] });
   }
   return { ok: false, error: "A IA não conseguiu organizar este conteúdo. Tente de novo ou escreva um pouco mais." };
 }
