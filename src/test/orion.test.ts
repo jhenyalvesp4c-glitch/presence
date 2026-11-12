@@ -43,3 +43,26 @@ describe("Orion", () => {
     expect(mentionedDossiers("Disparo em Juiz de Fora e Maceió", ["Maceió", "Juiz de Fora", "Santos"])).toEqual(["Maceió", "Juiz de Fora"]);
   });
 });
+
+import { audioExt, transcribe } from "@/lib/mcp/openai";
+describe("Transcrição de áudio", () => {
+  it("escolhe a extensão pelo tipo gravado", () => {
+    expect(audioExt("audio/webm;codecs=opus")).toBe("webm");
+    expect(audioExt("audio/mp4")).toBe("m4a");
+    expect(audioExt("audio/ogg;codecs=opus")).toBe("ogg");
+  });
+  it("envia o áudio com modelo, idioma e chave, e devolve o texto", async () => {
+    const orig = globalThis.fetch;
+    let seen: { url: string; auth: string | null; model: unknown; lang: unknown; file: unknown } | undefined;
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      const f = init.body as FormData;
+      seen = { url, auth: (init.headers as Record<string, string>)["authorization"] ?? null, model: f.get("model"), lang: f.get("language"), file: (f.get("file") as File).name };
+      return new Response(JSON.stringify({ text: " olá mundo " }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const text = await transcribe(new Uint8Array([1, 2, 3]), "audio/webm;codecs=opus", { OPENAI_API_KEY: "k", OPENAI_BASE_URL: "http://x/v1" });
+      expect(text).toBe("olá mundo");
+      expect(seen).toEqual({ url: "http://x/v1/audio/transcriptions", auth: "Bearer k", model: "whisper-1", lang: "pt", file: "audio.webm" });
+    } finally { globalThis.fetch = orig; }
+  });
+});

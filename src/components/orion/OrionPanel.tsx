@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowUpRight, BookPlus, CalendarDays, Loader2, MessageSquare, Search, Send, Sparkles, Trash2 } from "lucide-react";
+import { ArrowUpRight, BookPlus, CalendarDays, Check, Loader2, MessageSquare, Mic, Search, Send, Sparkles, Trash2, X } from "lucide-react";
 
 import { addEntry, deleteEntry, listEntries, todayIso, type BrainEntry } from "@/lib/data/brain";
 import { orionAsk, type AskResult } from "@/lib/orion.functions";
+import { transcribeAudio } from "@/lib/audio.functions";
+import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
 import { KIND_LABEL, type OrionKind } from "@/lib/orion";
 
 type Mode = "ask" | "doc";
@@ -25,6 +27,9 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
   const [error, setError] = useState("");
   const [recent, setRecent] = useState<BrainEntry[]>([]);
   const area = useRef<HTMLTextAreaElement>(null);
+  const recorder = useRecorder();
+  const [transcribing, setTranscribing] = useState(false);
+  const recording = recorder.state === "recording";
 
   const refresh = useCallback(() => { listEntries(6).then(setRecent).catch(() => undefined); }, []);
   useEffect(() => { refresh(); }, [refresh]);
@@ -57,6 +62,23 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
     setBusy(false);
   };
 
+  const startVoice = async () => {
+    setError("");
+    try { await recorder.start(); } catch (e) { setError((e as Error).message); }
+  };
+  const finishVoice = async () => {
+    const audio = await recorder.stop();
+    if (!audio) return;
+    setTranscribing(true);
+    try {
+      const r = await transcribeAudio({ data: audio });
+      if (r.ok) { setText((t) => (t.trim() ? `${t.trim()} ${r.text}` : r.text)); setTimeout(() => area.current?.focus(), 50); }
+      else setError(r.error);
+    } catch (e) { setError((e as Error).message); }
+    setTranscribing(false);
+  };
+  useEffect(() => { if (recording && recorder.seconds >= MAX_SECONDS) void finishVoice(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [recorder.seconds, recording]);
+
   const submit = () => (mode === "ask" ? ask() : document_());
   const remove = async (id: string) => {
     if (!window.confirm("Apagar esta anotação do Orion?")) return;
@@ -75,17 +97,35 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
       </div>
 
       <div className="relative rounded-2xl border border-violet/40 bg-[linear-gradient(100deg,color-mix(in_oklab,var(--violet)_14%,transparent),color-mix(in_oklab,var(--cyan)_8%,transparent))] p-2 shadow-[0_0_40px_-16px_var(--violet)] transition focus-within:shadow-[0_0_46px_-10px_var(--violet)]">
-        <div className="flex items-end gap-2">
-          <span className="mb-1.5 ml-1 grid h-8 w-8 shrink-0 place-items-center"><Sparkles size={18} className="text-cyan" /></span>
-          <textarea ref={area} rows={1} value={text} onChange={(e) => setText(e.target.value)} data-testid="orion-texto"
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
-            placeholder={mode === "ask" ? "Pergunte ao Orion… ex: teve falha no disparo de Maceió?" : "Documente algo… ex: disparo em Niterói deu erro de pagamento no cartão"}
-            className="min-h-9 min-w-0 flex-1 resize-none bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground" />
-          <button onClick={submit} disabled={busy || text.trim().length < 2} data-testid="orion-enviar" aria-label={mode === "ask" ? "Perguntar" : "Documentar"}
-            className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-brand text-primary-foreground transition enabled:hover:scale-105 disabled:opacity-40">
-            {busy ? <Loader2 size={15} className="animate-spin" /> : mode === "ask" ? <Send size={15} /> : <BookPlus size={15} />}
-          </button>
-        </div>
+        {recording ? (
+          <div className="flex items-center gap-3 px-2 py-1" data-testid="orion-gravando">
+            <span className="relative grid h-9 w-9 shrink-0 place-items-center"><span className="absolute inset-0 animate-ping rounded-full bg-destructive/40" /><span className="relative h-3 w-3 rounded-full bg-destructive" /></span>
+            <span className="flex h-6 flex-1 items-center gap-[3px]" aria-hidden>
+              {Array.from({ length: 28 }).map((_, i) => <span key={i} className="w-[3px] rounded-full bg-gradient-to-t from-cyan to-violet" style={{ height: `${30 + ((i * 37) % 70)}%`, animation: `orion-wave 1s ease-in-out ${(i % 7) * 0.12}s infinite alternate` }} />)}
+            </span>
+            <span className="font-mono text-xs tabular-nums text-muted-foreground" data-testid="orion-tempo">{Math.floor(recorder.seconds / 60)}:{String(recorder.seconds % 60).padStart(2, "0")}</span>
+            <button onClick={recorder.cancel} aria-label="Cancelar gravação" data-testid="orion-cancelar-audio" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:border-destructive/60 hover:text-destructive"><X size={15} /></button>
+            <button onClick={finishVoice} aria-label="Parar e transcrever" data-testid="orion-parar-audio" className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-brand text-primary-foreground transition hover:scale-105"><Check size={16} /></button>
+          </div>
+        ) : (
+          <div className="flex items-end gap-2">
+            <span className="mb-1.5 ml-1 grid h-8 w-8 shrink-0 place-items-center"><Sparkles size={18} className="text-cyan" /></span>
+            <textarea ref={area} rows={1} value={text} onChange={(e) => setText(e.target.value)} data-testid="orion-texto" disabled={transcribing}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
+              placeholder={transcribing ? "Transcrevendo o áudio…" : mode === "ask" ? "Pergunte ao Orion… ex: teve falha no disparo de Maceió?" : "Documente algo… ex: disparo em Niterói deu erro de pagamento no cartão"}
+              className="min-h-9 min-w-0 flex-1 resize-none bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground" />
+            {recorder.supported && (
+              <button onClick={startVoice} disabled={busy || transcribing} data-testid="orion-gravar" aria-label="Gravar áudio" title="Gravar áudio"
+                className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition enabled:hover:border-violet/60 enabled:hover:text-violet disabled:opacity-40">
+                {transcribing ? <Loader2 size={15} className="animate-spin" /> : <Mic size={16} />}
+              </button>
+            )}
+            <button onClick={submit} disabled={busy || transcribing || text.trim().length < 2} data-testid="orion-enviar" aria-label={mode === "ask" ? "Perguntar" : "Documentar"}
+              className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-brand text-primary-foreground transition enabled:hover:scale-105 disabled:opacity-40">
+              {busy ? <Loader2 size={15} className="animate-spin" /> : mode === "ask" ? <Send size={15} /> : <BookPlus size={15} />}
+            </button>
+          </div>
+        )}
         {mode === "doc" && (
           <div className="mt-1 flex items-center gap-2 px-1.5 pb-0.5 text-[0.68rem] text-muted-foreground">
             <CalendarDays size={12} /> Data do acontecimento:

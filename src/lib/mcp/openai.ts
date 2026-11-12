@@ -51,3 +51,24 @@ export function explain(e: OpenAIError, model: string): string {
   if (e.status === 400) return `A OpenAI recusou o pedido: ${e.message.slice(0, 200)}`;
   return "A IA está indisponível agora. Tente novamente.";
 }
+
+/** Extensão que a API de transcrição reconhece a partir do tipo do áudio gravado no navegador. */
+export const audioExt = (mime: string) => (/mp4|m4a|aac/.test(mime) ? "m4a" : /ogg/.test(mime) ? "ogg" : /wav/.test(mime) ? "wav" : /mpeg|mp3/.test(mime) ? "mp3" : "webm");
+export const DEFAULT_TRANSCRIBE_MODEL = "whisper-1";
+
+/** Áudio → texto (pt-BR) pela API de transcrição da OpenAI. */
+export async function transcribe(bytes: Uint8Array, mime: string, env: Record<string, string | undefined> = process.env): Promise<string> {
+  const model = env["OPENAI_TRANSCRIBE_MODEL"]?.trim() || DEFAULT_TRANSCRIBE_MODEL;
+  const form = new FormData();
+  form.append("file", new Blob([bytes as BlobPart], { type: mime.split(";")[0] || "audio/webm" }), `audio.${audioExt(mime)}`);
+  form.append("model", model);
+  form.append("language", "pt");
+  form.append("response_format", "json");
+  form.append("prompt", "Anotações em português do Brasil sobre disparos em massa, polos, dossiês, demandas, CRM, templates e treinamentos.");
+  const res = await fetch(`${baseUrl(env)}/audio/transcriptions`, {
+    method: "POST", headers: { authorization: `Bearer ${env["OPENAI_API_KEY"] ?? ""}` }, body: form, signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) return fail(res);
+  const j = (await res.json()) as { text?: string };
+  return (j.text ?? "").trim();
+}
