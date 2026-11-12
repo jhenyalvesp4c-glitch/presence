@@ -80,7 +80,7 @@
   * { border-color: var(--color-border); }
   /* Barras de rolagem no estilo do app (todas as telas, janelas e listas). */
   html { color-scheme: dark; }
-  * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--violet) 55%, transparent) transparent; }
+  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--violet) 55%, transparent) transparent; } }
   *::-webkit-scrollbar { width: 8px; height: 8px; }
   *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--cyan), var(--violet)); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }

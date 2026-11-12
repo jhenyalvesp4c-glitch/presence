@@ -823,7 +823,7 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
               <div className="mb-2 flex items-center justify-between rounded-full border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[color-mix(in_oklab,var(--glow)_10%,transparent)] px-2 py-1 text-[0.6rem] text-[var(--glow)]">
                 <span className="truncate">{statusMeta[s].label}</span><span className="font-mono">{col.length}</span>
               </div>
-              <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]" data-testid={`coluna-${type}-${s}`}>
+              <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1" data-testid={`coluna-${type}-${s}`}>
                 {col.map((d, i) => <MiniCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
                 {!col.length && <div className="rounded-xl border border-dashed border-border py-2 text-center text-[0.6rem] text-muted-foreground/60">vazio</div>}
               </div>
@@ -879,7 +879,7 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
                 <h3 className="font-display font-semibold">{statusMeta[s].label}</h3>
                 <span className="tag ml-auto !text-xs !tracking-normal">{col.length}</span>
               </div>
-              <div className="max-h-[36rem] flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+              <div className="max-h-[36rem] flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1">
                 {col.map((d, i) => <BigCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
               </div>
               <button onClick={() => onCreate(s)} className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-xs text-cyan transition hover:border-cyan/40 hover:bg-cyan/5">
