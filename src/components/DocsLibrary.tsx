@@ -7,6 +7,7 @@ import {
   Sparkles, Star, Trash2, User, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil,
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
+import { OrionPanel } from "@/components/orion/OrionPanel";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
@@ -100,8 +101,6 @@ function Library({ projectId }: { projectId: string }) {
   const [selId, setSelId] = useState("d1");
   const [grid, setGrid] = useState(true);
   const [q, setQ] = useState("");
-  const [ask, setAsk] = useState("");
-  const [orion, setOrion] = useState<{ q: string; phase: "think" | "done" } | null>(null);
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [trash, setTrash] = useState<Doc[]>([]);
   const [dossiers, setDossiers] = useState<string[]>([]);
@@ -151,63 +150,11 @@ function Library({ projectId }: { projectId: string }) {
     setFolders((fs) => [...fs, { id, name: newFolder.trim(), icon: Folder, color: "cyan", docs: [] }]);
     setCur(id); setNewFolder(null);
   };
-  const runOrion = (text: string) => {
-    if (!text.trim()) return;
-    setOrion({ q: text, phase: "think" }); setAsk("");
-    setTimeout(() => setOrion((o) => (o ? { ...o, phase: "done" } : o)), 1600);
-  };
-  const orionHits = orion ? docs.filter((d) => orion.q.toLowerCase().split(/\s+/).some((w) => w.length > 3 && (d.title + d.desc).toLowerCase().includes(w))).slice(0, 3) : [];
-  const hits = orionHits.length ? orionHits : docs.slice(0, 2);
 
   return (
     <div className="space-y-4">
       {/* Orion */}
-      <div className="relative animate-rise">
-        <form onSubmit={(e) => { e.preventDefault(); runOrion(ask); }}
-          className="group relative flex items-center gap-3 rounded-2xl border border-violet/40 bg-[linear-gradient(100deg,color-mix(in_oklab,var(--violet)_14%,transparent),color-mix(in_oklab,var(--cyan)_8%,transparent))] p-2 pl-4 shadow-[0_0_40px_-14px_var(--violet)] backdrop-blur-xl transition focus-within:shadow-[0_0_50px_-8px_var(--violet)]">
-          <span className="relative grid h-9 w-9 place-items-center">
-            <span className="absolute inset-0 rounded-full bg-violet/30 blur-md animate-pulse-ring" />
-            <Sparkles size={20} className="relative text-cyan" />
-          </span>
-          <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Pergunte ao Orion… ex: como desarquivar leads após o disparo?" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
-          <span className="mono-caps hidden !text-[0.55rem] sm:inline">Busca em {docs.length} documentos</span>
-          <button className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-brand text-primary-foreground transition hover:scale-105" aria-label="Perguntar"><Send size={15} /></button>
-        </form>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {["Senha do polo Maceió", "Regras do disparo em massa", "Último registro de execução"].map((s) => (
-            <button key={s} onClick={() => runOrion(s)} className="tag transition hover:shadow-[0_0_14px_-4px_var(--glow)]" style={tint("violet")}>{s}</button>
-          ))}
-        </div>
-        {orion && (
-          <div className="glass relative mt-3 overflow-hidden rounded-2xl border-violet/30 p-4 animate-rise">
-            <div className="pointer-events-none absolute inset-0 scanline" style={tint("violet")} />
-            <div className="flex items-start gap-3">
-              <span className="icon-tile h-9 w-9 shrink-0 !rounded-full" style={tint("violet")}><Sparkles size={16} /></span>
-              <div className="min-w-0 flex-1">
-                <p className="mono-caps">Orion · "{orion.q}"</p>
-                {orion.phase === "think" ? (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                    {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 rounded-full bg-cyan animate-pulse-ring" style={{ animationDelay: `${i * 0.2}s` }} />)}
-                    Vasculhando tutoriais, logins e históricos…
-                  </div>
-                ) : (
-                  <>
-                    <p className="mt-2 text-sm leading-relaxed">Encontrei <span className="text-cyan">{hits.length} fontes</span> relacionadas. O ponto principal: {hits[0]?.rules?.[0] ?? hits[0]?.desc}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {hits.map((h) => (
-                        <button key={h.id} onClick={() => setSelId(h.id)} className="glass flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs transition hover:shadow-[0_0_18px_-6px_var(--cyan)]">
-                          <FileText size={12} className="text-cyan" /> {h.title} <span className="text-muted-foreground">· {h.folder}</span> <ArrowRight size={11} />
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              <button onClick={() => setOrion(null)} className="text-muted-foreground hover:text-foreground"><X size={14} /></button>
-            </div>
-          </div>
-        )}
-      </div>
+      <div className="animate-rise"><OrionPanel /></div>
 
       <div className="grid gap-4 xl:grid-cols-[280px_1fr_380px]">
         {/* árvore */}

@@ -11,6 +11,7 @@ import {
 import { type ReactNode } from "react";
 
 import { HealthPreviewProvider } from "@/components/health-preview-provider";
+import { OrionDock } from "@/components/orion/OrionDock";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -124,6 +125,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <HealthPreviewProvider><Outlet /></HealthPreviewProvider>
+      <OrionDock />
       <Toaster position="top-center" theme="dark" />
     </QueryClientProvider>
   );
