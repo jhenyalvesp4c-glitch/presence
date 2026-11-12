@@ -432,7 +432,7 @@ function Demandas() {
                   <h2 className="font-display text-lg font-semibold">Demandas por tipo</h2>
                   <span className="tag" style={tint("violet")}>3 categorias · {filtered.length} demandas</span>
                 </div>
-                <div className={`grid gap-4 ${sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`}>
+                <div className={`grid items-start gap-4 ${sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`}>
                   {(["geral", "polo", "multi"] as DType[]).map((t) => (
                     <TypeBoard key={t} type={t} items={filtered.filter((i) => i.type === t)} selId={selId} onOpen={openCard} onCreate={() => setNewOpen({ type: t, status: "todo" })} />
                   ))}
@@ -823,9 +823,9 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
               <div className="mb-2 flex items-center justify-between rounded-full border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[color-mix(in_oklab,var(--glow)_10%,transparent)] px-2 py-1 text-[0.6rem] text-[var(--glow)]">
                 <span className="truncate">{statusMeta[s].label}</span><span className="font-mono">{col.length}</span>
               </div>
-              <div className="space-y-2">
+              <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]" data-testid={`coluna-${type}-${s}`}>
                 {col.map((d, i) => <MiniCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
-                {!col.length && <div className="rounded-xl border border-dashed border-border py-5 text-center text-[0.6rem] text-muted-foreground/60">vazio</div>}
+                {!col.length && <div className="rounded-xl border border-dashed border-border py-2 text-center text-[0.6rem] text-muted-foreground/60">vazio</div>}
               </div>
             </div>
           );
@@ -846,9 +846,9 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
       className={`group relative w-full overflow-hidden rounded-xl border bg-secondary/40 p-2 text-left transition animate-rise hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
       {active && <span className="scanline absolute inset-0" />}
       <p className="font-mono text-[0.55rem] text-muted-foreground">{d.id}</p>
-      <p className="mt-0.5 line-clamp-2 text-[0.72rem] font-medium leading-snug">{d.title}</p>
+      <p className="mt-0.5 line-clamp-4 break-words text-[0.74rem] font-medium leading-snug">{d.title}</p>
       <span className="tag mt-1.5 inline-block !px-1.5 !py-0 !text-[0.5rem]" style={tint(prio[d.priority].color)}>{prio[d.priority].label}</span>
-      <p className="mt-1.5 flex items-center gap-1 truncate text-[0.55rem] text-muted-foreground">
+      <p className="mt-1.5 flex items-start gap-1 break-words text-[0.6rem] leading-tight text-muted-foreground [&>svg]:mt-px [&>svg]:shrink-0">
         {d.type === "geral" ? <><Calendar size={9} /> {d.deadline}</> : d.type === "polo" ? <><MapPin size={9} /> {d.polo}</> : <><Network size={9} /> {d.polos!.length} {L.plural.toLowerCase()} · {progress(d)}%</>}
       </p>
     </button>
@@ -873,13 +873,13 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
         {STATUSES.map((s) => {
           const col = items.filter((i) => i.status === s);
           return (
-            <div key={s} className="accent-card flex min-h-[420px] flex-col p-3" style={tint(statusMeta[s].color)}>
+            <div key={s} className="accent-card flex min-h-[200px] flex-col p-3" style={tint(statusMeta[s].color)}>
               <div className="flex items-center gap-2 px-1 pb-3">
                 <span className="h-2.5 w-2.5 animate-pulse-ring rounded-full bg-[var(--glow)] shadow-[0_0_10px_var(--glow)]" />
                 <h3 className="font-display font-semibold">{statusMeta[s].label}</h3>
                 <span className="tag ml-auto !text-xs !tracking-normal">{col.length}</span>
               </div>
-              <div className="flex-1 space-y-3">
+              <div className="max-h-[36rem] flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
                 {col.map((d, i) => <BigCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
               </div>
               <button onClick={() => onCreate(s)} className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-xs text-cyan transition hover:border-cyan/40 hover:bg-cyan/5">
