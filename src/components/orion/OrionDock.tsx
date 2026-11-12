@@ -23,18 +23,20 @@ export function OrionDock() {
         <Sparkles size={22} className="relative text-cyan transition group-hover:rotate-12" />
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end overflow-y-auto bg-background/60 p-4 backdrop-blur-sm sm:items-end" {...backdropProps(() => setOpen(false))} data-testid="orion-janela">
-          <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Orion"
-            className="glass relative w-full max-w-xl rounded-3xl p-5 shadow-[0_0_60px_-20px_var(--violet)] animate-rise sm:mb-16">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="icon-tile h-10 w-10 !rounded-full" style={{ "--glow": "var(--violet)" } as React.CSSProperties}><Sparkles size={18} /></span>
-              <div className="mr-auto">
-                <h2 className="font-display text-lg font-semibold leading-tight">Orion</h2>
-                <p className="text-[0.7rem] text-muted-foreground">Seu segundo cérebro · pergunte ou documente</p>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-background/60 backdrop-blur-sm" {...backdropProps(() => setOpen(false))} data-testid="orion-janela">
+          <div className="pointer-events-none flex min-h-full items-end justify-end p-4 sm:pb-16">
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Orion"
+              className="glass pointer-events-auto relative flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col rounded-3xl p-5 shadow-[0_0_60px_-20px_var(--violet)] animate-rise sm:max-h-[calc(100dvh-5rem)]">
+              <div className="mb-4 flex shrink-0 items-center gap-3">
+                <span className="icon-tile h-10 w-10 !rounded-full" style={{ "--glow": "var(--violet)" } as React.CSSProperties}><Sparkles size={18} /></span>
+                <div className="mr-auto">
+                  <h2 className="font-display text-lg font-semibold leading-tight">Orion</h2>
+                  <p className="text-[0.7rem] text-muted-foreground">Seu segundo cérebro · pergunte ou documente</p>
+                </div>
+                <button onClick={() => setOpen(false)} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
               </div>
-              <button onClick={() => setOpen(false)} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+              <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2" data-testid="orion-rolagem"><OrionPanel autoFocus /></div>
             </div>
-            <OrionPanel autoFocus />
           </div>
         </div>
       )}

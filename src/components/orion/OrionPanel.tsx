@@ -117,7 +117,7 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
           {answer.sources.length > 0 && (
             <>
               <p className="mono-caps mt-4">{answer.sources.length} fonte{answer.sources.length > 1 ? "s" : ""}</p>
-              <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
+              <ul className="mt-2 space-y-2">
                 {answer.sources.map((s) => (
                   <li key={s.id}>
                     <a href={s.link} className="group block rounded-xl border border-border bg-secondary/30 p-2.5 transition hover:border-[color-mix(in_oklab,var(--glow)_55%,transparent)]" style={tint(KIND_COLOR[s.kind])}>
