@@ -66,3 +66,19 @@ describe("Transcrição de áudio", () => {
     } finally { globalThis.fetch = orig; }
   });
 });
+
+import { buildGraph, codesIn } from "@/components/brain/BrainGraph";
+import type { BrainEntry } from "@/lib/data/brain";
+const entry = (o: Partial<BrainEntry>): BrainEntry => ({ id: "1", title: "", text: "", date: "2026-11-12", dossiers: [], source: "orion", refId: null, summary: "", attachments: [], createdAt: "", ...o });
+describe("Mapa do segundo cérebro", () => {
+  it("acha códigos de demanda no texto", () => {
+    expect(codesIn("Ver #P048 e G42, também m7")).toEqual(["#P048", "#G042", "#M007"]);
+    expect(codesIn("sem códigos aqui")).toEqual([]);
+  });
+  it("liga anotações a dossiês e demandas", () => {
+    const g = buildGraph([entry({ id: "a", text: "Disparo #P048", dossiers: ["Maceió"] }), entry({ id: "b", text: "outro", dossiers: ["Maceió", "Santos"] })]);
+    expect(g.nodes.filter((n) => n.kind === "dossie").map((n) => n.label).sort()).toEqual(["Maceió", "Santos"]);
+    expect(g.nodes.some((n) => n.kind === "demanda" && n.label === "#P048")).toBe(true);
+    expect(g.edges.length).toBe(4);
+  });
+});

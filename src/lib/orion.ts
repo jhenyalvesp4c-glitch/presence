@@ -2,7 +2,7 @@
  * Orion (segundo cérebro): funções puras para montar o "acervo" pesquisável e ordenar por relevância.
  * Sem acesso ao banco aqui; quem lê as tabelas é orion.functions.ts.
  */
-export type OrionKind = "registro" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento";
+export type OrionKind = "registro" | "documentacao" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento";
 
 export type OrionDoc = {
   id: string;
@@ -19,7 +19,7 @@ export type OrionDoc = {
 export type OrionSource = { n: number; id: string; kind: OrionKind; title: string; snippet: string; date?: string | undefined; where?: string | undefined; link: string };
 
 export const KIND_LABEL: Record<OrionKind, string> = {
-  registro: "Anotação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com a assistente", treinamento: "Treinamento",
+  registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com a assistente", treinamento: "Treinamento",
 };
 
 export const normalize = (s: string) =>
@@ -100,7 +100,7 @@ export function rank(docs: OrionDoc[], question: string, today: string, limit = 
   const byDate = (a: OrionDoc, b: OrionDoc) => (b.date ?? "").localeCompare(a.date ?? "");
   if (!kws.length) return { docs: [...pool].sort(byDate).slice(0, limit), period, kws };
   const scored = pool
-    .map((d) => ({ d, s: scoreDoc(d, kws) * (d.kind === "registro" ? 1.4 : 1) }))
+    .map((d) => ({ d, s: scoreDoc(d, kws) * (d.kind === "registro" || d.kind === "documentacao" ? 1.4 : 1) }))
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s || byDate(a.d, b.d));
   return { docs: scored.slice(0, limit).map((x) => x.d), period, kws };
@@ -125,7 +125,7 @@ export const toSources = (docs: OrionDoc[], kws: string[]): OrionSource[] =>
 export function sourcesForAi(docs: OrionDoc[], maxChars = 24_000): string {
   let out = "";
   docs.forEach((d, i) => {
-    const block = `[${i + 1}] ${KIND_LABEL[d.kind]}${d.date ? ` · ${d.date}` : ""}${d.where ? ` · ${d.where}` : ""} · ${d.title}\n${d.text.replace(/\s+/g, " ").slice(0, 1500)}\n\n`;
+    const block = `[${i + 1}] ${KIND_LABEL[d.kind]}${d.date ? ` · ${d.date}` : ""}${d.where ? ` · ${d.where}` : ""} · ${d.title}\n${d.text.replace(/\s+/g, " ").slice(0, 2500)}\n\n`;
     if (out.length + block.length <= maxChars) out += block;
   });
   return out.trim();

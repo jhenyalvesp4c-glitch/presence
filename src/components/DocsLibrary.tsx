@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { syncMirrors, type Mirror } from "@/lib/data/brain";
 import { toast } from "sonner";
 import { loadProjectState } from "@/lib/data/project-data";
 import { backdropProps } from "@/lib/backdrop";
@@ -134,6 +135,25 @@ function Library({ projectId }: { projectId: string }) {
     loadProjectState(projectId).then((st) => setDossiers(st.ds.dossiers.map((d) => d.name))).catch(() => undefined);
   }, [projectId]);
   useEffect(() => { if (loaded) saveLogins(findFolder(folders, "log")?.docs ?? []); }, [folders, loaded]);
+  // Tudo da Documentação também vai para o segundo cérebro (Orion). Senhas NUNCA vão: ficam só neste navegador.
+  useEffect(() => {
+    if (!loaded) return;
+    const list: Mirror[] = [];
+    for (const d of findFolder(folders, "log")?.docs ?? []) {
+      if (!d.login) continue;
+      const g = groupOf(d), l = d.login;
+      list.push({
+        refId: `login:${d.id}`, title: `Login · ${g}${l.owner ? ` · ${l.owner}` : ""}`, dossier: g,
+        text: `Login do dossiê ${g}. Usuário: ${l.user}. Responsável: ${l.owner || "não informado"}. ${d.desc} (A senha fica guardada só neste navegador e não entra no segundo cérebro.)`,
+      });
+    }
+    for (const d of allDocs(folders)) {
+      if (d.login || !d.id.startsWith("n")) continue; // só o que a usuária criou (os exemplos não entram)
+      list.push({ refId: `doc:${d.id}`, title: d.title, text: [d.desc, ...(d.rules ?? []), ...(d.steps ?? [])].join("\n") });
+    }
+    const t = setTimeout(() => { syncMirrors(list).catch(() => undefined); }, 900);
+    return () => clearTimeout(t);
+  }, [folders, loaded]);
 
   const saveLogin = (d: Doc) => {
     setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: f.docs.some((x) => x.id === d.id) ? f.docs.map((x) => (x.id === d.id ? d : x)) : [d, ...f.docs] })));

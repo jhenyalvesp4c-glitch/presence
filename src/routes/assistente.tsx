@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 import {
-  ArrowRight, AudioLines, BarChart3, Bookmark, Calendar, CalendarCheck, ClipboardList, Dumbbell, Heart, Home,
+  ArrowRight, AudioLines, BarChart3, Bookmark, Brain, Calendar, CalendarCheck, ClipboardList, Dumbbell, Heart, Home,
   Layers, Lightbulb, ListChecks, Mic, Puzzle, Settings, Sparkles, Sun, Sprout, SquarePlus, Wallet, CreditCard,
   Workflow, Loader2, Trash2, X,
 } from "lucide-react";
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/assistente")({
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
-const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" }[] = [
+const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" }[] = [
   { Icon: Home, label: "Início", c: "cyan" },
   { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/projetos" },
   { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" },
@@ -40,6 +40,7 @@ const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/pro
   { Icon: Calendar, label: "Agenda", c: "cyan", to: "/planejamento" },
   { Icon: BarChart3, label: "Progresso", c: "violet" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" },
+  { Icon: Brain, label: "Segundo cérebro", c: "violet", to: "/cerebro" },
   { Icon: Puzzle, label: "Integrações", c: "cyan" },
   { Icon: Workflow, label: "Fluxos", c: "violet" },
   { Icon: Settings, label: "Ajustes", c: "cyan" },
@@ -67,7 +68,7 @@ const cards = [
 
 function RailIcon({ Icon, label, c, on = false, to, onClick, delay = "0s" }: {
   Icon: typeof Home; label: string; c: string; on?: boolean;
-  to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | undefined; onClick?: () => void; delay?: string;
+  to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" | undefined; onClick?: () => void; delay?: string;
 
 }) {
   const cls = `group relative grid h-10 w-10 place-items-center rounded-full transition duration-500 hover:-translate-y-0.5 hover:scale-[1.14] ${

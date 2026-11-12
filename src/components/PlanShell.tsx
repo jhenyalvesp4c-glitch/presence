@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
 import {
-  BarChart3, Book, Calendar, CalendarCheck, ClipboardList, Coffee, Dumbbell, Heart, Home, Laptop, Layers, ListChecks, Moon,
+  BarChart3, Book, Brain, Calendar, CalendarCheck, ClipboardList, Coffee, Dumbbell, Heart, Home, Laptop, Layers, ListChecks, Moon,
   Settings, ShowerHead, Sprout, Star, Sun, Utensils, LayoutGrid, Activity as ActivityIcon,
 } from "lucide-react";
 import type { IconKey } from "@/lib/plan-data";
@@ -22,6 +22,7 @@ const rail = [
   { Icon: BarChart3, label: "Progresso", c: "violet" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" as const },
   { Icon: Settings, label: "Ajustes", c: "cyan" },
+  { Icon: Brain, label: "Segundo cérebro", c: "violet", to: "/cerebro" as const },
 ];
 
 const nav = [

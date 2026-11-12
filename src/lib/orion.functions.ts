@@ -24,8 +24,8 @@ const rows = <T>(r: Rows<T>, what: string): T[] => {
 /** Reúne o que há no sistema como documentos pesquisáveis. */
 async function loadCorpus() {
   const { supabase } = await import("./data/db");
-  const [entries, projects, demands, hist, notes, execs, tasks, pnotes, msgs, trains] = await Promise.all([
-    supabase.from("brain_entries").select("id, text, entry_date, project_id, dossier_names").order("entry_date", { ascending: false }).limit(1500),
+  const [entries, projects, demands, hist, notes, execs, tasks, pnotes, msgs, trains, scripts] = await Promise.all([
+    supabase.from("brain_entries").select("id, title, text, entry_date, project_id, dossier_names, source, ai_summary, attachments").order("entry_date", { ascending: false }).limit(1500),
     supabase.from("projects").select("id, name"),
     supabase.from("project_demands").select("project_id, code, type, title, description, priority, status, deadline, dossier_name, updated_at").limit(2000),
     supabase.from("demand_history").select("project_id, code, label, text, status").limit(5000),
@@ -35,15 +35,20 @@ async function loadCorpus() {
     supabase.from("project_notes").select("id, project_id, text, date_label, created_at").limit(2000),
     supabase.from("assistant_messages").select("id, role, content, created_at").order("created_at", { ascending: false }).limit(1500),
     supabase.from("training_sessions").select("id, group_name, people, script_title, notes, created_at").limit(500),
+    supabase.from("training_scripts").select("project_id, id, data, updated_at").limit(200),
   ]);
 
   const projName = new Map(rows(projects as Rows<{ id: string; name: string }>, "projetos").map((p) => [p.id, p.name]));
   const docs: import("./orion").OrionDoc[] = [];
 
-  for (const e of rows(entries as Rows<{ id: string; text: string; entry_date: string; project_id: string | null; dossier_names: string[] }>, "anotações")) {
+  type Entry = { id: string; title: string; text: string; entry_date: string; project_id: string | null; dossier_names: string[]; source: string; ai_summary: string; attachments: { name: string }[] | null };
+  for (const e of rows(entries as Rows<Entry>, "anotações")) {
+    const files = (e.attachments ?? []).map((a) => a.name);
+    const body = [e.text, files.length ? `Arquivos anexados: ${files.join(", ")}.` : "", e.ai_summary ? `Conteúdo lido dos arquivos:\n${e.ai_summary}` : ""].filter(Boolean).join("\n");
     docs.push({
-      id: `registro:${e.id}`, kind: "registro", title: e.text.replace(/\s+/g, " ").slice(0, 80), text: e.text, date: e.entry_date,
-      where: [...(e.dossier_names ?? []), e.project_id ? projName.get(e.project_id) : undefined].filter(Boolean).join(", ") || undefined, link: "/assistente",
+      id: `registro:${e.id}`, kind: e.source === "documentacao" ? "documentacao" : "registro", title: e.title || e.text.replace(/\s+/g, " ").slice(0, 80) || files[0] || "Anotação", text: body, date: e.entry_date,
+      where: [...(e.dossier_names ?? []), e.project_id ? projName.get(e.project_id) : undefined].filter(Boolean).join(", ") || undefined,
+      link: e.source === "documentacao" ? "/demandas" : "/cerebro",
     });
   }
 
@@ -89,6 +94,16 @@ async function loadCorpus() {
 
   for (const s of rows(trains as Rows<{ id: string; group_name: string; people: number; script_title: string; notes: string; created_at: string }>, "treinamentos")) {
     docs.push({ id: `treinamento:${s.id}`, kind: "treinamento", title: `Turma ${s.group_name}`, text: [`${s.people} pessoas.`, s.script_title ? `Roteiro: ${s.script_title}.` : "", s.notes].filter(Boolean).join("\n"), date: day(s.created_at), link: "/demandas" });
+  }
+  const flat = (v: unknown, out: string[] = []): string[] => {
+    if (typeof v === "string") { if (v.length > 2 && !v.startsWith("data:")) out.push(v); }
+    else if (Array.isArray(v)) v.forEach((x) => flat(x, out));
+    else if (v && typeof v === "object") Object.values(v as Record<string, unknown>).forEach((x) => flat(x, out));
+    return out;
+  };
+  for (const sc of rows(scripts as Rows<{ project_id: string; id: string; data: unknown; updated_at: string }>, "roteiros")) {
+    const d = sc.data as { title?: string; name?: string };
+    docs.push({ id: `treinamento:script:${sc.project_id}:${sc.id}`, kind: "treinamento", title: `Roteiro: ${d.title ?? d.name ?? sc.id}`, text: flat(sc.data).join(" ").slice(0, 3000), date: day(sc.updated_at), where: projName.get(sc.project_id), link: "/demandas" });
   }
   return docs;
 }

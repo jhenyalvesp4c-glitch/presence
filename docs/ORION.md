@@ -9,6 +9,15 @@ Caixa disponível em **todas as páginas** (botão roxo no canto inferior direit
 ## Voz
 Nos dois modos há um botão de microfone: grave, toque no ✓ para parar e o áudio vira texto no campo (editável) antes de enviar; o ✕ cancela. A transcrição é feita pela OpenAI (`whisper-1`; mude com `OPENAI_TRANSCRIBE_MODEL`), em português, com limite de 3 minutos por gravação. Precisa de permissão de microfone no navegador e de `OPENAI_API_KEY`.
 
+## Página do segundo cérebro (`/cerebro`)
+Ícone de cérebro no menu lateral. Tem **linha do tempo** (por dia, com miniaturas), **mapa de ligações** (dossiês, anotações, documentação e demandas citadas como `#P048`) e **grade de arquivos**, com filtro por texto, tipo e dossiê. Clique num cartão para abrir a gaveta (texto, arquivos, conteúdo lido, ligações, editar/excluir).
+
+## Anexos (prints, documentos, arquivos)
+Em **Documentar** (na caixa do Orion e na página): clipe, arrastar e soltar, ou **colar print com Ctrl+V**. Imagens são reduzidas (1600 px); PDFs até 3 MB e textos são lidos pela IA e o conteúdo fica salvo (`ai_summary`) para a pesquisa achar. Outros tipos (Office, áudio, zip, PDFs grandes) são guardados, só sem leitura. Limite: 8 arquivos e 25 MB por anotação, no bucket privado `presence-app-brain-files`.
+
+## Documentação → segundo cérebro
+Logins (sem a senha, que nunca sai do navegador) e documentos criados na aba Documentação são espelhados automaticamente em `brain_entries` (`source = documentacao`, `ref_id = login:<id>` ou `doc:<id>`). Editar ou apagar na Documentação atualiza ou remove o espelho. Os documentos de exemplo da tela não entram.
+
 ## O que é pesquisado
 Anotações do Orion (`brain_entries`), demandas + histórico + observações + execuções por polo, tarefas e compromissos, notas de projeto, conversas com a assistente e turmas de treinamento. Nada é copiado: a pesquisa lê as tabelas na hora, então tudo o que entra no sistema já é "lembrado".
 

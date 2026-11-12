@@ -1,24 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowUpRight, BookPlus, CalendarDays, Check, Loader2, MessageSquare, Mic, Search, Send, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowUpRight, BookPlus, CalendarDays, Check, FileText, Loader2, MessageSquare, Mic, Paperclip, Search, Send, Sparkles, Trash2, X } from "lucide-react";
 
 import { addEntry, deleteEntry, listEntries, todayIso, type BrainEntry } from "@/lib/data/brain";
 import { orionAsk, type AskResult } from "@/lib/orion.functions";
 import { transcribeAudio } from "@/lib/audio.functions";
+import { summarizeFiles } from "@/lib/brain.functions";
+import { MAX_PENDING, filesFromClipboard, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
 import { KIND_LABEL, type OrionKind } from "@/lib/orion";
 
 type Mode = "ask" | "doc";
 type Answer = Extract<AskResult, { ok: true }> & { question: string };
 
-const KIND_COLOR: Record<OrionKind, string> = { registro: "violet", demanda: "cyan", tarefa: "amber", nota: "emerald", conversa: "pink", treinamento: "emerald" };
+const KIND_COLOR: Record<OrionKind, string> = { registro: "violet", documentacao: "amber", demanda: "cyan", tarefa: "amber", nota: "emerald", conversa: "pink", treinamento: "emerald" };
 const SUGGEST = ["O que eu documentei hoje?", "Teve alguma falha nos disparos este mês?", "O que aconteceu na semana passada?", "Quais demandas estão em andamento?"];
 
 const br = (iso: string) => iso.split("-").reverse().join("/");
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as React.CSSProperties;
 
 /** Orion: pergunta e documenta. Usado na caixa flutuante (todas as páginas) e na Documentação. */
-export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: boolean; className?: string }) {
+export function OrionPanel({ autoFocus = false, className = "", onDocumented }: { autoFocus?: boolean; className?: string; onDocumented?: () => void }) {
   const [mode, setMode] = useState<Mode>("ask");
   const [text, setText] = useState("");
   const [date, setDate] = useState(todayIso());
@@ -27,6 +29,10 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
   const [error, setError] = useState("");
   const [recent, setRecent] = useState<BrainEntry[]>([]);
   const area = useRef<HTMLTextAreaElement>(null);
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [stage, setStage] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const recorder = useRecorder();
   const [transcribing, setTranscribing] = useState(false);
   const recording = recorder.state === "recording";
@@ -50,16 +56,38 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
     setBusy(false);
   };
 
+  const addFiles = async (list: File[]) => {
+    if (!list.length) return;
+    setMode("doc"); setError("");
+    try {
+      const { added, rejected } = await toPending(list, pending);
+      if (added.length) setPending((p) => [...p, ...added]);
+      if (rejected.length) setError(rejected.join(" · "));
+    } catch (e) { setError((e as Error).message); }
+  };
+  const dropPending = (key: string) => setPending((p) => p.filter((x) => x.key !== key));
+
   const document_ = async () => {
-    if (!text.trim() || busy) return;
+    if ((!text.trim() && !pending.length) || busy) return;
     setBusy(true); setError("");
     try {
-      const e = await addEntry(text, date || todayIso());
-      setText(""); setDate(todayIso());
+      // Lê o conteúdo dos anexos (print, PDF, texto) para a busca achar depois.
+      let summary = "";
+      const textual = pending.filter((p) => p.ai?.mime === "text/plain").map((p) => `## ${p.name}\n${new TextDecoder().decode(Uint8Array.from(atob(p.ai!.data), (c) => c.charCodeAt(0)))}`);
+      const visual = pending.filter((p) => p.ai && p.ai.mime !== "text/plain").map((p) => ({ name: p.name, mime: p.ai!.mime, data: p.ai!.data }));
+      if (visual.length) {
+        setStage("Lendo os arquivos…");
+        const r = await summarizeFiles({ data: { files: visual } });
+        if (r.ok) { summary = r.text; if (r.note) toast.message(r.note); } else toast.error(r.error);
+      }
+      summary = [...textual, summary].filter(Boolean).join("\n\n");
+      setStage(pending.length ? "Guardando os arquivos…" : "");
+      const e = await addEntry({ text, date: date || todayIso(), summary, files: pending.map((p) => ({ name: p.name, mime: p.mime, blob: p.blob })) });
+      setText(""); setDate(todayIso()); setPending([]);
       toast.success(e.dossiers.length ? `Documentado · ${e.dossiers.join(", ")}` : "Documentado no Orion");
-      refresh();
+      refresh(); onDocumented?.();
     } catch (e) { setError((e as Error).message); }
-    setBusy(false);
+    setStage(""); setBusy(false);
   };
 
   const startVoice = async () => {
@@ -86,7 +114,12 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
   };
 
   return (
-    <div className={`space-y-3 ${className}`} data-testid="orion">
+    <div className={`relative space-y-3 ${className}`} data-testid="orion"
+      onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragOver(true); } }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
+      onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragOver(false); void addFiles([...e.dataTransfer.files]); } }}>
+      <input ref={fileInput} type="file" multiple hidden data-testid="orion-arquivo" onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
+      {dragOver && <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-2xl border-2 border-dashed border-cyan bg-background/80 text-sm text-cyan backdrop-blur-sm"><span className="flex items-center gap-2"><Paperclip size={16} /> Solte para anexar ao Orion</span></div>}
       <div className="inline-flex rounded-2xl border border-border bg-secondary/40 p-1" role="tablist">
         {([["ask", "Perguntar", Search], ["doc", "Documentar", BookPlus]] as const).map(([k, l, I]) => (
           <button key={k} role="tab" aria-selected={mode === k} data-testid={`orion-${k}`} onClick={() => { setMode(k); setError(""); }}
@@ -111,16 +144,21 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
           <div className="flex items-end gap-2">
             <span className="mb-1.5 ml-1 grid h-8 w-8 shrink-0 place-items-center"><Sparkles size={18} className="text-cyan" /></span>
             <textarea ref={area} rows={1} value={text} onChange={(e) => setText(e.target.value)} data-testid="orion-texto" disabled={transcribing}
+              onPaste={(e) => { const f = filesFromClipboard(e); if (f.length) { e.preventDefault(); void addFiles(f); } }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
-              placeholder={transcribing ? "Transcrevendo o áudio…" : mode === "ask" ? "Pergunte ao Orion… ex: teve falha no disparo de Maceió?" : "Documente algo… ex: disparo em Niterói deu erro de pagamento no cartão"}
+              placeholder={transcribing ? "Transcrevendo o áudio…" : mode === "ask" ? "Pergunte ao Orion… ex: teve falha no disparo de Maceió?" : "Documente algo… cole um print (Ctrl+V), anexe arquivos ou escreva. Ex: disparo em Niterói deu erro de pagamento"}
               className="min-h-9 min-w-0 flex-1 resize-none bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground" />
+            {mode === "doc" && (
+              <button onClick={() => fileInput.current?.click()} disabled={busy} data-testid="orion-anexar" aria-label="Anexar arquivo ou imagem" title="Anexar arquivo, print ou imagem (ou cole com Ctrl+V)"
+                className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition enabled:hover:border-cyan/60 enabled:hover:text-cyan disabled:opacity-40"><Paperclip size={16} /></button>
+            )}
             {recorder.supported && (
               <button onClick={startVoice} disabled={busy || transcribing} data-testid="orion-gravar" aria-label="Gravar áudio" title="Gravar áudio"
                 className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition enabled:hover:border-violet/60 enabled:hover:text-violet disabled:opacity-40">
                 {transcribing ? <Loader2 size={15} className="animate-spin" /> : <Mic size={16} />}
               </button>
             )}
-            <button onClick={submit} disabled={busy || transcribing || text.trim().length < 2} data-testid="orion-enviar" aria-label={mode === "ask" ? "Perguntar" : "Documentar"}
+            <button onClick={submit} disabled={busy || transcribing || (mode === "ask" ? text.trim().length < 2 : !text.trim() && !pending.length)} data-testid="orion-enviar" aria-label={mode === "ask" ? "Perguntar" : "Documentar"}
               className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-brand text-primary-foreground transition enabled:hover:scale-105 disabled:opacity-40">
               {busy ? <Loader2 size={15} className="animate-spin" /> : mode === "ask" ? <Send size={15} /> : <BookPlus size={15} />}
             </button>
@@ -136,12 +174,26 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
         )}
       </div>
 
+      {mode === "doc" && pending.length > 0 && (
+        <ul className="flex flex-wrap gap-2" data-testid="orion-anexos">
+          {pending.map((p) => (
+            <li key={p.key} className="group/f relative flex max-w-full items-center gap-2 rounded-xl border border-border bg-secondary/40 p-1.5 pr-7 transition hover:border-cyan/50">
+              {p.preview ? <img src={p.preview} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="icon-tile h-9 w-9 shrink-0 !rounded-lg"><FileText size={15} /></span>}
+              <span className="min-w-0"><span className="block max-w-40 truncate text-[0.7rem]">{p.name}</span><span className="text-[0.6rem] text-muted-foreground">{sizeLabel(p.size)}{p.ai ? "" : " · sem leitura por IA"}</span></span>
+              <button onClick={() => dropPending(p.key)} aria-label={`Remover ${p.name}`} className="absolute right-1.5 top-1.5 text-muted-foreground hover:text-destructive"><X size={12} /></button>
+            </li>
+          ))}
+          {pending.length < MAX_PENDING && <li><button onClick={() => fileInput.current?.click()} className="grid h-12 place-items-center rounded-xl border border-dashed border-border px-3 text-[0.65rem] text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">+ anexar</button></li>}
+        </ul>
+      )}
+
       {mode === "ask" && !answer && !busy && !error && (
         <div className="flex flex-wrap gap-2">
           {SUGGEST.map((s) => <button key={s} onClick={() => ask(s)} className="tag transition hover:shadow-[0_0_14px_-4px_var(--glow)]" style={tint("violet")}>{s}</button>)}
         </div>
       )}
 
+      {busy && mode === "doc" && stage && <p className="flex items-center gap-2 px-1 text-xs text-muted-foreground" data-testid="orion-etapa"><Loader2 size={12} className="animate-spin text-cyan" /> {stage}</p>}
       {busy && mode === "ask" && (
         <div className="flex items-center gap-2 px-1 text-sm text-muted-foreground" data-testid="orion-pensando">
           {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 animate-pulse-ring rounded-full bg-cyan" style={{ animationDelay: `${i * 0.2}s` }} />)}
@@ -186,7 +238,8 @@ export function OrionPanel({ autoFocus = false, className = "" }: { autoFocus?: 
             {recent.map((r) => (
               <li key={r.id} className="group relative rounded-xl border border-border bg-secondary/30 p-2.5 pr-9">
                 <span className="flex items-center gap-2 text-[0.65rem] text-muted-foreground"><MessageSquare size={10} /> {br(r.date)}{r.dossiers.length > 0 && <span className="min-w-0 truncate text-violet">· {r.dossiers.join(", ")}</span>}</span>
-                <span className="mt-1 block whitespace-pre-wrap break-words text-xs leading-snug">{r.text}</span>
+                <span className="mt-1 block whitespace-pre-wrap break-words text-xs leading-snug">{r.text || r.title || "(só arquivos)"}</span>
+                {r.attachments.length > 0 && <span className="mt-1 flex items-center gap-1 text-[0.65rem] text-cyan"><Paperclip size={10} /> {r.attachments.length} arquivo{r.attachments.length > 1 ? "s" : ""}</span>}
                 <button onClick={() => remove(r.id)} aria-label="Apagar anotação" className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-lg border border-border bg-background/80 text-muted-foreground opacity-0 transition hover:border-destructive/60 hover:text-destructive focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"><Trash2 size={12} /></button>
               </li>
             ))}
