@@ -35,6 +35,23 @@ const safeName = (n: string) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").repla
 
 export type NewFile = { name: string; mime: string; blob: Blob };
 
+/** Envia arquivos para o Storage (pasta do dono / pasta lógica) e devolve as referências. Se um falhar, apaga os já enviados. */
+export async function uploadFiles(folder: string, files: NewFile[]): Promise<Attachment[]> {
+  const done: Attachment[] = [];
+  try {
+    for (const f of files) {
+      const path = `${SINGLE_USER_ID}/${folder}/${Date.now().toString(36)}${done.length}-${safeName(f.name)}`;
+      const up = await supabase.storage.from(BUCKET).upload(path, f.blob, { contentType: f.mime || "application/octet-stream", upsert: true });
+      if (up.error) throw new Error(`Não consegui guardar "${f.name}": ${up.error.message}`);
+      done.push({ path, name: f.name, mime: f.mime, size: f.blob.size });
+    }
+    return done;
+  } catch (e) {
+    if (done.length) await supabase.storage.from(BUCKET).remove(done.map((a) => a.path));
+    throw e;
+  }
+}
+
 /** Salva a anotação (com arquivos, se houver). Os dossiês citados no texto viram etiquetas. */
 export async function addEntry(input: { text: string; date?: string; title?: string; files?: NewFile[]; summary?: string }): Promise<BrainEntry> {
   const files = input.files ?? [];
@@ -44,12 +61,7 @@ export async function addEntry(input: { text: string; date?: string; title?: str
   const id = crypto.randomUUID();
   const attachments: Attachment[] = [];
   try {
-    for (const [i, f] of files.entries()) {
-      const path = `${SINGLE_USER_ID}/${id}/${i}-${safeName(f.name)}`;
-      const up = await supabase.storage.from(BUCKET).upload(path, f.blob, { contentType: f.mime || "application/octet-stream", upsert: true });
-      if (up.error) throw new Error(`Não consegui guardar "${f.name}": ${up.error.message}`);
-      attachments.push({ path, name: f.name, mime: f.mime, size: f.blob.size });
-    }
+    attachments.push(...(await uploadFiles(id, files)));
     const row = must(await supabase.from("brain_entries").insert({
       id, user_id: SINGLE_USER_ID, text: clean, title: (input.title ?? "").slice(0, 200), entry_date: input.date || todayIso(),
       dossier_names: mentionedDossiers(`${clean} ${input.title ?? ""} ${files.map((f) => f.name).join(" ")}`, names),
@@ -91,7 +103,7 @@ export async function signedUrls(paths: string[]): Promise<Record<string, { view
 }
 
 /* ───────── Espelhos da Documentação (logins sem senha, documentos criados) ───────── */
-export type Mirror = { refId: string; title: string; text: string; dossier?: string | undefined };
+export type Mirror = { refId: string; title: string; text: string; dossier?: string | undefined; attachments?: Attachment[] | undefined; summary?: string | undefined };
 
 /** Cria ou atualiza os espelhos; devolve quando termina. Nunca recebe senhas. */
 export async function upsertMirrors(list: Mirror[]) {
@@ -100,6 +112,7 @@ export async function upsertMirrors(list: Mirror[]) {
   const rows = list.map((m) => ({
     user_id: SINGLE_USER_ID, ref_id: m.refId, source: "documentacao", title: m.title.slice(0, 200), text: m.text.slice(0, 6000),
     dossier_names: [...new Set([...(m.dossier ? [m.dossier] : []), ...mentionedDossiers(m.text, names)])],
+    attachments: m.attachments ?? [], ai_summary: (m.summary ?? "").slice(0, 20000),
   }));
   must(await supabase.from("brain_entries").upsert(rows, { onConflict: "user_id,ref_id" }).select("id"));
 }
@@ -114,7 +127,7 @@ const mirrorHash = new Map<string, string>();
 export async function syncMirrors(list: Mirror[]) {
   const existing = (must(await supabase.from("brain_entries").select("ref_id").eq("source", "documentacao")) as { ref_id: string | null }[]).map((r) => r.ref_id).filter((r): r is string => !!r);
   const keep = new Set(list.map((m) => m.refId)), known = new Set(existing);
-  const hash = (m: Mirror) => JSON.stringify([m.title, m.text, m.dossier ?? ""]);
+  const hash = (m: Mirror) => JSON.stringify([m.title, m.text, m.dossier ?? "", m.attachments ?? [], m.summary ?? ""]);
   const changed = list.filter((m) => !known.has(m.refId) || mirrorHash.get(m.refId) !== hash(m));
   await deleteMirrors(existing.filter((r) => !keep.has(r)));
   await upsertMirrors(changed);

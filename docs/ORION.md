@@ -21,6 +21,9 @@ Em **Documentar** (na caixa do Orion e na página): clipe, arrastar e soltar, ou
 ## Documentação → segundo cérebro
 Logins (sem a senha, que nunca sai do navegador) e documentos criados na aba Documentação são espelhados automaticamente em `brain_entries` (`source = documentacao`, `ref_id = login:<id>` ou `doc:<id>`). Editar ou apagar na Documentação atualiza ou remove o espelho. Os documentos de exemplo da tela não entram.
 
+## Documentação editável
+Em Documentação → Biblioteca, **+ Documento** abre um editor (título, tipo, descrição, regras, passo a passo e arquivos por clique, arraste ou Ctrl+V). Qualquer documento pode ser editado (lápis ao lado da estrela) ou excluído. Salva em `library_docs`/`library_folders`; exemplos do app editados viram uma linha com o mesmo id (`deleted` esconde um exemplo apagado). O que a usuária cria ou edita é espelhado para o Orion (`doc:<id>`), inclusive o texto lido dos arquivos.
+
 ## O que é pesquisado
 Anotações do Orion (`brain_entries`), demandas + histórico + observações + execuções por polo, tarefas e compromissos, notas de projeto, conversas com a assistente e turmas de treinamento. Nada é copiado: a pesquisa lê as tabelas na hora, então tudo o que entra no sistema já é "lembrado".
 

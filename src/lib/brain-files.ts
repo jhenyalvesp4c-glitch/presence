@@ -46,3 +46,16 @@ export async function toPending(files: File[], current: Pending[]): Promise<{ ad
 /** Arquivos colados (Ctrl+V) viram File; prints costumam vir sem nome. */
 export const filesFromClipboard = (e: ClipboardEvent | React.ClipboardEvent): File[] =>
   [...(e.clipboardData?.files ?? [])];
+
+import { summarizeFiles } from "@/lib/brain.functions";
+/** Lê o conteúdo dos anexos (texto direto; imagem/PDF pela IA) para a pesquisa do Orion achar depois. */
+export async function readPending(pending: Pending[]): Promise<{ summary: string; note?: string }> {
+  const textual = pending.filter((p) => p.ai?.mime === "text/plain").map((p) => `## ${p.name}\n${new TextDecoder().decode(Uint8Array.from(atob(p.ai!.data), (c) => c.charCodeAt(0)))}`);
+  const visual = pending.filter((p) => p.ai && p.ai.mime !== "text/plain").map((p) => ({ name: p.name, mime: p.ai!.mime, data: p.ai!.data }));
+  let ai = "", note: string | undefined;
+  if (visual.length) {
+    const r = await summarizeFiles({ data: { files: visual } });
+    if (r.ok) { ai = r.text; note = r.note; } else note = r.error;
+  }
+  return { summary: [...textual, ai].filter(Boolean).join("\n\n"), ...(note ? { note } : {}) };
+}

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { syncMirrors, type Mirror } from "@/lib/data/brain";
+import { signedUrls, syncMirrors, type Attachment, type Mirror } from "@/lib/data/brain";
+import { loadLibraryRows, removeDocRow, removeFiles, saveDocRow, saveFolderRow, type DocRow, type FolderRow } from "@/lib/data/library";
+import { DocEditor, type EditableDoc } from "@/components/library-doc-editor";
 import { toast } from "sonner";
 import { loadProjectState } from "@/lib/data/project-data";
 import { backdropProps } from "@/lib/backdrop";
@@ -15,8 +17,10 @@ const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
 type Doc = {
   id: string; title: string; desc: string; kind: string; color: string; updated: string; fav?: boolean;
-  rules?: string[]; steps?: string[]; files?: { name: string; size: string; type: "video" | "pdf" }[];
+  rules?: string[] | undefined; steps?: string[] | undefined; files?: { name: string; size: string; type: "video" | "pdf" }[];
   login?: { user: string; pass: string; owner: string; dossier?: string };
+  /** Arquivos reais anexados (Storage) e o texto lido deles (para o Orion). */
+  attachments?: Attachment[]; summary?: string;
 };
 type FolderT = { id: string; name: string; icon: typeof Folder; color: string; docs: Doc[]; subs?: FolderT[] | undefined };
 
@@ -86,6 +90,39 @@ async function copyText(v: string): Promise<boolean> {
 }
 const newId = () => `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
+const SEED_IDS = new Set(seedFolders.flatMap(function ids(f: FolderT): string[] { return [...f.docs.map((d) => d.id), ...(f.subs ?? []).flatMap(ids)]; }));
+const todayLabel = () => new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+
+const docToRow = (d: Doc, folderId: string, deleted = false): DocRow => ({
+  id: d.id, folder_id: folderId, title: d.title, description: d.desc, kind: d.kind, color: d.color, fav: !!d.fav,
+  rules: d.rules ?? [], steps: d.steps ?? [], attachments: d.attachments ?? [], ai_summary: d.summary ?? "", deleted, updated_label: d.updated,
+});
+const rowToDoc = (r: DocRow, base?: Doc): Doc => ({
+  ...(base ?? {}), id: r.id, title: r.title, desc: r.description, kind: r.kind, color: r.color, updated: r.updated_label || base?.updated || "—", fav: r.fav,
+  ...(r.rules.length ? { rules: r.rules } : { rules: undefined }), ...(r.steps.length ? { steps: r.steps } : { steps: undefined }),
+  attachments: r.attachments, summary: r.ai_summary,
+} as Doc);
+const dropDoc = (fs: FolderT[], id: string): FolderT[] => fs.map((f) => ({ ...f, docs: f.docs.filter((d) => d.id !== id), subs: f.subs && dropDoc(f.subs, id) }));
+const folderIdOf = (fs: FolderT[], id: string): string | undefined => {
+  for (const f of fs) { if (f.docs.some((d) => d.id === id)) return f.id; const s = folderIdOf(f.subs ?? [], id); if (s) return s; }
+  return undefined;
+};
+
+/** Junta o que está salvo no banco (documentos e pastas da usuária) com os exemplos do app. */
+function applyRows(base: FolderT[], rows: { docs: DocRow[]; folders: FolderRow[] }): FolderT[] {
+  let out = base;
+  for (const f of rows.folders) if (!findFolder(out, f.id)) out = [...out, { id: f.id, name: f.name, icon: Folder, color: f.color, docs: [] }];
+  for (const r of rows.docs) {
+    const cur = allDocs(out).find((d) => d.id === r.id);
+    if (r.deleted) { out = dropDoc(out, r.id); continue; }
+    const target = findFolder(out, r.folder_id) ? r.folder_id : "ger";
+    const doc = rowToDoc(r, cur);
+    if (cur && folderIdOf(out, r.id) === target) out = mapFolders(out, target, (f) => ({ ...f, docs: f.docs.map((d) => (d.id === r.id ? doc : d)) }));
+    else out = mapFolders(dropDoc(out, r.id), target, (f) => ({ ...f, docs: [doc, ...f.docs] }));
+  }
+  return out;
+}
+
 const allDocs = (fs: FolderT[]): (Doc & { folder: string })[] =>
   fs.flatMap((f) => [...f.docs.map((d) => ({ ...d, folder: f.name })), ...allDocs(f.subs ?? []).map((d) => d)]);
 const countDocs = (f: FolderT): number => f.docs.length + (f.subs ?? []).reduce((a, s) => a + countDocs(s), 0);
@@ -122,6 +159,9 @@ function Library({ projectId }: { projectId: string }) {
   const [q, setQ] = useState("");
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [trash, setTrash] = useState<Doc[]>([]);
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  const [editDoc, setEditDoc] = useState<{ doc: Doc; isNew: boolean; folderId: string } | null>(null);
+  const [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({});
   const [dossiers, setDossiers] = useState<string[]>([]);
   const [editing, setEditing] = useState<Doc | { preset: string } | null>(null);
   const [group, setGroup] = useState<string | null>(null);
@@ -132,6 +172,10 @@ function Library({ projectId }: { projectId: string }) {
     const saved = loadLogins();
     if (saved) setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: saved })));
     setLoaded(true);
+    loadLibraryRows().then((rows) => {
+      setFolders((fs) => applyRows(fs, rows));
+      setTouched(new Set(rows.docs.filter((d) => !d.deleted).map((d) => d.id)));
+    }).catch((e: Error) => toast.error(`Não consegui carregar a Documentação: ${e.message}`));
     loadProjectState(projectId).then((st) => setDossiers(st.ds.dossiers.map((d) => d.name))).catch(() => undefined);
   }, [projectId]);
   useEffect(() => { if (loaded) saveLogins(findFolder(folders, "log")?.docs ?? []); }, [folders, loaded]);
@@ -148,12 +192,16 @@ function Library({ projectId }: { projectId: string }) {
       });
     }
     for (const d of allDocs(folders)) {
-      if (d.login || !d.id.startsWith("n")) continue; // só o que a usuária criou (os exemplos não entram)
-      list.push({ refId: `doc:${d.id}`, title: d.title, text: [d.desc, ...(d.rules ?? []), ...(d.steps ?? [])].join("\n") });
+      if (d.login || !touched.has(d.id)) continue; // só o que a usuária criou ou editou (os exemplos intactos não entram)
+      list.push({
+        refId: `doc:${d.id}`, title: d.title,
+        text: [`${d.kind} na pasta ${d.folder}.`, d.desc, d.rules?.length ? `Regras importantes:\n- ${d.rules.join("\n- ")}` : "", d.steps?.length ? `Passo a passo:\n${d.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : ""].filter(Boolean).join("\n"),
+        attachments: d.attachments ?? [], summary: d.summary ?? "",
+      });
     }
     const t = setTimeout(() => { syncMirrors(list).catch(() => undefined); }, 900);
     return () => clearTimeout(t);
-  }, [folders, loaded]);
+  }, [folders, loaded, touched]);
 
   const saveLogin = (d: Doc) => {
     setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: f.docs.some((x) => x.id === d.id) ? f.docs.map((x) => (x.id === d.id ? d : x)) : [d, ...f.docs] })));
@@ -171,27 +219,69 @@ function Library({ projectId }: { projectId: string }) {
   const sel = docs.find((d) => d.id === selId);
   const shown = (q ? docs.filter((d) => (d.title + d.desc + d.kind + d.folder).toLowerCase().includes(q.toLowerCase())) : folder.docs);
 
-  const toggleFav = (id: string) => setFolders((fs) => {
-    const walk = (l: FolderT[]): FolderT[] => l.map((f) => ({ ...f, docs: f.docs.map((d) => (d.id === id ? { ...d, fav: !d.fav } : d)), subs: f.subs && walk(f.subs) }));
-    return walk(fs);
-  });
+  const persist = (d: Doc, folderId: string) => {
+    if (d.login) return;
+    setTouched((t) => new Set(t).add(d.id));
+    saveDocRow(docToRow(d, folderId)).catch((e: Error) => toast.error(`Não consegui salvar: ${e.message}`));
+  };
+  const toggleFav = (id: string) => {
+    const d = docs.find((x) => x.id === id); if (!d) return;
+    const next = { ...d, fav: !d.fav };
+    setFolders((fs) => {
+      const walk = (l: FolderT[]): FolderT[] => l.map((f) => ({ ...f, docs: f.docs.map((x) => (x.id === id ? { ...x, fav: next.fav } : x)), subs: f.subs && walk(f.subs) }));
+      return walk(fs);
+    });
+    const fid = folderIdOf(folders, id); if (fid) persist(next, fid);
+  };
   const addDoc = () => {
     if (cur === "log" && !q) { setEditing({ preset: "" }); return; }
-    const id = `n${Date.now()}`;
-    setFolders((fs) => mapFolders(fs, cur, (f) => ({ ...f, docs: [mk(id, "Novo documento", "Clique para descrever este documento.", "Rascunho", "cyan", { updated: "agora" }), ...f.docs] })));
-    setSelId(id); setQ("");
+    setEditDoc({ doc: mk(`n${Date.now().toString(36)}`, "", "", "Documento", "cyan", { updated: todayLabel() }), isNew: true, folderId: folder.id });
+  };
+  const editExisting = (id: string) => {
+    const d = docs.find((x) => x.id === id); if (!d) return;
+    setEditDoc({ doc: d, isNew: false, folderId: folderIdOf(folders, id) ?? folder.id });
+  };
+  const saveDoc = async (e: EditableDoc) => {
+    if (!editDoc) return;
+    const base = editDoc.doc;
+    const removed = (base.attachments ?? []).filter((a) => !e.attachments.some((k) => k.path === a.path)).map((a) => a.path);
+    const doc: Doc = { ...base, title: e.title, desc: e.desc, kind: e.kind, color: e.color, rules: e.rules.length ? e.rules : undefined, steps: e.steps.length ? e.steps : undefined, attachments: e.attachments, summary: e.summary, updated: todayLabel() };
+    await saveDocRow(docToRow(doc, editDoc.folderId));
+    if (removed.length) await removeFiles(removed).catch(() => undefined);
+    setTouched((t) => new Set(t).add(doc.id));
+    setFolders((fs) => {
+      const exists = allDocs(fs).some((x) => x.id === doc.id);
+      return exists ? mapFolders(fs, editDoc.folderId, (f) => ({ ...f, docs: f.docs.map((x) => (x.id === doc.id ? doc : x)) })) : mapFolders(fs, editDoc.folderId, (f) => ({ ...f, docs: [doc, ...f.docs] }));
+    });
+    setCur(editDoc.folderId); setOpen((o) => ({ ...o, [editDoc.folderId]: true })); setSelId(doc.id); setQ("");
+    setEditDoc(null);
+    toast.success(editDoc.isNew ? "Documento criado" : "Documento salvo");
   };
   const delDoc = (id: string) => {
-    const d = docs.find((x) => x.id === id); if (d) setTrash((t) => [d, ...t]);
-    const walk = (l: FolderT[]): FolderT[] => l.map((f) => ({ ...f, docs: f.docs.filter((x) => x.id !== id), subs: f.subs && walk(f.subs) }));
-    setFolders(walk);
+    const d = docs.find((x) => x.id === id); if (!d) return;
+    if (!window.confirm(`Excluir o documento "${d.title}"?${d.attachments?.length ? " Os arquivos anexados também serão apagados." : ""}`)) return;
+    setTrash((t) => [d, ...t]);
+    const fid = folderIdOf(folders, id) ?? "ger";
+    setFolders((fs) => dropDoc(fs, id));
+    if (!d.login) {
+      setTouched((t) => { const n = new Set(t); n.delete(id); return n; });
+      removeDocRow(docToRow(d, fid), SEED_IDS.has(id)).catch((e: Error) => toast.error(`Não consegui excluir: ${e.message}`));
+    }
   };
   const createFolder = () => {
     if (!newFolder?.trim()) return setNewFolder(null);
-    const id = `f${Date.now()}`;
+    const id = `f${Date.now().toString(36)}`;
     setFolders((fs) => [...fs, { id, name: newFolder.trim(), icon: Folder, color: "cyan", docs: [] }]);
+    saveFolderRow({ id, name: newFolder.trim(), color: "cyan", position: folders.length }).catch((e: Error) => toast.error(`Não consegui salvar a pasta: ${e.message}`));
     setCur(id); setNewFolder(null);
   };
+
+  // Endereços temporários dos arquivos do documento aberto.
+  const selPaths = (sel?.attachments ?? []).map((a) => a.path).join("|");
+  useEffect(() => {
+    const list = sel?.attachments ?? [];
+    if (list.length) signedUrls(list.map((a) => a.path)).then((u) => setUrls((o) => ({ ...o, ...u }))).catch(() => undefined);
+  }, [selPaths]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
@@ -258,7 +348,7 @@ function Library({ projectId }: { projectId: string }) {
                     className={`accent-card group relative flex items-start gap-3 !rounded-2xl p-4 text-left animate-rise ${on ? "!border-[color-mix(in_oklab,var(--cyan)_70%,transparent)] shadow-[0_0_40px_-10px_var(--cyan)]" : ""}`}>
                     <span className="icon-tile h-11 w-11 shrink-0 transition group-hover:scale-110 group-hover:rotate-3">{d.login ? <KeyRound size={18} /> : <FileText size={18} />}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{d.title}</span>
+                      <span className="line-clamp-2 break-words text-sm font-semibold">{d.title}</span>
                       <span className={`mt-1 block text-[0.72rem] leading-snug text-muted-foreground ${grid ? "line-clamp-2" : "truncate"}`}>{d.desc}</span>
                       <span className="tag mt-2 inline-block">{d.kind}</span>
                     </span>
@@ -323,8 +413,10 @@ function Library({ projectId }: { projectId: string }) {
         </section>
 
         {/* detalhes */}
+        {editDoc && <DocEditor key={`edit-${editDoc.doc.id}`} isNew={editDoc.isNew} folderName={findFolder(folders, editDoc.folderId)?.name ?? "Documentos"} onSave={saveDoc} onClose={() => setEditDoc(null)}
+          initial={{ title: editDoc.doc.title, desc: editDoc.doc.desc, kind: editDoc.doc.kind, color: editDoc.doc.color, rules: editDoc.doc.rules ?? [], steps: editDoc.doc.steps ?? [], attachments: editDoc.doc.attachments ?? [], summary: editDoc.doc.summary ?? "" }} />}
         {editing && <LoginEditor initial={"id" in editing ? editing : null} preset={"preset" in editing ? editing.preset : ""} dossiers={dossiers} onSave={saveLogin} onClose={() => setEditing(null)} />}
-        <DocDetail key={sel?.id} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
+        <DocDetail key={sel?.id} urls={urls} onEdit={() => { if (sel) editExisting(sel.id); }} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
       </div>
     </div>
   );
@@ -405,7 +497,7 @@ function Cred({ label, value, onCopy, copied, extra, testid }: { label: string; 
   );
 }
 
-function DocDetail({ d, onFav, onDelete, onEditLogin }: { d?: Doc & { folder: string }; onFav: () => void; onDelete: () => void; onEditLogin: () => void }) {
+function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, urls }: { d?: Doc & { folder: string }; onFav: () => void; onDelete: () => void; onEditLogin: () => void; onEdit: () => void; urls: Record<string, { view: string; download: string }> }) {
   const [menu, setMenu] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [done, setDone] = useState<number[]>([]);
@@ -419,11 +511,13 @@ function DocDetail({ d, onFav, onDelete, onEditLogin }: { d?: Doc & { folder: st
           <h3 className="font-display text-xl font-semibold">{d.title}</h3>
           <p className="text-xs text-muted-foreground">{d.kind} · Atualizado em {d.updated}</p>
         </div>
-        <button onClick={onFav}><Star size={17} className={d.fav ? "fill-amber text-amber" : "text-muted-foreground"} /></button>
+        <button onClick={onFav} aria-label="Favoritar"><Star size={17} className={d.fav ? "fill-amber text-amber" : "text-muted-foreground"} /></button>
+        {!d.login && <button onClick={onEdit} aria-label="Editar documento" title="Editar documento" data-testid="editar-documento" className="grid h-8 w-8 place-items-center rounded-lg border border-border text-muted-foreground transition hover:border-cyan/60 hover:text-cyan"><Pencil size={14} /></button>}
         <div className="relative">
           <button onClick={() => setMenu((m) => !m)} className="text-muted-foreground hover:text-foreground"><MoreHorizontal size={17} /></button>
           {menu && (
             <div className="glass absolute right-0 top-7 z-10 w-40 rounded-xl p-1 text-xs animate-rise">
+              {!d.login && <button onClick={() => { onEdit(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-secondary"><Pencil size={12} /> Editar documento</button>}
               {d.login && <button onClick={() => { onEditLogin(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-secondary"><Pencil size={12} /> Editar login</button>}
               <button onClick={() => { onDelete(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-destructive hover:bg-secondary"><Trash2 size={12} /> Mover p/ lixeira</button>
             </div>
@@ -466,6 +560,25 @@ function DocDetail({ d, onFav, onDelete, onEditLogin }: { d?: Doc & { folder: st
             })}
           </ol>
         </>
+      )}
+
+      {d.attachments && d.attachments.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-border p-3" data-testid="anexos-documento">
+          <p className="flex items-center gap-2 text-sm font-semibold"><Paperclip size={13} /> Arquivos ({d.attachments.length})</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {d.attachments.map((a) => {
+              const u = urls[a.path]; const img = a.mime.startsWith("image/");
+              return (
+                <div key={a.path} className="group/a overflow-hidden rounded-xl border border-border bg-secondary/30 transition hover:border-cyan/60 hover:shadow-[0_8px_24px_-14px_var(--cyan)]">
+                  {img && u ? <a href={u.view} target="_blank" rel="noreferrer" aria-label={`Abrir ${a.name}`}><img src={u.view} alt={a.name} loading="lazy" className="h-28 w-full object-cover transition duration-500 group-hover/a:scale-105" /></a>
+                    : <span className="grid h-16 place-items-center text-cyan"><FileText size={22} /></span>}
+                  <div className="flex items-center gap-2 p-2"><span className="min-w-0 flex-1"><span className="block truncate text-[0.7rem]">{a.name}</span><span className="text-[0.6rem] text-muted-foreground">{a.size < 1048576 ? `${Math.max(1, Math.round(a.size / 1024))} KB` : `${(a.size / 1048576).toFixed(1).replace(".", ",")} MB`}</span></span>
+                    {u && <a href={u.download} download={a.name} aria-label={`Baixar ${a.name}`} className="text-muted-foreground transition hover:text-cyan"><Download size={13} /></a>}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {d.files && (
