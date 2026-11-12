@@ -159,3 +159,19 @@ describe("limite de requisições", () => {
     expect(rateLimited("ip-teste", t0 + 61_000)).toBe(false);
   });
 });
+
+describe("subtarefas e status da demanda", () => {
+  it("[x] marca a subtarefa como concluída", async () => {
+    const { checklistItem } = await import("@/lib/mcp/records");
+    expect(checklistItem("[x] Primeiro disparo (12/11)")).toEqual({ text: "Primeiro disparo (12/11)", done: true });
+    expect(checklistItem("[ ] Segundo disparo")).toEqual({ text: "Segundo disparo", done: false });
+    expect(checklistItem("Conferir envio")).toEqual({ text: "Conferir envio", done: false });
+  });
+
+  it("demanda aceita status e categoria", async () => {
+    const { registroSchema } = await import("@/lib/mcp/records");
+    const r = registroSchema.safeParse({ tipo: "demanda", projeto_id: "p4c", escopo: "polo", dossie: "Juiz de Fora", titulo: "Disparo", status: "em_andamento", categoria: "Disparo em massa", checklist: ["[x] Primeiro"] });
+    expect(r.success).toBe(true);
+    expect(registroSchema.safeParse({ tipo: "demanda", projeto_id: "p4c", escopo: "geral", titulo: "x", status: "pausada" }).success).toBe(false);
+  });
+});

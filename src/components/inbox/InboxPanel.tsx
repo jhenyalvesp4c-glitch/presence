@@ -166,11 +166,11 @@ export function InboxPanel({ incoming, onClose, onListen, listening, interim }: 
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <input ref={fileInput} type="file" multiple hidden aria-label="Escolher arquivos" accept="image/*,.pdf,.txt,.md,.csv,.json,text/*"
+            <input ref={fileInput} type="file" multiple hidden aria-label="Escolher arquivos" accept="image/*,.pdf,.txt,.md,.csv,.json,text/*,.xlsx,.xlsm,.docx,.pptx"
               onChange={(e) => { void addFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
             <button type="button" onClick={() => fileInput.current?.click()} disabled={phase === "processing"} className="glass flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition hover:shadow-[0_0_20px_-8px_var(--cyan)]"><Paperclip size={15} className="text-cyan" /> Anexar arquivo</button>
             <button type="button" onClick={onListen} disabled={phase === "processing"} className={`glass flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition ${listening ? "text-emerald" : ""}`}><Mic size={15} className={listening ? "animate-pulse-ring" : "text-violet"} /> {listening ? "Ouvindo…" : "Ditar"}</button>
-            <span className="text-[0.68rem] text-muted-foreground">Imagens, PDF, TXT/CSV · até ~3 MB no total</span>
+            <span className="text-[0.68rem] text-muted-foreground">Imagens, PDF, TXT/CSV, Excel, Word e PowerPoint · até ~3 MB no total</span>
             <button type="button" onClick={() => void interpret()} disabled={phase === "processing" || (!text.trim() && !files.length)} data-testid="interpretar"
               className="ml-auto flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--cyan)] transition hover:scale-[1.02] disabled:opacity-50"
               style={{ background: "linear-gradient(90deg, var(--cyan), oklch(0.66 0.19 265) 55%, var(--violet))" }}>

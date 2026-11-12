@@ -102,6 +102,8 @@ export function messagesByIndex(lines: string[]): { byIndex: Map<number, string[
 const val = (v: unknown): string => (Array.isArray(v) ? v.join(", ") : v === undefined || v === null ? "" : String(v));
 
 /** Texto organizado para copiar (Markdown), agrupado por destino. */
+const STATUS_LABEL: Record<string, string> = { a_fazer: "A fazer", em_andamento: "Em andamento", concluida: "Concluída" };
+
 export function itemsToMarkdown(items: InboxItem[], names: { project: (id: string) => string }): string {
   const parts: string[] = [];
   for (const dest of DESTINOS) {
@@ -115,10 +117,10 @@ export function itemsToMarkdown(items: InboxItem[], names: { project: (id: strin
       add("projeto_id", "Projeto", names.project);
       add("escopo", "Escopo"); add("dossie", "Polo/dossiê"); add("dossies", "Polos/dossiês");
       add("data", "Data"); add("prazo", "Prazo"); add("inicio", "Início"); add("fim", "Fim"); add("hora", "Hora"); add("local", "Local");
-      add("categoria", "Categoria"); add("prioridade", "Prioridade"); add("responsavel", "Responsável");
+      add("categoria", "Categoria"); add("status", "Status", (v) => STATUS_LABEL[v] ?? v); add("prioridade", "Prioridade"); add("responsavel", "Responsável");
       add("descricao", "Descrição"); add("detalhes", "Detalhes"); add("situacao", "Situação");
       if (d.tipo === "anotacao" || d.tipo === "documentacao") add("texto", "Texto");
-      if (Array.isArray(d["checklist"]) && d["checklist"].length) lines.push(`  - Checklist: ${(d["checklist"] as string[]).map((c) => `[ ] ${c}`).join("; ")}`);
+      if (Array.isArray(d["checklist"]) && d["checklist"].length) lines.push(`  - Checklist: ${(d["checklist"] as string[]).map((c) => (/^\s*\[[ xX]\]/.test(c) ? c.trim() : `[ ] ${c}`)).join("; ")}`);
       if (it.anexos?.length) lines.push(`  - Anexos: ${it.anexos.join(", ")}`);
       parts.push(lines.join("\n"));
     }

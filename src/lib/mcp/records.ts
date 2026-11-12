@@ -25,9 +25,19 @@ export const demandaSchema = z.object({
   dossie: z.string().max(120).optional().describe("Nome exato do polo/dossiê (escopo polo)."),
   dossies: z.array(z.string().max(120)).max(60).optional().describe("Nomes exatos dos polos/dossiês (escopo multipolo)."),
   titulo: z.string().min(1).max(300), descricao: z.string().max(5000).optional(), prioridade: prio.optional(),
-  prazo: date.optional(), checklist: z.array(z.string().min(1).max(300)).max(40).optional().describe("Itens a cumprir; entram na descrição."),
+  prazo: date.optional(),
+  checklist: z.array(z.string().min(1).max(300)).max(40).optional().describe("Subtarefas; entram na descrição. Comece com \"[x] \" a que já está concluída (vai também para o histórico)."),
   responsavel: z.string().max(120).optional(),
+  status: z.enum(["a_fazer", "em_andamento", "concluida"]).optional().describe("Andamento atual; a_fazer se não houver indicação."),
+  categoria: z.string().max(60).optional().describe("Tipo de trabalho, texto livre (ex.: Disparo em massa). Entra na descrição."),
 });
+
+/** "[x] Primeiro disparo" -> { text: "Primeiro disparo", done: true }. Aceita [x], [X], [ ] e item sem marcador. */
+export const checklistItem = (raw: string) => {
+  const m = /^\s*\[( |x|X)\]\s*/.exec(raw);
+  return { text: (m ? raw.slice(m[0].length) : raw).trim(), done: m?.[1]?.toLowerCase() === "x" };
+};
+export const DEMAND_STATUS = { a_fazer: "todo", em_andamento: "doing", concluida: "done" } as const;
 export const compromissoSchema = z.object({
   tipo: z.literal("compromisso"), ...base,
   titulo: z.string().min(1).max(200), descricao: z.string().max(2000).optional(), data: date, inicio: time.optional(), fim: time.optional(),

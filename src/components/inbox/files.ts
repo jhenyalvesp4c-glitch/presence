@@ -1,4 +1,5 @@
 import { MAX_FILES, MAX_TEXT_FILE_CHARS, MAX_TOTAL_CHARS, type InboxFile } from "@/lib/inbox";
+import { isLegacyOffice, officeKind, officeToText } from "@/lib/office";
 
 export type LocalFile = InboxFile & { preview?: string | undefined };
 
@@ -47,8 +48,13 @@ export async function readFiles(list: File[], current: LocalFile[]): Promise<{ a
         out = { name, mime: "text/plain", size: t.length, data: utf8ToBase64(t) };
       } else if (f.type.startsWith("audio/") || /\.(mp3|m4a|wav|ogg|opus|aac)$/i.test(name)) {
         rejected.push(`${name}: áudio ainda não é transcrito aqui. Use o microfone (ditado) ou cole a transcrição`); continue;
-      } else if (/\.(docx?|xlsx?|pptx?)$/i.test(name)) {
-        rejected.push(`${name}: documentos do Office ainda não são lidos. Salve como PDF e envie de novo`); continue;
+      } else if (officeKind(name)) {
+        // Planilha/Word/PowerPoint: vira texto aqui no navegador (planilha em CSV) e segue como um .txt.
+        const full = await officeToText(await f.arrayBuffer(), officeKind(name)!);
+        const t = full.length > MAX_TEXT_FILE_CHARS ? `${full.slice(0, MAX_TEXT_FILE_CHARS - 100)}\n[… cortado: o arquivo passou de ${MAX_TEXT_FILE_CHARS.toLocaleString("pt-BR")} caracteres]` : full;
+        out = { name, mime: "text/plain", size: f.size, data: utf8ToBase64(t) };
+      } else if (isLegacyOffice(name)) {
+        rejected.push(`${name}: formato antigo do Office. Salve como .xlsx, .docx ou .pptx (ou PDF) e envie de novo`); continue;
       } else { rejected.push(`${name}: tipo de arquivo não suportado`); continue; }
       if (total + out.data.length > MAX_TOTAL_CHARS) { rejected.push(`${name}: passou do limite total de ~3 MB por envio`); continue; }
       total += out.data.length;

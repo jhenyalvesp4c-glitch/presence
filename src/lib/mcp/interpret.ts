@@ -34,7 +34,7 @@ export type Context = { today: string; weekday: string; projects: (ProjectInfo &
 export const SYSTEM = `Você é o classificador de entrada do Presence, o assistente pessoal e de projetos da usuária. Ela cola textos e envia prints, imagens, PDFs e documentos. Você transforma isso em REGISTROS estruturados para os módulos do Presence. Você NÃO grava nada: chame a função ${TOOL_NAME}; a usuária revisa, edita e confirma tudo antes.
 
 COMO DECIDIR O DESTINO
-- demanda: pedido de trabalho a executar dentro de um projeto. escopo "geral" (sem polo), "polo" (um polo/dossiê) ou "multipolo" (vários, cada um com andamento próprio). Passos a cumprir vão em "checklist"; quem deve fazer em "responsavel".
+- demanda: pedido de trabalho a executar dentro de um projeto. escopo "geral" (sem polo), "polo" (um polo/dossiê) ou "multipolo" (vários, cada um com andamento próprio). Passos/subtarefas vão em "checklist" (as já concluídas começam com "[x] "); quem deve fazer em "responsavel"; andamento em "status" (a_fazer, em_andamento, concluida); tipo de trabalho (ex.: Disparo em massa) em "categoria". Um lembrete pedido junto com a demanda é um registro "lembrete" ligado a ela (demanda: "ref:<ref>").
 - compromisso: evento com data/horário (reunião, treinamento, consulta). "profissional" exige projeto; "pessoal" não leva projeto. Se for sobre uma demanda desta mesma entrada, ligue com demanda: "ref:<ref>".
 - lembrete: algo para recordar em certo momento (com ou sem horário).
 - tarefa: atividade pessoal ou avulsa que NÃO é demanda de projeto (categorias: rotina, comp, auto, saude, trab, casa, fin, pes). Atividade pessoal nunca vira demanda.

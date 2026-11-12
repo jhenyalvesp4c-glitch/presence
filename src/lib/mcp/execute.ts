@@ -12,7 +12,7 @@ import { createTaskRow } from "../data/tasks";
 import { saveAppointment, syncSchedule } from "../data/appointments";
 import { must, supabase } from "../data/db";
 import { newId, removeExample, upsertExample } from "../training-library";
-import { ddmm, isCode, isRef, minusMinutes, deadlineLabel, TIPO_LABEL } from "./records";
+import { checklistItem, DEMAND_STATUS, ddmm, isCode, isRef, minusMinutes, deadlineLabel, TIPO_LABEL } from "./records";
 import { demandsOf, listCategories } from "./lookup";
 import type { Resolved } from "./plan";
 import type { Created } from "./ops";
@@ -39,10 +39,16 @@ export async function executeRecord(r: Resolved, ctx: Ctx): Promise<Created[]> {
       const items = await demandsOf(pid!);
       const type = r.escopo === "geral" ? "geral" : r.escopo === "polo" ? "polo" : "multi";
       const code = nextCode(items, type);
-      const desc = [r.descricao?.trim(), r.responsavel ? `Responsável: ${r.responsavel}` : "", r.checklist?.length ? `Checklist:\n${r.checklist.map((c) => `- [ ] ${c}`).join("\n")}` : ""].filter(Boolean).join("\n\n") || "Sem descrição.";
+      const checklist = (r.checklist ?? []).map(checklistItem).filter((c) => c.text);
+      const info = [r.categoria ? `Categoria: ${r.categoria}` : "", r.responsavel ? `Responsável: ${r.responsavel}` : ""].filter(Boolean).join("\n");
+      const desc = [r.descricao?.trim(), info, checklist.length ? `Subtarefas:\n${checklist.map((c) => `- [${c.done ? "x" : " "}] ${c.text}`).join("\n")}` : ""].filter(Boolean).join("\n\n") || "Sem descrição.";
+      const status = DEMAND_STATUS[r.status ?? "a_fazer"];
       const d: Demand = {
-        id: code, type, title: r.titulo.trim(), desc, priority: r.prioridade ?? "media", status: "todo", deadline: deadlineLabel(r.prazo),
-        history: [{ d: ddmm(ctx.now), text: type === "multi" ? `Demanda criada pelo assistente (MCP) para ${r._dossies!.length} polo${r._dossies!.length === 1 ? "" : "s"}` : "Demanda criada pelo assistente (MCP)", s: "todo" }],
+        id: code, type, title: r.titulo.trim(), desc, priority: r.prioridade ?? "media", status, deadline: deadlineLabel(r.prazo),
+        history: [
+          { d: ddmm(ctx.now), text: type === "multi" ? `Demanda criada pelo assistente (MCP) para ${r._dossies!.length} polo${r._dossies!.length === 1 ? "" : "s"}` : "Demanda criada pelo assistente (MCP)", s: status },
+          ...checklist.filter((c) => c.done).map((c) => ({ d: ddmm(ctx.now), text: `Concluída: ${c.text}`, s: "done" as const })),
+        ],
         notes: [],
         ...(type === "polo" ? { polo: r._dossie!.name } : {}),
         ...(type === "multi" ? { polos: r._dossies!.map((x) => ({ name: x.name, status: "todo" as const })) } : {}),

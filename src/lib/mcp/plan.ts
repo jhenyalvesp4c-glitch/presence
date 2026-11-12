@@ -138,7 +138,7 @@ export function lineOf(r: Resolved, n: number, nums: Map<string, number> = new M
   switch (r.tipo) {
     case "demanda": {
       const quem = r.escopo === "geral" ? "geral" : r.escopo === "polo" ? `polo ${r._dossie?.name}` : `multipolo (${r._dossies?.length}): ${r._dossies?.map((d) => d.name).join(", ")}`;
-      return `${n}. [${dest}${proj}] "${r.titulo}" — ${quem} · prioridade ${r.prioridade ?? "media"} · prazo ${deadlineLabel(r.prazo)}${r.checklist?.length ? ` · checklist ${r.checklist.length} itens` : ""}${r.responsavel ? ` · responsável ${r.responsavel}` : ""}${flag}`;
+      return `${n}. [${dest}${proj}] "${r.titulo}" — ${quem} · prioridade ${r.prioridade ?? "media"} · prazo ${deadlineLabel(r.prazo)}${r.status && r.status !== "a_fazer" ? ` · ${r.status === "em_andamento" ? "em andamento" : "concluída"}` : ""}${r.categoria ? ` · ${r.categoria}` : ""}${r.checklist?.length ? ` · ${r.checklist.length} subtarefas` : ""}${r.responsavel ? ` · responsável ${r.responsavel}` : ""}${flag}`;
     }
     case "compromisso":
       return `${n}. [${dest} · ${r.escopo}${proj}] "${r.titulo}" — ${r.data}${r.inicio ? ` ${r.inicio}${r.fim ? `–${r.fim}` : ""}` : " (dia todo)"}${r.local ? ` · ${r.local}` : ""}${r._dossie ? ` · ${r._dossie.name}` : ""}${r.demanda ? ` · demanda ${show(r.demanda)}` : ""}${r.lembrete_minutos_antes ? ` · lembrete ${r.lembrete_minutos_antes} min antes` : ""}${flag}`;

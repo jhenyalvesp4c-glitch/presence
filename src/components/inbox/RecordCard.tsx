@@ -24,7 +24,9 @@ const SPECS: Record<Tipo, Spec[]> = {
     { k: "dossies", label: "Polos / dossiês", kind: "dossies", show: (d) => d["escopo"] === "multipolo" },
     { k: "titulo", label: "Título", kind: "text" }, { k: "descricao", label: "Descrição", kind: "area" },
     { k: "prioridade", label: "Prioridade", kind: "select", options: PRIO }, { k: "prazo", label: "Prazo", kind: "date" },
-    { k: "checklist", label: "Checklist (um item por linha)", kind: "lines" }, { k: "responsavel", label: "Responsável", kind: "text" },
+    { k: "status", label: "Status", kind: "select", options: [["a_fazer", "A fazer"], ["em_andamento", "Em andamento"], ["concluida", "Concluída"]] },
+    { k: "categoria", label: "Categoria", kind: "text" },
+    { k: "checklist", label: "Subtarefas (uma por linha; \"[x] \" na frente = concluída)", kind: "lines" }, { k: "responsavel", label: "Responsável", kind: "text" },
   ],
   compromisso: [
     { k: "titulo", label: "Título", kind: "text" },
