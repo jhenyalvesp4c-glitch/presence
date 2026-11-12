@@ -428,3 +428,10 @@
 @keyframes health-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
 
 @keyframes orion-wave { from { transform: scaleY(0.35); } to { transform: scaleY(1); } }
+
+/* ---------- Modo apresentação (Treinamentos) ---------- */
+@keyframes pres-in-r { from { opacity: 0; transform: translateX(70px) scale(.97); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes pres-in-l { from { opacity: 0; transform: translateX(-70px) scale(.97); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes pres-aurora { 0%,100% { transform: translate3d(-6%, -4%, 0) scale(1); } 50% { transform: translate3d(6%, 5%, 0) scale(1.15); } }
+@keyframes pres-grid { from { background-position: 0 0; } to { background-position: 0 64px; } }
+@keyframes pres-pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }

@@ -12,6 +12,7 @@ import {
   type Block, type Example, type Pin, type Script, type Visual,
 } from "@/lib/training-library";
 import { BlockEditor, ExampleEditor, ScriptEditor } from "./training-editors";
+import { TrainingPresenter } from "./training-presenter";
 import { visualSrc } from "./training-images";
 import {
   ArrowRight, CalendarDays, Check, ChevronDown, Clock, Copy, GraduationCap, Lightbulb, MessageCircleQuestion,
@@ -28,7 +29,8 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
   const [selId, setSelId] = useState("s1");
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [openB, setOpenB] = useState<Record<string, boolean>>({ b3: true });
-  const [lesson, setLesson] = useState(false);
+  const lesson = false; // o antigo "modo aula" virou a apresentação em slides
+  const [presenting, setPresenting] = useState(false);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Todos");
   const [hl, setHl] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
   };
   const saveScript = (sc: Script) => {
     setLib((l) => upsertScript(l, sc));
-    if (editScript === "new") { setSelId(sc.id); setLesson(false); toast.success("Roteiro criado"); } else toast.success("Roteiro salvo");
+    if (editScript === "new") { setSelId(sc.id); toast.success("Roteiro criado"); } else toast.success("Roteiro salvo");
     setEditScript(null);
   };
   const deleteScript = (sc: Script) => {
@@ -169,7 +171,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                 const its = s.blocks.flatMap((b) => b.show.map((_, i) => `${b.id}:${i}`));
                 const p = its.length ? Math.round((its.filter((k) => shown[k]).length / its.length) * 100) : 0;
                 return (
-                  <button key={s.id} onClick={() => { setSelId(s.id); setLesson(false); }} style={tint(s.color)}
+                  <button key={s.id} onClick={() => { setSelId(s.id); }} style={tint(s.color)}
                     className={`accent-card block w-full !rounded-2xl p-3 text-left transition ${on ? "!border-[color-mix(in_oklab,var(--glow)_70%,transparent)] shadow-[0_0_30px_-10px_var(--glow)]" : ""}`}>
                     <span className="block truncate text-sm font-semibold">{s.title}</span>
                     <span className="mt-0.5 flex items-center gap-1 text-[0.68rem] text-muted-foreground"><Users size={10} /> {s.audience}</span>
@@ -245,9 +247,10 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
             <button onClick={() => setEditScript(sel)} aria-label="Editar roteiro" title="Editar roteiro" className="glass grid h-8 w-8 place-items-center rounded-xl text-muted-foreground transition hover:text-foreground"><Pencil size={13} /></button>
             <button onClick={() => deleteScript(sel)} aria-label="Excluir roteiro" title="Excluir roteiro" className="glass grid h-8 w-8 place-items-center rounded-xl text-muted-foreground transition hover:text-pink"><Trash2 size={13} /></button>
             <button onClick={reset} className="glass flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs text-muted-foreground transition hover:text-foreground"><RotateCcw size={12} /> Reiniciar</button>
-            <button onClick={() => { setLesson((l) => !l); if (!lesson) setOpenB(Object.fromEntries(sel.blocks.map((b) => [b.id, true]))); }}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition hover:scale-105 ${lesson ? "border border-emerald/60 bg-emerald/15 text-emerald" : "bg-gradient-brand text-primary-foreground"}`}>
-              {lesson ? <><Square size={12} /> Encerrar aula</> : <><Play size={12} /> Modo aula</>}
+            <button onClick={() => setPresenting(true)} data-testid="apresentar" title="Apresentar em slides (tela cheia)"
+              className="group relative flex items-center gap-1.5 overflow-hidden rounded-xl bg-gradient-brand px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-[0_0_24px_-6px_var(--glow)] transition hover:scale-105 hover:shadow-[0_0_34px_-4px_var(--glow)]">
+              <span aria-hidden className="absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/30 transition duration-700 group-hover:left-[150%]" />
+              <Play size={12} className="relative" /> <span className="relative">Apresentar</span>
             </button>
           </div>
 
@@ -451,6 +454,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
           </div>
         </aside>
       </div>
+      {presenting && sel && <TrainingPresenter script={sel} examples={examples} shown={shown} onToggle={toggle} onClose={() => setPresenting(false)} />}
       {zoom && <Lightbox visual={zoom} onClose={() => setZoom(null)} />}
       {editScript && (
         <ScriptEditor initial={editScript === "new" ? undefined : editScript} onClose={() => setEditScript(null)} onSave={saveScript}
