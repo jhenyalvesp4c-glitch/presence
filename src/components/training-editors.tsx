@@ -1,8 +1,10 @@
-import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { backdropProps } from "@/lib/backdrop";
 import { toast } from "sonner";
-import { BookOpen, ImageIcon, Layers, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
-import { COLORS, newId, type Block, type Example, type Faq, type Script, type Visual } from "@/lib/training-library";
+import { ArrowDown, ArrowUp, BookOpen, FileText, ImageIcon, Layers, Paperclip, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { COLORS, mediaOf, newId, type Block, type Example, type Faq, type MediaFile, type Script, type Visual } from "@/lib/training-library";
+import { toPending, sizeLabel, type Pending } from "@/lib/brain-files";
+import { uploadFiles } from "@/lib/data/brain";
 import { visualSrc } from "./training-images";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -149,24 +151,89 @@ export function ScriptEditor({ initial, folders = [], onClose, onSave, onDelete 
   );
 }
 
+/* ───────────── Passos com arquivos ───────────── */
+type Row = { id: string; text: string; files: MediaFile[]; pend: Pending[] };
+
+function ShowItemsField({ rows, setRows }: { rows: Row[]; setRows: (f: (r: Row[]) => Row[]) => void }) {
+  const [target, setTarget] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState("");
+  const patch = (id: string, p: Partial<Row>) => setRows((l) => l.map((r) => (r.id === id ? { ...r, ...p } : r)));
+  const move = (i: number, d: -1 | 1) => setRows((l) => { const j = i + d; if (j < 0 || j >= l.length) return l; const n = [...l]; [n[i], n[j]] = [n[j]!, n[i]!]; return n; });
+  const attach = async (files: File[]) => {
+    const id = target; if (!id || !files.length) return;
+    setError("");
+    const cur = rows.find((r) => r.id === id)?.pend ?? [];
+    const { added, rejected } = await toPending(files, cur).catch((e) => ({ added: [] as Pending[], rejected: [(e as Error).message] }));
+    if (added.length) setRows((l) => l.map((r) => (r.id === id ? { ...r, pend: [...r.pend, ...added] } : r)));
+    if (rejected.length) setError(rejected.join(" · "));
+  };
+  return (
+    <div className="space-y-2">
+      <input ref={input} type="file" multiple hidden data-testid="passo-arquivo" onChange={(e) => { void attach([...(e.target.files ?? [])]); e.target.value = ""; }} />
+      {rows.map((r, i) => (
+        <div key={r.id} className="rounded-xl border border-border bg-secondary/15 p-2" data-testid="passo-editor">
+          <div className="flex items-center gap-1.5">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-brand text-[0.62rem] font-bold text-primary-foreground">{i + 1}</span>
+            <input value={r.text} onChange={(e) => patch(r.id, { text: e.target.value })} placeholder="Ex.: Importar a planilha" className={`${field} !py-1.5`} data-testid="passo-texto" />
+            <button type="button" onClick={() => { setTarget(r.id); input.current?.click(); }} aria-label="Anexar imagem ou arquivo a este passo" title="Anexar imagem, PDF ou arquivo (vira um botão na apresentação)" data-testid="passo-anexar" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground transition hover:border-cyan/60 hover:text-cyan"><Paperclip size={14} /></button>
+            <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Subir passo" className={`${iconBtn} hover:!text-foreground disabled:opacity-30`}><ArrowUp size={13} /></button>
+            <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} aria-label="Descer passo" className={`${iconBtn} hover:!text-foreground disabled:opacity-30`}><ArrowDown size={13} /></button>
+            <button type="button" onClick={() => setRows((l) => l.filter((x) => x.id !== r.id))} aria-label="Excluir passo" className={iconBtn}><Trash2 size={13} /></button>
+          </div>
+          {(r.files.length > 0 || r.pend.length > 0) && (
+            <ul className="mt-2 flex flex-wrap gap-2 pl-8">
+              {r.files.map((f) => <li key={f.path} className="flex items-center gap-2 rounded-lg border border-border bg-secondary/40 py-1 pl-2 pr-1.5 text-[0.68rem]"><FileText size={12} className="text-cyan" /><span className="max-w-40 truncate">{f.name}</span><button type="button" onClick={() => patch(r.id, { files: r.files.filter((x) => x.path !== f.path) })} aria-label={`Remover ${f.name}`} className="text-muted-foreground hover:text-pink"><X size={12} /></button></li>)}
+              {r.pend.map((p) => <li key={p.key} className="flex items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/5 py-1 pl-1.5 pr-1.5 text-[0.68rem]">{p.preview ? <img src={p.preview} alt="" className="h-6 w-6 rounded object-cover" /> : <FileText size={12} className="text-cyan" />}<span className="max-w-40 truncate">{p.name}</span><span className="text-muted-foreground">{sizeLabel(p.size)}</span><button type="button" onClick={() => patch(r.id, { pend: r.pend.filter((x) => x.key !== p.key) })} aria-label={`Remover ${p.name}`} className="text-muted-foreground hover:text-pink"><X size={12} /></button></li>)}
+            </ul>
+          )}
+        </div>
+      ))}
+      {error && <p role="alert" className="text-[0.7rem] text-pink">{error}</p>}
+      <button type="button" onClick={() => setRows((l) => [...l, { id: newId("r"), text: "", files: [], pend: [] }])} className={small} data-testid="adicionar-passo"><Plus size={11} /> Adicionar passo</button>
+      <p className="text-[0.65rem] leading-snug text-muted-foreground">Com um arquivo anexado, o passo vira um botão na apresentação: ao clicar, a imagem, o PDF ou o documento abre na tela.</p>
+    </div>
+  );
+}
+
 /* ───────────── Bloco ───────────── */
 export function BlockEditor({ initial, color, examples, onClose, onSave, onDelete }: {
   initial?: Block | undefined; color: string; examples: Example[]; onClose: () => void; onSave: (b: Block) => void; onDelete?: (() => void) | undefined;
 }) {
   const [b, setB] = useState<Block>(() => initial ? structuredClone(initial) : { id: newId("b"), title: "", minutes: 10, show: [""], examples: [] });
+  const [rows, setRows] = useState<Row[]>(() => {
+    const base = initial ?? { show: [""], media: undefined } as unknown as Block;
+    return (base.show.length ? base.show : [""]).map((t, i) => ({ id: newId("r"), text: t, files: mediaOf(base, i), pend: [] }));
+  });
+  const [saving, setSaving] = useState(false);
   const set = <K extends keyof Block>(k: K, v: Block[K]) => setB((x) => ({ ...x, [k]: v }));
   const sc = b.scenario;
-  const submit = () => {
+  const submit = async () => {
+    if (saving) return;
     if (!b.title.trim()) return void toast.error("Dê um nome para o bloco.");
-    const faq = (b.faq ?? []).map((f) => ({ q: f.q.trim(), a: f.a.trim() })).filter((f) => f.q || f.a);
-    const why = clean(b.why ?? []);
-    const visuals = (b.visuals ?? []).map(cleanVisual);
-    const scenario = sc && (sc.situation.trim() || sc.before.trim() || sc.after.trim()) ? sc : undefined;
-    onSave({
-      ...b, title: b.title.trim(), minutes: Math.max(0, Math.min(600, Math.round(b.minutes || 0))), show: clean(b.show),
-      tip: b.tip?.trim() || undefined, say: b.say?.trim() || undefined, faq: faq.length ? faq : undefined, why: why.length ? why : undefined,
-      visuals: visuals.length ? visuals : undefined, scenario,
-    });
+    setSaving(true);
+    try {
+      // Envia os arquivos novos dos passos e monta "o que mostrar" + os arquivos de cada passo (pela posição).
+      const kept: { text: string; files: MediaFile[] }[] = [];
+      for (const r of rows) {
+        const text = r.text.trim();
+        if (!text && !r.files.length && !r.pend.length) continue;
+        const up = r.pend.length ? await uploadFiles("treinamentos", r.pend.map((p) => ({ name: p.name, mime: p.mime, blob: p.blob }))) : [];
+        kept.push({ text: text || r.files[0]?.name || up[0]?.name || "Passo", files: [...r.files, ...up] });
+      }
+      const media: Record<string, MediaFile[]> = {};
+      kept.forEach((k, i) => { if (k.files.length) media[String(i)] = k.files; });
+      const faq = (b.faq ?? []).map((f) => ({ q: f.q.trim(), a: f.a.trim() })).filter((f) => f.q || f.a);
+      const why = clean(b.why ?? []);
+      const visuals = (b.visuals ?? []).map(cleanVisual);
+      const scenario = sc && (sc.situation.trim() || sc.before.trim() || sc.after.trim()) ? sc : undefined;
+      onSave({
+        ...b, title: b.title.trim(), minutes: Math.max(0, Math.min(600, Math.round(b.minutes || 0))), show: kept.map((k) => k.text), media: Object.keys(media).length ? media : undefined,
+        tip: b.tip?.trim() || undefined, say: b.say?.trim() || undefined, faq: faq.length ? faq : undefined, why: why.length ? why : undefined,
+        visuals: visuals.length ? visuals : undefined, scenario,
+      });
+    } catch (e) { toast.error(`Não consegui guardar os arquivos: ${(e as Error).message}`); }
+    setSaving(false);
   };
   const setFaq = (i: number, patch: Partial<Faq>) => set("faq", (b.faq ?? []).map((f, j) => (j === i ? { ...f, ...patch } : f)));
   return (
@@ -186,7 +253,7 @@ export function BlockEditor({ initial, color, examples, onClose, onSave, onDelet
       </Section>
 
       <Section title="O que mostrar">
-        <ListField items={b.show} onChange={(v) => set("show", v)} placeholder="Ex.: Onde ficam as etiquetas no lead" addLabel="Adicionar item" />
+        <ShowItemsField rows={rows} setRows={setRows} />
       </Section>
 
       <Section title="Exemplos para usar">

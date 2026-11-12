@@ -7,9 +7,9 @@ import { transcribeAudio } from "@/lib/audio.functions";
 import { MAX_PENDING, filesFromClipboard, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { uploadFiles } from "@/lib/data/brain";
 import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
-import { buildScript, type Draft } from "@/lib/training-ai";
+import { buildScript, usedImages, type Draft } from "@/lib/training-ai";
 import { generateTrainingScript } from "@/lib/training-ai.functions";
-import type { Example, Script } from "@/lib/training-library";
+import type { Example, MediaFile, Script } from "@/lib/training-library";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 const field = "mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none transition focus:border-violet/60";
@@ -72,14 +72,14 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
       const draft: Draft = r.draft;
       // Guarda só as imagens que a IA usou; "Imagem n" = n-ésima imagem enviada.
       const images = pending.filter((p) => p.ai!.mime.startsWith("image/"));
-      const used = [...new Set(draft.blocos.flatMap((b) => (b.imagens ?? []).map((v) => v.imagem)))].filter((n) => n >= 1 && n <= images.length).sort((a, b) => a - b);
-      const imagePaths: (string | undefined)[] = [];
+      const used = usedImages(draft).filter((n) => n >= 1 && n <= images.length);
+      const stored: (MediaFile | undefined)[] = [];
       if (used.length) {
         const up = await uploadFiles("treinamentos", used.map((n) => ({ name: images[n - 1]!.name, mime: images[n - 1]!.mime, blob: images[n - 1]!.blob }))).catch((e: Error) => { toast.error(`Não consegui guardar as imagens: ${e.message}`); return []; });
-        used.forEach((n, i) => { imagePaths[n - 1] = up[i]?.path; });
+        used.forEach((n, i) => { stored[n - 1] = up[i]; });
       }
       const chosenFolder = folder === "__new__" ? newFolder.trim() : folder;
-      const { script, examples } = buildScript(draft, { imagePaths, folder: chosenFolder, title, audience });
+      const { script, examples } = buildScript(draft, { images: stored, folder: chosenFolder, title, audience });
       onCreate(script, examples);
       setDone({ script, examples, duvidas: draft.duvidas });
     } catch (e) { setError((e as Error).message); }

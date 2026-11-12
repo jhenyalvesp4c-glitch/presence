@@ -8,12 +8,16 @@ export type Pin = { x: number; y: number; label: string; text: string };
 export type Visual = { img: string; title: string; caption: string; pins: Pin[] };
 export type Example = { id: string; title: string; situation: string; text: string; cat: string; color: string; visual?: Visual | undefined };
 export type Faq = { q: string; a: string };
+/** Arquivo anexado a um passo (imagem, PDF, planilha…), guardado no Storage. */
+export type MediaFile = { path: string; name: string; mime: string; size: number };
 export type Scenario = { situation: string; before: string; after: string; beforeLabel?: string | undefined; afterLabel?: string | undefined };
 export type Block = {
   id: string; title: string; minutes: number; show: string[]; examples: string[]; tip?: string | undefined; faq?: Faq[] | undefined;
   visuals?: Visual[] | undefined; why?: string[] | undefined; scenario?: Scenario | undefined;
   /** Texto para falar na aula ou no vídeo (só o apresentador vê, nas notas). */
   say?: string | undefined;
+  /** Arquivos de cada passo de "O que mostrar", pela posição do passo ("0", "1"…): viram botão na apresentação. */
+  media?: Record<string, MediaFile[]> | undefined;
 };
 export type Script = { id: string; title: string; audience: string; goal: string; color: string; blocks: Block[]; folder?: string | undefined };
 export type Library = { scripts: Script[]; examples: Example[]; folders?: string[] | undefined };
@@ -155,6 +159,20 @@ export const moveBlock = (lib: Library, sid: string, bid: string, dir: -1 | 1): 
     return { ...s, blocks };
   });
 
+/** Depois de apagar o passo `removed`, os arquivos dos passos seguintes descem uma posição. */
+export const shiftMedia = (media: Block["media"], removed: number): Block["media"] => {
+  if (!media) return media;
+  const out: Record<string, MediaFile[]> = {};
+  for (const [k, v] of Object.entries(media)) { const i = Number(k); if (i === removed) continue; out[String(i > removed ? i - 1 : i)] = v; }
+  return Object.keys(out).length ? out : undefined;
+};
+export const mediaOf = (b: Block, i: number): MediaFile[] => b.media?.[String(i)] ?? [];
+export const withMedia = (b: Block, i: number, files: MediaFile[]): Block => {
+  const media = { ...(b.media ?? {}) };
+  if (files.length) media[String(i)] = files; else delete media[String(i)];
+  return { ...b, media: Object.keys(media).length ? media : undefined };
+};
+
 /** Troca (text) ou apaga (null) um item de "O que mostrar"; texto vazio também apaga. */
 export const setShowItem = (lib: Library, sid: string, bid: string, index: number, text: string | null): Library =>
   mapScript(lib, sid, (s) => ({
@@ -163,7 +181,7 @@ export const setShowItem = (lib: Library, sid: string, bid: string, index: numbe
       if (b.id !== bid) return b;
       const t = text?.trim();
       if (index >= b.show.length) return t ? { ...b, show: [...b.show, t] } : b;
-      return { ...b, show: t ? b.show.map((x, i) => (i === index ? t : x)) : b.show.filter((_, i) => i !== index) };
+      return t ? { ...b, show: b.show.map((x, i) => (i === index ? t : x)) } : { ...b, show: b.show.filter((_, i) => i !== index), media: shiftMedia(b.media, index) };
     }),
   }));
 

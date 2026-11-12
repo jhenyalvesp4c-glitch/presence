@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { backdropProps } from "@/lib/backdrop";
 import { toast } from "sonner";
 import { useCategories, useToggleTask } from "@/lib/data/tasks";
@@ -8,16 +8,19 @@ import { todayIso } from "@/lib/dates";
 import { useDbState } from "@/lib/data/use-db-state";
 import { loadLibrary, saveLibrary } from "@/lib/data/training-library";
 import {
-  addFolder, folderNames, moveBlock, removeBlock, removeExample, removeFolder, removeScript, renameFolder, seedLibrary, setShowItem, upsertBlock, upsertExample, upsertScript,
+  addFolder, folderNames, mediaOf, withMedia, type MediaFile, moveBlock, removeBlock, removeExample, removeFolder, removeScript, renameFolder, seedLibrary, setShowItem, upsertBlock, upsertExample, upsertScript,
   type Block, type Example, type Pin, type Script, type Visual,
 } from "@/lib/training-library";
 import { BlockEditor, ExampleEditor, ScriptEditor } from "./training-editors";
 import { TrainingPresenter } from "./training-presenter";
 import { TrainingGenerator } from "./training-generator";
-import { primeVisuals } from "./training-images";
+import { MediaViewer } from "./media-viewer";
+import { toPending } from "@/lib/brain-files";
+import { uploadFiles } from "@/lib/data/brain";
+import { primePaths, primeVisuals } from "./training-images";
 import { visualSrc } from "./training-images";
 import {
-  ArrowRight, FolderPlus, FolderOpen, Folder as FolderIcon, ChevronRight, Wand2, Mic, CalendarDays, Check, ChevronDown, Clock, Copy, GraduationCap, Lightbulb, MessageCircleQuestion,
+  ArrowRight, Paperclip, FolderPlus, FolderOpen, Folder as FolderIcon, ChevronRight, Wand2, Mic, CalendarDays, Check, ChevronDown, Clock, Copy, GraduationCap, Lightbulb, MessageCircleQuestion,
   Play, Plus, RotateCcw, Search, Sparkles, Square, Target, Users, X, ImageIcon, Maximize2, MapPin, Pencil, Trash2, CalendarPlus, ThumbsUp, ArrowDown, ArrowUp, CheckCircle2,
 } from "lucide-react";
 
@@ -31,7 +34,8 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
   // Imagens enviadas pela usuária (Storage): busca os endereços e redesenha quando chegarem.
   useEffect(() => {
     const vs = scripts.flatMap((sc) => sc.blocks.flatMap((b) => b.visuals ?? [])).concat(examples.flatMap((e) => (e.visual ? [e.visual] : [])));
-    primeVisuals(vs).then((any) => { if (any) setTick((t) => t + 1); }).catch(() => undefined);
+    const media = scripts.flatMap((sc) => sc.blocks.flatMap((b) => Object.values(b.media ?? {}).flat().map((f) => f.path)));
+    Promise.all([primeVisuals(vs), primePaths(media)]).then(([a, b]) => { if (a || b) setTick((t) => t + 1); }).catch(() => undefined);
   }, [scripts, examples]);
   const [selId, setSelId] = useState("s1");
   const [shown, setShown] = useState<Record<string, boolean>>({});
@@ -42,6 +46,9 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [folderForm, setFolderForm] = useState<{ from: string | null; name: string } | null>(null);
   const [, setTick] = useState(0);
+  const [viewer, setViewer] = useState<{ title: string; files: MediaFile[] } | null>(null);
+  const [attachTo, setAttachTo] = useState<{ block: string; i: number } | null>(null);
+  const itemInput = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Todos");
   const [hl, setHl] = useState<string | null>(null);
@@ -87,6 +94,21 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
     (cat === "Todos" || e.cat === cat) && (e.title + e.situation + e.text).toLowerCase().includes(q.toLowerCase())), [examples, cat, q]);
 
   const toggle = (k: string) => setShown((s) => ({ ...s, [k]: !s[k] }));
+  const attachToItem = async (files: File[]) => {
+    const t = attachTo; setAttachTo(null);
+    if (!t || !files.length || !sel) return;
+    const { added, rejected } = await toPending(files, []).catch((e) => ({ added: [], rejected: [(e as Error).message] }));
+    if (rejected.length) toast.error(rejected.join(" · "));
+    if (!added.length) return;
+    try {
+      const up = await uploadFiles("treinamentos", added.map((p) => ({ name: p.name, mime: p.mime, blob: p.blob })));
+      setLib((l) => {
+        const bl = l.scripts.find((x) => x.id === sel.id)?.blocks.find((x) => x.id === t.block);
+        return bl ? upsertBlock(l, sel.id, withMedia(bl, t.i, [...mediaOf(bl, t.i), ...up])) : l;
+      });
+      toast.success(up.length > 1 ? "Arquivos anexados ao passo" : "Arquivo anexado ao passo");
+    } catch (e) { toast.error(`Não consegui anexar: ${(e as Error).message}`); }
+  };
   const ScriptCard = ({ sc }: { sc: Script }) => {
     const on = sc.id === sel?.id;
     const its = sc.blocks.flatMap((b) => b.show.map((_, i) => `${b.id}:${i}`));
@@ -370,8 +392,12 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                                         <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition ${ok ? "border-emerald bg-emerald/20 text-emerald" : "border-muted-foreground/50"}`}>{ok && <Check size={11} />}</span>
                                         <span className={ok ? "text-muted-foreground line-through" : ""}>{s}</span>
                                       </button>
+                                      {mediaOf(b, i).length > 0 && (
+                                        <button onClick={() => setViewer({ title: s, files: mediaOf(b, i) })} aria-label={`Ver arquivos de ${s}`} data-testid="ver-arquivos-passo" className="flex shrink-0 items-center gap-1 rounded-full border border-cyan/50 bg-cyan/10 px-2 py-0.5 text-[0.65rem] font-semibold text-cyan transition hover:scale-105 hover:bg-cyan/20"><ImageIcon size={11} /> {mediaOf(b, i).length}</button>
+                                      )}
                                       {!lesson && (
-                                        <span className="flex opacity-0 transition focus-within:opacity-100 group-hover/i:opacity-100">
+                                        <span className="flex opacity-0 transition focus-within:opacity-100 group-hover/i:opacity-100 [@media(hover:none)]:opacity-100">
+                                          <button onClick={() => { setAttachTo({ block: b.id, i }); itemInput.current?.click(); }} aria-label={`Anexar arquivo a ${s}`} title="Anexar imagem, PDF ou arquivo (vira botão na apresentação)" data-testid="anexar-passo" className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-cyan"><Paperclip size={11} /></button>
                                           <button onClick={() => setEditItem({ block: b.id, i, text: s })} aria-label={`Editar item ${s}`} title="Editar" className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"><Pencil size={11} /></button>
                                           <button onClick={() => deleteItem(b.id, i)} aria-label={`Excluir item ${s}`} title="Excluir" className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-pink"><Trash2 size={11} /></button>
                                         </span>
@@ -515,6 +541,8 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
       </div>
       {generating && <TrainingGenerator folders={folderNames(lib)} onClose={() => setGenerating(false)} onOpen={(id) => setSelId(id)} onPresent={() => setPresenting(true)}
         onCreate={(script, exs) => { setLib((l) => { let n = { ...l, examples: [...l.examples, ...exs] }; if (script.folder) n = addFolder(n, script.folder); return upsertScript(n, script); }); setSelId(script.id); }} />}
+      <input ref={itemInput} type="file" multiple hidden data-testid="passo-arquivo-lista" onChange={(e) => { void attachToItem([...(e.target.files ?? [])]); e.target.value = ""; }} />
+      {viewer && !presenting && <MediaViewer title={viewer.title} files={viewer.files} onClose={() => setViewer(null)} />}
       {presenting && sel && <TrainingPresenter script={sel} examples={examples} shown={shown} onToggle={toggle} onClose={() => setPresenting(false)} />}
       {zoom && <Lightbox visual={zoom} onClose={() => setZoom(null)} />}
       {editScript && (

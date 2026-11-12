@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addFolder, folderNames, removeFolder, renameFolder, seedLibrary } from "@/lib/training-library";
-import { briefContent, buildScript, draftSchema, type Draft } from "@/lib/training-ai";
+import { addFolder, folderNames, removeFolder, renameFolder, seedLibrary, setShowItem, withMedia, mediaOf, shiftMedia } from "@/lib/training-library";
+import { briefContent, buildScript, draftSchema, usedImages, type Draft } from "@/lib/training-ai";
 
 const draft: Draft = {
   titulo: "Disparo em massa", publico: "Coordenadores", objetivo: "Fazer o disparo.", duvidas: ["Qual o menu?"],
@@ -20,7 +20,7 @@ describe("Roteiro criado pela IA", () => {
   });
 
   it("converte em roteiro: blocos, fala, dica, imagem guardada e exemplo ligado", () => {
-    const { script, examples } = buildScript(draft, { imagePaths: ["u/treinamentos/a.jpg"], folder: " Disparo ", color: "violet" });
+    const { script, examples } = buildScript(draft, { images: [{ path: "u/treinamentos/a.jpg", name: "a.jpg", mime: "image/jpeg", size: 10 }], folder: " Disparo ", color: "violet" });
     expect(script.title).toBe("Disparo em massa");
     expect(script.folder).toBe("Disparo");
     expect(script.blocks).toHaveLength(2);
@@ -36,7 +36,7 @@ describe("Roteiro criado pela IA", () => {
   });
 
   it("nome e público digitados valem mais que os sugeridos", () => {
-    const { script } = buildScript(draft, { imagePaths: [], title: "Meu nome", audience: "Gestores" });
+    const { script } = buildScript(draft, { images: [], title: "Meu nome", audience: "Gestores" });
     expect(script.title).toBe("Meu nome");
     expect(script.audience).toBe("Gestores");
     expect(script.blocks[0]!.visuals).toBeUndefined();
@@ -54,6 +54,20 @@ describe("Roteiro criado pela IA", () => {
   });
 });
 
+describe("Passos com arquivo", () => {
+  const d: Draft = { ...draft, blocos: [{ titulo: "B", minutos: 5, falar: "", mostrar: ["Abrir o menu", { passo: "Importar a planilha", imagem: 1 }, { passo: "Sem print", imagem: 3 }] }] };
+  it("liga a imagem ao passo (vira botão) e ignora imagem inexistente", () => {
+    const { script } = buildScript(d, { images: [{ path: "p/1.jpg", name: "1.jpg", mime: "image/jpeg", size: 5 }] });
+    const b = script.blocks[0]!;
+    expect(b.show).toEqual(["Abrir o menu", "Importar a planilha", "Sem print"]);
+    expect(b.media).toEqual({ "1": [{ path: "p/1.jpg", name: "1.jpg", mime: "image/jpeg", size: 5 }] });
+  });
+  it("lista as imagens usadas, em passos e em imagens", () => {
+    expect(usedImages(d)).toEqual([1, 3]);
+    expect(usedImages(draft)).toEqual([1, 2]);
+  });
+});
+
 describe("Pastas de roteiros", () => {
   it("cria, renomeia e apaga sem perder roteiros", () => {
     let lib = seedLibrary();
@@ -67,5 +81,20 @@ describe("Pastas de roteiros", () => {
     expect(folderNames(lib)).toEqual([]);
     expect(lib.scripts).toHaveLength(3);
     expect(lib.scripts[0]!.folder).toBeUndefined();
+  });
+});
+
+describe("Arquivos dos passos acompanham as mudanças", () => {
+  const f = (n: string) => ({ path: n, name: n, mime: "image/png", size: 1 });
+  it("apagar um passo faz os arquivos dos seguintes descerem", () => {
+    let lib = seedLibrary();
+    const sid = lib.scripts[0]!.id, blk = lib.scripts[0]!.blocks[1]!; // bloco com 4 passos
+    lib = { ...lib, scripts: lib.scripts.map((s) => (s.id === sid ? { ...s, blocks: s.blocks.map((b) => (b.id === blk.id ? withMedia(withMedia(withMedia(b, 0, [f("a")]), 1, [f("b")]), 3, [f("d")]) : b)) } : s)) };
+    lib = setShowItem(lib, sid, blk.id, 1, null); // apaga o passo 2 (arquivo "b")
+    const b = lib.scripts[0]!.blocks[1]!;
+    expect(mediaOf(b, 0).map((x) => x.path)).toEqual(["a"]);
+    expect(mediaOf(b, 1)).toEqual([]);
+    expect(mediaOf(b, 2).map((x) => x.path)).toEqual(["d"]);
+    expect(shiftMedia(undefined, 0)).toBeUndefined();
   });
 });

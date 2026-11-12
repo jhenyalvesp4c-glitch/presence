@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy, Eye, GraduationCap, Grid3x3, Lightbulb, Maximize, MessageCircleQuestion,
-  Minimize, MousePointerClick, Sparkles, StickyNote, Target, ThumbsUp, Users, X,
+  Minimize, MousePointerClick, Sparkles, StickyNote, Target, ThumbsUp, Users, X, Image as ImageIcon,
 } from "lucide-react";
 
-import type { Block, Example, Faq, Script, Visual } from "@/lib/training-library";
-import { visualSrc } from "./training-images";
+import { mediaOf, type Block, type Example, type Faq, type MediaFile, type Script, type Visual } from "@/lib/training-library";
+import { MediaViewer } from "./media-viewer";
+import { mediaUrl, primePaths, visualSrc } from "./training-images";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
@@ -101,6 +102,9 @@ function ExamplePanel({ e, i }: { e: Example; i: number }) {
 /** Um bloco inteiro numa página só: o que mostrar, por que ajuda, imagens, situação, exemplos e perguntas. */
 function BlockPage({ s, script, examples, shown, onToggle }: { s: Extract<Slide, { k: "block" }>; script: Script; examples: Example[]; shown: Record<string, boolean>; onToggle: (k: string) => void }) {
   const b = s.block;
+  const [viewer, setViewer] = useState<{ title: string; files: MediaFile[] } | null>(null);
+  const [, setTick] = useState(0);
+  useEffect(() => { primePaths(Object.values(b.media ?? {}).flat().map((f) => f.path)).then((any) => { if (any) setTick((t) => t + 1); }).catch(() => undefined); }, [b.media]);
   const exs = b.examples.map((id) => examples.find((e) => e.id === id)).filter((e): e is Example => !!e);
   let n = 1;
   const next = () => n++;
@@ -123,19 +127,24 @@ function BlockPage({ s, script, examples, shown, onToggle }: { s: Extract<Slide,
           <Section icon={Eye} title="O que vamos mostrar" color="cyan" i={next()} className={b.why?.length ? "" : "lg:col-span-2"}>
             <ul className="space-y-2">
               {b.show.map((t, i) => {
-                const k = `${b.id}:${i}`, ok = !!shown[k];
+                const k = `${b.id}:${i}`, ok = !!shown[k], files = mediaOf(b, i), has = files.length > 0;
+                const images = files.filter((f) => f.mime.startsWith("image/")).length;
+                const open = () => { if (!ok) onToggle(k); setViewer({ title: t, files }); };
                 return (
                   <li key={k}>
-                    <button onClick={() => onToggle(k)} data-testid="item-mostrar"
-                      className={`group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition duration-300 hover:-translate-y-0.5 ${ok ? "border-emerald/60 bg-emerald/10" : "border-border bg-secondary/25 hover:border-[var(--glow)] hover:shadow-[0_0_26px_-14px_var(--glow)]"}`}>
-                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-base font-bold transition ${ok ? "border-emerald bg-emerald/20 text-emerald" : "border-[var(--glow)] text-[var(--glow)]"}`}>{ok ? <Check size={17} style={{ animation: "pres-pop .35s both" }} /> : i + 1}</span>
-                      <span className={`${big} transition ${ok ? "text-muted-foreground line-through decoration-emerald/60" : ""}`}>{t}</span>
-                    </button>
+                    <div role="button" tabIndex={0} onClick={() => (has ? open() : onToggle(k))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); has ? open() : onToggle(k); } }} data-testid={has ? "item-com-arquivo" : "item-mostrar"}
+                      className={`group flex w-full cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left transition duration-300 hover:-translate-y-0.5 ${ok ? "border-emerald/60 bg-emerald/10" : has ? "border-cyan/40 bg-cyan/5 hover:border-cyan hover:shadow-[0_0_30px_-12px_var(--cyan)]" : "border-border bg-secondary/25 hover:border-[var(--glow)] hover:shadow-[0_0_26px_-14px_var(--glow)]"}`}>
+                      <span role={has ? "button" : undefined} tabIndex={has ? 0 : undefined} aria-label={has ? (ok ? "Desmarcar como mostrado" : "Marcar como mostrado") : undefined} data-testid={has ? "marcar-item" : undefined}
+                        onClick={has ? (e) => { e.stopPropagation(); onToggle(k); } : undefined} onKeyDown={has ? (e) => { if (e.key === "Enter") { e.stopPropagation(); onToggle(k); } } : undefined}
+                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-base font-bold transition ${ok ? "border-emerald bg-emerald/20 text-emerald" : "border-[var(--glow)] text-[var(--glow)]"} ${has ? "hover:scale-110" : ""}`}>{ok ? <Check size={17} style={{ animation: "pres-pop .35s both" }} /> : i + 1}</span>
+                      <span className={`min-w-0 flex-1 ${big} transition ${ok ? "text-muted-foreground line-through decoration-emerald/60" : ""}`}>{t}</span>
+                      {has && <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-cyan/60 bg-cyan/10 px-3 py-1.5 text-xs font-semibold text-cyan shadow-[0_0_18px_-6px_var(--cyan)] transition group-hover:scale-105 group-hover:bg-cyan/20"><ImageIcon size={14} /> {images === files.length ? (files.length > 1 ? `Ver ${files.length} imagens` : "Ver imagem") : files.length > 1 ? `Ver ${files.length} arquivos` : "Abrir arquivo"}</span>}
+                    </div>
                   </li>
                 );
               })}
             </ul>
-            <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><MousePointerClick size={12} /> Clique num item para marcar como já mostrado.</p>
+            <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><MousePointerClick size={12} /> Clique num item para marcar como já mostrado. Os com botão azul abrem a imagem ou o arquivo.</p>
           </Section>
         )}
 
@@ -175,6 +184,7 @@ function BlockPage({ s, script, examples, shown, onToggle }: { s: Extract<Slide,
           </Section>
         )}
       </div>
+      {viewer && <MediaViewer title={viewer.title} files={viewer.files} onClose={() => setViewer(null)} />}
     </div>
   );
 }

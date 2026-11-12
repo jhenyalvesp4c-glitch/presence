@@ -4,7 +4,7 @@
  * Nada aqui fala com a rede (a chamada fica em training-ai.functions.ts).
  */
 import { z } from "zod/v4";
-import { COLORS, newId, type Block, type Example, type Script, type Visual } from "./training-library";
+import { COLORS, newId, type Block, type Example, type MediaFile, type Script, type Visual } from "./training-library";
 
 const pin = z.object({
   x: z.number().min(0).max(100).describe("Posição horizontal do ponto, em % da largura da imagem (0 = borda esquerda)."),
@@ -24,7 +24,8 @@ const block = z.object({
   titulo: z.string().min(1).max(100),
   minutos: z.number().int().min(1).max(90),
   falar: z.string().max(1500).describe("O que a pessoa vai FALAR neste bloco, em texto natural de fala (2 a 6 frases)."),
-  mostrar: z.array(z.string().min(1).max(200)).min(1).max(10).describe("Passos curtos que aparecem na tela, cada um começando com verbo no infinitivo, na ordem em que são feitos."),
+  mostrar: z.array(z.union([z.string().min(1).max(200), z.object({ passo: z.string().min(1).max(200), imagem: z.number().int().min(1).optional().describe("Número da imagem enviada que mostra exatamente este passo (vira um botão que abre a imagem na apresentação).") })])).min(1).max(10)
+    .describe("Passos curtos que aparecem na tela, cada um começando com verbo no infinitivo, na ordem em que são feitos. Use { passo, imagem } quando um print mostra aquele passo."),
   dica: z.string().max(600).optional().describe("Lembretes só para o apresentador (a turma não vê). Ex.: 'Não esquecer de avisar que o número precisa estar com +55'."),
   porque: z.array(z.string().max(250)).max(5).optional().describe("Por que isso importa no dia a dia (só se a usuária deu motivo ou for evidente)."),
   situacao: z.object({ situacao: z.string().max(300), antes: z.string().max(400), depois: z.string().max(400), rotuloAntes: z.string().max(30).optional(), rotuloDepois: z.string().max(30).optional() }).optional(),
@@ -50,6 +51,7 @@ Regras:
 - "mostrar": passos curtos, cada um começando com verbo (Importar a base, Marcar a coluna do telefone…). "falar": como se fala em voz alta, natural, sem repetir a lista inteira.
 - Todo aviso importante que a usuária mencionar (ex.: "o número tem que ter +55", "a planilha precisa ter a coluna igual à variável do template") DEVE aparecer no bloco certo: como passo em "mostrar" e como lembrete em "dica".
 - NÃO invente telas, botões, menus ou funções que ela não citou e que não aparecem nas imagens. Se faltar informação, escreva em "duvidas" (ex.: "Qual o nome exato do menu de importação?").
+- Quando um print mostra exatamente um passo, ligue-o ao passo com { passo, imagem: N } em "mostrar": na apresentação o passo vira um botão que abre aquela imagem. Cada imagem pode servir a um passo e também aparecer em "imagens" com pontos.
 - Use "imagens" só com as imagens enviadas (campo imagem = número). Pontos: coordenadas em % do canto superior esquerdo, no centro do elemento, e apenas para o que você vê com clareza.
 - "exemplos": modelos prontos que ela citou (texto de mensagem, nome de etiqueta). Não crie exemplos soltos.
 - "situacao" (antes/depois), "porque" e "perguntas": só se houver base no que ela contou. Melhor menos e correto.
@@ -73,23 +75,29 @@ export function briefContent(brief: string, files: BriefFile[], hints: { title?:
 }
 
 const trim = (s: string | undefined) => (s ?? "").trim();
+export const showItem = (i: Draft["blocos"][number]["mostrar"][number]) => (typeof i === "string" ? { passo: i, imagem: undefined } : { passo: i.passo, imagem: i.imagem });
+/** Números das imagens que o rascunho usa (em passos ou em "imagens"). */
+export const usedImages = (d: Draft): number[] => [...new Set(d.blocos.flatMap((b) => [...(b.imagens ?? []).map((v) => v.imagem), ...b.mostrar.map((m) => showItem(m).imagem).filter((n): n is number => !!n)]))].sort((a, b) => a - b);
 const asVisual = (v: NonNullable<Draft["blocos"][number]["imagens"]>[number], path: string): Visual => ({
   img: `storage:${path}`, title: trim(v.titulo) || "Imagem", caption: trim(v.legenda),
   pins: v.pontos.map((p) => ({ x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, label: trim(p.label), text: trim(p.text) })).filter((p) => p.label || p.text),
 });
 
-/** Converte o rascunho da IA em um roteiro do app. `imagePaths[n-1]` é o caminho guardado da "Imagem n". */
-export function buildScript(draft: Draft, opts: { imagePaths: (string | undefined)[]; folder?: string | undefined; color?: string | undefined; title?: string | undefined; audience?: string | undefined }): { script: Script; examples: Example[] } {
+/** Converte o rascunho da IA em um roteiro do app. `images[n-1]` é o arquivo guardado da "Imagem n". */
+export function buildScript(draft: Draft, opts: { images: (MediaFile | undefined)[]; folder?: string | undefined; color?: string | undefined; title?: string | undefined; audience?: string | undefined }): { script: Script; examples: Example[] } {
   const examples: Example[] = [];
   const blocks: Block[] = draft.blocos.map((b) => {
     const exIds = (b.exemplos ?? []).map((e) => {
       const ex: Example = { id: newId("e"), title: trim(e.titulo) || "Exemplo", situation: trim(e.situacao), text: trim(e.texto), cat: trim(e.categoria) || "Geral", color: opts.color ?? "cyan" };
       examples.push(ex); return ex.id;
     });
-    const visuals = (b.imagens ?? []).flatMap((v) => { const path = opts.imagePaths[v.imagem - 1]; return path ? [asVisual(v, path)] : []; });
+    const visuals = (b.imagens ?? []).flatMap((v) => { const img = opts.images[v.imagem - 1]; return img ? [asVisual(v, img.path)] : []; });
+    const items = b.mostrar.map(showItem).map((x) => ({ text: trim(x.passo), file: x.imagem ? opts.images[x.imagem - 1] : undefined })).filter((x) => x.text);
+    const media: Record<string, MediaFile[]> = {};
+    items.forEach((x, i) => { if (x.file) media[String(i)] = [x.file]; });
     const sc = b.situacao;
     return {
-      id: newId("b"), title: trim(b.titulo), minutes: b.minutos, show: b.mostrar.map(trim).filter(Boolean), examples: exIds,
+      id: newId("b"), title: trim(b.titulo), minutes: b.minutos, show: items.map((x) => x.text), media: Object.keys(media).length ? media : undefined, examples: exIds,
       say: trim(b.falar) || undefined, tip: trim(b.dica) || undefined,
       why: b.porque?.length ? b.porque.map(trim).filter(Boolean) : undefined,
       scenario: sc && (trim(sc.situacao) || trim(sc.antes) || trim(sc.depois)) ? { situation: trim(sc.situacao), before: trim(sc.antes), after: trim(sc.depois), beforeLabel: trim(sc.rotuloAntes) || "Antes", afterLabel: trim(sc.rotuloDepois) || "Depois" } : undefined,
