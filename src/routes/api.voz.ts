@@ -7,6 +7,26 @@ const body = z.object({ messages: z.array(z.object({ role: z.enum(["user", "assi
 export const Route = createFileRoute("/api/voz")({
   server: {
     handlers: {
+      // Diagnóstico: testa a IA da conversa (modelo e chave) com uma chamada mínima.
+      GET: async ({ request }) => {
+        const { guard } = await import("@/lib/voice/http");
+        const blocked = guard(request, "voz");
+        if (blocked) return blocked;
+        const out = (v: unknown) => new Response(JSON.stringify(v), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+        const { DEFAULT_MODEL } = await import("@/lib/mcp/interpret");
+        const model = process.env["OPENAI_VOICE_MODEL"]?.trim() || process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
+        if (!process.env["OPENAI_API_KEY"]) return out({ ok: false, modelo: model, erro: "Sem OPENAI_API_KEY no servidor." });
+        try {
+          const { streamChat } = await import("@/lib/mcp/openai");
+          const t0 = Date.now();
+          let first = 0;
+          const r = await streamChat({ model, messages: [{ role: "user", content: "Responda só: ok" }], max_completion_tokens: 20, reasoning_effort: "low" }, () => { if (!first) first = Date.now() - t0; });
+          return out({ ok: !!r.text, modelo: model, resposta: r.text.slice(0, 40), primeiro_texto_ms: first, total_ms: Date.now() - t0 });
+        } catch (e) {
+          const { OpenAIError, explain } = await import("@/lib/mcp/openai");
+          return out({ ok: false, modelo: model, erro: e instanceof OpenAIError ? explain(e, model) : e instanceof Error ? e.message : "falha" });
+        }
+      },
       POST: async ({ request }) => {
         const { guard } = await import("@/lib/voice/http");
         const blocked = guard(request, "voz");
