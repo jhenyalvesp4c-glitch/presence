@@ -1,9 +1,10 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { loadProjectState } from "@/lib/data/project-data";
 import { backdropProps } from "@/lib/backdrop";
 import {
   BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Download, Eye, EyeOff, FileText, FileVideo, Folder,
   FolderOpen, FolderPlus, GraduationCap, KeyRound, LayoutGrid, Lightbulb, List, MoreHorizontal, Plus, Search, Send,
-  Sparkles, Star, Trash2, User, X, LayoutTemplate, Files, Paperclip, ArrowRight,
+  Sparkles, Star, Trash2, User, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil,
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
 
@@ -12,7 +13,7 @@ const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 type Doc = {
   id: string; title: string; desc: string; kind: string; color: string; updated: string; fav?: boolean;
   rules?: string[]; steps?: string[]; files?: { name: string; size: string; type: "video" | "pdf" }[];
-  login?: { user: string; pass: string; owner: string };
+  login?: { user: string; pass: string; owner: string; dossier?: string };
 };
 type FolderT = { id: string; name: string; icon: typeof Folder; color: string; docs: Doc[]; subs?: FolderT[] | undefined };
 
@@ -57,6 +58,14 @@ const seedFolders: FolderT[] = [
   ] },
 ];
 
+/** Logins ficam só neste navegador (senhas não vão para o banco). */
+const LOGINS_KEY = "presence.logins.v1";
+const loadLogins = (): Doc[] | null => {
+  try { const raw = localStorage.getItem(LOGINS_KEY); const v = raw ? JSON.parse(raw) : null; return Array.isArray(v) ? (v as Doc[]) : null; } catch { return null; }
+};
+const saveLogins = (docs: Doc[]) => { try { localStorage.setItem(LOGINS_KEY, JSON.stringify(docs)); } catch { /* sem armazenamento */ } };
+const newId = () => `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+
 const allDocs = (fs: FolderT[]): (Doc & { folder: string })[] =>
   fs.flatMap((f) => [...f.docs.map((d) => ({ ...d, folder: f.name })), ...allDocs(f.subs ?? []).map((d) => d)]);
 const countDocs = (f: FolderT): number => f.docs.length + (f.subs ?? []).reduce((a, s) => a + countDocs(s), 0);
@@ -79,12 +88,12 @@ export function DocsLibrary({ projectId }: { projectId: string }) {
           </button>
         ))}
       </div>
-      {section === "lib" ? <Library /> : <TrainingScripts projectId={projectId} />}
+      {section === "lib" ? <Library projectId={projectId} /> : <TrainingScripts projectId={projectId} />}
     </div>
   );
 }
 
-function Library() {
+function Library({ projectId }: { projectId: string }) {
   const [folders, setFolders] = useState(seedFolders);
   const [open, setOpen] = useState<Record<string, boolean>>({ tut: true, log: true });
   const [cur, setCur] = useState("tut");
@@ -95,6 +104,26 @@ function Library() {
   const [orion, setOrion] = useState<{ q: string; phase: "think" | "done" } | null>(null);
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [trash, setTrash] = useState<Doc[]>([]);
+  const [dossiers, setDossiers] = useState<string[]>([]);
+  const [editing, setEditing] = useState<Doc | "new" | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const saved = loadLogins();
+    if (saved) setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: saved })));
+    setLoaded(true);
+    loadProjectState(projectId).then((st) => setDossiers(st.ds.dossiers.map((d) => d.name))).catch(() => undefined);
+  }, [projectId]);
+  useEffect(() => { if (loaded) saveLogins(findFolder(folders, "log")?.docs ?? []); }, [folders, loaded]);
+
+  const saveLogin = (d: Doc) => {
+    setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: f.docs.some((x) => x.id === d.id) ? f.docs.map((x) => (x.id === d.id ? d : x)) : [d, ...f.docs] })));
+    setSelId(d.id); setCur("log"); setOpen((o) => ({ ...o, log: true })); setEditing(null);
+  };
+  const removeLogin = (d: Doc) => {
+    if (!window.confirm(`Excluir o login "${d.title}"? Esta ação não pode ser desfeita.`)) return;
+    setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: f.docs.filter((x) => x.id !== d.id) })));
+  };
 
   const docs = useMemo(() => allDocs(folders), [folders]);
   const folder = findFolder(folders, cur) ?? folders[0]!;
@@ -106,6 +135,7 @@ function Library() {
     return walk(fs);
   });
   const addDoc = () => {
+    if (cur === "log" && !q) { setEditing("new"); return; }
     const id = `n${Date.now()}`;
     setFolders((fs) => mapFolders(fs, cur, (f) => ({ ...f, docs: [mk(id, "Novo documento", "Clique para descrever este documento.", "Rascunho", "cyan", { updated: "agora" }), ...f.docs] })));
     setSelId(id); setQ("");
@@ -236,7 +266,7 @@ function Library() {
                 const on = d.id === selId;
                 return (
                   <button key={d.id} onClick={() => setSelId(d.id)} style={{ ...tint(d.color), animationDelay: `${i * 0.05}s` }}
-                    className={`accent-card group flex items-start gap-3 !rounded-2xl p-4 text-left animate-rise ${on ? "!border-[color-mix(in_oklab,var(--cyan)_70%,transparent)] shadow-[0_0_40px_-10px_var(--cyan)]" : ""}`}>
+                    className={`accent-card group relative flex items-start gap-3 !rounded-2xl p-4 text-left animate-rise ${on ? "!border-[color-mix(in_oklab,var(--cyan)_70%,transparent)] shadow-[0_0_40px_-10px_var(--cyan)]" : ""}`}>
                     <span className="icon-tile h-11 w-11 shrink-0 transition group-hover:scale-110 group-hover:rotate-3">{d.login ? <KeyRound size={18} /> : <FileText size={18} />}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold">{d.title}</span>
@@ -246,6 +276,7 @@ function Library() {
                     <span role="button" onClick={(e) => { e.stopPropagation(); toggleFav(d.id); }} className="transition hover:scale-125">
                       <Star size={15} className={d.fav ? "fill-amber text-amber drop-shadow-[0_0_6px_var(--amber)]" : "text-muted-foreground"} />
                     </span>
+                    {d.login && <HoverActions onEdit={() => setEditing(d)} onDelete={() => removeLogin(d)} className="bottom-3 right-3" />}
                   </button>
                 );
               })}
@@ -260,16 +291,19 @@ function Library() {
                 <h3 className="font-display text-lg font-semibold">Logins dos Dossiês</h3>
                 <p className="text-[0.7rem] text-muted-foreground">Acesso de usuários por dossiê · {findFolder(folders, "log")?.docs.length ?? 0} itens</p>
               </div>
+              <button onClick={() => setEditing("new")} data-testid="novo-login" className="flex items-center gap-1 rounded-full border border-amber/50 px-3 py-1.5 text-xs text-amber transition hover:bg-amber/10"><Plus size={12} /> Novo login</button>
               <button onClick={() => { setCur("log"); setOpen((o) => ({ ...o, log: true })); }} className="glass flex items-center gap-1 rounded-full px-3 py-1.5 text-xs transition hover:text-cyan">Ver tudo <ArrowRight size={12} /></button>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {(findFolder(folders, "log")?.docs ?? []).slice(0, 3).map((d, i) => <LoginCard key={d.id} d={d} color={["amber", "emerald", "violet"][i]!} onOpen={() => setSelId(d.id)} />)}
+              {(findFolder(folders, "log")?.docs ?? []).slice(0, 3).map((d, i) => <LoginCard key={d.id} d={d} color={["amber", "emerald", "violet"][i % 3]!} onOpen={() => setSelId(d.id)} onEdit={() => setEditing(d)} onDelete={() => removeLogin(d)} />)}
+              {!(findFolder(folders, "log")?.docs.length) && <p className="py-6 text-center text-sm text-muted-foreground sm:col-span-3">Nenhum login ainda. Use "Novo login".</p>}
             </div>
           </div>
         </section>
 
         {/* detalhes */}
-        <DocDetail key={sel?.id} {...(sel ? { d: sel } : {})} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
+        {editing && <LoginEditor initial={editing === "new" ? null : editing} dossiers={dossiers} onSave={saveLogin} onClose={() => setEditing(null)} />}
+        <DocDetail key={sel?.id} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
       </div>
     </div>
   );
@@ -307,21 +341,21 @@ function TreeNode({ f, depth, open, setOpen, cur, selId, onFolder, onDoc }: {
   );
 }
 
-function LoginCard({ d, color, onOpen }: { d: Doc; color: string; onOpen: () => void }) {
+function LoginCard({ d, color, onOpen, onEdit, onDelete }: { d: Doc; color: string; onOpen: () => void; onEdit?: () => void; onDelete?: () => void }) {
   const [show, setShow] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const copy = (k: string, v: string) => { navigator.clipboard?.writeText(v).catch(() => {}); setCopied(k); setTimeout(() => setCopied(null), 1200); };
   if (!d.login) return null;
   return (
-    <div className="accent-card group !rounded-2xl p-3" style={tint(color)}>
+    <div className="accent-card group relative !rounded-2xl p-3" style={tint(color)}>
       <button onClick={onOpen} className="flex w-full items-center gap-2 text-left">
         <span className="icon-tile h-9 w-9 !rounded-full transition group-hover:shadow-[0_0_18px_-4px_var(--glow)]"><User size={16} /></span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{d.title}</span>
-          <span className="flex items-center gap-1 text-[0.65rem] text-muted-foreground"><User size={9} /> {d.login.owner}</span>
+          <span className="flex items-center gap-1 truncate text-[0.65rem] text-muted-foreground"><User size={9} /> {d.login.owner || "—"}</span>
         </span>
-        <MoreHorizontal size={14} className="text-muted-foreground" />
       </button>
+      {onEdit && onDelete && <HoverActions onEdit={onEdit} onDelete={onDelete} className="right-2 top-2" />}
       <Cred label="Usuário" value={d.login.user} onCopy={() => copy("u", d.login!.user)} copied={copied === "u"} />
       <Cred label="Senha" value={show ? d.login.pass : "••••••••••"} onCopy={() => copy("p", d.login!.pass)} copied={copied === "p"}
         extra={<button onClick={() => setShow((s) => !s)} className="text-muted-foreground hover:text-[var(--glow)]">{show ? <EyeOff size={12} /> : <Eye size={12} />}</button>} />
@@ -340,7 +374,7 @@ function Cred({ label, value, onCopy, copied, extra }: { label: string; value: s
   );
 }
 
-function DocDetail({ d, onFav, onDelete }: { d?: Doc & { folder: string }; onFav: () => void; onDelete: () => void }) {
+function DocDetail({ d, onFav, onDelete, onEditLogin }: { d?: Doc & { folder: string }; onFav: () => void; onDelete: () => void; onEditLogin: () => void }) {
   const [menu, setMenu] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [done, setDone] = useState<number[]>([]);
@@ -358,7 +392,8 @@ function DocDetail({ d, onFav, onDelete }: { d?: Doc & { folder: string }; onFav
         <div className="relative">
           <button onClick={() => setMenu((m) => !m)} className="text-muted-foreground hover:text-foreground"><MoreHorizontal size={17} /></button>
           {menu && (
-            <div className="glass absolute right-0 top-7 z-10 w-36 rounded-xl p-1 text-xs animate-rise">
+            <div className="glass absolute right-0 top-7 z-10 w-40 rounded-xl p-1 text-xs animate-rise">
+              {d.login && <button onClick={() => { onEditLogin(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-secondary"><Pencil size={12} /> Editar login</button>}
               <button onClick={() => { onDelete(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-destructive hover:bg-secondary"><Trash2 size={12} /> Mover p/ lixeira</button>
             </div>
           )}
@@ -470,6 +505,84 @@ function DocArt({ d }: { d: Doc }) {
         )}
         {[...Array(10)].map((_, i) => <circle key={i} cx={(i * 37) % 320} cy={(i * 53) % 140} r="1.2" fill="var(--cyan)" className="animate-pulse-ring" style={{ animationDelay: `${i * 0.3}s` }} />)}
       </svg>
+    </div>
+  );
+}
+
+/** Editar e excluir: ficam escondidos e aparecem ao passar o mouse sobre o cartão (sempre visíveis no toque). */
+function HoverActions({ onEdit, onDelete, className }: { onEdit: () => void; onDelete: () => void; className: string }) {
+  const btn = "grid h-6 w-6 place-items-center rounded-lg border border-border bg-background/80 text-muted-foreground backdrop-blur transition";
+  return (
+    <span className={`absolute z-10 flex gap-1 opacity-0 transition focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 ${className}`}>
+      <span role="button" tabIndex={0} aria-label="Editar login" data-testid="editar-login" onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onEdit(); } }} className={`${btn} hover:border-cyan/60 hover:text-cyan`}><Pencil size={12} /></span>
+      <span role="button" tabIndex={0} aria-label="Excluir login" data-testid="excluir-login" onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onDelete(); } }} className={`${btn} hover:border-destructive/60 hover:text-destructive`}><Trash2 size={12} /></span>
+    </span>
+  );
+}
+
+function LoginEditor({ initial, dossiers, onSave, onClose }: { initial: Doc | null; dossiers: string[]; onSave: (d: Doc) => void; onClose: () => void }) {
+  const l = initial?.login;
+  const [dossier, setDossier] = useState(l?.dossier ?? (initial ? "" : ""));
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [owner, setOwner] = useState(l?.owner ?? "");
+  const [user, setUser] = useState(l?.user ?? "");
+  const [pass, setPass] = useState(l?.pass ?? "");
+  const [desc, setDesc] = useState(initial?.desc ?? "");
+  const [show, setShow] = useState(false);
+  const options = dossier && !dossiers.includes(dossier) ? [dossier, ...dossiers] : dossiers;
+  const name = title.trim() || dossier;
+  const ok = !!name && !!user.trim();
+  const field = "mt-1 w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none transition focus:border-amber/60";
+  const submit = () => {
+    if (!ok) return;
+    const finalDesc = desc.trim() || (dossier ? `Acesso do polo ${dossier} ao CRM e plataforma de disparo.` : "Acesso ao sistema.");
+    onSave({
+      ...(initial ?? mk(newId(), name, finalDesc, "Login", "amber")),
+      title: name, desc: finalDesc, updated: "agora",
+      login: { user: user.trim(), pass, owner: owner.trim(), ...(dossier ? { dossier } : {}) },
+    });
+  };
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-background/80 p-4 backdrop-blur-md" {...backdropProps(onClose)}>
+      <form onSubmit={(e) => { e.preventDefault(); submit(); }} onClick={(e) => e.stopPropagation()} data-testid="editor-login"
+        className="glass mx-auto my-8 w-full max-w-md rounded-3xl p-5 animate-rise" style={tint("amber")}>
+        <div className="flex items-center gap-3">
+          <span className="icon-tile h-10 w-10 !rounded-2xl"><KeyRound size={18} /></span>
+          <h3 className="mr-auto font-display text-lg font-semibold">{initial ? "Editar login" : "Novo login"}</h3>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+        </div>
+        <label className="mt-4 block text-xs text-muted-foreground">Vinculado ao dossiê
+          <select value={dossier} onChange={(e) => { setDossier(e.target.value); if (!title.trim() || title === dossier) setTitle(e.target.value); }} className={`${field} [&>option]:bg-popover`} data-testid="login-dossie">
+            <option value="">— sem vínculo —</option>
+            {options.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label className="mt-3 block text-xs text-muted-foreground">Nome do cartão
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Maceió" className={field} data-testid="login-nome" />
+        </label>
+        <label className="mt-3 block text-xs text-muted-foreground">Responsável
+          <input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Quem usa este acesso" className={field} data-testid="login-responsavel" />
+        </label>
+        <label className="mt-3 block text-xs text-muted-foreground">Usuário
+          <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="usuario@p4c.com" autoComplete="off" className={`${field} font-mono`} data-testid="login-usuario" />
+        </label>
+        <label className="mt-3 block text-xs text-muted-foreground">Senha
+          <span className="relative block">
+            <input value={pass} onChange={(e) => setPass(e.target.value)} type={show ? "text" : "password"} autoComplete="new-password" className={`${field} pr-10 font-mono`} data-testid="login-senha" />
+            <button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? "Ocultar senha" : "Mostrar senha"} className="absolute right-3 top-1/2 mt-0.5 -translate-y-1/2 text-muted-foreground hover:text-amber">{show ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+          </span>
+        </label>
+        <label className="mt-3 block text-xs text-muted-foreground">Observação (opcional)
+          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} className={`${field} resize-none`} data-testid="login-obs" />
+        </label>
+        <p className="mt-3 text-[0.65rem] leading-snug text-muted-foreground">Os logins ficam salvos só neste navegador; as senhas não vão para o banco de dados.</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">Cancelar</button>
+          <button type="submit" disabled={!ok} data-testid="salvar-login" className="rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-primary-foreground transition enabled:hover:scale-105 disabled:opacity-40">Salvar</button>
+        </div>
+      </form>
     </div>
   );
 }
