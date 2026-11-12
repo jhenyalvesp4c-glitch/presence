@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { toast } from "sonner";
 import { loadProjectState } from "@/lib/data/project-data";
 import { backdropProps } from "@/lib/backdrop";
 import {
   BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Download, Eye, EyeOff, FileText, FileVideo, Folder,
   FolderOpen, FolderPlus, GraduationCap, KeyRound, LayoutGrid, Lightbulb, List, MoreHorizontal, Plus, Search, Send,
-  Sparkles, Star, Trash2, User, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil,
+  Sparkles, Star, Trash2, User, Users, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil, ClipboardCopy,
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
 import { OrionPanel } from "@/components/orion/OrionPanel";
@@ -20,7 +21,7 @@ type FolderT = { id: string; name: string; icon: typeof Folder; color: string; d
 
 const mk = (id: string, title: string, desc: string, kind: string, color: string, extra: Partial<Doc> = {}): Doc => ({ id, title, desc, kind, color, updated: "30/10", ...extra });
 const login = (polo: string, user: string, owner: string): Doc =>
-  mk(`l-${polo}`, polo, `Acesso do polo ${polo} ao CRM e plataforma de disparo.`, "Login", "amber", { login: { user, pass: `P4c@${polo.slice(0, 3).toLowerCase()}2026`, owner } });
+  mk(`l-${polo}`, polo, `Acesso do polo ${polo} ao CRM e plataforma de disparo.`, "Login", "amber", { login: { user, pass: `P4c@${polo.slice(0, 3).toLowerCase()}2026`, owner, dossier: polo } });
 
 const seedFolders: FolderT[] = [
   { id: "tut", name: "Tutoriais e Processos", icon: BookOpen, color: "cyan", docs: [
@@ -65,6 +66,23 @@ const loadLogins = (): Doc[] | null => {
   try { const raw = localStorage.getItem(LOGINS_KEY); const v = raw ? JSON.parse(raw) : null; return Array.isArray(v) ? (v as Doc[]) : null; } catch { return null; }
 };
 const saveLogins = (docs: Doc[]) => { try { localStorage.setItem(LOGINS_KEY, JSON.stringify(docs)); } catch { /* sem armazenamento */ } };
+/** Dossiê (polo) a que o login pertence; logins antigos, sem vínculo gravado, usam o nome do cartão. */
+const groupOf = (d: Doc) => d.login?.dossier?.trim() || d.title;
+const groupLogins = (docs: Doc[]) => {
+  const m = new Map<string, Doc[]>();
+  for (const d of docs) if (d.login) { const k = groupOf(d); (m.get(k) ?? m.set(k, []).get(k)!).push(d); }
+  return [...m.entries()].map(([name, logins]) => ({ name, logins }));
+};
+/** Copia para a área de transferência; se o navegador bloquear a API moderna, usa o método antigo. */
+async function copyText(v: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(v); return true; } catch { /* tenta o método antigo */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = v; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy"); ta.remove(); return ok;
+  } catch { return false; }
+}
 const newId = () => `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
 const allDocs = (fs: FolderT[]): (Doc & { folder: string })[] =>
@@ -104,7 +122,9 @@ function Library({ projectId }: { projectId: string }) {
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const [trash, setTrash] = useState<Doc[]>([]);
   const [dossiers, setDossiers] = useState<string[]>([]);
-  const [editing, setEditing] = useState<Doc | "new" | null>(null);
+  const [editing, setEditing] = useState<Doc | { preset: string } | null>(null);
+  const [group, setGroup] = useState<string | null>(null);
+  const [allGroups, setAllGroups] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -125,6 +145,8 @@ function Library({ projectId }: { projectId: string }) {
   };
 
   const docs = useMemo(() => allDocs(folders), [folders]);
+  const logins = findFolder(folders, "log")?.docs ?? [];
+  const groups = useMemo(() => groupLogins(logins), [logins]);
   const folder = findFolder(folders, cur) ?? folders[0]!;
   const sel = docs.find((d) => d.id === selId);
   const shown = (q ? docs.filter((d) => (d.title + d.desc + d.kind + d.folder).toLowerCase().includes(q.toLowerCase())) : folder.docs);
@@ -134,7 +156,7 @@ function Library({ projectId }: { projectId: string }) {
     return walk(fs);
   });
   const addDoc = () => {
-    if (cur === "log" && !q) { setEditing("new"); return; }
+    if (cur === "log" && !q) { setEditing({ preset: "" }); return; }
     const id = `n${Date.now()}`;
     setFolders((fs) => mapFolders(fs, cur, (f) => ({ ...f, docs: [mk(id, "Novo documento", "Clique para descrever este documento.", "Rascunho", "cyan", { updated: "agora" }), ...f.docs] })));
     setSelId(id); setQ("");
@@ -232,24 +254,56 @@ function Library({ projectId }: { projectId: string }) {
 
           {/* Logins */}
           <div className="glass rounded-3xl p-4 animate-rise" style={{ animationDelay: ".1s" }}>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="icon-tile h-11 w-11 !rounded-2xl" style={tint("violet")}><KeyRound size={19} /></span>
               <div className="mr-auto">
                 <h3 className="font-display text-lg font-semibold">Logins dos Dossiês</h3>
-                <p className="text-[0.7rem] text-muted-foreground">Acesso de usuários por dossiê · {findFolder(folders, "log")?.docs.length ?? 0} itens</p>
+                <p className="text-[0.7rem] text-muted-foreground">{groups.length} dossiê{groups.length === 1 ? "" : "s"} · {logins.length} login{logins.length === 1 ? "" : "s"}</p>
               </div>
-              <button onClick={() => setEditing("new")} data-testid="novo-login" className="flex items-center gap-1 rounded-full border border-amber/50 px-3 py-1.5 text-xs text-amber transition hover:bg-amber/10"><Plus size={12} /> Novo login</button>
-              <button onClick={() => { setCur("log"); setOpen((o) => ({ ...o, log: true })); }} className="glass flex items-center gap-1 rounded-full px-3 py-1.5 text-xs transition hover:text-cyan">Ver tudo <ArrowRight size={12} /></button>
+              <button onClick={() => setEditing({ preset: group ?? "" })} data-testid="novo-login" className="flex items-center gap-1 rounded-full border border-amber/50 px-3 py-1.5 text-xs text-amber transition hover:bg-amber/10"><Plus size={12} /> Novo login</button>
+              <button onClick={() => { setAllGroups((v) => !v); setGroup(null); }} data-testid="ver-tudo" aria-pressed={allGroups}
+                className={`glass flex items-center gap-1 rounded-full px-3 py-1.5 text-xs transition hover:text-cyan ${allGroups ? "!border-cyan/60 text-cyan" : ""}`}>{allGroups ? "Recolher" : "Ver tudo"} <ArrowRight size={12} className={allGroups ? "-rotate-90" : ""} /></button>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {(findFolder(folders, "log")?.docs ?? []).slice(0, 3).map((d, i) => <LoginCard key={d.id} d={d} color={["amber", "emerald", "violet"][i % 3]!} onOpen={() => setSelId(d.id)} onEdit={() => setEditing(d)} onDelete={() => removeLogin(d)} />)}
-              {!(findFolder(folders, "log")?.docs.length) && <p className="py-6 text-center text-sm text-muted-foreground sm:col-span-3">Nenhum login ainda. Use "Novo login".</p>}
-            </div>
+
+            {!allGroups && (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="grupos-login">
+                {groups.map((g, i) => {
+                  const on = group === g.name;
+                  return (
+                    <button key={g.name} onClick={() => setGroup(on ? null : g.name)} data-testid={`grupo-login-${g.name}`} aria-pressed={on} style={tint(["amber", "emerald", "violet", "cyan", "pink"][i % 5]!)}
+                      className={`accent-card flex items-center gap-3 !rounded-2xl p-3 text-left transition ${on ? "!border-[var(--glow)] shadow-[0_0_28px_-8px_var(--glow)]" : ""}`}>
+                      <span className="icon-tile h-9 w-9 shrink-0 !rounded-full"><Users size={15} /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">{g.name}</span>
+                        <span className="block truncate text-[0.65rem] text-muted-foreground">{g.logins.length} usuário{g.logins.length === 1 ? "" : "s"} · {g.logins.map((l) => l.login!.owner).filter(Boolean).join(", ") || "sem responsável"}</span>
+                      </span>
+                      <ChevronRight size={14} className={`shrink-0 text-muted-foreground transition ${on ? "rotate-90 text-[var(--glow)]" : ""}`} />
+                    </button>
+                  );
+                })}
+                {!groups.length && <p className="py-6 text-center text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">Nenhum login ainda. Use “Novo login”.</p>}
+              </div>
+            )}
+
+            {(allGroups ? groups : groups.filter((g) => g.name === group)).map((g, gi) => (
+              <div key={g.name} className="mt-4 rounded-2xl border border-border/70 bg-secondary/20 p-3 animate-rise" data-testid={`logins-de-${g.name}`}>
+                <div className="flex items-center gap-2">
+                  <Users size={14} className="text-amber" />
+                  <h4 className="mr-auto text-sm font-semibold">{g.name} <span className="font-normal text-muted-foreground">· {g.logins.length} usuário{g.logins.length === 1 ? "" : "s"}</span></h4>
+                  <button onClick={() => setEditing({ preset: g.name })} className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[0.68rem] text-muted-foreground transition hover:border-amber/50 hover:text-amber"><Plus size={11} /> Usuário em {g.name}</button>
+                  {!allGroups && <button onClick={() => setGroup(null)} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={14} /></button>}
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {g.logins.map((d, i) => <LoginCard key={d.id} d={d} heading="usuario" color={["amber", "emerald", "violet", "cyan"][(gi + i) % 4]!} onOpen={() => setSelId(d.id)} onEdit={() => setEditing(d)} onDelete={() => removeLogin(d)} />)}
+                </div>
+              </div>
+            ))}
+            {!allGroups && !group && groups.length > 0 && <p className="mt-3 text-center text-[0.7rem] text-muted-foreground">Toque em um dossiê para ver todos os logins dele.</p>}
           </div>
         </section>
 
         {/* detalhes */}
-        {editing && <LoginEditor initial={editing === "new" ? null : editing} dossiers={dossiers} onSave={saveLogin} onClose={() => setEditing(null)} />}
+        {editing && <LoginEditor initial={"id" in editing ? editing : null} preset={"preset" in editing ? editing.preset : ""} dossiers={dossiers} onSave={saveLogin} onClose={() => setEditing(null)} />}
         <DocDetail key={sel?.id} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
       </div>
     </div>
@@ -288,35 +342,45 @@ function TreeNode({ f, depth, open, setOpen, cur, selId, onFolder, onDoc }: {
   );
 }
 
-function LoginCard({ d, color, onOpen, onEdit, onDelete }: { d: Doc; color: string; onOpen: () => void; onEdit?: () => void; onDelete?: () => void }) {
+function LoginCard({ d, color, onOpen, onEdit, onDelete, heading = "dossie" }: { d: Doc; color: string; onOpen: () => void; onEdit?: () => void; onDelete?: () => void; heading?: "dossie" | "usuario" }) {
   const [show, setShow] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const copy = (k: string, v: string) => { navigator.clipboard?.writeText(v).catch(() => {}); setCopied(k); setTimeout(() => setCopied(null), 1200); };
+  const copy = async (k: string, v: string, what: string) => {
+    if (await copyText(v)) { setCopied(k); setTimeout(() => setCopied(null), 1400); toast.success(`${what} copiado`); }
+    else toast.error("Não consegui copiar. Selecione o texto e copie manualmente.");
+  };
   if (!d.login) return null;
+  const l = d.login;
+  const title = heading === "usuario" ? l.owner || l.user : d.title;
+  const sub = heading === "usuario" ? d.title : l.owner || "—";
   return (
-    <div className="accent-card group relative !rounded-2xl p-3" style={tint(color)}>
-      <button onClick={onOpen} className="flex w-full items-center gap-2 text-left">
-        <span className="icon-tile h-9 w-9 !rounded-full transition group-hover:shadow-[0_0_18px_-4px_var(--glow)]"><User size={16} /></span>
+    <div className="accent-card group relative !rounded-2xl p-3" style={tint(color)} data-testid="login-card">
+      <button onClick={onOpen} className="flex w-full items-center gap-2 pr-14 text-left">
+        <span className="icon-tile h-9 w-9 shrink-0 !rounded-full transition group-hover:shadow-[0_0_18px_-4px_var(--glow)]"><User size={16} /></span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">{d.title}</span>
-          <span className="flex items-center gap-1 truncate text-[0.65rem] text-muted-foreground"><User size={9} /> {d.login.owner || "—"}</span>
+          <span className="block truncate text-sm font-semibold">{title}</span>
+          <span className="flex items-center gap-1 truncate text-[0.65rem] text-muted-foreground"><User size={9} /> {sub}</span>
         </span>
       </button>
       {onEdit && onDelete && <HoverActions onEdit={onEdit} onDelete={onDelete} className="right-2 top-2" />}
-      <Cred label="Usuário" value={d.login.user} onCopy={() => copy("u", d.login!.user)} copied={copied === "u"} />
-      <Cred label="Senha" value={show ? d.login.pass : "••••••••••"} onCopy={() => copy("p", d.login!.pass)} copied={copied === "p"}
-        extra={<button onClick={() => setShow((s) => !s)} className="text-muted-foreground hover:text-[var(--glow)]">{show ? <EyeOff size={12} /> : <Eye size={12} />}</button>} />
+      <Cred label="Usuário" value={l.user} onCopy={() => copy("u", l.user, "Usuário")} copied={copied === "u"} testid="copiar-usuario" />
+      <Cred label="Senha" value={show ? l.pass : "••••••••••"} onCopy={() => copy("p", l.pass, "Senha")} copied={copied === "p"} testid="copiar-senha"
+        extra={<button onClick={() => setShow((v) => !v)} aria-label={show ? "Ocultar senha" : "Mostrar senha"} className="text-muted-foreground hover:text-[var(--glow)]">{show ? <EyeOff size={12} /> : <Eye size={12} />}</button>} />
+      <button onClick={() => copy("all", `Usuário: ${l.user}\nSenha: ${l.pass}`, "Usuário e senha")} data-testid="copiar-tudo"
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[color-mix(in_oklab,var(--glow)_40%,transparent)] py-1.5 text-[0.68rem] text-[var(--glow)] transition hover:bg-[color-mix(in_oklab,var(--glow)_10%,transparent)]">
+        {copied === "all" ? <><Check size={12} /> Copiado</> : <><ClipboardCopy size={12} /> Copiar usuário e senha</>}
+      </button>
     </div>
   );
 }
 
-function Cred({ label, value, onCopy, copied, extra }: { label: string; value: string; onCopy: () => void; copied: boolean; extra?: React.ReactNode }) {
+function Cred({ label, value, onCopy, copied, extra, testid }: { label: string; value: string; onCopy: () => void; copied: boolean; extra?: React.ReactNode; testid?: string }) {
   return (
     <div className="mt-2 flex items-center gap-2 rounded-lg bg-secondary/50 px-2 py-1.5 text-[0.68rem]">
       <span className="text-muted-foreground">{label}:</span>
       <span className="min-w-0 flex-1 truncate font-mono">{value}</span>
       {extra}
-      <button onClick={onCopy} className="text-muted-foreground hover:text-[var(--glow)]">{copied ? <Check size={12} className="text-emerald" /> : <Copy size={12} />}</button>
+      <button onClick={onCopy} aria-label={`Copiar ${label.toLowerCase()}`} data-testid={testid} className="text-muted-foreground hover:text-[var(--glow)]">{copied ? <Check size={12} className="text-emerald" /> : <Copy size={12} />}</button>
     </div>
   );
 }
@@ -469,10 +533,10 @@ function HoverActions({ onEdit, onDelete, className }: { onEdit: () => void; onD
   );
 }
 
-function LoginEditor({ initial, dossiers, onSave, onClose }: { initial: Doc | null; dossiers: string[]; onSave: (d: Doc) => void; onClose: () => void }) {
+function LoginEditor({ initial, preset = "", dossiers, onSave, onClose }: { initial: Doc | null; preset?: string; dossiers: string[]; onSave: (d: Doc) => void; onClose: () => void }) {
   const l = initial?.login;
-  const [dossier, setDossier] = useState(l?.dossier ?? (initial ? "" : ""));
-  const [title, setTitle] = useState(initial?.title ?? "");
+  const [dossier, setDossier] = useState(l?.dossier ?? preset);
+  const [title, setTitle] = useState(initial?.title ?? preset);
   const [owner, setOwner] = useState(l?.owner ?? "");
   const [user, setUser] = useState(l?.user ?? "");
   const [pass, setPass] = useState(l?.pass ?? "");
