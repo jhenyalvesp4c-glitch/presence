@@ -26,6 +26,8 @@ import { Route as SaudeRouteImport } from './routes/saude'
 import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as TreinoRouteImport } from './routes/treino'
 import { Route as ApiMcpRouteImport } from './routes/api.mcp'
+import { Route as ApiTtsRouteImport } from './routes/api.tts'
+import { Route as ApiVozRouteImport } from './routes/api.voz'
 import { Route as DietaNovaRouteImport } from './routes/dieta.nova'
 import { Route as MedidasNovaRouteImport } from './routes/medidas.nova'
 import { Route as OrganizarProntoRouteImport } from './routes/organizar_.pronto'
@@ -121,6 +123,16 @@ const ApiMcpRoute = ApiMcpRouteImport.update({
   path: '/api/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTtsRoute = ApiTtsRouteImport.update({
+  id: '/api/tts',
+  path: '/api/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVozRoute = ApiVozRouteImport.update({
+  id: '/api/voz',
+  path: '/api/voz',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DietaNovaRoute = DietaNovaRouteImport.update({
   id: '/dieta/nova',
   path: '/dieta/nova',
@@ -185,6 +197,8 @@ export interface FileRoutesByFullPath {
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
+  '/api/tts': typeof ApiTtsRoute
+  '/api/voz': typeof ApiVozRoute
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
@@ -213,6 +227,8 @@ export interface FileRoutesByTo {
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
+  '/api/tts': typeof ApiTtsRoute
+  '/api/voz': typeof ApiVozRoute
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
@@ -242,6 +258,8 @@ export interface FileRoutesById {
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
+  '/api/tts': typeof ApiTtsRoute
+  '/api/voz': typeof ApiVozRoute
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar_/pronto': typeof OrganizarProntoRoute
@@ -272,6 +290,8 @@ export interface FileRouteTypes {
     | '/tarefas'
     | '/treino'
     | '/api/mcp'
+    | '/api/tts'
+    | '/api/voz'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar/pronto'
@@ -300,6 +320,8 @@ export interface FileRouteTypes {
     | '/tarefas'
     | '/treino'
     | '/api/mcp'
+    | '/api/tts'
+    | '/api/voz'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar/pronto'
@@ -328,6 +350,8 @@ export interface FileRouteTypes {
     | '/tarefas'
     | '/treino'
     | '/api/mcp'
+    | '/api/tts'
+    | '/api/voz'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar_/pronto'
@@ -357,6 +381,8 @@ export interface RootRouteChildren {
   TarefasRoute: typeof TarefasRoute
   TreinoRoute: typeof TreinoRoute
   ApiMcpRoute: typeof ApiMcpRouteWithChildren
+  ApiTtsRoute: typeof ApiTtsRoute
+  ApiVozRoute: typeof ApiVozRoute
   DietaNovaRoute: typeof DietaNovaRoute
   MedidasNovaRoute: typeof MedidasNovaRoute
   OrganizarProntoRoute: typeof OrganizarProntoRoute
@@ -488,6 +514,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMcpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tts': {
+      id: '/api/tts'
+      path: '/api/tts'
+      fullPath: '/api/tts'
+      preLoaderRoute: typeof ApiTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/voz': {
+      id: '/api/voz'
+      path: '/api/voz'
+      fullPath: '/api/voz'
+      preLoaderRoute: typeof ApiVozRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dieta/nova': {
       id: '/dieta/nova'
       path: '/dieta/nova'
@@ -583,6 +623,8 @@ const rootRouteChildren: RootRouteChildren = {
   TarefasRoute: TarefasRoute,
   TreinoRoute: TreinoRoute,
   ApiMcpRoute: ApiMcpRouteWithChildren,
+  ApiTtsRoute: ApiTtsRoute,
+  ApiVozRoute: ApiVozRoute,
   DietaNovaRoute: DietaNovaRoute,
   MedidasNovaRoute: MedidasNovaRoute,
   OrganizarProntoRoute: OrganizarProntoRoute,

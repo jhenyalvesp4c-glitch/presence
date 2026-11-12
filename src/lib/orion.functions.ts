@@ -22,7 +22,7 @@ const rows = <T>(r: Rows<T>, what: string): T[] => {
 };
 
 /** Reúne o que há no sistema como documentos pesquisáveis. */
-async function loadCorpus() {
+export async function loadCorpus() {
   const { supabase } = await import("./data/db");
   const [entries, projects, demands, hist, notes, execs, tasks, pnotes, msgs, trains, scripts, dfiles] = await Promise.all([
     supabase.from("brain_entries").select("id, title, text, entry_date, project_id, dossier_names, source, ai_summary, attachments").order("entry_date", { ascending: false }).limit(1500),

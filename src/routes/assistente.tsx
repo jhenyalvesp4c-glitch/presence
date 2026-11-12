@@ -10,6 +10,7 @@ import { LivingOrb } from "@/components/LivingOrb";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { ActionChooser, type HomeAction } from "@/components/home/ActionChooser";
 import { OrionPanel } from "@/components/orion/OrionPanel";
+import { useVoice } from "@/lib/voice/use-voice";
 import { useHome } from "@/lib/use-home";
 import { useSpeech } from "@/lib/use-speech";
 import imgRotina from "@/assets/card-rotina.jpg";
@@ -107,6 +108,7 @@ function RailBits({ Icon, label, on }: { Icon: typeof Home; label: string; on: b
 function Assistente() {
 
   const home = useHome();
+  const voice = useVoice();
   const [text, setText] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   // Central de entrada: texto, prints e arquivos interpretados e levados ao módulo certo.
@@ -178,9 +180,9 @@ function Assistente() {
             </div>
             <div className="flex items-center gap-4">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: listening ? "var(--emerald)" : "var(--cyan)", boxShadow: "0 0 8px currentColor" }} />
-              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening ? "Ouvindo…" : home.thinking ? "Pensando…" : "Standby"}</span>
+              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? "Pensando…" : "Standby"}</span>
               <span className="h-8 w-px bg-border" />
-              <button onClick={() => toggleVoice("chat")} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz"><AudioLines size={18} /></button>
+              <button onClick={voice.toggle} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz" data-testid="voz-cabecalho"><AudioLines size={18} /></button>
             </div>
           </header>
 
@@ -200,12 +202,12 @@ function Assistente() {
               </Link>
             </div>
 
-            <button onClick={() => toggleVoice("chat")} aria-label="Tocar para falar"
+            <button onClick={voice.toggle} aria-label="Tocar para falar" data-testid="orbe"
               className="relative mx-auto aspect-[4/3] w-[clamp(240px,36vw,620px)] shrink-0 animate-rise" style={{ animationDelay: ".2s" }}>
               <div className="pointer-events-none absolute inset-0 origin-center scale-[1.12] sm:scale-[1.32] md:scale-[1.36] lg:scale-[1.45] xl:scale-[1.55]">
                 <div className="absolute inset-[12%] rounded-full blur-3xl transition" style={{ background: `color-mix(in oklab, var(--${listening ? "emerald" : "cyan"}) ${listening ? 38 : 26}%, transparent)` }} />
                 <div className="absolute inset-[30%] rounded-full blur-2xl transition" style={{ background: `color-mix(in oklab, var(--violet) ${listening ? 30 : 20}%, transparent)` }} />
-                <LivingOrb active={listening} />
+                <LivingOrb active={listening || voice.phase === "listening" || voice.phase === "speaking"} />
               </div>
 
             </button>
