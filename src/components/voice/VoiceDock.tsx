@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { ArrowUpRight, Check, Mic, Send, Square, X } from "lucide-react";
+import { ArrowUpRight, Check, Mic, Send, Square, Volume2, X } from "lucide-react";
 
 import { useVoice, type Phase } from "@/lib/voice/use-voice";
 
@@ -58,8 +58,10 @@ export function VoiceDock() {
               {busy && <button onClick={v.toggle} aria-label="Interromper e falar" title="Interromper" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition hover:border-emerald/60 hover:text-emerald"><Mic size={15} /></button>}
               <button onClick={v.stop} aria-label="Encerrar conversa" title="Encerrar" data-testid="voz-encerrar" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition hover:border-destructive/60 hover:text-destructive"><Square size={14} /></button>
             </div>
+            {v.note && <p className="mt-2 rounded-xl border border-amber/40 bg-amber/10 px-3 py-1.5 text-[0.72rem] leading-snug text-amber" role="alert" data-testid="voz-aviso">{v.note}</p>}
             <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) { v.sendText(text); setText(""); } }} className="mt-2 flex items-center gap-2 border-t border-border/60 pt-2">
               <input value={text} onChange={(e) => setText(e.target.value)} placeholder="ou digite aqui…" maxLength={500} data-testid="voz-digitar" className="min-w-0 flex-1 bg-transparent px-1 text-xs outline-none placeholder:text-muted-foreground" />
+              <button type="button" onClick={v.testVoice} aria-label="Testar a voz" title="Testar a voz (toca uma frase)" data-testid="voz-testar" className="grid h-7 w-7 place-items-center rounded-lg border border-border text-muted-foreground transition hover:border-cyan/60 hover:text-cyan"><Volume2 size={13} /></button>
               <button type="submit" disabled={!text.trim()} aria-label="Enviar" className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-brand text-primary-foreground disabled:opacity-40"><Send size={12} /></button>
             </form>
           </div>

@@ -8,6 +8,21 @@ const json = (status: number, v: unknown) => new Response(JSON.stringify(v), { s
 export const Route = createFileRoute("/api/tts")({
   server: {
     handlers: {
+      // Diagnóstico: confere a configuração do ElevenLabs sem expor nada secreto.
+      GET: async ({ request }) => {
+        const { guard } = await import("@/lib/voice/http");
+        const blocked = guard(request, "tts");
+        if (blocked) return blocked;
+        const info = { chave: !!process.env["ELEVENLABS_API_KEY"], voz: !!process.env["ELEVENLABS_VOICE_ID"], modelo: process.env["ELEVENLABS_MODEL"] ?? "eleven_flash_v2_5", openai: !!process.env["OPENAI_API_KEY"] };
+        if (!info.chave) return json(200, { ...info, ok: false, erro: "Sem ELEVENLABS_API_KEY no servidor." });
+        try {
+          const { elevenSpeak } = await import("@/lib/mcp/openai");
+          const res = await elevenSpeak("Olá.");
+          const bytes = res.ok ? (await res.arrayBuffer()).byteLength : 0;
+          const erro = res.ok ? undefined : (await res.text().catch(() => "")).slice(0, 300);
+          return json(200, { ...info, ok: res.ok && bytes > 200, status: res.status, tipo: res.headers.get("content-type"), bytes, ...(erro ? { erro } : {}) });
+        } catch (e) { return json(200, { ...info, ok: false, erro: e instanceof Error ? e.message : "falha" }); }
+      },
       POST: async ({ request }) => {
         const { guard } = await import("@/lib/voice/http");
         const blocked = guard(request, "tts");
