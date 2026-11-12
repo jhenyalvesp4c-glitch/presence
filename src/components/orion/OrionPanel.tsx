@@ -10,7 +10,7 @@ import { MAX_PENDING, filesFromClipboard, sizeLabel, toPending, type Pending } f
 import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
 import { OrionReport, type Report } from "./OrionReport";
 
-type Mode = "ask" | "doc";
+export type Mode = "ask" | "doc";
 type Answer = Report;
 
 const SUGGEST = ["O que eu documentei hoje?", "Teve alguma falha nos disparos este mês?", "O que aconteceu na semana passada?", "Quais demandas estão em andamento?"];
@@ -19,8 +19,8 @@ const br = (iso: string) => iso.split("-").reverse().join("/");
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as React.CSSProperties;
 
 /** Orion: pergunta e documenta. Usado na caixa flutuante (todas as páginas) e na Documentação. */
-export function OrionPanel({ autoFocus = false, className = "", onDocumented }: { autoFocus?: boolean; className?: string; onDocumented?: () => void }) {
-  const [mode, setMode] = useState<Mode>("ask");
+export function OrionPanel({ autoFocus = false, className = "", onDocumented, initialMode = "ask" }: { autoFocus?: boolean; className?: string; onDocumented?: () => void; initialMode?: Mode }) {
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [text, setText] = useState("");
   const [date, setDate] = useState(todayIso());
   const [busy, setBusy] = useState(false);

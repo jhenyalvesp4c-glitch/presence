@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
+import { ActionChooser, type HomeAction } from "@/components/home/ActionChooser";
+import { OrionPanel } from "@/components/orion/OrionPanel";
 import { useHome } from "@/lib/use-home";
 import { useSpeech } from "@/lib/use-speech";
 import imgRotina from "@/assets/card-rotina.jpg";
@@ -108,7 +110,13 @@ function Assistente() {
   const [text, setText] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   // Central de entrada: texto, prints e arquivos interpretados e levados ao módulo certo.
-  const [inboxOpen, setInboxOpen] = useState(false);
+  // Painel aberto abaixo do botão: registrar demanda (Central de entrada) ou Orion (documentar / perguntar).
+  const [panel, setPanel] = useState<HomeAction | null>(null);
+  const [chooser, setChooser] = useState(false);
+  const inboxOpen = panel === "demand";
+  const setInboxOpen = (v: boolean | ((o: boolean) => boolean)) => setPanel((p) => ((typeof v === "function" ? v(p === "demand") : v) ? "demand" : p === "demand" ? null : p));
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pick = (a: HomeAction) => { setChooser(false); setPanel(a); setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 120); };
   const [incoming, setIncoming] = useState<{ id: number; text: string } | null>(null);
   const [active, setActive] = useState(0);
   const voiceTarget = useRef<"chat" | "demand">("chat");
@@ -224,7 +232,7 @@ function Assistente() {
           {/* Action */}
           <div className="w-full space-y-4 px-[3%] animate-rise" style={{ animationDelay: ".3s" }}>
             <div className="flex items-center gap-4">
-              <button onClick={() => toggleVoice("demand")} className="flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full py-5 text-base font-semibold text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)]"
+              <button onClick={() => (listening ? speech.stop() : setChooser(true))} data-testid="registrar-demanda" className="flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full py-5 text-base font-semibold text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)]"
                 style={{ background: "linear-gradient(90deg, var(--cyan), oklch(0.66 0.19 265) 55%, var(--violet))" }}>
                 <Mic size={22} className={listening ? "animate-pulse-ring" : ""} /> {listening ? (speech.interim || "Ouvindo…") : "Registrar demanda"}
               </button>
@@ -246,7 +254,21 @@ function Assistente() {
               </p>
             )}
 
-            {inboxOpen && <InboxPanel incoming={incoming} onClose={() => setInboxOpen(false)} onListen={() => toggleVoice("demand")} listening={listening} interim={speech.interim} />}
+            <div ref={panelRef}>
+              {inboxOpen && <InboxPanel incoming={incoming} onClose={() => setPanel(null)} onListen={() => toggleVoice("demand")} listening={listening} interim={speech.interim} />}
+              {(panel === "doc" || panel === "ask") && (
+                <section className="glass relative mx-auto w-full max-w-3xl rounded-3xl p-4 animate-rise sm:p-5" data-testid="painel-orion-inicio" style={tint(panel === "doc" ? "violet" : "emerald")}>
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="icon-tile h-10 w-10 !rounded-2xl"><Sparkles size={17} /></span>
+                    <div className="mr-auto"><p className="mono-caps !text-[0.62rem]">Orion · segundo cérebro</p><h3 className="font-display text-lg font-semibold leading-tight">{panel === "doc" ? "Documentar" : "Perguntar"}</h3></div>
+                    <button onClick={() => setChooser(true)} className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">Trocar</button>
+                    <button onClick={() => setPanel(null)} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+                  </div>
+                  <OrionPanel key={panel} initialMode={panel} autoFocus />
+                </section>
+              )}
+            </div>
+            {chooser && <ActionChooser onPick={pick} onClose={() => setChooser(false)} />}
 
             {(home.messages.length > 0 || home.thinking) && (
               <div className="glass mx-auto max-h-[420px] w-full max-w-3xl space-y-3 overflow-y-auto rounded-3xl p-5">
