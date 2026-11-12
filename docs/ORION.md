@@ -6,6 +6,9 @@ Caixa disponível em **todas as páginas** (botão roxo no canto inferior direit
 - **Perguntar**: pesquisa em tudo o que o Presence guarda e responde com IA (OpenAI), citando as fontes numeradas. Entende "hoje", "ontem", "semana passada", "este mês", "mês passado".
 - **Documentar**: grava uma anotação livre (com data do acontecimento, padrão = hoje). Os dossiês/polos citados no texto viram etiquetas. As últimas aparecem na lista, com apagar ao passar o mouse.
 
+## Como a resposta é mostrada
+A resposta vem como **relatório**: protocolo e data, a pergunta, o texto organizado (negrito, listas e números de fonte clicáveis), os **arquivos encontrados** (imagens grandes com ampliação, PDFs e outros com download) e os **documentos consultados** em cartões numerados (Nº 01…), com tipo, data, dossiê, trecho com as palavras destacadas e os arquivos anexos. As fontes citadas aparecem primeiro; as demais ficam em "Ver outras fontes". Os arquivos vêm tanto das anotações do Orion quanto dos anexos das demandas.
+
 ## Voz
 Nos dois modos há um botão de microfone: grave, toque no ✓ para parar e o áudio vira texto no campo (editável) antes de enviar; o ✕ cancela. A transcrição é feita pela OpenAI (`whisper-1`; mude com `OPENAI_TRANSCRIBE_MODEL`), em português, com limite de 3 minutos por gravação. Precisa de permissão de microfone no navegador e de `OPENAI_API_KEY`.
 

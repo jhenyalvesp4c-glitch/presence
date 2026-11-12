@@ -120,3 +120,15 @@ export async function syncMirrors(list: Mirror[]) {
   await upsertMirrors(changed);
   for (const m of changed) mirrorHash.set(m.refId, hash(m));
 }
+
+/** Endereços temporários (1 h) para arquivos de qualquer bucket do Presence (anotações e anexos de demandas). */
+export async function signedUrlsFor(files: { bucket: string; path: string }[]): Promise<Record<string, { view: string; download: string }>> {
+  const out: Record<string, { view: string; download: string }> = {};
+  const byBucket = new Map<string, string[]>();
+  for (const f of files) { const l = byBucket.get(f.bucket) ?? []; if (!l.includes(f.path)) l.push(f.path); byBucket.set(f.bucket, l); }
+  await Promise.all([...byBucket.entries()].map(async ([bucket, paths]) => {
+    const [view, down] = await Promise.all([supabase.storage.from(bucket).createSignedUrls(paths, 3600), supabase.storage.from(bucket).createSignedUrls(paths, 3600, { download: true })]);
+    for (const v of view.data ?? []) if (v.path && v.signedUrl) out[`${bucket}/${v.path}`] = { view: v.signedUrl, download: down.data?.find((d) => d.path === v.path)?.signedUrl ?? v.signedUrl };
+  }));
+  return out;
+}

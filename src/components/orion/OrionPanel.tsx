@@ -8,12 +8,11 @@ import { transcribeAudio } from "@/lib/audio.functions";
 import { summarizeFiles } from "@/lib/brain.functions";
 import { MAX_PENDING, filesFromClipboard, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
-import { KIND_LABEL, type OrionKind } from "@/lib/orion";
+import { OrionReport, type Report } from "./OrionReport";
 
 type Mode = "ask" | "doc";
-type Answer = Extract<AskResult, { ok: true }> & { question: string };
+type Answer = Report;
 
-const KIND_COLOR: Record<OrionKind, string> = { registro: "violet", documentacao: "amber", demanda: "cyan", tarefa: "amber", nota: "emerald", conversa: "pink", treinamento: "emerald" };
 const SUGGEST = ["O que eu documentei hoje?", "Teve alguma falha nos disparos este mês?", "O que aconteceu na semana passada?", "Quais demandas estão em andamento?"];
 
 const br = (iso: string) => iso.split("-").reverse().join("/");
@@ -202,34 +201,7 @@ export function OrionPanel({ autoFocus = false, className = "", onDocumented }: 
       )}
       {error && <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
 
-      {answer && mode === "ask" && (
-        <div className="glass relative overflow-hidden rounded-2xl p-4 animate-rise" style={tint("violet")} data-testid="orion-resposta">
-          <p className="mono-caps">Orion · “{answer.question}”{answer.period ? ` · ${answer.period}` : ""}</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed" data-testid="orion-texto-resposta">{answer.answer}</p>
-          {answer.sources.length > 0 && (
-            <>
-              <p className="mono-caps mt-4">{answer.sources.length} fonte{answer.sources.length > 1 ? "s" : ""}</p>
-              <ul className="mt-2 space-y-2">
-                {answer.sources.map((s) => (
-                  <li key={s.id}>
-                    <a href={s.link} className="group block rounded-xl border border-border bg-secondary/30 p-2.5 transition hover:border-[color-mix(in_oklab,var(--glow)_55%,transparent)]" style={tint(KIND_COLOR[s.kind])}>
-                      <span className="flex items-center gap-2 text-[0.65rem] text-muted-foreground">
-                        <span className="font-mono text-[var(--glow)]">[{s.n}]</span>
-                        <span className="tag !px-1.5 !py-0 !text-[0.55rem]">{KIND_LABEL[s.kind]}</span>
-                        {s.date && <span>{br(s.date)}</span>}
-                        {s.where && <span className="min-w-0 truncate">· {s.where}</span>}
-                        <ArrowUpRight size={11} className="ml-auto shrink-0 opacity-0 transition group-hover:opacity-100" />
-                      </span>
-                      <span className="mt-1 block text-xs font-medium leading-snug">{s.title}</span>
-                      {s.snippet && s.snippet !== s.title && <span className="mt-0.5 block break-words text-[0.7rem] leading-snug text-muted-foreground">{s.snippet}</span>}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
+      {answer && mode === "ask" && <OrionReport r={answer} />}
 
       {mode === "doc" && recent.length > 0 && (
         <div data-testid="orion-recentes">

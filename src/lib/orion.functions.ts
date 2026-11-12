@@ -8,7 +8,7 @@ import { z } from "zod";
 import type { OrionSource } from "./orion";
 
 export type AskResult =
-  | { ok: true; mode: "ia" | "busca"; answer: string; sources: OrionSource[]; period: string | null; note?: string }
+  | { ok: true; mode: "ia" | "busca"; answer: string; sources: OrionSource[]; period: string | null; keywords: string[]; note?: string }
   | { ok: false; error: string };
 
 const askInput = z.object({ question: z.string().trim().min(2, "Escreva a pergunta.").max(600) });
@@ -24,7 +24,7 @@ const rows = <T>(r: Rows<T>, what: string): T[] => {
 /** Reúne o que há no sistema como documentos pesquisáveis. */
 async function loadCorpus() {
   const { supabase } = await import("./data/db");
-  const [entries, projects, demands, hist, notes, execs, tasks, pnotes, msgs, trains, scripts] = await Promise.all([
+  const [entries, projects, demands, hist, notes, execs, tasks, pnotes, msgs, trains, scripts, dfiles] = await Promise.all([
     supabase.from("brain_entries").select("id, title, text, entry_date, project_id, dossier_names, source, ai_summary, attachments").order("entry_date", { ascending: false }).limit(1500),
     supabase.from("projects").select("id, name"),
     supabase.from("project_demands").select("project_id, code, type, title, description, priority, status, deadline, dossier_name, updated_at").limit(2000),
@@ -36,12 +36,13 @@ async function loadCorpus() {
     supabase.from("assistant_messages").select("id, role, content, created_at").order("created_at", { ascending: false }).limit(1500),
     supabase.from("training_sessions").select("id, group_name, people, script_title, notes, created_at").limit(500),
     supabase.from("training_scripts").select("project_id, id, data, updated_at").limit(200),
+    supabase.from("demand_files").select("project_id, code, name, mime_type, size_bytes, storage_path").limit(2000),
   ]);
 
   const projName = new Map(rows(projects as Rows<{ id: string; name: string }>, "projetos").map((p) => [p.id, p.name]));
   const docs: import("./orion").OrionDoc[] = [];
 
-  type Entry = { id: string; title: string; text: string; entry_date: string; project_id: string | null; dossier_names: string[]; source: string; ai_summary: string; attachments: { name: string }[] | null };
+  type Entry = { id: string; title: string; text: string; entry_date: string; project_id: string | null; dossier_names: string[]; source: string; ai_summary: string; attachments: { path: string; name: string; mime: string; size: number }[] | null };
   for (const e of rows(entries as Rows<Entry>, "anotações")) {
     const files = (e.attachments ?? []).map((a) => a.name);
     const body = [e.text, files.length ? `Arquivos anexados: ${files.join(", ")}.` : "", e.ai_summary ? `Conteúdo lido dos arquivos:\n${e.ai_summary}` : ""].filter(Boolean).join("\n");
@@ -49,6 +50,7 @@ async function loadCorpus() {
       id: `registro:${e.id}`, kind: e.source === "documentacao" ? "documentacao" : "registro", title: e.title || e.text.replace(/\s+/g, " ").slice(0, 80) || files[0] || "Anotação", text: body, date: e.entry_date,
       where: [...(e.dossier_names ?? []), e.project_id ? projName.get(e.project_id) : undefined].filter(Boolean).join(", ") || undefined,
       link: e.source === "documentacao" ? "/demandas" : "/cerebro",
+      files: (e.attachments ?? []).map((a) => ({ bucket: "presence-app-brain-files", path: a.path, name: a.name, mime: a.mime, size: a.size })),
     });
   }
 
@@ -60,6 +62,11 @@ async function loadCorpus() {
   const H = byCode(rows(hist as Rows<{ project_id: string; code: string; label: string; text: string; status: string }>, "histórico"));
   const N = byCode(rows(notes as Rows<{ project_id: string; code: string; text: string }>, "observações"));
   const X = byCode(rows(execs as Rows<{ project_id: string; code: string; dossier_name: string; status: string; done_on: string | null; note: string }>, "execuções"));
+  const DF = new Map<string, import("./orion").FileRef[]>();
+  for (const f of rows(dfiles as Rows<{ project_id: string; code: string; name: string; mime_type: string; size_bytes: number | string; storage_path: string }>, "arquivos das demandas")) {
+    const k = `${f.project_id}|${f.code}`;
+    (DF.get(k) ?? DF.set(k, []).get(k)!).push({ bucket: "presence-app-demand-files", path: f.storage_path, name: f.name, mime: f.mime_type, size: Number(f.size_bytes) });
+  }
   const STATUS: Record<string, string> = { todo: "a fazer", doing: "em andamento", done: "concluída" };
   for (const d of rows(demands as Rows<{ project_id: string; code: string; type: string; title: string; description: string; priority: string; status: string; deadline: string; dossier_name: string | null; updated_at: string }>, "demandas")) {
     const k = `${d.project_id}|${d.code}`;
@@ -68,11 +75,13 @@ async function loadCorpus() {
       `Status: ${STATUS[d.status] ?? d.status}. Prioridade: ${d.priority}. Prazo: ${d.deadline || "sem prazo"}.`,
       ...(H.get(k) ?? []).map((h) => `Histórico ${h.label}: ${h.text} (${STATUS[h.status] ?? h.status})`),
       ...(N.get(k) ?? []).map((n) => `Observação: ${n.text}`),
+      ...((DF.get(k) ?? []).length ? [`Arquivos anexados: ${DF.get(k)!.map((f) => f.name).join(", ")}.`] : []),
       ...(X.get(k) ?? []).map((x) => `${x.dossier_name}: ${STATUS[x.status] ?? x.status}${x.done_on ? ` em ${x.done_on}` : ""}${x.note ? ` — ${x.note}` : ""}`),
     ].filter(Boolean);
     docs.push({
       id: `demanda:${k}`, kind: "demanda", title: `${d.code} ${d.title}`, text: lines.join("\n"), date: day(d.updated_at),
       where: [d.dossier_name, projName.get(d.project_id)].filter(Boolean).join(" · ") || undefined, link: `/demandas?projeto=${encodeURIComponent(d.project_id)}`,
+      files: DF.get(k),
     });
   }
 
@@ -130,10 +139,10 @@ export const orionAsk = createServerFn({ method: "POST" })
       const sources = toSources(docs, kws);
       const periodLabel = period?.label ?? null;
       if (!docs.length) {
-        return { ok: true, mode: "busca", answer: "Não encontrei nada sobre isso no que o Presence tem guardado. Se foi algo que aconteceu, use “Documentar” para registrar e eu passo a achar.", sources: [], period: periodLabel };
+        return { ok: true, mode: "busca", answer: "Não encontrei nada sobre isso no que o Presence tem guardado. Se foi algo que aconteceu, use “Documentar” para registrar e eu passo a achar.", sources: [], period: periodLabel, keywords: kws };
       }
       if (!process.env["OPENAI_API_KEY"]) {
-        return { ok: true, mode: "busca", answer: `Encontrei ${docs.length} registro${docs.length > 1 ? "s" : ""} relacionados. A resposta escrita pela IA ainda não está ligada (falta OPENAI_API_KEY no servidor), mas as fontes estão abaixo.`, sources, period: periodLabel };
+        return { ok: true, mode: "busca", answer: `Encontrei ${docs.length} registro${docs.length > 1 ? "s" : ""} relacionados. A resposta escrita pela IA ainda não está ligada (falta OPENAI_API_KEY no servidor), mas as fontes estão abaixo.`, sources, period: periodLabel, keywords: kws };
       }
       const { makeCreate, OpenAIError, explain } = await import("./mcp/openai");
       const { DEFAULT_MODEL } = await import("./mcp/interpret");
@@ -148,10 +157,10 @@ export const orionAsk = createServerFn({ method: "POST" })
           store: false,
         });
         const answer = textOf(msg);
-        if (!answer) return { ok: true, mode: "busca", answer: "A IA não devolveu texto desta vez, mas as fontes encontradas estão abaixo.", sources, period: periodLabel };
-        return { ok: true, mode: "ia", answer, sources, period: periodLabel };
+        if (!answer) return { ok: true, mode: "busca", answer: "A IA não devolveu texto desta vez, mas as fontes encontradas estão abaixo.", sources, period: periodLabel, keywords: kws };
+        return { ok: true, mode: "ia", answer, sources, period: periodLabel, keywords: kws };
       } catch (e) {
-        if (e instanceof OpenAIError) return { ok: true, mode: "busca", answer: `${explain(e, model)} Enquanto isso, estas são as fontes encontradas.`, sources, period: periodLabel };
+        if (e instanceof OpenAIError) return { ok: true, mode: "busca", answer: `${explain(e, model)} Enquanto isso, estas são as fontes encontradas.`, sources, period: periodLabel, keywords: kws };
         throw e;
       }
     } catch (e) {

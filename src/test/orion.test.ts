@@ -82,3 +82,13 @@ describe("Mapa do segundo cérebro", () => {
     expect(g.edges.length).toBe(4);
   });
 });
+
+import { toSources } from "@/lib/orion";
+describe("Fontes com arquivos", () => {
+  it("leva os arquivos do documento para a fonte", () => {
+    const d: OrionDoc = { id: "x", kind: "registro", title: "t", text: "texto", link: "/", files: [{ bucket: "b", path: "p.png", name: "p.png", mime: "image/png", size: 10 }] };
+    const [s] = toSources([d, { ...d, id: "y", files: undefined }], []);
+    expect(s!.files).toHaveLength(1);
+    expect(toSources([{ ...d, files: undefined }], [])[0]!.files).toEqual([]);
+  });
+});

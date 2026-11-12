@@ -4,6 +4,9 @@
  */
 export type OrionKind = "registro" | "documentacao" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento";
 
+/** Arquivo guardado no Presence (print, PDF, anexo de demanda…) que acompanha um documento. */
+export type FileRef = { bucket: string; path: string; name: string; mime: string; size: number };
+
 export type OrionDoc = {
   id: string;
   kind: OrionKind;
@@ -14,9 +17,10 @@ export type OrionDoc = {
   /** Projeto / dossiê a que o registro se refere (texto livre, entra na busca). */
   where?: string | undefined;
   link: string;
+  files?: FileRef[] | undefined;
 };
 
-export type OrionSource = { n: number; id: string; kind: OrionKind; title: string; snippet: string; date?: string | undefined; where?: string | undefined; link: string };
+export type OrionSource = { n: number; id: string; kind: OrionKind; title: string; snippet: string; date?: string | undefined; where?: string | undefined; link: string; files: FileRef[] };
 
 export const KIND_LABEL: Record<OrionKind, string> = {
   registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com a assistente", treinamento: "Treinamento",
@@ -119,7 +123,7 @@ export function snippet(text: string, kws: string[], max = 260): string {
 }
 
 export const toSources = (docs: OrionDoc[], kws: string[]): OrionSource[] =>
-  docs.map((d, i) => ({ n: i + 1, id: d.id, kind: d.kind, title: d.title, snippet: snippet(d.text, kws), date: d.date, where: d.where, link: d.link }));
+  docs.map((d, i) => ({ n: i + 1, id: d.id, kind: d.kind, title: d.title, snippet: snippet(d.text, kws), date: d.date, where: d.where, link: d.link, files: d.files ?? [] }));
 
 /** Texto das fontes para a IA (limitado, com número e data para citar). */
 export function sourcesForAi(docs: OrionDoc[], maxChars = 24_000): string {
@@ -142,4 +146,5 @@ Regras:
 - Responda SOMENTE com o que está nas fontes. Se não houver informação suficiente, diga isso com clareza e sugira o que ela poderia documentar; nunca invente.
 - Cite as fontes pelo número entre colchetes, ex.: [2]. Datas sempre no formato dia/mês/ano.
 - Para contagens, somas e médias (ex.: falhas em disparos), mostre a conta com os números que encontrou nas fontes e avise se podem estar faltando registros.
-- Seja direto e organizado (frases curtas; lista quando houver vários itens). Português do Brasil.`;
+- Se uma fonte tiver arquivos anexados (prints, PDFs, imagens) e eles forem relevantes, diga que estão anexados àquela fonte, ex.: "há um print anexado em [2]". O sistema exibe os arquivos das fontes que você citar.
+- Formato: comece com a resposta direta em 1 ou 2 frases. Depois, se houver vários pontos, use lista com "- ". Destaque nomes, datas e números importantes com **negrito**. Sem títulos e sem tabelas. Português do Brasil.`;
