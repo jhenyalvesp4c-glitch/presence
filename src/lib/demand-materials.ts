@@ -55,7 +55,8 @@ async function fileRows(projectId: string, code: string): Promise<FileRow[]> {
   return must(await supabase.from("demand_files").select(FILE_COLS).eq("project_id", projectId).eq("code", code).order("added_at").order("id")) as FileRow[];
 }
 
-const notify = (key: string) => window.dispatchEvent(new CustomEvent(EVENT, { detail: key }));
+// No servidor (MCP) não há janela: só avisa quando existe `window`.
+const notify = (key: string) => { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENT, { detail: key })); };
 export function onMaterialsChange(fn: (key: string) => void) {
   const h = (e: Event) => fn((e as CustomEvent<string>).detail);
   window.addEventListener(EVENT, h);

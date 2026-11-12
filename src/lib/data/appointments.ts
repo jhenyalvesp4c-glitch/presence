@@ -27,7 +27,7 @@ export async function syncSchedule(taskId: string, d: AppointmentDraft | null) {
 }
 
 /** Grava o compromisso (tarefa da categoria Compromissos) e devolve o id da tarefa. */
-export async function saveAppointment(draft: AppointmentDraft, compId: string | undefined, projectId: string, id?: string): Promise<string> {
+export async function saveAppointment(draft: AppointmentDraft, compId: string | undefined, projectId: string | null, id?: string): Promise<string> {
   if (!compId) throw new Error("A categoria Compromissos ainda não carregou.");
   let taskId = id;
   if (id) {

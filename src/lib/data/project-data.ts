@@ -71,7 +71,7 @@ export async function saveProjects(prev: Project[], next: Project[]) {
 export type ProjectState = { ds: DossierState; notes: Note[] };
 
 /** Garante a linha do projeto "p4c" (padrão da página de Demandas). Os demais vêm da tela de projetos. */
-async function ensureProject(pid: string) {
+export async function ensureProject(pid: string) {
   const found = must(await supabase.from("projects").select("id, legacy_imported, label_singular, label_plural").eq("id", pid).limit(1)) as
     { id: string; legacy_imported: boolean; label_singular: string; label_plural: string }[];
   if (found[0]) return found[0];

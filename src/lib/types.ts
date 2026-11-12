@@ -22,6 +22,10 @@ export type Task = {
   color?: string | null;
   project_id?: string | null;
   dossier_id?: string | null;
+  // Vínculos criados pelo MCP (demanda, outro registro) e tipo (tarefa ou lembrete).
+  demand_code?: string | null;
+  related_task_id?: string | null;
+  kind?: "tarefa" | "lembrete";
 };
 
 export type RoutineItem = {

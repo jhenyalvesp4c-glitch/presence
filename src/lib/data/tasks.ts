@@ -41,21 +41,23 @@ export type NewTask = {
   due_time?: string | null;
 };
 
+/** Cria a tarefa no topo da lista manual (usado pela tela e pelo MCP). `extra` leva os campos novos (origem, vínculos). */
+export async function createTaskRow(t: NewTask, extra: Record<string, unknown> = {}): Promise<Task> {
+  const { data: first } = await supabase.from("tasks").select("position").order("position").limit(1).maybeSingle();
+  const position = (first?.position ?? 1) - 1;
+  return must(
+    await supabase
+      .from("tasks")
+      .insert({ ...t, ...extra, title: t.title.trim().slice(0, 200), position })
+      .select(TASK_COLS)
+      .single(),
+  ) as Task;
+}
+
 export function useCreateTask() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async (t: NewTask) => {
-      // Novas tarefas entram no topo da lista manual.
-      const { data: first } = await supabase.from("tasks").select("position").order("position").limit(1).maybeSingle();
-      const position = (first?.position ?? 1) - 1;
-      return must(
-        await supabase
-          .from("tasks")
-          .insert({ ...t, title: t.title.trim().slice(0, 200), position })
-          .select(TASK_COLS)
-          .single(),
-      ) as Task;
-    },
+    mutationFn: (t: NewTask) => createTaskRow(t),
     onSuccess: invalidate,
   });
 }

@@ -24,6 +24,7 @@ import { Route as ResumoRouteImport } from './routes/resumo'
 import { Route as SaudeRouteImport } from './routes/saude'
 import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as TreinoRouteImport } from './routes/treino'
+import { Route as ApiMcpRouteImport } from './routes/api.mcp'
 import { Route as DietaNovaRouteImport } from './routes/dieta.nova'
 import { Route as MedidasNovaRouteImport } from './routes/medidas.nova'
 import { Route as OrganizarProntoRouteImport } from './routes/organizar_.pronto'
@@ -32,6 +33,7 @@ import { Route as SaudeDietaRouteImport } from './routes/saude_.dieta'
 import { Route as SaudeTreinoRouteImport } from './routes/saude_.treino'
 import { Route as TreinoExerciciosRouteImport } from './routes/treino_.exercicios'
 import { Route as TreinoNovaRouteImport } from './routes/treino_.nova'
+import { Route as ApiMcpTokenRouteImport } from './routes/api.mcp.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -108,6 +110,11 @@ const TreinoRoute = TreinoRouteImport.update({
   path: '/treino',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DietaNovaRoute = DietaNovaRouteImport.update({
   id: '/dieta/nova',
   path: '/dieta/nova',
@@ -148,6 +155,11 @@ const TreinoNovaRoute = TreinoNovaRouteImport.update({
   path: '/treino/nova',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMcpTokenRoute = ApiMcpTokenRouteImport.update({
+  id: '/$token',
+  path: '/$token',
+  getParentRoute: () => ApiMcpRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -165,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
+  '/api/mcp': typeof ApiMcpRouteWithChildren
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
@@ -173,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/saude/treino': typeof SaudeTreinoRoute
   '/treino/exercicios': typeof TreinoExerciciosRoute
   '/treino/nova': typeof TreinoNovaRoute
+  '/api/mcp/$token': typeof ApiMcpTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -190,6 +204,7 @@ export interface FileRoutesByTo {
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
+  '/api/mcp': typeof ApiMcpRouteWithChildren
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
@@ -198,6 +213,7 @@ export interface FileRoutesByTo {
   '/saude/treino': typeof SaudeTreinoRoute
   '/treino/exercicios': typeof TreinoExerciciosRoute
   '/treino/nova': typeof TreinoNovaRoute
+  '/api/mcp/$token': typeof ApiMcpTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -216,6 +232,7 @@ export interface FileRoutesById {
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
+  '/api/mcp': typeof ApiMcpRouteWithChildren
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar_/pronto': typeof OrganizarProntoRoute
@@ -224,6 +241,7 @@ export interface FileRoutesById {
   '/saude_/treino': typeof SaudeTreinoRoute
   '/treino_/exercicios': typeof TreinoExerciciosRoute
   '/treino_/nova': typeof TreinoNovaRoute
+  '/api/mcp/$token': typeof ApiMcpTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -243,6 +261,7 @@ export interface FileRouteTypes {
     | '/saude'
     | '/tarefas'
     | '/treino'
+    | '/api/mcp'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar/pronto'
@@ -251,6 +270,7 @@ export interface FileRouteTypes {
     | '/saude/treino'
     | '/treino/exercicios'
     | '/treino/nova'
+    | '/api/mcp/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -268,6 +288,7 @@ export interface FileRouteTypes {
     | '/saude'
     | '/tarefas'
     | '/treino'
+    | '/api/mcp'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar/pronto'
@@ -276,6 +297,7 @@ export interface FileRouteTypes {
     | '/saude/treino'
     | '/treino/exercicios'
     | '/treino/nova'
+    | '/api/mcp/$token'
   id:
     | '__root__'
     | '/'
@@ -293,6 +315,7 @@ export interface FileRouteTypes {
     | '/saude'
     | '/tarefas'
     | '/treino'
+    | '/api/mcp'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar_/pronto'
@@ -301,6 +324,7 @@ export interface FileRouteTypes {
     | '/saude_/treino'
     | '/treino_/exercicios'
     | '/treino_/nova'
+    | '/api/mcp/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -319,6 +343,7 @@ export interface RootRouteChildren {
   SaudeRoute: typeof SaudeRoute
   TarefasRoute: typeof TarefasRoute
   TreinoRoute: typeof TreinoRoute
+  ApiMcpRoute: typeof ApiMcpRouteWithChildren
   DietaNovaRoute: typeof DietaNovaRoute
   MedidasNovaRoute: typeof MedidasNovaRoute
   OrganizarProntoRoute: typeof OrganizarProntoRoute
@@ -436,6 +461,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TreinoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dieta/nova': {
       id: '/dieta/nova'
       path: '/dieta/nova'
@@ -492,8 +524,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TreinoNovaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mcp/$token': {
+      id: '/api/mcp/$token'
+      path: '/$token'
+      fullPath: '/api/mcp/$token'
+      preLoaderRoute: typeof ApiMcpTokenRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
   }
 }
+
+interface ApiMcpRouteChildren {
+  ApiMcpTokenRoute: typeof ApiMcpTokenRoute
+}
+
+const ApiMcpRouteChildren: ApiMcpRouteChildren = {
+  ApiMcpTokenRoute: ApiMcpTokenRoute,
+}
+
+const ApiMcpRouteWithChildren =
+  ApiMcpRoute._addFileChildren(ApiMcpRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -511,6 +561,7 @@ const rootRouteChildren: RootRouteChildren = {
   SaudeRoute: SaudeRoute,
   TarefasRoute: TarefasRoute,
   TreinoRoute: TreinoRoute,
+  ApiMcpRoute: ApiMcpRouteWithChildren,
   DietaNovaRoute: DietaNovaRoute,
   MedidasNovaRoute: MedidasNovaRoute,
   OrganizarProntoRoute: OrganizarProntoRoute,
