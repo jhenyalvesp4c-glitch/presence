@@ -48,7 +48,7 @@ describe("roteiros e exemplos de treinamento", () => {
   });
 
   it("biblioteca vazia ou estranha vinda do banco não quebra a tela", () => {
-    expect(normalizeLibrary(null)).toEqual({ scripts: [], examples: [] });
+    expect(normalizeLibrary(null)).toEqual({ scripts: [], examples: [], folders: [] });
     expect(normalizeLibrary({ scripts: [{ id: "x", title: "X", blocks: [{ id: "b" }] }] }).scripts[0]!.blocks[0]!.show).toEqual([]);
   });
 });

@@ -114,15 +114,17 @@ const clean = (xs: string[]) => xs.map((x) => x.trim()).filter(Boolean);
 const cleanVisual = (v: Visual): Visual => ({ ...v, title: v.title.trim() || "Imagem", caption: v.caption.trim(), pins: v.pins.filter((p) => p.label.trim() || p.text.trim()) });
 
 /* ───────────── Roteiro ───────────── */
-export function ScriptEditor({ initial, onClose, onSave, onDelete }: {
-  initial?: Script | undefined; onClose: () => void; onSave: (s: Script) => void; onDelete?: (() => void) | undefined;
+export function ScriptEditor({ initial, folders = [], onClose, onSave, onDelete }: {
+  initial?: Script | undefined; folders?: string[]; onClose: () => void; onSave: (s: Script) => void; onDelete?: (() => void) | undefined;
 }) {
   const [s, setS] = useState<Script>(() => initial ?? {
     id: newId("s"), title: "", audience: "", goal: "", color: "emerald", blocks: [{ id: newId("b"), title: "Abertura", minutes: 10, show: [], examples: [] }],
   });
+  const [newFolder, setNewFolder] = useState("");
   const submit = () => {
     if (!s.title.trim()) return void toast.error("Dê um nome para o roteiro.");
-    onSave({ ...s, title: s.title.trim(), audience: s.audience.trim(), goal: s.goal.trim() });
+    const folder = s.folder === "__new__" ? newFolder.trim() || undefined : s.folder || undefined;
+    onSave({ ...s, title: s.title.trim(), audience: s.audience.trim(), goal: s.goal.trim(), folder });
   };
   return (
     <Modal title={initial ? "Editar roteiro" : "Novo roteiro"} subtitle="Os blocos você edita direto no roteiro." icon={<BookOpen size={18} />} color={s.color}
@@ -136,6 +138,12 @@ export function ScriptEditor({ initial, onClose, onSave, onDelete }: {
       <label className="block"><span className={label}>Objetivo</span>
         <textarea value={s.goal} onChange={(e) => setS({ ...s, goal: e.target.value })} rows={2} maxLength={500} placeholder="O que a turma precisa saber fazer ao final?" className={`${field} resize-none`} />
       </label>
+      <label className="block"><span className={label}>Pasta</span>
+        <select value={s.folder ?? ""} onChange={(e) => setS({ ...s, folder: e.target.value })} className={`${field} [&>option]:bg-popover`} data-testid="editar-roteiro-pasta">
+          <option value="">Sem pasta</option>{folders.map((f) => <option key={f} value={f}>{f}</option>)}<option value="__new__">+ Nova pasta…</option>
+        </select>
+      </label>
+      {s.folder === "__new__" && <input value={newFolder} onChange={(e) => setNewFolder(e.target.value)} maxLength={60} placeholder="Nome da nova pasta" className={field} />}
       <div><span className={label}>Cor</span><ColorPicker value={s.color} onChange={(color) => setS({ ...s, color })} /></div>
     </Modal>
   );
@@ -156,7 +164,7 @@ export function BlockEditor({ initial, color, examples, onClose, onSave, onDelet
     const scenario = sc && (sc.situation.trim() || sc.before.trim() || sc.after.trim()) ? sc : undefined;
     onSave({
       ...b, title: b.title.trim(), minutes: Math.max(0, Math.min(600, Math.round(b.minutes || 0))), show: clean(b.show),
-      tip: b.tip?.trim() || undefined, faq: faq.length ? faq : undefined, why: why.length ? why : undefined,
+      tip: b.tip?.trim() || undefined, say: b.say?.trim() || undefined, faq: faq.length ? faq : undefined, why: why.length ? why : undefined,
       visuals: visuals.length ? visuals : undefined, scenario,
     });
   };
@@ -172,6 +180,10 @@ export function BlockEditor({ initial, color, examples, onClose, onSave, onDelet
           <input type="number" min={0} max={600} value={b.minutes || ""} onChange={(e) => set("minutes", Number(e.target.value) || 0)} className={field} />
         </label>
       </div>
+
+      <Section title="O que falar (para a aula ou o vídeo)">
+        <textarea value={b.say ?? ""} onChange={(e) => set("say", e.target.value)} rows={4} maxLength={1500} placeholder="Escreva como você falaria este bloco. Só você vê, nas notas do apresentador (tecla N)." className={`${field} resize-y`} />
+      </Section>
 
       <Section title="O que mostrar">
         <ListField items={b.show} onChange={(v) => set("show", v)} placeholder="Ex.: Onde ficam as etiquetas no lead" addLabel="Adicionar item" />

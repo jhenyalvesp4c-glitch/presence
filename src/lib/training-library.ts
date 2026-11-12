@@ -12,9 +12,11 @@ export type Scenario = { situation: string; before: string; after: string; befor
 export type Block = {
   id: string; title: string; minutes: number; show: string[]; examples: string[]; tip?: string | undefined; faq?: Faq[] | undefined;
   visuals?: Visual[] | undefined; why?: string[] | undefined; scenario?: Scenario | undefined;
+  /** Texto para falar na aula ou no vídeo (só o apresentador vê, nas notas). */
+  say?: string | undefined;
 };
-export type Script = { id: string; title: string; audience: string; goal: string; color: string; blocks: Block[] };
-export type Library = { scripts: Script[]; examples: Example[] };
+export type Script = { id: string; title: string; audience: string; goal: string; color: string; blocks: Block[]; folder?: string | undefined };
+export type Library = { scripts: Script[]; examples: Example[]; folders?: string[] | undefined };
 
 export const COLORS = ["cyan", "violet", "pink", "emerald", "amber"] as const;
 
@@ -116,15 +118,16 @@ const seedScripts: Script[] = [
     ] },
 ];
 
-export const seedLibrary = (): Library => structuredClone({ scripts: seedScripts, examples: seedExamples });
+export const seedLibrary = (): Library => structuredClone({ scripts: seedScripts, examples: seedExamples, folders: [] });
 
 export const newId = (prefix: string) => `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 /** Garante o formato mesmo se o que veio do banco estiver incompleto. */
-export function normalizeLibrary(raw: { scripts?: unknown; examples?: unknown } | null | undefined): Library {
+export function normalizeLibrary(raw: { scripts?: unknown; examples?: unknown; folders?: unknown } | null | undefined): Library {
   return {
+    folders: arr<string>(raw?.folders).filter((f) => typeof f === "string" && f.trim()),
     scripts: arr<Script>(raw?.scripts).map((s) => ({ ...s, blocks: arr<Block>(s.blocks).map((b) => ({ ...b, show: arr(b.show), examples: arr(b.examples) })) })),
     examples: arr<Example>(raw?.examples),
   };
@@ -169,6 +172,27 @@ export const upsertExample = (lib: Library, e: Example): Library =>
 
 /** Apaga o exemplo e tira ele de todos os blocos que o usavam. */
 export const removeExample = (lib: Library, id: string): Library => ({
+  ...lib,
   examples: lib.examples.filter((e) => e.id !== id),
   scripts: lib.scripts.map((s) => ({ ...s, blocks: s.blocks.map((b) => (b.examples.includes(id) ? { ...b, examples: b.examples.filter((x) => x !== id) } : b)) })),
+});
+
+/* ───────────── Pastas de roteiros ───────────── */
+/** Todas as pastas: as criadas (mesmo vazias) e as que algum roteiro usa. */
+export const folderNames = (lib: Library): string[] => [...new Set([...(lib.folders ?? []), ...lib.scripts.map((s) => s.folder).filter((f): f is string => !!f)])];
+
+export const addFolder = (lib: Library, name: string): Library => {
+  const n = name.trim().slice(0, 60);
+  return !n || folderNames(lib).some((f) => f.toLowerCase() === n.toLowerCase()) ? lib : { ...lib, folders: [...(lib.folders ?? []), n] };
+};
+
+export const renameFolder = (lib: Library, from: string, to: string): Library => {
+  const n = to.trim().slice(0, 60);
+  if (!n || n === from || folderNames(lib).some((f) => f.toLowerCase() === n.toLowerCase() && f !== from)) return lib;
+  return { ...lib, folders: (lib.folders ?? []).map((f) => (f === from ? n : f)), scripts: lib.scripts.map((s) => (s.folder === from ? { ...s, folder: n } : s)) };
+};
+
+/** Apaga a pasta; os roteiros dela vão para "Sem pasta" (nada é perdido). */
+export const removeFolder = (lib: Library, name: string): Library => ({
+  ...lib, folders: (lib.folders ?? []).filter((f) => f !== name), scripts: lib.scripts.map((s) => (s.folder === name ? { ...s, folder: undefined } : s)),
 });

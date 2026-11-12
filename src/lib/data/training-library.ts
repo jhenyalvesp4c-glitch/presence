@@ -27,7 +27,7 @@ export function scriptFromLegacy(raw: unknown): Script {
 }
 
 export async function loadLibrary(projectId: string): Promise<Library> {
-  const rows = must(await supabase.from("training_library").select("scripts, examples").eq("project_id", projectId).limit(1)) as { scripts: unknown; examples: unknown }[];
+  const rows = must(await supabase.from("training_library").select("scripts, examples, folders").eq("project_id", projectId).limit(1)) as { scripts: unknown; examples: unknown; folders: unknown }[];
   if (rows[0]) return normalizeLibrary(rows[0]);
 
   const legacy = must(await supabase.from("training_scripts").select("data, position").eq("project_id", projectId).order("position")) as { data: unknown }[];
@@ -40,6 +40,6 @@ export async function loadLibrary(projectId: string): Promise<Library> {
 
 export async function saveLibrary(projectId: string, _prev: Library, next: Library) {
   must(await supabase.from("training_library")
-    .upsert({ project_id: projectId, scripts: next.scripts, examples: next.examples, updated_at: new Date().toISOString() }, { onConflict: "project_id" })
+    .upsert({ project_id: projectId, scripts: next.scripts, examples: next.examples, folders: next.folders ?? [], updated_at: new Date().toISOString() }, { onConflict: "project_id" })
     .select("project_id"));
 }

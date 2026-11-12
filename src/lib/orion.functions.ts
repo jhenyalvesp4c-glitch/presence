@@ -35,7 +35,7 @@ async function loadCorpus() {
     supabase.from("project_notes").select("id, project_id, text, date_label, created_at").limit(2000),
     supabase.from("assistant_messages").select("id, role, content, created_at").order("created_at", { ascending: false }).limit(1500),
     supabase.from("training_sessions").select("id, group_name, people, script_title, notes, created_at").limit(500),
-    supabase.from("training_scripts").select("project_id, id, data, updated_at").limit(200),
+    supabase.from("training_library").select("project_id, scripts, examples, updated_at").limit(50),
     supabase.from("demand_files").select("project_id, code, name, mime_type, size_bytes, storage_path").limit(2000),
   ]);
 
@@ -104,15 +104,25 @@ async function loadCorpus() {
   for (const s of rows(trains as Rows<{ id: string; group_name: string; people: number; script_title: string; notes: string; created_at: string }>, "treinamentos")) {
     docs.push({ id: `treinamento:${s.id}`, kind: "treinamento", title: `Turma ${s.group_name}`, text: [`${s.people} pessoas.`, s.script_title ? `Roteiro: ${s.script_title}.` : "", s.notes].filter(Boolean).join("\n"), date: day(s.created_at), link: "/demandas" });
   }
-  const flat = (v: unknown, out: string[] = []): string[] => {
-    if (typeof v === "string") { if (v.length > 2 && !v.startsWith("data:")) out.push(v); }
-    else if (Array.isArray(v)) v.forEach((x) => flat(x, out));
-    else if (v && typeof v === "object") Object.values(v as Record<string, unknown>).forEach((x) => flat(x, out));
-    return out;
-  };
-  for (const sc of rows(scripts as Rows<{ project_id: string; id: string; data: unknown; updated_at: string }>, "roteiros")) {
-    const d = sc.data as { title?: string; name?: string };
-    docs.push({ id: `treinamento:script:${sc.project_id}:${sc.id}`, kind: "treinamento", title: `Roteiro: ${d.title ?? d.name ?? sc.id}`, text: flat(sc.data).join(" ").slice(0, 3000), date: day(sc.updated_at), where: projName.get(sc.project_id), link: "/demandas" });
+  type LibScript = { id: string; title?: string; audience?: string; goal?: string; folder?: string; blocks?: { title?: string; minutes?: number; say?: string; tip?: string; show?: string[]; why?: string[]; faq?: { q: string; a: string }[]; scenario?: { situation?: string; before?: string; after?: string }; visuals?: { title?: string; caption?: string }[] }[] };
+  type LibExample = { id: string; title?: string; situation?: string; text?: string; cat?: string };
+  for (const lib of rows(scripts as Rows<{ project_id: string; scripts: unknown; examples: unknown; updated_at: string }>, "roteiros")) {
+    const proj = projName.get(lib.project_id);
+    for (const sc of (Array.isArray(lib.scripts) ? lib.scripts : []) as LibScript[]) {
+      const text = [
+        sc.goal ? `Objetivo: ${sc.goal}` : "", sc.audience ? `Para: ${sc.audience}` : "", sc.folder ? `Pasta: ${sc.folder}` : "",
+        ...(sc.blocks ?? []).map((b, i) => [
+          `Bloco ${i + 1}: ${b.title ?? ""} (${b.minutes ?? 0} min)`,
+          b.say ? `O que falar: ${b.say}` : "", b.show?.length ? `Passos: ${b.show.join("; ")}` : "", b.tip ? `Lembrete: ${b.tip}` : "",
+          b.why?.length ? `Por que ajuda: ${b.why.join("; ")}` : "", b.scenario?.situation ? `Situação: ${b.scenario.situation} Antes: ${b.scenario.before ?? ""} Depois: ${b.scenario.after ?? ""}` : "",
+          ...(b.faq ?? []).map((f) => `Pergunta: ${f.q} Resposta: ${f.a}`), ...(b.visuals ?? []).map((v) => `Imagem: ${v.title ?? ""} ${v.caption ?? ""}`),
+        ].filter(Boolean).join("\n")),
+      ].filter(Boolean).join("\n");
+      docs.push({ id: `treinamento:roteiro:${lib.project_id}:${sc.id}`, kind: "treinamento", title: `Roteiro: ${sc.title ?? sc.id}`, text: text.slice(0, 12000), date: day(lib.updated_at), where: [sc.folder, proj].filter(Boolean).join(" · ") || undefined, link: "/demandas" });
+    }
+    for (const ex of (Array.isArray(lib.examples) ? lib.examples : []) as LibExample[]) {
+      docs.push({ id: `treinamento:exemplo:${lib.project_id}:${ex.id}`, kind: "treinamento", title: `Exemplo: ${ex.title ?? ex.id}`, text: [ex.cat ? `Categoria: ${ex.cat}` : "", ex.situation ? `Situação: ${ex.situation}` : "", ex.text ?? ""].filter(Boolean).join("\n"), date: day(lib.updated_at), where: proj, link: "/demandas" });
+    }
   }
   return docs;
 }

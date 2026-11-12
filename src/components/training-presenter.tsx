@@ -324,7 +324,10 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
       {notes && (
         <div className="relative z-10 mx-4 mb-2 flex items-start gap-3 rounded-2xl border border-amber/50 bg-amber/10 p-3 text-sm backdrop-blur sm:mx-6" data-testid="notas">
           <Lightbulb size={16} className="mt-0.5 shrink-0 text-amber" />
-          <p className="min-w-0 flex-1"><b className="mono-caps mr-2 !text-amber">Nota do apresentador</b>{s.k === "block" ? tip || "Este bloco não tem dica. Você pode escrevê-la ao editar o bloco." : "As dicas aparecem aqui nos slides dos blocos."}{s.k === "block" ? <span className="ml-2 text-muted-foreground">· {s.block.minutes} min previstos</span> : null}</p>
+          <div className="min-w-0 flex-1 space-y-2">
+            <p><b className="mono-caps mr-2 !text-amber">Nota do apresentador</b>{s.k === "block" ? tip || "Este bloco não tem dica." : "As notas aparecem aqui nos slides dos blocos."}{s.k === "block" ? <span className="ml-2 text-muted-foreground">· {s.block.minutes} min previstos</span> : null}</p>
+            {s.k === "block" && s.block.say && <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border border-violet/40 bg-violet/10 p-3 text-[0.95rem] leading-relaxed" data-testid="nota-falar"><b className="mono-caps mr-2 !text-violet">O que falar</b>{s.block.say}</p>}
+          </div>
         </div>
       )}
 

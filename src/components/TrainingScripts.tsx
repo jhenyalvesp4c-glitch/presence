@@ -8,14 +8,16 @@ import { todayIso } from "@/lib/dates";
 import { useDbState } from "@/lib/data/use-db-state";
 import { loadLibrary, saveLibrary } from "@/lib/data/training-library";
 import {
-  moveBlock, removeBlock, removeExample, removeScript, seedLibrary, setShowItem, upsertBlock, upsertExample, upsertScript,
+  addFolder, folderNames, moveBlock, removeBlock, removeExample, removeFolder, removeScript, renameFolder, seedLibrary, setShowItem, upsertBlock, upsertExample, upsertScript,
   type Block, type Example, type Pin, type Script, type Visual,
 } from "@/lib/training-library";
 import { BlockEditor, ExampleEditor, ScriptEditor } from "./training-editors";
 import { TrainingPresenter } from "./training-presenter";
+import { TrainingGenerator } from "./training-generator";
+import { primeVisuals } from "./training-images";
 import { visualSrc } from "./training-images";
 import {
-  ArrowRight, CalendarDays, Check, ChevronDown, Clock, Copy, GraduationCap, Lightbulb, MessageCircleQuestion,
+  ArrowRight, FolderPlus, FolderOpen, Folder as FolderIcon, ChevronRight, Wand2, Mic, CalendarDays, Check, ChevronDown, Clock, Copy, GraduationCap, Lightbulb, MessageCircleQuestion,
   Play, Plus, RotateCcw, Search, Sparkles, Square, Target, Users, X, ImageIcon, Maximize2, MapPin, Pencil, Trash2, CalendarPlus, ThumbsUp, ArrowDown, ArrowUp, CheckCircle2,
 } from "lucide-react";
 
@@ -26,11 +28,20 @@ const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 export function TrainingScripts({ projectId }: { projectId: string }) {
   const [lib, setLib, ready] = useDbState(`training-library-${projectId}`, seedLibrary(), () => loadLibrary(projectId), (p, n) => saveLibrary(projectId, p, n));
   const { scripts, examples } = lib;
+  // Imagens enviadas pela usuária (Storage): busca os endereços e redesenha quando chegarem.
+  useEffect(() => {
+    const vs = scripts.flatMap((sc) => sc.blocks.flatMap((b) => b.visuals ?? [])).concat(examples.flatMap((e) => (e.visual ? [e.visual] : [])));
+    primeVisuals(vs).then((any) => { if (any) setTick((t) => t + 1); }).catch(() => undefined);
+  }, [scripts, examples]);
   const [selId, setSelId] = useState("s1");
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [openB, setOpenB] = useState<Record<string, boolean>>({ b3: true });
   const lesson = false; // o antigo "modo aula" virou a apresentação em slides
   const [presenting, setPresenting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [folderForm, setFolderForm] = useState<{ from: string | null; name: string } | null>(null);
+  const [, setTick] = useState(0);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Todos");
   const [hl, setHl] = useState<string | null>(null);
@@ -76,6 +87,22 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
     (cat === "Todos" || e.cat === cat) && (e.title + e.situation + e.text).toLowerCase().includes(q.toLowerCase())), [examples, cat, q]);
 
   const toggle = (k: string) => setShown((s) => ({ ...s, [k]: !s[k] }));
+  const ScriptCard = ({ sc }: { sc: Script }) => {
+    const on = sc.id === sel?.id;
+    const its = sc.blocks.flatMap((b) => b.show.map((_, i) => `${b.id}:${i}`));
+    const p = its.length ? Math.round((its.filter((k) => shown[k]).length / its.length) * 100) : 0;
+    return (
+      <button onClick={() => setSelId(sc.id)} style={tint(sc.color)} data-testid="roteiro-card"
+        className={`accent-card block w-full !rounded-2xl p-3 text-left transition ${on ? "!border-[color-mix(in_oklab,var(--glow)_70%,transparent)] shadow-[0_0_30px_-10px_var(--glow)]" : ""}`}>
+        <span className="line-clamp-2 break-words text-sm font-semibold">{sc.title}</span>
+        <span className="mt-0.5 flex items-center gap-1 text-[0.68rem] text-muted-foreground"><Users size={10} /> <span className="truncate">{sc.audience || "—"}</span></span>
+        <span className="mt-2 flex items-center gap-2 text-[0.62rem] text-muted-foreground">
+          <span className="h-1 flex-1 overflow-hidden rounded-full bg-secondary"><span className="block h-full rounded-full bg-[var(--glow)] transition-all" style={{ width: `${p}%` }} /></span>
+          {sc.blocks.length} blocos
+        </span>
+      </button>
+    );
+  };
   const reset = () => setShown((s) => Object.fromEntries(Object.entries(s).filter(([k]) => !items.includes(k))));
   const copy = (e: Example) => { navigator.clipboard?.writeText(e.text).catch(() => {}); setCopied(e.id); setTimeout(() => setCopied(null), 1200); };
   const focusExample = (id: string) => {
@@ -164,22 +191,47 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
               <h2 className="font-display text-lg font-semibold">Roteiros</h2>
               <button onClick={() => setEditScript("new")} className="flex items-center gap-1 rounded-full border border-cyan/60 px-3 py-1 text-xs text-cyan transition hover:bg-cyan/10"><Plus size={12} /> Novo</button>
             </div>
-            <div className="mt-3 space-y-2">
-              {scripts.length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">Nenhum roteiro. Crie o primeiro em "Novo".</p>}
-              {scripts.map((s) => {
-                const on = s.id === sel?.id;
-                const its = s.blocks.flatMap((b) => b.show.map((_, i) => `${b.id}:${i}`));
-                const p = its.length ? Math.round((its.filter((k) => shown[k]).length / its.length) * 100) : 0;
+            <button onClick={() => setGenerating(true)} data-testid="criar-com-ia"
+              className="group relative mt-3 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-brand px-3 py-2.5 text-xs font-semibold text-primary-foreground shadow-[0_0_28px_-8px_var(--violet)] transition hover:scale-[1.02] hover:shadow-[0_0_36px_-4px_var(--violet)]">
+              <span aria-hidden className="absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/30 transition duration-700 group-hover:left-[150%]" />
+              <Wand2 size={14} className="relative" /> <span className="relative">Criar roteiro com o Presence</span>
+            </button>
+            <div className="mt-3 flex items-center gap-2">
+              <p className="mono-caps mr-auto !text-[0.58rem]">Pastas</p>
+              <button onClick={() => setFolderForm({ from: null, name: "" })} data-testid="nova-pasta-roteiro" className="flex items-center gap-1 text-[0.7rem] text-muted-foreground transition hover:text-cyan"><FolderPlus size={12} /> Nova pasta</button>
+            </div>
+            {folderForm && (
+              <form onSubmit={(e) => { e.preventDefault(); const n = folderForm.name.trim(); if (n) { setLib((l) => (folderForm.from ? renameFolder(l, folderForm.from, n) : addFolder(l, n))); } setFolderForm(null); }} className="mt-2 flex items-center gap-2 rounded-xl border border-cyan/60 px-3 py-1.5">
+                <FolderIcon size={13} className="text-cyan" />
+                <input autoFocus value={folderForm.name} onChange={(e) => setFolderForm({ ...folderForm, name: e.target.value })} onBlur={() => setFolderForm(null)} onKeyDown={(e) => e.key === "Escape" && setFolderForm(null)} maxLength={60} placeholder="Nome da pasta" data-testid="nome-pasta-roteiro" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
+              </form>
+            )}
+            <div className="mt-2 space-y-2">
+              {scripts.length === 0 && folderNames(lib).length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">Nenhum roteiro. Crie um com o Presence ou em "Novo".</p>}
+              {[...folderNames(lib), ""].map((fname) => {
+                const list = scripts.filter((sc) => (sc.folder ?? "") === fname);
+                if (fname === "" && (list.length === 0 || folderNames(lib).length === 0)) {
+                  return list.map((sc) => <ScriptCard key={sc.id} sc={sc} />);
+                }
+                const closed = !!collapsed[fname || "__none__"];
                 return (
-                  <button key={s.id} onClick={() => { setSelId(s.id); }} style={tint(s.color)}
-                    className={`accent-card block w-full !rounded-2xl p-3 text-left transition ${on ? "!border-[color-mix(in_oklab,var(--glow)_70%,transparent)] shadow-[0_0_30px_-10px_var(--glow)]" : ""}`}>
-                    <span className="block truncate text-sm font-semibold">{s.title}</span>
-                    <span className="mt-0.5 flex items-center gap-1 text-[0.68rem] text-muted-foreground"><Users size={10} /> {s.audience}</span>
-                    <span className="mt-2 flex items-center gap-2 text-[0.62rem] text-muted-foreground">
-                      <span className="h-1 flex-1 overflow-hidden rounded-full bg-secondary"><span className="block h-full rounded-full bg-[var(--glow)] transition-all" style={{ width: `${p}%` }} /></span>
-                      {s.blocks.length} blocos
-                    </span>
-                  </button>
+                  <div key={fname || "__none__"} data-testid={`pasta-${fname || "sem-pasta"}`} className="rounded-2xl border border-border/70 bg-secondary/15">
+                    <div className="group/f flex items-center gap-1 pr-1.5">
+                      <button onClick={() => setCollapsed((c) => ({ ...c, [fname || "__none__"]: !closed }))} aria-expanded={!closed} className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-left">
+                        <ChevronRight size={13} className={`shrink-0 text-muted-foreground transition-transform ${closed ? "" : "rotate-90"}`} />
+                        {closed ? <FolderIcon size={15} className="shrink-0 text-amber" /> : <FolderOpen size={15} className="shrink-0 text-amber" />}
+                        <span className="min-w-0 flex-1 truncate text-[0.8rem] font-medium">{fname || "Sem pasta"}</span>
+                        <span className="rounded-full border border-border px-1.5 text-[0.6rem] tabular-nums text-muted-foreground">{list.length}</span>
+                      </button>
+                      {fname && (
+                        <span className="flex opacity-0 transition focus-within:opacity-100 group-hover/f:opacity-100 [@media(hover:none)]:opacity-100">
+                          <button onClick={() => setFolderForm({ from: fname, name: fname })} aria-label={`Renomear pasta ${fname}`} title="Renomear" className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"><Pencil size={11} /></button>
+                          <button onClick={() => { if (window.confirm(list.length ? `Excluir a pasta "${fname}"? Os ${list.length} roteiro(s) dela vão para "Sem pasta".` : `Excluir a pasta "${fname}"?`)) setLib((l) => removeFolder(l, fname)); }} aria-label={`Excluir pasta ${fname}`} title="Excluir pasta" className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-pink"><Trash2 size={11} /></button>
+                        </span>
+                      )}
+                    </div>
+                    {!closed && <div className="space-y-2 px-2 pb-2">{list.map((sc) => <ScriptCard key={sc.id} sc={sc} />)}{list.length === 0 && <p className="px-2 pb-1 text-[0.65rem] text-muted-foreground">Pasta vazia. Crie um roteiro e escolha esta pasta.</p>}</div>}
+                  </div>
                 );
               })}
             </div>
@@ -339,6 +391,13 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                           )}
                         </div>
 
+                        {b.say ? (
+                          <div className="rounded-xl border border-violet/40 bg-violet/5 p-3">
+                            <p className="flex items-center gap-1.5 text-[0.8rem] font-semibold"><Mic size={13} className="text-violet" /> O que falar</p>
+                            <p className="mt-1.5 whitespace-pre-wrap text-[0.78rem] leading-relaxed text-foreground/90">{b.say}</p>
+                          </div>
+                        ) : null}
+
                         {b.visuals?.length ? <VisualGuide visuals={b.visuals} onZoom={setZoom} /> : null}
 
                         {b.why?.length ? (
@@ -454,10 +513,12 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
           </div>
         </aside>
       </div>
+      {generating && <TrainingGenerator folders={folderNames(lib)} onClose={() => setGenerating(false)} onOpen={(id) => setSelId(id)} onPresent={() => setPresenting(true)}
+        onCreate={(script, exs) => { setLib((l) => { let n = { ...l, examples: [...l.examples, ...exs] }; if (script.folder) n = addFolder(n, script.folder); return upsertScript(n, script); }); setSelId(script.id); }} />}
       {presenting && sel && <TrainingPresenter script={sel} examples={examples} shown={shown} onToggle={toggle} onClose={() => setPresenting(false)} />}
       {zoom && <Lightbox visual={zoom} onClose={() => setZoom(null)} />}
       {editScript && (
-        <ScriptEditor initial={editScript === "new" ? undefined : editScript} onClose={() => setEditScript(null)} onSave={saveScript}
+        <ScriptEditor folders={folderNames(lib)} initial={editScript === "new" ? undefined : editScript} onClose={() => setEditScript(null)} onSave={saveScript}
           onDelete={editScript === "new" ? undefined : () => deleteScript(editScript)} />
       )}
       {editBlock && sel && (
