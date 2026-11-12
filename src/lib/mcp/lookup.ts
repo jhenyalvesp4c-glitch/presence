@@ -19,10 +19,14 @@ export class NeedsChoice extends Error {
 /* ───────────── projetos e dossiês ───────────── */
 export async function listProjects(): Promise<(ProjectInfo & { dossies: number; demandas_abertas: number })[]> {
   await ensureProject(P4C_ID); // o projeto padrão (P4C) passa a existir no banco na primeira consulta
-  const rows = must(await supabase.from("projects").select("id, name, description, status, label_singular, label_plural, position").order("position").order("created_at")) as
-    { id: string; name: string; description: string; status: string; label_singular: string; label_plural: string }[];
-  const dos = must(await supabase.from("dossiers").select("project_id")) as { project_id: string }[];
-  const dem = must(await supabase.from("project_demands").select("project_id, status")) as { project_id: string; status: string }[];
+  const [pr, dr, mr] = await Promise.all([
+    supabase.from("projects").select("id, name, description, status, label_singular, label_plural, position").order("position").order("created_at"),
+    supabase.from("dossiers").select("project_id"),
+    supabase.from("project_demands").select("project_id, status"),
+  ]);
+  const rows = must(pr) as { id: string; name: string; description: string; status: string; label_singular: string; label_plural: string }[];
+  const dos = must(dr) as { project_id: string }[];
+  const dem = must(mr) as { project_id: string; status: string }[];
   return rows.map((r) => ({
     id: r.id, nome: r.name, descricao: r.description, status: r.status, rotulo_dossie: { singular: r.label_singular, plural: r.label_plural },
     dossies: dos.filter((d) => d.project_id === r.id).length, demandas_abertas: dem.filter((d) => d.project_id === r.id && d.status !== "done").length,

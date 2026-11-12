@@ -7,6 +7,7 @@ import {
   Workflow, Loader2, Trash2, X,
 } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
+import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { useHome } from "@/lib/use-home";
 import { useSpeech } from "@/lib/use-speech";
 import imgRotina from "@/assets/card-rotina.jpg";
@@ -105,7 +106,9 @@ function Assistente() {
   const home = useHome();
   const [text, setText] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
-  const [demandDraft, setDemandDraft] = useState<string | null>(null);
+  // Central de entrada: texto, prints e arquivos interpretados e levados ao módulo certo.
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [incoming, setIncoming] = useState<{ id: number; text: string } | null>(null);
   const [active, setActive] = useState(0);
   const voiceTarget = useRef<"chat" | "demand">("chat");
   const convoEnd = useRef<HTMLDivElement>(null);
@@ -118,13 +121,8 @@ function Assistente() {
     if (home.error) toast.error(home.error);
   }, [home.error]);
 
-  async function saveDemand(title: string, source: "voz" | "texto") {
-    const d = await home.registerDemand(title, source);
-    if (d) toast.success("Demanda registrada", { description: d.title });
-  }
-
   const speech = useSpeech((spoken) => {
-    if (voiceTarget.current === "demand") void saveDemand(spoken, "voz");
+    if (voiceTarget.current === "demand") { setInboxOpen(true); setIncoming({ id: Date.now(), text: spoken }); }
     else void home.ask(spoken);
   });
   const listening = speech.listening;
@@ -134,7 +132,7 @@ function Assistente() {
     voiceTarget.current = target;
     if (!speech.start()) {
       // Navegador sem reconhecimento de voz: cai para digitação.
-      if (target === "demand") setDemandDraft("");
+      if (target === "demand") setInboxOpen(true);
       else setChatOpen(true);
     }
   }
@@ -229,7 +227,7 @@ function Assistente() {
                 style={{ background: "linear-gradient(90deg, var(--cyan), oklch(0.66 0.19 265) 55%, var(--violet))" }}>
                 <Mic size={22} className={listening ? "animate-pulse-ring" : ""} /> {listening ? (speech.interim || "Ouvindo…") : "Registrar demanda"}
               </button>
-              <button onClick={() => setDemandDraft("")} className="icon-tile h-16 w-16 shrink-0 !rounded-2xl transition hover:scale-105" style={tint("violet")} aria-label="Nova demanda (digitar)"><SquarePlus size={20} /></button>
+              <button onClick={() => setInboxOpen((o) => !o)} className={`icon-tile h-16 w-16 shrink-0 !rounded-2xl transition hover:scale-105 ${inboxOpen ? "shadow-[0_0_30px_-6px_var(--glow)]" : ""}`} style={tint("violet")} aria-label="Central de entrada: texto, prints e arquivos" aria-expanded={inboxOpen} title="Enviar texto, prints, PDFs e documentos" data-testid="abrir-central"><SquarePlus size={20} /></button>
             </div>
 
             <div className="flex flex-wrap justify-center gap-3">
@@ -247,15 +245,7 @@ function Assistente() {
               </p>
             )}
 
-            {demandDraft !== null && (
-              <form onSubmit={(e) => { e.preventDefault(); if (demandDraft.trim()) { void saveDemand(demandDraft, "texto"); setDemandDraft(null); } }}
-                className="glass flex items-center gap-3 rounded-full p-2 pl-5" style={tint("violet")}>
-                <input value={demandDraft} onChange={(e) => setDemandDraft(e.target.value)} placeholder="Descreva a demanda…" maxLength={300}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none" autoFocus />
-                <button type="button" onClick={() => setDemandDraft(null)} className="grid h-10 w-10 place-items-center rounded-full text-muted-foreground hover:text-foreground" aria-label="Cancelar"><X size={16} /></button>
-                <button type="submit" className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-primary-foreground" aria-label="Registrar"><ArrowRight size={16} /></button>
-              </form>
-            )}
+            {inboxOpen && <InboxPanel incoming={incoming} onClose={() => setInboxOpen(false)} onListen={() => toggleVoice("demand")} listening={listening} interim={speech.interim} />}
 
             {(home.messages.length > 0 || home.thinking) && (
               <div className="glass mx-auto max-h-[420px] w-full max-w-3xl space-y-3 overflow-y-auto rounded-3xl p-5">

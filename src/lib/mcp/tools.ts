@@ -5,9 +5,10 @@
 import { z } from "zod/v4";
 import { demandBrief, allTasks, demandsOf, libraryOf, listCategories, listDossiers, listProjects, notesOf, pickDossier, resolveProject, taskBrief, NeedsChoice } from "./lookup";
 import { prepare } from "./plan";
-import { executeRecord, makeCtx, undoCreated } from "./execute";
-import { claimProposal, expireProposal, getOperation, getProposal, logOperation, markUndone, recentOperations, saveProposal, type Created } from "./ops";
-import { RANK, TIPO_LABEL, hhmmNow, isoDay, normalize, registroSchema, weekdayPt, type Registro } from "./records";
+import { undoCreated } from "./execute";
+import { commitRecords } from "./commit";
+import { claimProposal, expireProposal, getOperation, getProposal, logOperation, markUndone, recentOperations, saveProposal } from "./ops";
+import { TIPO_LABEL, hhmmNow, isoDay, normalize, registroSchema, weekdayPt, type Registro } from "./records";
 import type { ToolDef, ToolResult, ToolSet } from "./protocol";
 
 export const INSTRUCTIONS = `Você opera o Presence, o assistente pessoal e de projetos da usuária. Seu trabalho é ENCAMINHAR cada informação ao módulo certo, sem inventar destino.
@@ -231,14 +232,8 @@ const confirmar = def({
     if (prep.problems.length) return fail(`O Presence mudou desde a proposta:\n- ${prep.problems.join("\n- ")}\nCrie uma nova proposta.`);
     if (!(await claimProposal(p.id))) return fail("Esta proposta acabou de ser confirmada por outra chamada.");
 
-    const ctxx = await makeCtx();
-    const created: Created[] = []; const failed: string[] = []; const skipped = prep.resolved.filter((r) => r._ignorar).map((r) => r.tipo);
-    const order = prep.resolved.map((r, i) => ({ r, i })).filter((x) => !x.r._ignorar).sort((x, y) => RANK[x.r.tipo] - RANK[y.r.tipo] || x.i - y.i);
-    for (const { r, i } of order) {
-      try { created.push(...(await executeRecord(r, ctxx))); } catch (e) { failed.push(`#${i + 1} ${TIPO_LABEL[r.tipo]}: ${e instanceof Error ? e.message : "erro"}`); }
-    }
-    const status = failed.length ? (created.length ? "parcial" : "erro") : "ok";
-    const op = await logOperation({ proposalId: p.id, kind: "criacao", status, client: ctx.client, summary: p.summary, created, ...(failed.length ? { error: failed.join(" | ") } : {}) });
+    const { op, created, failed, skipped: nSkipped, status } = await commitRecords(prep.resolved, { client: ctx.client, proposalId: p.id, summary: p.summary });
+    const skipped = { length: nSkipped };
     const lines = created.map((c) => `✅ ${c.modulo}: ${c.rotulo} — id ${c.id}${c.projeto_id ? ` (projeto ${c.projeto_id})` : ""}`);
     const msg = `${status === "ok" ? "Registros criados" : status === "parcial" ? "Criação parcial" : "Nada foi criado"} (operação ${op.id}):\n${lines.join("\n")}${failed.length ? `\n\nFalhas:\n- ${failed.join("\n- ")}` : ""}${skipped.length ? `\n\nIgnorados por duplicidade: ${skipped.length}` : ""}\n\nPara desfazer: desfazer_operacao com operacao_id ${op.id}.`;
     const out = { operacao_id: op.id, status, criados: created.map(({ undo: _u, ...c }) => c), falhas: failed };

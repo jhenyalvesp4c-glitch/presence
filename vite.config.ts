@@ -28,7 +28,9 @@ export default defineConfig(({ command }) => ({
     // Nitro produces the deployable server bundle. The preset defaults to Node
     // (`node .output/server/index.mjs`); override with NITRO_PRESET (e.g. vercel,
     // netlify, cloudflare-module) or pass `{ preset: "..." }` here.
-    ...(command === "build" ? [nitro()] : []),
+    // A Central de entrada chama a IA (leitura de prints e PDFs) e pode levar dezenas de segundos: na Vercel a
+    // função do servidor precisa de mais tempo que os 10 s padrão (60 s é o teto do plano gratuito).
+    ...(command === "build" ? [nitro({ vercel: { functions: { maxDuration: 60 } } })] : []),
     viteReact(),
   ],
   resolve: {

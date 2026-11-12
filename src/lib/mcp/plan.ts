@@ -27,7 +27,7 @@ export async function prepare(registros: Registro[]): Promise<Prepared> {
   refProblems(registros).forEach((p) => problems.push(p));
   if (problems.length) return { resolved: [], problems, warnings, summary: "" };
 
-  const cats = await listCategories();
+  const [cats, tasks] = await Promise.all([listCategories(), allTasks()]);
   const projects = new Map<string, ProjectInfo>();
   const dossiers = new Map<string, DossierInfo[]>();
   const getProject = async (id: string) => {
@@ -38,7 +38,6 @@ export async function prepare(registros: Registro[]): Promise<Prepared> {
     if (!dossiers.has(pid)) dossiers.set(pid, await listDossiers(pid));
     return dossiers.get(pid)!;
   };
-  const tasks = await allTasks();
   const compId = cats.find((c) => c.slug === "comp")?.id;
   const demandCache = new Map<string, Awaited<ReturnType<typeof demandsOf>>>();
   const demands = async (pid: string) => { if (!demandCache.has(pid)) demandCache.set(pid, await demandsOf(pid)); return demandCache.get(pid)!; };

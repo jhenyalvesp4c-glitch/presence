@@ -1,7 +1,9 @@
 /** Propostas pendentes e histórico de operações do MCP (tabelas mcp_proposals e mcp_operations). */
 import { must, supabase } from "../data/db";
-import { makeCode } from "./records";
+import { randomInt } from "node:crypto";
 import type { Resolved } from "./plan";
+
+const makeCode = () => String(randomInt(1000, 10000));
 
 export type Created = {
   tipo: string; modulo: string; id: string; rotulo: string; projeto_id?: string;

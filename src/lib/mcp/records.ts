@@ -2,7 +2,6 @@
  * Registros que o assistente pode propor ao Presence: formato de entrada (zod), validações que não
  * dependem do banco e funções puras (normalização de texto, semelhança, datas, resumo).
  */
-import { randomInt } from "node:crypto";
 import { z } from "zod/v4";
 
 export const TZ = "America/Sao_Paulo";
@@ -77,6 +76,17 @@ export const evidenciaSchema = z.object({
 export const registroSchema = z.discriminatedUnion("tipo", [
   demandaSchema, compromissoSchema, lembreteSchema, tarefaSchema, rotinaSchema, anotacaoSchema, documentacaoSchema, evidenciaSchema,
 ]);
+
+/**
+ * Rascunho: mesmos campos, mas só o `tipo` é obrigatório. É o que a IA da Central de entrada devolve (quando não
+ * sabe o projeto ou o polo, deixa o campo de fora em vez de chutar) e o que a tela deixa a usuária completar.
+ * A validação completa (`registroSchema`) roda no servidor antes de gravar.
+ */
+export const rascunhoSchema = z.discriminatedUnion("tipo", [
+  demandaSchema.partial().required({ tipo: true }), compromissoSchema.partial().required({ tipo: true }), lembreteSchema.partial().required({ tipo: true }),
+  tarefaSchema.partial().required({ tipo: true }), rotinaSchema.partial().required({ tipo: true }), anotacaoSchema.partial().required({ tipo: true }),
+  documentacaoSchema.partial().required({ tipo: true }), evidenciaSchema.partial().required({ tipo: true }),
+]);
 export type Registro = z.infer<typeof registroSchema>;
 export type Tipo = Registro["tipo"];
 
@@ -112,8 +122,6 @@ export const minusMinutes = (date: string, hhmm: string, min: number): { date: s
   const d = new Date(t);
   return { date: d.toISOString().slice(0, 10), time: d.toISOString().slice(11, 16) };
 };
-
-export const makeCode = () => String(randomInt(1000, 10000));
 
 /* ───────────── validação sem banco ───────────── */
 export const isCode = (s: string) => /^#[GPM]\d+$/.test(s);
