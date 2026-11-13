@@ -15,7 +15,8 @@ Toque na esfera da tela inicial (ou no botão de microfone no canto inferior esq
 Cada conversa também fica salva em `assistant_messages` (o Orion encontra depois).
 
 ## Como funciona (rapidez)
-- Voz → texto: reconhecimento de fala do navegador (Chrome/Edge/Safari). Sem suporte, aparece uma caixa para digitar e a resposta continua falada.
+- Voz → texto, dois modos: (1) reconhecimento de fala do navegador (rápido, mas depende de um serviço do Google/Apple); (2) **modo gravação**: grava o microfone, percebe o fim da fala por silêncio (~1 s) e transcreve na OpenAI (`whisper-1`). Se o navegador der erro de rede ou não tiver reconhecimento, o app muda sozinho para o modo gravação e lembra a escolha (`localStorage presence.stt`). Sempre há a caixa para digitar.
+- Rodando local: coloque `OPENAI_API_KEY`, `ELEVENLABS_API_KEY` e `ELEVENLABS_VOICE_ID` no `.env`. Abra `/api/voz` e `/api/tts` no navegador para um diagnóstico (modelo e voz).
 - `/api/voz`: Chat Completions em **streaming** com ferramentas (`src/lib/voice/agent.ts`). Cada frase pronta vai para `/api/tts` na hora (a próxima já é gerada enquanto a anterior toca).
 - `/api/tts`: ElevenLabs (`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`; modelo `eleven_flash_v2_5`, troque com `ELEVENLABS_MODEL`). Sem a chave, usa a voz do próprio navegador.
 - IA: `OPENAI_API_KEY`; modelo `OPENAI_VOICE_MODEL` (ou `OPENAI_MODEL`).

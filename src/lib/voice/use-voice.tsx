@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useRouter } from "@tanstack/react-router";
 
 import { SINGLE_USER_ID, supabase } from "@/lib/supabase";
+import { transcribeAudio } from "@/lib/audio.functions";
 import type { Panel, Turn, VoiceEvent } from "./agent";
 import { takeSentences } from "./sentences";
 
@@ -25,6 +26,12 @@ const recCtor = (): (new () => Rec) | undefined => {
   const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 };
+
+/* ───────────── modo gravação: grava o microfone, detecta o fim da fala e transcreve na OpenAI ───────────── */
+const recMime = () => (typeof MediaRecorder === "undefined" ? "" : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find((m) => MediaRecorder.isTypeSupported(m)) ?? "");
+const blobToBase64 = (b: Blob) => new Promise<string>((res, rej) => { const f = new FileReader(); f.onload = () => res(String(f.result).split(",")[1] ?? ""); f.onerror = () => rej(new Error("leitura")); f.readAsDataURL(b); });
+/** A transcrição às vezes "inventa" frases em silêncio ou ruído; essas não valem como fala. */
+const GHOST = /^(obrigad[oa]\.?|legendas? .*|tchau\.?|\.+|\s*)$|amara\.org|inscreva-se/i;
 
 /* ───────────── fila de fala: cada frase vira áudio (ElevenLabs) e toca na ordem ───────────── */
 class Speaker {
@@ -167,22 +174,31 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const abort = useRef<AbortController | null>(null);
   const endAfter = useRef(false);
   const speaker = useRef<Speaker | null>(null);
+  const mic = useRef<MediaStream | null>(null);
+  const vadStop = useRef<(() => void) | null>(null);
+  const sttMode = useRef<"nativo" | "gravado">("nativo");
+  const askRef = useRef<(t: string) => Promise<void>>(async () => undefined);
+  const listenRef = useRef<() => void>(() => undefined);
   const turn = useRef(0);
 
   const setP = (p: Phase) => { phaseRef.current = p; setPhase(p); };
-  useEffect(() => { setCanListen(!!recCtor()); }, []);
+  useEffect(() => {
+    setCanListen(!!recCtor() || !!navigator.mediaDevices?.getUserMedia);
+    try { if (localStorage.getItem("presence.stt") === "gravado") sttMode.current = "gravado"; } catch { /* sem armazenamento */ }
+  }, []);
   const spk = () => (speaker.current ??= new Speaker(() => { if (activeRef.current) setP("speaking"); }, (n) => setNote(n)));
 
   const stopListening = useCallback(() => { const r = rec.current; rec.current = null; if (r) { r.onend = null; r.onresult = null; try { r.abort(); } catch { /* já parado */ } } setInterim(""); }, []);
 
   const endSession = useCallback(() => {
     activeRef.current = false; setActive(false);
-    stopListening(); abort.current?.abort(); speaker.current?.cancel();
+    stopListening(); vadStop.current?.(); abort.current?.abort(); speaker.current?.cancel();
+    mic.current?.getTracks().forEach((t) => t.stop()); mic.current = null;
     setP("idle"); setInterim("");
     setTimeout(() => { if (!activeRef.current) { setUserText(""); setBotText(""); } }, 6000);
   }, [stopListening]);
 
-  const listen = useCallback(() => {
+  const listenNative = useCallback(() => {
     if (!activeRef.current) return;
     const C = recCtor();
     if (!C) { setP("idle"); return; }
@@ -195,28 +211,97 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       for (let i = 0; i < e.results.length; i++) { const x = e.results[i]!; if (x.isFinal) finalText += x[0]!.transcript; else partial += x[0]!.transcript; }
       setInterim(finalText + partial);
     };
+    let switched = false;
     r.onerror = (e) => {
       const m: Record<string, string> = {
         "not-allowed": "O navegador bloqueou o microfone. Clique no cadeado ao lado do endereço e permita o microfone para este site.",
         "service-not-allowed": "O navegador bloqueou o reconhecimento de voz. Permita o microfone para este site.",
         "audio-capture": "Não encontrei nenhum microfone.",
-        network: "O reconhecimento de voz do navegador está sem conexão com o serviço dele. Você pode digitar abaixo.",
       };
-      if (m[e.error]) { setNote(m[e.error]!); if (e.error !== "network") idle.current = MAX_IDLE; }
+      if (e.error === "network" || e.error === "service-not-allowed" && !m[e.error]) {
+        // O reconhecimento do navegador depende de um serviço dele; sem ele, passamos para o modo de gravação.
+        switched = true; sttMode.current = "gravado";
+        try { localStorage.setItem("presence.stt", "gravado"); } catch { /* sem armazenamento */ }
+        setNote("O reconhecimento de voz do navegador não funciona neste computador. Mudei para o modo de gravação (usa a OpenAI e demora um pouco mais).");
+      } else if (m[e.error]) { setNote(m[e.error]!); idle.current = MAX_IDLE; }
     };
     r.onend = () => {
       if (rec.current !== r) return;
       rec.current = null; setInterim("");
+      if (switched) { if (activeRef.current) listenRef.current(); return; }
       const text = finalText.trim();
-      if (text) { idle.current = 0; void ask(text); return; }
+      if (text) { idle.current = 0; void askRef.current(text); return; }
       if (!activeRef.current) return;
       if (++idle.current >= MAX_IDLE) { endSession(); return; }
-      setTimeout(() => { if (activeRef.current && phaseRef.current === "listening") listen(); }, 200);
+      setTimeout(() => { if (activeRef.current && phaseRef.current === "listening") listenRef.current(); }, 200);
     };
     rec.current = r;
-    try { r.start(); setP("listening"); } catch { setTimeout(() => listen(), 300); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try { r.start(); setP("listening"); } catch { setTimeout(() => listenRef.current(), 300); }
   }, [endSession, stopListening]);
+
+  /** Modo gravação: grava, percebe quando a pessoa para de falar (silêncio de ~1 s) e manda para transcrever. */
+  const listenRecorded = useCallback(async () => {
+    if (!activeRef.current) return;
+    stopListening(); vadStop.current?.();
+    let stream = mic.current;
+    if (!stream || !stream.active) {
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); mic.current = stream; }
+      catch (e) {
+        const n = (e as DOMException).name;
+        setNote(n === "NotAllowedError" ? "O navegador bloqueou o microfone. Clique no cadeado ao lado do endereço e permita o microfone para este site." : n === "NotFoundError" ? "Não encontrei nenhum microfone." : "Não consegui acessar o microfone.");
+        setP("idle"); return;
+      }
+    }
+    if (!activeRef.current) return;
+    setP("listening"); setInterim("");
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const ac = new AC!(); void ac.resume();
+    const an = ac.createAnalyser(); an.fftSize = 1024; ac.createMediaStreamSource(stream).connect(an);
+    const data = new Uint8Array(an.fftSize);
+    const mime = recMime();
+    const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks: Blob[] = [];
+    mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    mr.start(200);
+    const t0 = performance.now();
+    let noise = 0.01, loud = 0, quiet = 0, started = false, finished = false;
+    const finish = async (kind: "enviar" | "silencio" | "cancelar") => {
+      if (finished) return; finished = true; clearInterval(timer); vadStop.current = null;
+      const stopped = new Promise<void>((res) => { mr.onstop = () => res(); });
+      try { mr.stop(); } catch { /* já parou */ }
+      await stopped; try { void ac.close(); } catch { /* já fechou */ }
+      if (kind === "cancelar" || !activeRef.current) return;
+      if (kind === "silencio") { if (++idle.current >= MAX_IDLE) endSession(); else listenRef.current(); return; }
+      setP("thinking"); setInterim("");
+      try {
+        const blob = new Blob(chunks, { type: mr.mimeType || mime || "audio/webm" });
+        const r = await transcribeAudio({ data: { data: await blobToBase64(blob), mime: blob.type } });
+        if (!activeRef.current) return;
+        const text = r.ok ? r.text.trim() : "";
+        if (!r.ok) setNote(r.error);
+        if (text.length >= 2 && !GHOST.test(text)) { idle.current = 0; void askRef.current(text); return; }
+      } catch (e) { setNote(`Não consegui transcrever a gravação (${e instanceof Error ? e.message : "erro"}).`); }
+      if (++idle.current >= MAX_IDLE) endSession(); else listenRef.current();
+    };
+    const timer = setInterval(() => {
+      an.getByteTimeDomainData(data);
+      let sum = 0; for (const v of data) { const x = (v - 128) / 128; sum += x * x; }
+      const rms = Math.sqrt(sum / data.length), now = performance.now();
+      if (now - t0 < 400) { noise = Math.max(noise, rms); return; } // mede o ruído do ambiente
+      if (rms > Math.max(0.025, noise * 2.5)) { loud += 50; quiet = 0; if (!started && loud >= 150) { started = true; setInterim("…"); } } else if (started) quiet += 50;
+      if (started && quiet >= 950) void finish(loud >= 300 ? "enviar" : "silencio");
+      else if (!started && now - t0 > 10_000) void finish("silencio");
+      else if (now - t0 > 25_000) void finish(started ? "enviar" : "silencio");
+    }, 50);
+    vadStop.current = () => { void finish("cancelar"); };
+  }, [endSession, stopListening]);
+
+  /** Escolhe o jeito de ouvir: o do navegador (rápido) ou a gravação (funciona em qualquer navegador). */
+  const listen = useCallback(() => {
+    if (!activeRef.current) return;
+    if (sttMode.current === "gravado" || !recCtor()) void listenRecorded(); else listenNative();
+  }, [listenNative, listenRecorded]);
+  listenRef.current = listen;
 
   /** Uma rodada: manda a fala, recebe a resposta em streaming e fala cada frase assim que fica pronta. */
   const ask = useCallback(async (text: string) => {
@@ -267,13 +352,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     await sp.drained();
     if (turn.current !== my || !activeRef.current) return;
     if (endAfter.current) { endSession(); return; }
-    if (recCtor()) listen(); else setP("idle");
+    listen();
   }, [endSession, listen, router, stopListening]);
+  askRef.current = ask;
 
   const start = useCallback(() => {
     activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
     spk().unlock();
-    if (recCtor()) listen(); else setP("idle");
+    listen();
   }, [listen]);
 
   const stop = useCallback(() => { turn.current++; endSession(); }, [endSession]);
@@ -284,7 +370,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     stopListening(); const sp = spk(); sp.unlock(); sp.cancel(); sp.reset(); setNote(null);
     setBotText("Olá! Se você está me ouvindo, a voz está funcionando."); setP("thinking");
     sp.enqueue("Olá! Se você está me ouvindo, a voz está funcionando.");
-    void sp.drained().then(() => { if (activeRef.current && phaseRef.current !== "listening") { if (recCtor()) listen(); else setP("idle"); } });
+    void sp.drained().then(() => { if (activeRef.current && phaseRef.current !== "listening") listen(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listen, stopListening]);
 
@@ -293,7 +379,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     if (!activeRef.current) return start();
     if (phaseRef.current === "speaking" || phaseRef.current === "thinking") {
       turn.current++; abort.current?.abort(); speaker.current?.cancel(); speaker.current?.reset();
-      if (recCtor()) listen(); else setP("idle");
+      listen();
       return;
     }
     stop();
