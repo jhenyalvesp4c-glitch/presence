@@ -10,8 +10,8 @@ export async function waGet<T>(r: string, params: Record<string, string> = {}): 
   try {
     const q = new URLSearchParams({ r, ...params });
     const res = await fetch(`/api/whatsapp?${q}`, { headers: await authHeaders() });
-    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) return { ok: false, offline: res.status === 503 || body["offline"] === true, erro: String(body["error"] ?? "erro") };
+    const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!res.ok || !body) return { ok: false, offline: res.status === 503 || body?.["offline"] === true, erro: !body ? `O app respondeu ${res.status} sem dados (a rota do WhatsApp não existe nesta versão do app: reinicie o npm run dev)` : `${res.status}: ${String(body["error"] ?? "erro")}` };
     return { ok: true, data: body as T };
   } catch (e) { return { ok: false, offline: true, erro: e instanceof Error ? e.message : "sem conexão" }; }
 }

@@ -24,13 +24,14 @@ function Toggle({ on, onChange, label, hint, Icon }: { on: boolean; onChange: (v
 function WhatsApp() {
   const [st, setSt] = useState<WaStatus | null>(null);
   const [offline, setOffline] = useState(false);
+  const [why, setWhy] = useState("");
   const [busy, setBusy] = useState(false);
   const [alerts, setAlerts] = useState(true), [voice, setVoice] = useState(true);
   useEffect(() => { setAlerts(waPrefs.alerts()); setVoice(waPrefs.voice()); }, []);
 
   const load = useCallback(async () => {
     const r = await waGet<WaStatus>("status");
-    if (r.ok) { setSt(r.data); setOffline(false); } else { setSt(null); setOffline(true); }
+    if (r.ok) { setSt(r.data); setOffline(false); setWhy(""); } else { setSt(null); setOffline(true); setWhy(r.erro); }
   }, []);
   useEffect(() => { void load(); const t = setInterval(() => void load(), st?.phase === "aguardando_qr" ? 2500 : 6000); return () => clearInterval(t); }, [load, st?.phase]);
 
@@ -64,6 +65,7 @@ function WhatsApp() {
               <li>Volte a esta tela: o QR Code aparece sozinho.</li>
             </ol>
             <p className="mt-3 text-xs text-muted-foreground">Funciona só no app do seu computador (o endereço localhost), não no site publicado.</p>
+            {why && <p className="mt-2 break-words rounded-xl border border-white/10 px-3 py-2 text-xs text-muted-foreground" data-testid="wa-motivo">Detalhe técnico: {why}</p>}
           </div>
         )}
 
