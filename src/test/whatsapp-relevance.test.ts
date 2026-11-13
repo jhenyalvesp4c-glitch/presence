@@ -18,7 +18,7 @@ describe("avisos do WhatsApp", () => {
     expect(c("jheny", { from_me: true })).toBeNull();
   });
   it("assuntos de CRM avisam", () => {
-    for (const t of ["o CRM caiu", "quem cria usuário novo?", "preciso de um disparo em massa", "template foi reprovado", "o qr code não conecta", "problema na conexão do whatsapp", "a Meta bloqueou o template"]) expect(c(t), t).toBe("crm");
+    for (const t of ["o CRM caiu", "P4C fora do ar", "problema na P4C?", "quem cria usuário novo?", "preciso de um disparo em massa", "template foi reprovado", "o qr code não conecta", "problema na conexão do whatsapp", "a Meta bloqueou o template"]) expect(c(t), t).toBe("crm");
   });
   it("campanhas e valores não avisam", () => {
     for (const t of ["disparo da campanha de hoje", "qual o valor do disparo?", "template da campanha nova", "CRM: saldo r$ 500", "meta do mês é 30 vendas", "bom dia grupo"]) expect(c(t), t).toBeNull();

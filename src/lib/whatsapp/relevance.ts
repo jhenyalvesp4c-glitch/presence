@@ -9,7 +9,7 @@ const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerC
 const NAME_RE = /(?<![a-z0-9])j+h*e+n+[iy]+(?![a-z0-9])/;
 
 export const DEFAULT_CRM = [
-  "crm", "atendechat", "disparo", "disparos", "dispare", "disparar", "envio em massa", "envios em massa", "mensagem em massa", "mensagens em massa",
+  "crm", "p4c", "disparo", "disparos", "dispare", "disparar", "envio em massa", "envios em massa", "mensagem em massa", "mensagens em massa",
   "template", "templates", "api oficial", "whatsapp business", "waba", "qr code", "qrcode",
   "usuario", "usuarios", "fila", "filas", "conexao", "conexoes", "reconectar", "integracao", "webhook", "chatbot",
   "permissao", "permissoes", "login", "acesso ao sistema", "plataforma de atendimento",
