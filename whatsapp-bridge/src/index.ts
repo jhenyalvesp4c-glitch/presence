@@ -40,4 +40,7 @@ server.listen(port, "127.0.0.1", () => {
 
 const prune = () => { try { const n = store.prune(days); if (n) console.log(`Apaguei ${n} mensagens com mais de ${days} dias.`); } catch { /* ok */ } };
 prune(); setInterval(prune, 6 * 3600_000);
+// Um erro solto da conexão não pode derrubar a ponte: registra e segue.
+process.on("uncaughtException", (e) => console.error("[whatsapp] Erro inesperado (a ponte continua ligada):", e instanceof Error ? e.message : e));
+process.on("unhandledRejection", (e) => console.error("[whatsapp] Falha em segundo plano (a ponte continua ligada):", e instanceof Error ? e.message : e));
 process.on("SIGINT", () => { conn.stop(); store.close(); process.exit(0); });
