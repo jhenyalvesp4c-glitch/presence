@@ -28,7 +28,7 @@ export type Turn = { role: "user" | "assistant"; content: string };
 export const PAGES: Record<string, string> = {
   inicio: "/assistente", demandas: "/demandas", projetos: "/projetos", tarefas: "/tarefas", calendario: "/calendario", planejamento: "/planejamento",
   saude: "/saude", treino: "/saude/treino", dieta: "/saude/dieta", habitos: "/habitos", progresso: "/progresso", cerebro: "/cerebro",
-  organizar: "/organizar", analise: "/analise", resumo: "/resumo", hoje: "/hoje",
+  organizar: "/organizar", analise: "/analise", resumo: "/resumo",
 };
 
 /* ───────────── contexto (com cache curto, para responder rápido) ───────────── */
@@ -50,7 +50,7 @@ Regras de fala:
 - Responda em português do Brasil, em UMA ou DUAS frases curtas. Nada de listas, markdown, emojis, URLs ou códigos; diga datas e horas do jeito que se fala ("amanhã às três da tarde").
 - Faça o pedido na hora usando as ferramentas e depois confirme em uma frase ("Pronto, criei a demanda…"). Não peça permissão para o que foi pedido com clareza.
 - Se faltar um dado essencial, faça UMA pergunta curta. Se algo for ambíguo (projeto, polo), pergunte qual, citando as opções.
-- Para "o que tenho hoje" (ou amanhã) use resumo_do_dia e fale só os destaques em até três frases: a tela já mostra a lista completa.
+- Para "o que tenho hoje", "me mostra tudo", "minha agenda/pendências" (ou amanhã) use SOMENTE resumo_do_dia, sem abrir nenhuma página (a tela de Saúde "Hoje" é outra coisa: só abra saude se ela pedir saúde). O painel mostra tudo: compromissos, lembretes, tarefas, atrasadas e demandas. Fale só os destaques em até três frases, citando as quantidades.
 - Para perguntas sobre o que aconteceu, documentos, anotações ou arquivos, use buscar_no_orion e responda com o que encontrou. Para guardar algo que a usuária contou, use documentar.
 - Para abrir telas use abrir_pagina. Quando a usuária se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
@@ -62,7 +62,7 @@ const schemaOf = (z_: z.ZodType) => { const { $schema: _s, ...rest } = z.toJSONS
 
 export const TOOLS = [
   fn("abrir_pagina", "Abre uma tela do Presence para a usuária.", { type: "object", properties: {
-    pagina: { type: "string", enum: Object.keys(PAGES), description: "inicio, demandas, projetos, tarefas, calendario, planejamento, saude, treino, dieta, habitos, progresso, cerebro (segundo cérebro/Orion), organizar, analise, resumo, hoje" },
+    pagina: { type: "string", enum: Object.keys(PAGES), description: "inicio, demandas, projetos, tarefas, calendario, planejamento, saude, treino, dieta, habitos, progresso, cerebro (segundo cérebro/Orion), organizar, analise, resumo" },
     projeto: { type: "string", description: "Só para demandas: nome do projeto, se ela pedir um específico." },
   }, required: ["pagina"] }),
   fn("registrar", "Cria registros reais no Presence (demanda, tarefa, compromisso, lembrete, rotina, anotação). Use os nomes EXATOS de projetos e polos do contexto. Datas em AAAA-MM-DD, horas em HH:MM.", schemaOf(z.object({
@@ -136,16 +136,22 @@ async function runTool(name: string, args: Record<string, unknown>, emit: Emit, 
       const d = must(dem) as { code: string; title: string; status: string; priority: string; dossier_name: string | null; project_id: string }[];
       const hoje = t.filter((x) => x.due_date === day), atrasadas = t.filter((x) => x.due_date < day && !x.done);
       const doing = d.filter((x) => x.status === "doing"), high = d.filter((x) => x.priority === "alta" && x.status !== "doing");
+      const todo = d.filter((x) => x.status !== "doing" && x.priority !== "alta");
       const item = (x: (typeof t)[number]): PanelItem => ({ rotulo: x.title, detalhe: [hhmm(x.due_time) ? `${hhmm(x.due_time)}${x.end_time ? `–${hhmm(x.end_time)}` : ""}` : "", x.place ?? ""].filter(Boolean).join(" · ") || undefined, feita: x.done, link: x.kind === "evento" ? "/calendario" : "/tarefas" } as PanelItem);
+      const dem_ = (x: (typeof d)[number]): PanelItem => ({ rotulo: `${x.code} ${x.title}`, detalhe: x.dossier_name ?? undefined, link: `/demandas?projeto=${encodeURIComponent(x.project_id)}` });
+      const compromissos = hoje.filter((x) => x.kind === "evento"), lembretes = hoje.filter((x) => x.kind === "lembrete"), tarefas = hoje.filter((x) => x.kind !== "evento" && x.kind !== "lembrete");
       const secoes: Panel["secoes"] = [
-        { titulo: "Agenda e tarefas", itens: hoje.map(item) },
-        ...(atrasadas.length ? [{ titulo: "Atrasadas", itens: atrasadas.slice(0, 8).map((x) => ({ ...item(x), detalhe: `era para ${x.due_date.split("-").reverse().join("/")}` })) }] : []),
-        ...(doing.length ? [{ titulo: "Demandas em andamento", itens: doing.slice(0, 8).map((x) => ({ rotulo: `${x.code} ${x.title}`, detalhe: x.dossier_name ?? undefined, link: `/demandas?projeto=${encodeURIComponent(x.project_id)}` })) }] : []),
-        ...(high.length ? [{ titulo: "Prioridade alta (a fazer)", itens: high.slice(0, 6).map((x) => ({ rotulo: `${x.code} ${x.title}`, detalhe: x.dossier_name ?? undefined, link: `/demandas?projeto=${encodeURIComponent(x.project_id)}` })) }] : []),
+        { titulo: "Compromissos", itens: compromissos.map(item) },
+        { titulo: "Lembretes", itens: lembretes.map(item) },
+        { titulo: "Tarefas", itens: tarefas.map(item) },
+        ...(atrasadas.length ? [{ titulo: "Atrasadas", itens: atrasadas.slice(0, 20).map((x) => ({ ...item(x), detalhe: `era para ${x.due_date.split("-").reverse().join("/")}` })) }] : []),
+        { titulo: "Demandas em andamento", itens: doing.slice(0, 20).map(dem_) },
+        { titulo: "Demandas de prioridade alta", itens: high.slice(0, 20).map(dem_) },
+        { titulo: "Demandas a fazer", itens: todo.slice(0, 15).map(dem_) },
       ].filter((s) => s.itens.length);
       emit({ t: "painel", p: { titulo: ptDate(day), secoes: secoes.length ? secoes : [{ titulo: "Agenda", itens: [{ rotulo: "Nada marcado para este dia." }] }] } });
       return {
-        data: day, compromissos_e_tarefas: hoje.map((x) => ({ titulo: x.title, hora: hhmm(x.due_time), feita: x.done, tipo: x.kind })), atrasadas: atrasadas.length,
+        data: day, compromissos: compromissos.map((x) => ({ titulo: x.title, hora: hhmm(x.due_time) })), lembretes: lembretes.map((x) => ({ titulo: x.title, hora: hhmm(x.due_time) })), tarefas: tarefas.map((x) => ({ titulo: x.title, hora: hhmm(x.due_time), feita: x.done })), atrasadas: atrasadas.length, demandas_a_fazer: todo.length,
         demandas_em_andamento: doing.slice(0, 5).map((x) => `${x.code} ${x.title}`), demandas_alta_prioridade: high.slice(0, 5).map((x) => `${x.code} ${x.title}`), demandas_abertas_total: d.length,
       };
     }

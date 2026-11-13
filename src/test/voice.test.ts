@@ -29,3 +29,11 @@ describe("Voz: frases para falar", () => {
     expect(r.chunks.join(" ")).toContain("Depois você almoça com a equipe.");
   });
 });
+
+describe("voz: 'hoje' não abre a tela de Saúde", () => {
+  it("não existe a página 'hoje' nas telas abríveis", async () => {
+    const { PAGES } = await import("../lib/voice/agent");
+    expect(Object.keys(PAGES)).not.toContain("hoje");
+    expect(Object.values(PAGES)).not.toContain("/hoje");
+  });
+});
