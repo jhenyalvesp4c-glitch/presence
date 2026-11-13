@@ -442,3 +442,12 @@
 @keyframes vp-aurora { 0%,100% { transform: translate3d(-8%, -6%, 0) scale(1); } 50% { transform: translate3d(8%, 6%, 0) scale(1.2); } }
 @keyframes vp-sweep { from { transform: translateX(-120%); } to { transform: translateX(220%); } }
 @keyframes vp-spin { to { transform: rotate(360deg); } }
+
+/* Altura da barra de navegação de baixo (só no celular): usada para erguer os botões flutuantes. */
+:root { --tabbar: 0px; }
+@media (max-width: 767px) { :root { --tabbar: calc(4.4rem + env(safe-area-inset-bottom)); } }
+@media (max-width: 767px) {
+  .lift-a { bottom: calc(var(--tabbar) + 1rem) !important; }
+  .lift-b { bottom: calc(var(--tabbar) + 0.75rem) !important; }
+  .lift-c { bottom: calc(var(--tabbar) + 5.25rem) !important; }
+}

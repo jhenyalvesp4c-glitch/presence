@@ -465,7 +465,7 @@ function Demandas() {
       />
       {ready && !sel && !newOpen && !noteEdit && (tab === "overview" || tab === "geral" || tab === "polo" || tab === "multi") && (
         <button onClick={() => setNewOpen({ type: tab === "overview" ? "geral" : tab, status: "todo" })} data-testid="nova-demanda-fab" aria-label="Nova demanda"
-          className="fixed bottom-24 right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-brand text-primary-foreground shadow-[0_12px_32px_-6px_var(--cyan)] transition active:scale-95 md:hidden"><Plus size={24} /></button>
+          className="fixed lift-c right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-brand text-primary-foreground shadow-[0_12px_32px_-6px_var(--cyan)] transition active:scale-95 md:hidden"><Plus size={24} /></button>
       )}
       {selecting && (
         <div className="glass fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl px-4 py-3 shadow-lg animate-rise">

@@ -162,12 +162,12 @@ function Assistente() {
         </aside>
 
 
-        <main className="flex min-w-0 flex-1 flex-col gap-6">
+        <main className="flex min-w-0 flex-1 flex-col gap-6 max-md:gap-5 max-md:pb-28">
           {/* Header */}
-          <header className="glass flex items-center justify-between rounded-3xl px-6 py-4 animate-rise">
+          <header className="glass flex items-center justify-between rounded-3xl px-6 py-4 animate-rise max-sm:rounded-2xl max-sm:px-4 max-sm:py-2.5">
             <div className="flex items-center gap-5">
               <span className="h-2.5 w-2.5 rounded-full bg-cyan shadow-[0_0_12px_var(--cyan)] animate-pulse-ring" />
-              <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan">PRESENCE</span>
+              <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan max-sm:text-lg max-sm:tracking-[0.28em]">PRESENCE</span>
               <span className="tag hidden !px-4 !py-1.5 sm:inline" style={tint("violet")}>Assistente pessoal</span>
             </div>
             <div className="flex items-center gap-4">
@@ -175,27 +175,28 @@ function Assistente() {
               <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? "Pensando…" : "Standby"}</span>
               <span className="h-8 w-px bg-border" />
               <button onClick={voice.toggle} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz" data-testid="voz-cabecalho"><AudioLines size={18} /></button>
+              <div className="md:hidden"><AccountMenu below /></div>
             </div>
           </header>
 
           {/* Hero: text · orb (centered) · quick actions */}
-          <section className="grid items-center gap-6 px-[3%] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,0.8fr)] sm:gap-2">
+          <section className="grid items-center gap-4 px-[3%] max-sm:gap-3 sm:gap-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,0.8fr)] sm:gap-2">
             <div className="flex animate-rise flex-col items-center text-center sm:items-start sm:justify-self-start sm:text-left" style={{ animationDelay: ".1s" }}>
-              <p className="mono-caps mb-3">Olá{home.displayName ? `, ${home.displayName}` : ""} <span className="text-violet">✦</span></p>
-              <h1 className="font-serif text-4xl leading-[1.05] tracking-tight sm:text-[clamp(1.9rem,4.2vw,4.25rem)]">
+              <p className="mono-caps mb-2 sm:mb-3">Olá{home.displayName ? `, ${home.displayName}` : ""} <span className="text-violet">✦</span></p>
+              <h1 className="font-serif text-[2rem] leading-[1.05] tracking-tight sm:text-[clamp(1.9rem,4.2vw,4.25rem)]">
                 Como posso<br /><span className="text-gradient">te ajudar hoje?</span>
               </h1>
-              <p className="mt-5 max-w-sm text-[0.95rem] leading-relaxed text-muted-foreground">
+              <p className="mt-5 max-w-sm text-[0.95rem] leading-relaxed text-muted-foreground max-sm:hidden">
                 Organize sua rotina, acompanhe seus objetivos e conte com a Presence para facilitar seu dia.
               </p>
-              <Link to="/planejamento" className="glass group mt-7 inline-flex items-center gap-4 rounded-full px-6 py-3 text-sm transition hover:shadow-[0_0_30px_-8px_var(--cyan)]">
+              <Link to="/planejamento" className="glass group mt-7 inline-flex max-sm:hidden items-center gap-4 rounded-full px-6 py-3 text-sm transition hover:shadow-[0_0_30px_-8px_var(--cyan)]">
                 <Sparkles size={18} className="text-cyan" /> "Planeje meu dia de hoje"
                 <ArrowRight size={16} className="transition group-hover:translate-x-1" />
               </Link>
             </div>
 
             <button onClick={voice.toggle} aria-label="Tocar para falar" data-testid="orbe"
-              className="relative mx-auto aspect-[4/3] w-[clamp(240px,36vw,620px)] shrink-0 animate-rise" style={{ animationDelay: ".2s" }}>
+              className="relative mx-auto aspect-[4/3] w-[clamp(240px,36vw,620px)] shrink-0 animate-rise max-sm:w-[84vw] max-sm:max-w-[340px]" style={{ animationDelay: ".2s" }}>
               <div className="pointer-events-none absolute inset-0 origin-center scale-[1.12] sm:scale-[1.32] md:scale-[1.36] lg:scale-[1.45] xl:scale-[1.55]">
                 <div className="absolute inset-[12%] rounded-full blur-3xl transition" style={{ background: `color-mix(in oklab, var(--${listening ? "emerald" : "cyan"}) ${listening ? 38 : 26}%, transparent)` }} />
                 <div className="absolute inset-[30%] rounded-full blur-2xl transition" style={{ background: `color-mix(in oklab, var(--violet) ${listening ? 30 : 20}%, transparent)` }} />
@@ -204,11 +205,12 @@ function Assistente() {
 
             </button>
 
-            <div className="mx-auto flex w-full max-w-xs animate-rise flex-col items-stretch gap-3 sm:mx-0 sm:w-36 lg:w-40 sm:max-w-none sm:justify-self-start">
+            <div className="mx-auto flex w-full max-w-xs animate-rise flex-col items-stretch gap-3 max-sm:-mx-[3%] max-sm:w-[calc(100%+6%)] max-sm:max-w-none max-sm:snap-x max-sm:flex-row max-sm:gap-2 max-sm:overflow-x-auto max-sm:px-[3%] max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-36 lg:w-40 sm:max-w-none sm:justify-self-start">
+              <Link to="/planejamento" className="glass flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[0.82rem] text-foreground/90 sm:hidden"><Sparkles size={16} className="text-cyan" /> Planeje meu dia</Link>
               {quick.map(({ Icon, label, c }, i) => {
-                const cls = "glass flex items-center justify-center gap-2.5 rounded-2xl px-3.5 py-3 text-left text-[0.82rem] text-muted-foreground transition hover:text-foreground hover:shadow-[0_0_28px_-8px_var(--glow)] sm:justify-start sm:[&:nth-child(2)]:translate-x-5";
+                const cls = "glass flex items-center justify-center gap-2.5 rounded-2xl px-3.5 py-3 text-left max-sm:shrink-0 max-sm:snap-start max-sm:rounded-full max-sm:py-2.5 text-[0.82rem] text-muted-foreground transition hover:text-foreground hover:shadow-[0_0_28px_-8px_var(--glow)] sm:justify-start sm:[&:nth-child(2)]:translate-x-5";
                 const st = { ...tint(c), animationDelay: `${0.3 + i * 0.1}s` };
-                const inner = (<><Icon size={19} style={{ color: "var(--glow)" }} /><span className="leading-snug">{label[0]}<br />{label[1]}</span></>);
+                const inner = (<><Icon size={19} style={{ color: "var(--glow)" }} /><span className="leading-snug max-sm:whitespace-nowrap">{label[0]}{" "}<br className="max-sm:hidden" />{label[1]}</span></>);
                 return i < 2
                   ? <Link key={i} to={i === 0 ? "/organizar" : "/treino"} className={cls} style={st}>{inner}</Link>
                   : <button key={i} onClick={() => send(label.join(" "))} className={cls} style={st}>{inner}</button>;
@@ -216,7 +218,7 @@ function Assistente() {
             </div>
           </section>
 
-          <div className="-mt-4 text-center" aria-live="polite">
+          <div className="-mt-4 text-center max-sm:-mt-1" aria-live="polite">
             {voice.active && voice.phase !== "idle" ? (
               <div className="mx-auto flex min-h-[3.2rem] max-w-xl flex-col items-center gap-1.5 animate-rise" data-testid="voz-estado">
                 <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em]" style={{ color: voice.phase === "listening" ? "var(--emerald)" : voice.phase === "thinking" ? "oklch(0.8 0.15 75)" : "var(--cyan)" }} data-testid="voz-fase">
@@ -235,17 +237,17 @@ function Assistente() {
           {/* Action */}
           <div className="w-full space-y-4 px-[3%] animate-rise" style={{ animationDelay: ".3s" }}>
             <div className="flex items-center gap-4">
-              <button onClick={() => (listening ? speech.stop() : setChooser(true))} data-testid="registrar-demanda" className="flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full py-5 text-base font-semibold text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)]"
+              <button onClick={() => (listening ? speech.stop() : setChooser(true))} data-testid="registrar-demanda" className="flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full py-5 text-base font-semibold max-sm:py-4 text-primary-foreground shadow-[0_0_50px_-12px_var(--cyan)] transition hover:shadow-[0_0_60px_-8px_var(--violet)]"
                 style={{ background: "linear-gradient(90deg, var(--cyan), oklch(0.66 0.19 265) 55%, var(--violet))" }}>
                 <Mic size={22} className={listening ? "animate-pulse-ring" : ""} /> {listening ? (speech.interim || "Ouvindo…") : "Registrar demanda"}
               </button>
-              <button onClick={() => setInboxOpen((o) => !o)} className={`icon-tile h-16 w-16 shrink-0 !rounded-2xl transition hover:scale-105 ${inboxOpen ? "shadow-[0_0_30px_-6px_var(--glow)]" : ""}`} style={tint("violet")} aria-label="Central de entrada: texto, prints e arquivos" aria-expanded={inboxOpen} title="Enviar texto, prints, PDFs e documentos" data-testid="abrir-central"><SquarePlus size={20} /></button>
+              <button onClick={() => setInboxOpen((o) => !o)} className={`icon-tile h-16 w-16 shrink-0 !rounded-2xl max-sm:h-14 max-sm:w-14 transition hover:scale-105 ${inboxOpen ? "shadow-[0_0_30px_-6px_var(--glow)]" : ""}`} style={tint("violet")} aria-label="Central de entrada: texto, prints e arquivos" aria-expanded={inboxOpen} title="Enviar texto, prints, PDFs e documentos" data-testid="abrir-central"><SquarePlus size={20} /></button>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap justify-center gap-3 max-sm:-mx-[3%] max-sm:flex-nowrap max-sm:justify-start max-sm:gap-2 max-sm:overflow-x-auto max-sm:px-[3%] max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
               {prompts.map(({ Icon, t }) => (
                 <button key={t} onClick={() => send(t)} disabled={voice.phase === "thinking"}
-                  className="glass flex shrink-0 items-center gap-3 rounded-full px-5 py-3 text-sm text-foreground/85 transition hover:text-foreground hover:shadow-[0_0_20px_-8px_var(--cyan)]">
+                  className="glass flex shrink-0 items-center gap-3 whitespace-nowrap rounded-full px-5 py-3 text-sm text-foreground/85 max-sm:gap-2 max-sm:px-4 max-sm:py-2.5 transition hover:text-foreground hover:shadow-[0_0_20px_-8px_var(--cyan)]">
                   <Icon size={18} className="text-violet" /> {t}
                 </button>
               ))}
@@ -275,7 +277,7 @@ function Assistente() {
           </div>
 
           {/* Cards */}
-          <section className="grid gap-4 pb-2 sm:grid-cols-2 lg:grid-cols-5">
+          <section className="grid gap-4 pb-2 max-sm:-mx-3 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:gap-3 max-sm:overflow-x-auto max-sm:px-3 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden sm:grid-cols-2 lg:grid-cols-5" data-testid="cartoes-inicio">
             {cards.map(({ img, Icon, t, d, c, to }, i) => {
               const body = (
                 <>
@@ -293,7 +295,7 @@ function Assistente() {
                   </div>
                 </>
               );
-              const cls = "accent-card group flex h-56 flex-col text-left animate-rise";
+              const cls = "accent-card group flex h-56 flex-col text-left animate-rise max-sm:h-48 max-sm:w-[76%] max-sm:shrink-0 max-sm:snap-center";
               const st = { ...tint(c), animationDelay: `${0.4 + i * 0.08}s` };
               return to ? <Link key={t} to={to} className={cls} style={st}>{body}</Link> : <button key={t} className={cls} style={st}>{body}</button>;
             })}

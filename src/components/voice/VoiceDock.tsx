@@ -47,7 +47,7 @@ export function VoiceDock() {
   return (
     <>
       {!onHome && (
-        <div className="fixed bottom-4 left-4 z-40 flex max-w-[min(86vw,22rem)] flex-col items-start gap-2 sm:bottom-5 sm:left-5" data-testid="voz-dock">
+        <div className="fixed bottom-4 left-4 z-40 flex max-w-[min(86vw,22rem)] flex-col items-start gap-2 lift-b sm:bottom-5 sm:left-5" data-testid="voz-dock">
           {v.active && (v.botText || v.note) && (
             <div className="space-y-1.5 animate-rise">
               {v.botText && v.phase !== "listening" && <p className="line-clamp-3 break-words rounded-2xl border border-border bg-background/85 px-3.5 py-2 text-sm leading-snug shadow-[0_0_30px_-12px_var(--cyan)] backdrop-blur-xl" data-testid="voz-texto">{v.botText}</p>}

@@ -18,7 +18,7 @@ export function OrionDock() {
   return (
     <>
       <button onClick={() => setOpen(true)} aria-label="Abrir o Orion, seu segundo cérebro" data-testid="orion-abrir" title="Orion · Ctrl+K"
-        className="group fixed bottom-5 right-5 z-40 grid h-14 w-14 place-items-center rounded-full border border-violet/50 bg-background/80 shadow-[0_0_34px_-6px_var(--violet)] backdrop-blur-xl transition hover:scale-105 hover:shadow-[0_0_44px_-2px_var(--violet)] max-sm:bottom-4 max-sm:right-4">
+        className="group fixed bottom-5 right-5 z-40 lift-a grid h-14 w-14 place-items-center rounded-full border border-violet/50 bg-background/80 shadow-[0_0_34px_-6px_var(--violet)] backdrop-blur-xl transition hover:scale-105 hover:shadow-[0_0_44px_-2px_var(--violet)] max-sm:bottom-4 max-sm:right-4">
         <span className="absolute inset-0 animate-pulse-ring rounded-full bg-violet/20" />
         <Sparkles size={22} className="relative text-cyan transition group-hover:rotate-12" />
       </button>
