@@ -207,7 +207,7 @@ function Assistente() {
               <div className="pointer-events-none absolute inset-0 origin-center scale-[1.12] sm:scale-[1.32] md:scale-[1.36] lg:scale-[1.45] xl:scale-[1.55]">
                 <div className="absolute inset-[12%] rounded-full blur-3xl transition" style={{ background: `color-mix(in oklab, var(--${listening ? "emerald" : "cyan"}) ${listening ? 38 : 26}%, transparent)` }} />
                 <div className="absolute inset-[30%] rounded-full blur-2xl transition" style={{ background: `color-mix(in oklab, var(--violet) ${listening ? 30 : 20}%, transparent)` }} />
-                <LivingOrb active={listening || voice.phase === "listening" || voice.phase === "speaking"} />
+                <LivingOrb mode={voice.phase !== "idle" ? voice.phase : listening ? "listening" : "idle"} />
               </div>
 
             </button>
@@ -224,11 +224,20 @@ function Assistente() {
             </div>
           </section>
 
-          <p className="-mt-4 text-center">
-            <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em] !text-foreground">
-              Toque <span className="text-cyan">para falar</span> · ou diga <span className="text-cyan">Presence</span>
-            </span>
-          </p>
+          <div className="-mt-4 text-center" aria-live="polite">
+            {voice.active && voice.phase !== "idle" ? (
+              <div className="mx-auto flex min-h-[3.2rem] max-w-xl flex-col items-center gap-1.5 animate-rise" data-testid="voz-estado">
+                <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em]" style={{ color: voice.phase === "listening" ? "var(--emerald)" : voice.phase === "thinking" ? "oklch(0.8 0.15 75)" : "var(--cyan)" }} data-testid="voz-fase">
+                  {voice.phase === "listening" ? "Ouvindo…" : voice.phase === "thinking" ? "Pensando…" : "Falando…"}
+                </span>
+                {voice.botText && voice.phase !== "listening" && <p className="line-clamp-2 max-w-xl text-balance px-4 font-serif text-lg leading-snug text-foreground/90 sm:text-xl" data-testid="voz-texto">{voice.botText}</p>}
+              </div>
+            ) : (
+              <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em] !text-foreground">
+                Toque <span className="text-cyan">na esfera</span> · e converse comigo
+              </span>
+            )}
+          </div>
 
 
           {/* Action */}

@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { ArrowUpRight, Check, Mic, Send, Square, Volume2, X } from "lucide-react";
+import { ArrowUpRight, Check, Mic, X } from "lucide-react";
 
 import { useVoice, type Phase } from "@/lib/voice/use-voice";
 
@@ -17,55 +16,51 @@ function Bars({ on, color }: { on: boolean; color: string }) {
   );
 }
 
-/** Botão do assistente de voz em todas as páginas, barra de legendas enquanto conversa e painel com o que ele mostra. */
+const SUBTITLE_LABEL: Record<Phase, string> = { idle: "Toque para falar", listening: "Ouvindo…", thinking: "Pensando…", speaking: "Falando…" };
+
+/** Mini esfera viva: muda de forma conforme ouve, pensa e fala. */
+function MiniOrb({ phase, onClick }: { phase: Phase; onClick: () => void }) {
+  const c = COLOR[phase];
+  return (
+    <button onClick={onClick} aria-label={phase === "idle" ? "Falar com a Presence" : "Parar ou interromper"} data-testid={phase === "idle" ? "voz-abrir" : "voz-esfera"}
+      className="group relative grid h-16 w-16 place-items-center rounded-full outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-cyan">
+      <span className="absolute inset-0 rounded-full blur-xl transition-colors duration-700" style={{ background: `color-mix(in oklab, ${c} 45%, transparent)`, opacity: phase === "idle" ? 0.45 : 0.9 }} />
+      {phase !== "idle" && <span className="absolute inset-0 animate-ping rounded-full" style={{ border: `1.5px solid ${c}`, animationDuration: phase === "listening" ? "1.8s" : phase === "speaking" ? "0.9s" : "2.6s" }} />}
+      <span className="absolute inset-1.5 rounded-full border border-dashed opacity-70" style={{ borderColor: c, animation: `spin ${phase === "thinking" ? 1.1 : 12}s linear infinite` }} />
+      <span className="relative grid h-11 w-11 place-items-center rounded-full shadow-[inset_0_0_14px_rgba(255,255,255,.25)] transition-all duration-500"
+        style={{ background: `radial-gradient(circle at 35% 30%, ${c}, color-mix(in oklab, var(--violet) 70%, black))`, boxShadow: `0 0 26px -2px ${c}`, transform: phase === "speaking" ? "scale(1.12)" : phase === "listening" ? "scale(.94)" : "scale(1)" }}>
+        {phase === "idle" || phase === "listening" ? <Mic size={18} className="text-white/90" /> : phase === "thinking" ? <span className="h-3 w-3 animate-pulse rounded-full bg-white/90" /> : <Bars on color="rgba(255,255,255,.95)" />}
+      </span>
+    </button>
+  );
+}
+
+/** Esfera do assistente de voz nas outras páginas, legenda curta do que ela diz, avisos e painel com o que ela mostra. */
 export function VoiceDock() {
   const v = useVoice();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const [text, setText] = useState("");
-  const color = COLOR[v.phase];
-  const busy = v.phase === "thinking" || v.phase === "speaking";
   const go = (href: string) => router.history.push(href);
+  const onHome = path === "/assistente";
 
   return (
     <>
-      {!v.active && path !== "/assistente" && (
-        <button onClick={v.toggle} aria-label="Falar com a Presence" title="Falar com a Presence" data-testid="voz-abrir"
-          className="group fixed bottom-5 left-5 z-40 grid h-14 w-14 place-items-center rounded-full border border-cyan/50 bg-background/80 shadow-[0_0_34px_-6px_var(--cyan)] backdrop-blur-xl transition hover:scale-105 hover:shadow-[0_0_44px_-2px_var(--cyan)] max-sm:bottom-4 max-sm:left-4 max-md:hidden">
-          <span className="absolute inset-0 animate-pulse-ring rounded-full bg-cyan/15" />
-          <Mic size={22} className="relative text-cyan transition group-hover:scale-110" />
-        </button>
-      )}
-
-      {v.active && (
-        <div className="fixed bottom-4 left-1/2 z-50 w-[min(94vw,760px)] -translate-x-1/2 animate-rise" data-testid="voz-barra" role="status" aria-live="polite">
-          <div className="relative overflow-hidden rounded-3xl border bg-background/85 p-3 shadow-[0_0_60px_-18px_var(--glow)] backdrop-blur-2xl" style={{ borderColor: `color-mix(in oklab, ${color} 55%, transparent)`, ["--glow" as string]: color }}>
-            <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent" />
-            <div className="flex items-center gap-3">
-              <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full" style={{ background: `color-mix(in oklab, ${color} 18%, transparent)`, boxShadow: `0 0 26px -6px ${color}` }}>
-                <span className="absolute inset-0 animate-ping rounded-full opacity-30" style={{ background: color, animationDuration: v.phase === "listening" ? "1.4s" : "2.6s" }} />
-                {v.phase === "thinking" ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: color, borderTopColor: "transparent" }} /> : <Mic size={18} style={{ color }} className="relative" />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="mono-caps flex items-center gap-2 !text-[0.6rem]" style={{ color }}><span data-testid="voz-fase">{LABEL[v.phase]}</span></p>
-                {v.userText && v.phase !== "listening" && <p className="truncate text-[0.7rem] text-muted-foreground">Você: {v.userText}</p>}
-                <p className="line-clamp-3 break-words text-sm leading-snug" data-testid="voz-texto">
-                  {v.phase === "listening" ? (v.interim || <span className="text-muted-foreground">{v.canListen ? "Pode falar…" : "Seu navegador não ouve voz. Digite abaixo."}</span>)
-                    : v.phase === "thinking" && !v.botText ? <span className="text-muted-foreground">…</span> : v.botText}
-                </p>
-              </div>
-              <Bars on={v.phase === "listening" || v.phase === "speaking"} color={color} />
-              {busy && <button onClick={v.toggle} aria-label="Interromper e falar" title="Interromper" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition hover:border-emerald/60 hover:text-emerald"><Mic size={15} /></button>}
-              <button onClick={v.stop} aria-label="Encerrar conversa" title="Encerrar" data-testid="voz-encerrar" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition hover:border-destructive/60 hover:text-destructive"><Square size={14} /></button>
+      {!onHome && (
+        <div className="fixed bottom-4 left-4 z-40 flex max-w-[min(86vw,22rem)] flex-col items-start gap-2 sm:bottom-5 sm:left-5" data-testid="voz-dock">
+          {v.active && (v.botText || v.note) && (
+            <div className="space-y-1.5 animate-rise">
+              {v.botText && v.phase !== "listening" && <p className="line-clamp-3 break-words rounded-2xl border border-border bg-background/85 px-3.5 py-2 text-sm leading-snug shadow-[0_0_30px_-12px_var(--cyan)] backdrop-blur-xl" data-testid="voz-texto">{v.botText}</p>}
+              {v.note && <p className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-1.5 text-[0.72rem] leading-snug text-amber" role="alert" data-testid="voz-aviso">{v.note}</p>}
             </div>
-            {v.note && <p className="mt-2 rounded-xl border border-amber/40 bg-amber/10 px-3 py-1.5 text-[0.72rem] leading-snug text-amber" role="alert" data-testid="voz-aviso">{v.note}</p>}
-            <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) { v.sendText(text); setText(""); } }} className="mt-2 flex items-center gap-2 border-t border-border/60 pt-2">
-              <input value={text} onChange={(e) => setText(e.target.value)} placeholder="ou digite aqui…" maxLength={500} data-testid="voz-digitar" className="min-w-0 flex-1 bg-transparent px-1 text-xs outline-none placeholder:text-muted-foreground" />
-              <button type="button" onClick={v.testVoice} aria-label="Testar a voz" title="Testar a voz (toca uma frase)" data-testid="voz-testar" className="grid h-7 w-7 place-items-center rounded-lg border border-border text-muted-foreground transition hover:border-cyan/60 hover:text-cyan"><Volume2 size={13} /></button>
-              <button type="submit" disabled={!text.trim()} aria-label="Enviar" className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-brand text-primary-foreground disabled:opacity-40"><Send size={12} /></button>
-            </form>
+          )}
+          <div className="flex items-center gap-2">
+            <MiniOrb phase={v.phase} onClick={v.toggle} />
+            {v.active && <span className="mono-caps rounded-full border border-border bg-background/80 px-3 py-1 !text-[0.62rem] backdrop-blur" style={{ color: COLOR[v.phase] }} data-testid="voz-fase">{SUBTITLE_LABEL[v.phase]}</span>}
           </div>
         </div>
+      )}
+      {onHome && v.active && v.note && (
+        <p className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,34rem)] -translate-x-1/2 rounded-xl border border-amber/40 bg-background/90 px-3 py-2 text-center text-[0.75rem] leading-snug text-amber backdrop-blur" role="alert" data-testid="voz-aviso">{v.note}</p>
       )}
 
       {v.panel && (

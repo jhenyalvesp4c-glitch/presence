@@ -4,12 +4,16 @@ import orb from "@/assets/presence-orb-v2.jpg";
 // Sphere geometry inside presence-orb-v2.jpg (percent of width/height)
 const CX = 49.8, CY = 44.3, R = 20.6, RC = 23.4;
 
-export function LivingOrb({ active }: { active: boolean }) {
+export type OrbMode = "idle" | "listening" | "thinking" | "speaking";
+
+/** `mode` muda a forma da esfera: ouvindo (calma, verde), pensando (gira rápido, âmbar/violeta), falando (energética, ciano). `active` (antigo) = falando. */
+export function LivingOrb({ active, mode }: { active?: boolean; mode?: OrbMode }) {
   const wrap = useRef<HTMLDivElement>(null);
   const core = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const activeRef = useRef(active);
-  activeRef.current = active;
+  const m0: OrbMode = mode ?? (active ? "speaking" : "idle");
+  const modeRef = useRef<OrbMode>(m0);
+  modeRef.current = m0;
 
   useEffect(() => {
     const c = canvas.current!, ctx = c.getContext("2d")!;
@@ -17,18 +21,22 @@ export function LivingOrb({ active }: { active: boolean }) {
     const cols = ["--cyan", "--violet", "--emerald"].map((v) => css.getPropertyValue(v).trim());
     const motes = Array.from({ length: 70 }, (_, i) => ({ a: Math.random() * 6.28, r: 1.05 + Math.random() * 0.9, s: (Math.random() * 0.5 + 0.2) * (i % 2 ? 1 : -1), z: Math.random(), c: cols[i % 3]!, tw: Math.random() * 6 }));
     const ripples: { t: number }[] = [];
-    let raf = 0, t = 0, amp = 0, voice = 0, rot = 0, last = performance.now(), nextRipple = 0;
+    let raf = 0, t = 0, amp = 0, voice = 0, rot = 0, spin = 1, last = performance.now(), nextRipple = 0;
 
     const frame = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
-      const on = activeRef.current;
-      amp += ((on ? 1 : 0) - amp) * 0.06;
-      // simulated speech envelope: layered noise when listening
-      const target = on ? 0.35 + 0.65 * Math.abs(Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1) * Math.sin(t * 11.7 + 2)) : 0;
+      const mode = modeRef.current;
+      const on = mode === "speaking";
+      const ampT = mode === "idle" ? 0 : mode === "speaking" ? 1 : mode === "thinking" ? 0.6 : 0.55;
+      amp += (ampT - amp) * 0.06;
+      spin += ((mode === "thinking" ? 3.2 : 1) - spin) * 0.05;
+      // envelope: falando = voz energética; ouvindo = respiração calma de espera; pensando = pulso curto
+      const speak = 0.35 + 0.65 * Math.abs(Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1) * Math.sin(t * 11.7 + 2));
+      const target = mode === "speaking" ? speak : mode === "listening" ? 0.18 + 0.14 * Math.sin(t * 2.2) : mode === "thinking" ? 0.25 + 0.2 * Math.sin(t * 5) : 0;
       voice += (target - voice) * 0.25;
       const breath = Math.sin(t * 1.25) * 0.5 + 0.5; // ~5s breath cycle
       const scale = 1 + breath * 0.025 + voice * 0.06;
-      rot = Math.sin(t * 0.35) * (4 + amp * 10);
+      rot = Math.sin(t * 0.35 * spin) * (4 + amp * 10);
       if (core.current) {
         core.current.style.transform = `rotate(${rot}deg) scale(${scale})`;
         core.current.style.filter = `brightness(${1 + breath * 0.15 + voice * 0.5}) saturate(${1 + amp * 0.4}) hue-rotate(${Math.sin(t * 0.4) * 12 - amp * 25}deg)`;
@@ -45,17 +53,17 @@ export function LivingOrb({ active }: { active: boolean }) {
       ctx.globalCompositeOperation = "lighter";
 
       // voice ripples
-      if (on && t > nextRipple) { ripples.push({ t: 0 }); nextRipple = t + 0.35 + Math.random() * 0.4; }
+      if ((on || mode === "listening") && t > nextRipple) { ripples.push({ t: 0 }); nextRipple = t + (on ? 0.35 + Math.random() * 0.4 : 1.1 + Math.random() * 0.5); }
       for (let i = ripples.length - 1; i >= 0; i--) {
         const rp = ripples[i]!; rp.t += dt;
         const k = rp.t / 1.6; if (k >= 1) { ripples.splice(i, 1); continue; }
-        ctx.globalAlpha = (1 - k) * 0.5; ctx.strokeStyle = cols[i % 2 ? 1 : 0]!; ctx.lineWidth = 1.5;
+        ctx.globalAlpha = (1 - k) * 0.5; ctx.strokeStyle = mode === "listening" ? cols[2]! : cols[i % 2 ? 1 : 0]!; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(cx, cy, rad * (1 + k * 0.8), 0, Math.PI * 2); ctx.stroke();
       }
 
       // drifting motes orbiting the presence
       for (const m of motes) {
-        m.a += dt * m.s * (0.4 + amp * 1.6);
+        m.a += dt * m.s * (0.4 + amp * 1.6) * spin;
         const rr = rad * (m.r + voice * 0.15 * Math.sin(m.tw + t * 4));
         const x = cx + Math.cos(m.a) * rr, y = cy + Math.sin(m.a) * rr * 0.42 + Math.sin(m.a * 2 + m.tw) * rad * 0.12;
         const front = Math.sin(m.a) > 0;
@@ -87,7 +95,7 @@ export function LivingOrb({ active }: { active: boolean }) {
       {/* breathing halo */}
       <div className="absolute rounded-full blur-3xl transition-colors duration-700"
         style={{ left: `${CX - R * 1.1}%`, top: `${CY - R * 1.45}%`, width: `${R * 2.2}%`, aspectRatio: "1", opacity: "var(--halo)" as unknown as number,
-          background: `radial-gradient(circle, color-mix(in oklab, var(--${active ? "emerald" : "cyan"}) 55%, transparent), color-mix(in oklab, var(--violet) 25%, transparent) 55%, transparent 72%)` }} />
+          background: `radial-gradient(circle, color-mix(in oklab, ${m0 === "listening" ? "var(--emerald)" : m0 === "thinking" ? "oklch(0.8 0.15 75)" : "var(--cyan)"} 55%, transparent), color-mix(in oklab, var(--violet) 25%, transparent) 55%, transparent 72%)` }} />
       {/* static: platform + orbits */}
       <img src={orb} alt="Orbe Presence" width={1024} height={768} className="absolute inset-0 h-full w-full object-contain mix-blend-screen" style={{ maskImage: mask, WebkitMaskImage: mask }} />
       {/* living core: sphere rotates, breathes, reacts */}
