@@ -18,6 +18,15 @@ const state: BridgeState = { phase: "desligado", qr: null, phone: "", name: "", 
 const conn = startConnection(store, state, join(dir, "auth"));
 const server = createApi(store, state, token, { logout: () => conn.logout(), pause: (on) => conn.pause(on) });
 
+server.on("error", (e: NodeJS.ErrnoException) => {
+  if (e.code === "EADDRINUSE") {
+    console.error(`\nJá existe uma ponte do WhatsApp ligada (a porta ${port} está em uso).`);
+    console.error("Feche a outra janela preta do whatsapp.cmd, ou rode no PowerShell:");
+    console.error(`  Stop-Process -Id (Get-NetTCPConnection -LocalPort ${port}).OwningProcess -Force\n`);
+  } else console.error("Erro ao ligar a ponte:", e.message);
+  process.exit(1);
+});
+
 server.listen(port, "127.0.0.1", () => {
   const info = { port, token, pid: process.pid, started: new Date().toISOString() };
   const file = join(dir, "bridge.json");
