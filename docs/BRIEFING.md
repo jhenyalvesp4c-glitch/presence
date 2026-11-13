@@ -14,3 +14,5 @@ A Presence aprende com cada pessoa: como chamar, jeito de conversar, como começ
 - `briefingPrompt` (src/lib/briefing.ts) entra no prompt da voz (`runAgent`) com tudo que ela sabe + os aprendizados.
 - Começo da conversa: o cliente manda `[[inicio]]` quando a pessoa toca na esfera e escolheu cumprimentar; `greetingDirective` diz como (só cumprimentar, mostrar o dia, perguntar como ajudar, ou o que ela pediu a mais). "Esperar eu falar" não fala nada.
 - Ferramentas da voz: `lembrar` (guarda aprendizado, sem duplicar), `esquecer`, `ajustar_perfil` (nome, jeito, saudação). "Como te chamar" também atualiza `profiles.display_name` (saudação da tela inicial).
+
+<!-- publicado 2026-11-13T14:22Z -->
