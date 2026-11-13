@@ -41,6 +41,18 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
   useEffect(() => { if (stage < 0 || stage >= STEPS.length - 1) return; const t = setTimeout(() => setStage((s) => (s >= 0 && s < STEPS.length - 1 ? s + 1 : s)), 4500); return () => clearTimeout(t); }, [stage]);
   useEffect(() => { if (recording && rec.seconds >= MAX_SECONDS) void stopVoice(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [rec.seconds, recording]);
 
+  const addRef = useRef<(l: File[]) => Promise<void>>(async () => {});
+  // Colar (Ctrl+V) funciona mesmo com o foco fora da caixa de texto (ex.: logo depois de clicar na área de prints).
+  useEffect(() => {
+    const onDocPaste = (e: ClipboardEvent) => {
+      if (done || busy) return;
+      const f = filesFromClipboard(e);
+      if (f.length) { e.preventDefault(); void addRef.current(f); }
+    };
+    document.addEventListener("paste", onDocPaste);
+    return () => document.removeEventListener("paste", onDocPaste);
+  });
+
   const add = async (list: File[]) => {
     if (!list.length) return;
     setError("");
@@ -50,6 +62,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
     const msgs = [...rejected, ...skipped];
     if (msgs.length) setError(msgs.join(" · "));
   };
+  addRef.current = add;
 
   const startVoice = async () => { setError(""); try { await rec.start(); } catch (e) { setError((e as Error).message); } };
   async function stopVoice() {
@@ -90,7 +103,6 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-background/80 p-4 backdrop-blur-md" {...backdropProps(() => { if (!busy && !recording) onClose(); })} data-testid="gerador-roteiro">
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Criar roteiro com o Presence" style={tint(color)}
-        onPaste={(e) => { if (done) return; const f = filesFromClipboard(e); if (f.length) { e.preventDefault(); void add(f); } }}
         onDragOver={(e) => { if (!done && e.dataTransfer.types.includes("Files")) { e.preventDefault(); setOver(true); } }} onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false); }}
         onDrop={(e) => { if (!done && e.dataTransfer.files.length) { e.preventDefault(); setOver(false); void add([...e.dataTransfer.files]); } }}
         className="glass relative mx-auto my-6 w-full max-w-3xl overflow-hidden rounded-3xl p-5 animate-rise sm:p-6">

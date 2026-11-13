@@ -44,8 +44,16 @@ export async function toPending(files: File[], current: Pending[]): Promise<{ ad
 }
 
 /** Arquivos colados (Ctrl+V) viram File; prints costumam vir sem nome. */
-export const filesFromClipboard = (e: ClipboardEvent | React.ClipboardEvent): File[] =>
-  [...(e.clipboardData?.files ?? [])];
+export const filesFromClipboard = (e: ClipboardEvent | React.ClipboardEvent): File[] => {
+  const cd = e.clipboardData;
+  if (!cd) return [];
+  const out = [...(cd.files ?? [])];
+  if (out.length) return out;
+  // Algumas origens (copiar imagem de uma página, recortes) só vêm em `items`.
+  const fromItems: File[] = [];
+  for (const it of [...(cd.items ?? [])]) if (it.kind === "file") { const f = it.getAsFile(); if (f) fromItems.push(f); }
+  return fromItems;
+};
 
 import { summarizeFiles } from "@/lib/brain.functions";
 /** Lê o conteúdo dos anexos (texto direto; imagem/PDF pela IA) para a pesquisa do Orion achar depois. */
