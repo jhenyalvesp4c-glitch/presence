@@ -323,17 +323,17 @@ function Demandas() {
   return (
     <LabelCtx.Provider value={L}>
     <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard, selecting, picked, toggle }}>
-    <div className="relative min-h-screen overflow-x-hidden">
+    <div className="relative min-h-screen overflow-x-clip">
       <BgFx />
-      <div className={`relative mx-auto max-w-[1500px] px-4 py-6 transition-[padding] duration-500 md:px-8 ${sel ? "xl:pr-[500px]" : ""}`}>
+      <div className={`relative mx-auto max-w-[1500px] px-4 py-4 transition-[padding] duration-500 max-md:pb-40 md:px-8 md:py-6 ${sel ? "xl:pr-[500px]" : ""}`}>
         {/* topo */}
-        <header className="flex flex-wrap items-center justify-between gap-6 animate-rise">
-          <div className="flex items-center gap-5">
-            <Link to="/projetos" className="icon-tile h-9 w-9 transition hover:scale-105" style={tint("cyan")} aria-label="Voltar aos projetos" title="Voltar aos projetos"><ArrowLeft size={15} /></Link>
-            <HexLogo />
+        <header className="flex flex-wrap items-center justify-between gap-4 animate-rise md:gap-6">
+          <div className="flex items-center gap-3 md:gap-5">
+            <Link to="/projetos" className="icon-tile h-11 w-11 md:h-9 md:w-9 transition hover:scale-105" style={tint("cyan")} aria-label="Voltar aos projetos" title="Voltar aos projetos"><ArrowLeft size={15} /></Link>
+            <div className="max-md:hidden"><HexLogo /></div>
             <div>
-              <h1 className="font-display text-4xl font-extrabold tracking-tight">{project?.name ?? "P4C"}<span className="glow-text" style={tint(project?.color ?? "cyan")}>.</span></h1>
-              <p className="mono-caps !tracking-[0.4em]">Projeto</p>
+              <h1 className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">{project?.name ?? "P4C"}<span className="glow-text" style={tint(project?.color ?? "cyan")}>.</span></h1>
+              <p className="mono-caps !tracking-[0.4em] max-md:hidden">Projeto</p>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald"><span className="h-1.5 w-1.5 animate-pulse-ring rounded-full bg-emerald shadow-[0_0_8px_var(--emerald)]" /> Ativo</p>
             </div>
             <div className="ml-2 hidden max-w-xs border-l border-border pl-5 md:block">
@@ -341,15 +341,15 @@ function Demandas() {
               <p className="text-xs text-muted-foreground">Gestão de demandas, {L.plural.toLowerCase()} e execuções com organização, clareza e foco.</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex w-full flex-wrap items-center gap-4 md:w-auto">
             <button onClick={() => setNewOpen({ type: "geral", status: "todo" })} data-testid="nova-demanda" disabled={!ready}
-              className="disabled:opacity-50 flex items-center gap-2 rounded-2xl border border-cyan/60 bg-cyan/10 px-4 py-3 text-sm font-medium text-cyan shadow-[0_0_30px_-8px_var(--cyan)] transition hover:bg-cyan/20">
+              className="disabled:opacity-50 max-md:hidden flex items-center gap-2 rounded-2xl border border-cyan/60 bg-cyan/10 px-4 py-3 text-sm font-medium text-cyan shadow-[0_0_30px_-8px_var(--cyan)] transition hover:bg-cyan/20">
               <Plus size={16} /> Nova demanda
             </button>
-            <div className="glass grid grid-cols-4 divide-x divide-border rounded-2xl py-3">
+            <div className="glass grid w-full grid-cols-4 divide-x divide-border rounded-2xl py-2.5 md:w-auto md:py-3">
               {[{ v: pend, l: "pendentes", c: "amber" }, { v: done, l: "concluídas", c: "emerald" }, { v: notes.length, l: "anotações", c: "violet" }, { v: ds.dossiers.length, l: L.plural.toLowerCase(), c: "cyan" }].map((s) => (
-                <div key={s.l} className="px-5 text-center" style={tint(s.c)}>
-                  <p className="font-display text-3xl font-bold glow-text tabular-nums">{s.v}</p>
+                <div key={s.l} className="px-2 text-center md:px-5" style={tint(s.c)}>
+                  <p className="font-display text-2xl font-bold glow-text tabular-nums md:text-3xl">{s.v}</p>
                   <p className="text-[0.65rem] text-muted-foreground">{s.l}</p>
                 </div>
               ))}
@@ -358,16 +358,16 @@ function Demandas() {
         </header>
 
         {/* abas de tipo */}
-        <nav className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 animate-rise" style={{ animationDelay: ".05s" }}>
+        <nav className="mt-4 animate-rise max-md:sticky max-md:top-0 max-md:z-30 max-md:-mx-4 max-md:flex max-md:snap-x max-md:gap-2 max-md:overflow-x-auto max-md:border-b max-md:border-white/5 max-md:bg-background/95 max-md:px-4 max-md:py-2.5 max-md:backdrop-blur-xl max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden md:mt-6 md:grid md:grid-cols-3 md:gap-3 lg:grid-cols-4 2xl:grid-cols-8" style={{ animationDelay: ".05s" }} data-testid="abas-demandas">
           {tabs.map((t) => {
             const on = tab === t.k;
             return (
-              <button key={t.k} onClick={() => setTab(t.k)} style={tint(t.color)}
-                className={`accent-card group flex items-center gap-3 !rounded-2xl p-3 text-left ${on ? "!border-[color-mix(in_oklab,var(--glow)_70%,transparent)] shadow-[0_0_40px_-12px_var(--glow)]" : "opacity-80 hover:opacity-100"}`}>
-                <span className={`icon-tile h-10 w-10 shrink-0 !rounded-full transition group-hover:rotate-12 ${on ? "shadow-[0_0_20px_-4px_var(--glow)]" : ""}`}><t.icon size={18} /></span>
+              <button key={t.k} onClick={(e) => { setTab(t.k); e.currentTarget.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); }} style={tint(t.color)}
+                className={`accent-card group flex items-center gap-3 !rounded-2xl p-3 text-left max-md:shrink-0 max-md:snap-center max-md:gap-2 max-md:!rounded-full max-md:!py-2 max-md:!pl-2 max-md:!pr-3 ${on ? "!border-[color-mix(in_oklab,var(--glow)_70%,transparent)] shadow-[0_0_40px_-12px_var(--glow)]" : "opacity-80 hover:opacity-100"}`}>
+                <span className={`icon-tile h-10 w-10 shrink-0 !rounded-full transition max-md:!h-8 max-md:!w-8 group-hover:rotate-12 ${on ? "shadow-[0_0_20px_-4px_var(--glow)]" : ""}`}><t.icon size={18} /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{t.label}</span>
-                  <span className="block truncate text-[0.65rem] text-muted-foreground">{t.sub}</span>
+                  <span className="block truncate text-sm font-semibold max-md:whitespace-nowrap">{t.label}</span>
+                  <span className="block truncate text-[0.65rem] text-muted-foreground max-md:hidden">{t.sub}</span>
                 </span>
                 <span className="tag !text-[0.65rem] !tracking-normal">{t.n}</span>
                 {on && <span className="absolute inset-x-6 bottom-0 h-px bg-[var(--glow)] shadow-[0_0_12px_var(--glow)]" />}
@@ -377,18 +377,25 @@ function Demandas() {
         </nav>
 
         {filterBar && (
-          <div className="relative z-30 mt-4 flex flex-wrap items-center gap-2 animate-rise" style={{ animationDelay: ".1s" }}>
-            <div className="glass flex rounded-xl p-1">
+          <div className="relative z-30 mt-3 flex flex-wrap items-center gap-2 animate-rise md:mt-4" style={{ animationDelay: ".1s" }}>
+            <label className="glass order-first flex w-full items-center gap-2 rounded-xl px-3.5 py-3 md:hidden">
+              <Search size={15} className="text-muted-foreground" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar demanda, ${sing} ou código…`} className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+              {q && <button type="button" onClick={() => setQ("")} aria-label="Limpar busca"><X size={14} /></button>}
+            </label>
+            <div className="glass flex rounded-xl p-1 max-md:w-full">
               {([["kanban", "Kanban", LayoutGrid], ["lista", "Lista", List], ["matriz", "Matriz", Table2]] as const).map(([k, l, I]) => (
-                <button key={k} onClick={() => setView(k)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition ${view === k ? "bg-cyan/15 text-cyan shadow-[0_0_16px_-6px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}><I size={13} /> {l}</button>
+                <button key={k} onClick={() => setView(k)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition max-md:flex-1 max-md:justify-center max-md:py-2.5 max-md:text-sm ${view === k ? "bg-cyan/15 text-cyan shadow-[0_0_16px_-6px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}><I size={13} /> {l}</button>
               ))}
             </div>
+            <div className="contents max-md:flex max-md:w-full max-md:gap-2 max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden">
             <Pick label="Prioridade" value={prioF} onChange={(v) => setPrioF(v as typeof prioF)} options={[["todas", "Todas"], ["alta", "Alta"], ["media", "Média"], ["baixa", "Baixa"]]} />
             <Pick label="Status" value={statusF} onChange={(v) => setStatusF(v as typeof statusF)} options={[["todos", "Todos"], ["pend", "Só pendentes"], ["todo", "A fazer"], ["doing", "Em andamento"], ["done", "Concluídas"]]} />
             <Pick label={L.singular} value={poloF ?? ""} onChange={(v) => setPoloF(v || null)} options={[["", "Todos"], ...names.map((n): [string, string] => [n, n])]} />
+            </div>
             {poloF && <button onClick={() => setPoloF(null)} className="tag flex items-center gap-1" style={tint(dossierColor(names, poloF))}><MapPin size={10} /> {poloF} <X size={10} /></button>}
-            <button onClick={() => (selecting ? stopSelecting() : (setSelecting(true), setSelId(null)))} data-testid="selecionar" className={`glass flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition hover:border-cyan/40 ${selecting ? "border-cyan/60 text-cyan" : ""}`}><CheckSquare size={13} /> {selecting ? "Cancelar seleção" : "Selecionar"}</button>
-            <div className="relative">
+            <button onClick={() => (selecting ? stopSelecting() : (setSelecting(true), setSelId(null)))} data-testid="selecionar" className={`glass max-md:hidden flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition hover:border-cyan/40 ${selecting ? "border-cyan/60 text-cyan" : ""}`}><CheckSquare size={13} /> {selecting ? "Cancelar seleção" : "Selecionar"}</button>
+            <div className="relative max-md:hidden">
               <button onClick={() => setBulkOpen((o) => !o)} data-testid="acoes-massa" className="glass flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition hover:border-cyan/40"><Layers size={13} /> Ações em massa <ChevronDown size={12} className={`transition ${bulkOpen ? "rotate-180" : ""}`} /></button>
               {bulkOpen && (
                 <div className="glass absolute left-0 top-full z-30 mt-2 w-72 rounded-xl p-1 animate-in fade-in zoom-in-95">
@@ -399,7 +406,7 @@ function Demandas() {
                 </div>
               )}
             </div>
-            <label className="glass ml-auto flex min-w-[220px] flex-1 items-center gap-2 rounded-xl px-3 py-2 sm:max-w-sm">
+            <label className="glass ml-auto flex min-w-[220px] flex-1 items-center gap-2 rounded-xl px-3 py-2 max-md:hidden sm:max-w-sm">
               <Search size={14} className="text-muted-foreground" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar demanda, ${sing} ou código…`} className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground" />
               {q && <button onClick={() => setQ("")}><X size={12} /></button>}
@@ -426,13 +433,13 @@ function Demandas() {
             <Matrix items={boardItems(tab)} names={names} selId={selId} onOpen={openCard} onCell={cycleCell} />
           ) : tab === "overview" ? (
             <div className="grid gap-4 2xl:grid-cols-[1fr_270px]">
-              <section className="glass relative overflow-hidden rounded-3xl p-4 animate-rise">
-                <div className="mb-4 flex items-center gap-3">
+              <section className="glass relative overflow-hidden rounded-3xl p-4 animate-rise max-md:rounded-2xl max-md:p-3">
+                <div className="mb-4 flex flex-wrap items-center gap-3">
                   <span className="icon-tile h-8 w-8" style={tint("cyan")}><Layers size={15} /></span>
                   <h2 className="font-display text-lg font-semibold">Demandas por tipo</h2>
                   <span className="tag" style={tint("violet")}>3 categorias · {filtered.length} demandas</span>
                 </div>
-                <div className={`grid items-start gap-4 ${sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`}>
+                <div className={`grid items-start gap-4 max-md:-mx-4 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:gap-3 max-md:overflow-x-auto max-md:px-4 max-md:pb-2 max-md:pt-2 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden ${sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`} data-testid="carrossel-tipos">
                   {(["geral", "polo", "multi"] as DType[]).map((t) => (
                     <TypeBoard key={t} type={t} items={filtered.filter((i) => i.type === t)} selId={selId} onOpen={openCard} onCreate={() => setNewOpen({ type: t, status: "todo" })} />
                   ))}
@@ -456,6 +463,10 @@ function Demandas() {
         onNote={(t) => sel && update(sel.id, (d) => ({ ...d, notes: [...d.notes, t], history: [...d.history, { d: today(), text: "Observação adicionada", s: d.status }] }))}
         onDelete={() => sel && remove(sel.id)}
       />
+      {ready && !sel && !newOpen && !noteEdit && (tab === "overview" || tab === "geral" || tab === "polo" || tab === "multi") && (
+        <button onClick={() => setNewOpen({ type: tab === "overview" ? "geral" : tab, status: "todo" })} data-testid="nova-demanda-fab" aria-label="Nova demanda"
+          className="fixed bottom-24 right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-brand text-primary-foreground shadow-[0_12px_32px_-6px_var(--cyan)] transition active:scale-95 md:hidden"><Plus size={24} /></button>
+      )}
       {selecting && (
         <div className="glass fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl px-4 py-3 shadow-lg animate-rise">
           <span className="text-xs"><b>{picked.size}</b> selecionada{picked.size === 1 ? "" : "s"}</span>
@@ -533,9 +544,10 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const deadline = date ? date.split("-").reverse().slice(0, 2).join("/") : "";
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" {...backdropProps(onClose)}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in max-sm:place-items-end max-sm:p-0 sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials }); }}
-        className="glass relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label="Nova demanda">
+        className="glass relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]" role="dialog" aria-label="Nova demanda">
+        <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" />
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10" style={tint("cyan")}><Plus size={18} /></span>
           <h2 className="flex-1 font-display text-xl font-bold">Nova demanda</h2>
@@ -787,7 +799,7 @@ function HexLogo() {
 
 function Pick({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
-    <label className="glass relative flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs">
+    <label className="glass relative flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs max-md:shrink-0 max-md:py-2.5 max-md:text-sm">
       <span className="text-muted-foreground">{label}:</span>
       <select value={value} onChange={(e) => onChange(e.target.value)} className="appearance-none bg-transparent pr-5 font-medium outline-none [&>option]:bg-popover">
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -803,10 +815,30 @@ function progress(d: Demand) {
   return Math.round((d.polos.filter((p) => p.status === "done").length / d.polos.length) * 100);
 }
 
+const SHORT: Record<Status, string> = { todo: "A fazer", doing: "Andamento", done: "Feitas" };
+/** Seletor de status só no celular: mostra uma coluna por vez (a fazer, em andamento, concluídas). */
+function StatusTabs({ value, onChange, items }: { value: Status; onChange: (s: Status) => void; items: Demand[] }) {
+  return (
+    <div className="mt-3 flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 md:hidden" role="tablist" data-testid="status-abas">
+      {STATUSES.map((s) => {
+        const on = value === s, n = items.filter((i) => i.status === s).length;
+        return (
+          <button key={s} type="button" role="tab" aria-selected={on} onClick={() => onChange(s)} style={tint(statusMeta[s].color)}
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-2 text-[0.72rem] font-medium transition ${on ? "bg-[color-mix(in_oklab,var(--glow)_18%,transparent)] text-[var(--glow)] shadow-[0_0_18px_-8px_var(--glow)]" : "text-muted-foreground"}`}>
+            <span className="truncate">{SHORT[s]}</span><span className="font-mono text-[0.65rem] opacity-80">{n}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+const firstStatus = (items: Demand[]): Status => STATUSES.find((s) => items.some((i) => i.status === s)) ?? STATUSES[0]!;
+
 function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; items: Demand[]; selId: string | null; onOpen: (id: string) => void; onCreate: () => void }) {
   const m = useTM()[type];
+  const [st, setSt] = useState<Status>(() => firstStatus(items));
   return (
-    <div className="accent-card flex flex-col p-3" style={tint(m.color)}>
+    <div className="accent-card flex flex-col p-3 max-md:w-[88%] max-md:shrink-0 max-md:snap-center" style={tint(m.color)}>
       <div className="flex items-center gap-3 px-1">
         <span className="icon-tile h-11 w-11 !rounded-full shadow-[0_0_24px_-6px_var(--glow)]"><m.icon size={20} /></span>
         <div className="min-w-0 flex-1">
@@ -815,15 +847,16 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
         </div>
         <span className="tag !text-xs !tracking-normal">{items.length}</span>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <StatusTabs value={st} onChange={setSt} items={items} />
+      <div className="mt-3 md:grid md:grid-cols-3 md:gap-2">
         {STATUSES.map((s) => {
           const col = items.filter((i) => i.status === s);
           return (
-            <div key={s} className="min-w-0" style={tint(statusMeta[s].color)}>
-              <div className="mb-2 flex items-center justify-between rounded-full border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[color-mix(in_oklab,var(--glow)_10%,transparent)] px-2 py-1 text-[0.6rem] text-[var(--glow)]">
+            <div key={s} className={`min-w-0 ${s === st ? "" : "max-md:hidden"}`} style={tint(statusMeta[s].color)}>
+              <div className="mb-2 flex items-center justify-between rounded-full max-md:hidden border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[color-mix(in_oklab,var(--glow)_10%,transparent)] px-2 py-1 text-[0.6rem] text-[var(--glow)]">
                 <span className="truncate">{statusMeta[s].label}</span><span className="font-mono">{col.length}</span>
               </div>
-              <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1" data-testid={`coluna-${type}-${s}`}>
+              <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1 max-md:max-h-[55vh] max-md:space-y-2.5" data-testid={`coluna-${type}-${s}`}>
                 {col.map((d, i) => <MiniCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
                 {!col.length && <div className="rounded-xl border border-dashed border-border py-2 text-center text-[0.6rem] text-muted-foreground/60">vazio</div>}
               </div>
@@ -843,12 +876,12 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
   return (
     <div className="group/card relative">
     <button onClick={onClick} style={{ ...tint(typeBase[d.type].color), animationDelay: `${delay * 0.05}s` }}
-      className={`group relative w-full overflow-hidden rounded-xl border bg-secondary/40 p-2 text-left transition animate-rise hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
+      className={`group relative w-full overflow-hidden rounded-xl border bg-secondary/40 p-2 text-left transition animate-rise max-md:rounded-2xl max-md:p-3.5 hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
       {active && <span className="scanline absolute inset-0" />}
-      <p className="font-mono text-[0.55rem] text-muted-foreground">{d.id}</p>
-      <p className="mt-0.5 line-clamp-4 break-words text-[0.74rem] font-medium leading-snug">{d.title}</p>
+      <p className="font-mono text-[0.55rem] text-muted-foreground max-md:text-[0.65rem]">{d.id}</p>
+      <p className="mt-0.5 line-clamp-4 break-words text-[0.74rem] font-medium leading-snug max-md:text-[0.95rem]">{d.title}</p>
       <span className="tag mt-1.5 inline-block !px-1.5 !py-0 !text-[0.5rem]" style={tint(prio[d.priority].color)}>{prio[d.priority].label}</span>
-      <p className="mt-1.5 flex items-start gap-1 break-words text-[0.6rem] leading-tight text-muted-foreground [&>svg]:mt-px [&>svg]:shrink-0">
+      <p className="mt-1.5 flex items-start gap-1 break-words text-[0.6rem] leading-tight text-muted-foreground max-md:text-xs [&>svg]:mt-px [&>svg]:shrink-0">
         {d.type === "geral" ? <><Calendar size={9} /> {d.deadline}</> : d.type === "polo" ? <><MapPin size={9} /> {d.polo}</> : <><Network size={9} /> {d.polos!.length} {L.plural.toLowerCase()} · {progress(d)}%</>}
       </p>
     </button>
@@ -860,8 +893,9 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
 function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; items: Demand[]; selId: string | null; onOpen: (id: string) => void; onCreate: (s: Status) => void }) {
   const m = useTM()[type];
   const L = useLabel();
+  const [st, setSt] = useState<Status>(() => firstStatus(items));
   return (
-    <section className="glass relative overflow-hidden rounded-3xl p-5 animate-rise" style={tint(m.color)}>
+    <section className="glass relative overflow-hidden rounded-3xl p-5 animate-rise max-md:rounded-2xl max-md:p-3" style={tint(m.color)}>
       <div className="mb-5 flex items-center gap-3">
         <span className="icon-tile h-11 w-11 !rounded-full shadow-[0_0_24px_-6px_var(--glow)]"><m.icon size={20} /></span>
         <div>
@@ -869,12 +903,13 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
           <p className="text-xs text-muted-foreground">{type === "multi" ? `Uma demanda principal com execução individual por ${L.singular.toLowerCase()}.` : m.sub + "."}</p>
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <StatusTabs value={st} onChange={setSt} items={items} />
+      <div className="mt-3 grid gap-4 md:mt-0 md:grid-cols-3">
         {STATUSES.map((s) => {
           const col = items.filter((i) => i.status === s);
           return (
-            <div key={s} className="accent-card flex min-h-[200px] flex-col p-3" style={tint(statusMeta[s].color)}>
-              <div className="flex items-center gap-2 px-1 pb-3">
+            <div key={s} className={`accent-card flex min-h-[200px] flex-col p-3 ${s === st ? "" : "max-md:hidden"}`} style={tint(statusMeta[s].color)}>
+              <div className="flex items-center gap-2 px-1 pb-3 max-md:hidden">
                 <span className="h-2.5 w-2.5 animate-pulse-ring rounded-full bg-[var(--glow)] shadow-[0_0_10px_var(--glow)]" />
                 <h3 className="font-display font-semibold">{statusMeta[s].label}</h3>
                 <span className="tag ml-auto !text-xs !tracking-normal">{col.length}</span>
@@ -937,7 +972,7 @@ function ListView({ items, selId, onOpen }: { items: Demand[]; selId: string | n
         <button onClick={() => onOpen(d.id)} style={{ animationDelay: `${i * 0.03}s` }}
           className={`grid w-full grid-cols-2 gap-3 border-b border-border/60 px-5 py-3 text-left text-sm transition animate-rise hover:bg-secondary/50 md:grid-cols-[90px_1fr_130px_110px_90px_80px_56px] ${selId === d.id ? "bg-cyan/10" : ""}`}>
           <span className="font-mono text-xs text-muted-foreground">{d.id}</span>
-          <span className="truncate font-medium">{d.title}</span>
+          <span className="truncate font-medium max-md:col-span-2 max-md:whitespace-normal">{d.title}</span>
           <span className="text-xs" style={{ color: `var(--${tm[d.type].color})` }}>{tm[d.type].short}</span>
           <span className="text-xs" style={{ color: `var(--${statusMeta[d.status].color})` }}>{statusMeta[d.status].label}</span>
           <span className="text-xs text-muted-foreground">{d.deadline}</span>
@@ -1134,9 +1169,9 @@ function NoteDialog({ note, dossiers, onClose, onSave }: {
   const [dossierId, setDossierId] = useState<string>(note?.dossierId && dossiers.some((d) => d.id === note.dossierId) ? note.dossierId : "");
   const ok = text.trim().length > 0;
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" {...backdropProps(onClose)}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in max-sm:place-items-end max-sm:p-0 sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onSave({ text, color, dossierId: dossierId || undefined }); }}
-        className="glass relative flex w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label={note ? "Editar nota" : "Nova nota"}>
+        className="glass relative flex w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]" role="dialog" aria-label={note ? "Editar nota" : "Nova nota"}>
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10" style={tint(color)}><StickyNote size={18} /></span>
           <h2 className="flex-1 font-display text-xl font-bold">{note ? "Editar nota" : "Nova nota"}</h2>
@@ -1205,7 +1240,8 @@ function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onSta
     <>
       <div {...backdropProps(onClose)} className="fixed inset-0 z-40 bg-background/50 backdrop-blur-[2px] animate-in fade-in xl:hidden" />
       <aside style={tint(m.color)}
-        className="fixed bottom-3 right-3 top-3 z-50 flex w-[min(470px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-3xl border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[linear-gradient(170deg,oklch(0.19_0.045_262/0.96),oklch(0.13_0.03_262/0.97))] shadow-[0_0_80px_-20px_var(--glow)] backdrop-blur-2xl animate-in slide-in-from-right-12 fade-in duration-500">
+        className="fixed bottom-3 right-3 top-3 z-50 flex w-[min(470px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-3xl max-md:!inset-x-0 max-md:!bottom-0 max-md:!right-0 max-md:!top-12 max-md:!w-full max-md:!rounded-b-none animate-[vp-in_.4s_ease_both] border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[linear-gradient(170deg,oklch(0.19_0.045_262/0.96),oklch(0.13_0.03_262/0.97))] shadow-[0_0_80px_-20px_var(--glow)] backdrop-blur-2xl animate-in slide-in-from-right-12 fade-in duration-500">
+        <div aria-hidden className="relative z-10 mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/25 md:hidden" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(60%_100%_at_30%_0%,color-mix(in_oklab,var(--glow)_22%,transparent),transparent)]" />
         <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-[var(--glow)] to-transparent opacity-70" />
 
