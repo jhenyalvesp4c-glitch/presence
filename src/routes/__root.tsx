@@ -13,6 +13,7 @@ import { type ReactNode } from "react";
 import { HealthPreviewProvider } from "@/components/health-preview-provider";
 import { OrionDock } from "@/components/orion/OrionDock";
 import { VoiceDock } from "@/components/voice/VoiceDock";
+import { ReminderWatcher } from "@/components/reminders/ReminderWatcher";
 import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { VoiceProvider } from "@/lib/voice/use-voice";
 import appCss from "../styles.css?url";
@@ -133,6 +134,7 @@ function RootComponent() {
         <div className={railPad}><HealthPreviewProvider><Outlet /></HealthPreviewProvider></div>
         <OrionDock />
         <VoiceDock />
+        <ReminderWatcher />
       </VoiceProvider>
       <Toaster position="top-center" theme="dark" />
     </QueryClientProvider>

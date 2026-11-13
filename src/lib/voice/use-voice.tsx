@@ -9,7 +9,7 @@ import { takeSentences } from "./sentences";
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
   active: boolean; phase: Phase; userText: string; botText: string; interim: string; panel: Panel | null; canListen: boolean; note: string | null;
-  testVoice: () => void; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
+  testVoice: () => void; announce: (text: string) => void; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
 };
 const Ctx = createContext<Voice | null>(null);
 export const useVoice = (): Voice => {
@@ -391,9 +391,23 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     void ask(x);
   }, [ask]);
 
+  /** Fala um aviso (ex.: lembrete) sem abrir conversa. Se ela já está falando ou ouvindo, não atravessa. */
+  const announce = useCallback((text: string) => {
+    if (!text.trim() || activeRef.current) return;
+    const sp = spk(); sp.reset(); sp.enqueue(text.slice(0, 400));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Na primeira interação com a página, libera o áudio para os avisos falados.
+  useEffect(() => {
+    const un = () => { try { spk().unlock(); } catch { /* sem áudio */ } window.removeEventListener("pointerdown", un); window.removeEventListener("keydown", un); };
+    window.addEventListener("pointerdown", un); window.addEventListener("keydown", un);
+    return () => { window.removeEventListener("pointerdown", un); window.removeEventListener("keydown", un); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => () => { activeRef.current = false; speaker.current?.cancel(); stopListening(); }, [stopListening]);
 
-  const value = useMemo<Voice>(() => ({ active, phase, userText, botText, interim, panel, canListen, note, testVoice, toggle, stop, sendText, closePanel: () => setPanel(null) }),
-    [active, phase, userText, botText, interim, panel, canListen, note, testVoice, toggle, stop, sendText]);
+  const value = useMemo<Voice>(() => ({ active, phase, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText, closePanel: () => setPanel(null) }),
+    [active, phase, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
