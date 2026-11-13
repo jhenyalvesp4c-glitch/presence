@@ -122,6 +122,12 @@ export class Store {
     return rows.map((r) => this.toMsg(r, String(r["chat_name"] ?? ""), !!r["is_group"]));
   }
 
+  /** Mensagens de outras pessoas (grupos e conversas diretas) depois de `after` (segundos), da mais antiga para a mais nova. */
+  recent(after: number, limit = 200): Msg[] {
+    const rows = this.db.prepare("select m.*, c.name as chat_name, c.is_group as is_group from messages m join chats c on c.jid = m.chat where m.from_me = 0 and m.ts > ? order by m.ts asc limit ?").all(after, Math.min(limit, 500)) as Record<string, unknown>[];
+    return rows.map((r) => this.toMsg(r, String(r["chat_name"] ?? ""), !!r["is_group"]));
+  }
+
   /** Marca a conversa como lida PELA PRESENCE (só aqui; não muda nada no seu WhatsApp). */
   markChecked(jid: string, upTo?: number) {
     this.db.prepare("update chats set checked_ts = max(checked_ts, ?) where jid = ?").run(upTo ?? Math.floor(Date.now() / 1000), jid);

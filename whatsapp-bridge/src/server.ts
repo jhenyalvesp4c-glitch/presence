@@ -59,6 +59,8 @@ export function createApi(store: Store, state: BridgeState, token: string, contr
 
       if (route === "GET /mentions") return json(res, 200, { mentions: store.mentions(n("after"), n("limit", 50)), now: Math.floor(Date.now() / 1000) });
 
+      if (route === "GET /recentes") return json(res, 200, { messages: store.recent(n("after"), n("limit", 200)), now: Math.floor(Date.now() / 1000) });
+
       if (route === "POST /pause") { const on = q.get("on") === "1"; controls.pause(on); return json(res, 200, { ok: true, paused: on }); }
       if (route === "POST /logout") { await controls.logout(); return json(res, 200, { ok: true }); }
       if (route === "POST /marcar-lidas") {

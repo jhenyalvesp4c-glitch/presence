@@ -4,6 +4,7 @@ export type WaStatus = {
   phase: "desligado" | "aguardando_qr" | "conectando" | "conectado" | "pausado"; qr: string | null; phone: string; name: string; since: number; paused: boolean;
   chats: number; messages: number; now: number; erro?: string;
 };
+export type WaMessage = Omit<WaMention, "mentions_me" | "reply_to_me"> & { from_me: boolean; mentions_me: boolean; reply_to_me: boolean };
 export type WaMention = { id: string; chat: string; chat_name: string; is_group: boolean; sender_name: string; sender: string; ts: number; text: string; kind: string; mentions_me: boolean; reply_to_me: boolean };
 
 const get = (k: string, d: string) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
@@ -62,5 +63,9 @@ export const clientFetcher = async (path: string, method: "GET" | "POST" = "GET"
 export const waPrefs = {
   alerts: () => get("presence.wa.avisos", "1") === "1", setAlerts: (v: boolean) => set("presence.wa.avisos", v ? "1" : "0"),
   voice: () => get("presence.wa.voz", "1") === "1", setVoice: (v: boolean) => set("presence.wa.voz", v ? "1" : "0"),
+  names: () => get("presence.wa.avisar.nome", "1") === "1", setNames: (v: boolean) => set("presence.wa.avisar.nome", v ? "1" : "0"),
+  crm: () => get("presence.wa.avisar.crm", "1") === "1", setCrm: (v: boolean) => set("presence.wa.avisar.crm", v ? "1" : "0"),
+  /** Listas de palavras (uma por linha ou separadas por vírgula). Vazio = usa o padrão. */
+  list: (k: "nomes" | "crm" | "ignorar") => get(`presence.wa.lista.${k}`, ""), setList: (k: "nomes" | "crm" | "ignorar", v: string) => set(`presence.wa.lista.${k}`, v),
   cursor: () => Number(get("presence.wa.cursor", "0")) || 0, setCursor: (n: number) => set("presence.wa.cursor", String(n)),
 };

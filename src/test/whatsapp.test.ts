@@ -73,6 +73,12 @@ describe("whatsapp: guardar e consultar", () => {
     const m = store.mentions(0); expect(m).toHaveLength(1); expect(m[0]).toMatchObject({ text: "@Jheny preciso de você", chat_name: "Juiz de Fora" });
     expect(store.mentions(base + 120)).toHaveLength(0);
   });
+  it("lista as mensagens recentes de outras pessoas, de grupos e conversas diretas", () => {
+    const r = store.recent(0);
+    expect(r.length).toBeGreaterThan(3); expect(r.every((m) => !m.from_me)).toBe(true);
+    expect(r.map((m) => m.ts)).toEqual([...r.map((m) => m.ts)].sort((x, y) => x - y));
+    expect(store.recent(Math.max(...r.map((m) => m.ts)))).toHaveLength(0);
+  });
   it("apaga as antigas e limpa tudo", () => {
     const s = new Store(":memory:"); s.addMessage({ id: "a", chat: grupo, chat_name: "G", is_group: true, sender: "x@s.whatsapp.net", sender_name: "X", from_me: false, ts: 1000, text: "velha", kind: "texto", mentions_me: false, reply_to_me: false });
     expect(s.prune(30)).toBe(1); expect(s.counts().messages).toBe(0); s.clear(); expect(s.counts().chats).toBe(0);

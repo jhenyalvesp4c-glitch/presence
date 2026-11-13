@@ -28,8 +28,9 @@ function WhatsApp() {
   const [direct, setDirect] = useState(true);
   useEffect(() => { setDirect(directEnabled()); }, []);
   const [busy, setBusy] = useState(false);
-  const [alerts, setAlerts] = useState(true), [voice, setVoice] = useState(true);
-  useEffect(() => { setAlerts(waPrefs.alerts()); setVoice(waPrefs.voice()); }, []);
+  const [alerts, setAlerts] = useState(true), [voice, setVoice] = useState(true), [byName, setByName] = useState(true), [byCrm, setByCrm] = useState(true);
+  const [lists, setLists] = useState({ nomes: "", crm: "", ignorar: "" });
+  useEffect(() => { setAlerts(waPrefs.alerts()); setVoice(waPrefs.voice()); setByName(waPrefs.names()); setByCrm(waPrefs.crm()); setLists({ nomes: waPrefs.list("nomes"), crm: waPrefs.list("crm"), ignorar: waPrefs.list("ignorar") }); }, []);
 
   const load = useCallback(async () => {
     const r = await waGet<WaStatus>("status");
@@ -101,7 +102,20 @@ function WhatsApp() {
               <p className="flex items-center gap-2 font-medium"><Check size={15} className="text-emerald" /> Conectado{st.phone ? ` como +${st.phone}` : ""}{st.name ? ` (${st.name})` : ""}</p>
               <p className="mt-1 text-xs text-muted-foreground">{st.chats} conversas e {st.messages} mensagens guardadas neste computador.</p>
             </div>
-            <Toggle on={alerts} onChange={(v) => { setAlerts(v); waPrefs.setAlerts(v); }} Icon={Bell} label="Avisar quando me marcarem" hint="Mostra um aviso e notificação quando alguém me marcar ou responder a uma mensagem minha em um grupo." />
+            <Toggle on={alerts} onChange={(v) => { setAlerts(v); waPrefs.setAlerts(v); }} Icon={Bell} label="Avisar quando me marcarem" hint="Mostra um aviso e notificação quando alguém me marcar ou responder a uma mensagem minha." />
+            <Toggle on={byName} onChange={(v) => { setByName(v); waPrefs.setNames(v); }} Icon={Bell} label="Avisar quando falarem o meu nome" hint="Mesmo sem marcar e mesmo escrito diferente: Jheny, Jenny, Jeny, Jhenny, Jeni…" />
+            <Toggle on={byCrm} onChange={(v) => { setByCrm(v); waPrefs.setCrm(v); }} Icon={Bell} label="Avisar quando falarem de CRM" hint="CRM, disparo em massa, usuários, templates, conexão e QR code. Conversas sobre campanhas e valores não avisam." />
+            <details className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 text-sm" data-testid="wa-palavras">
+              <summary className="cursor-pointer font-medium">Ajustar as palavras dos avisos</summary>
+              <div className="mt-3 space-y-3 text-xs text-muted-foreground">
+                {([["nomes", "Outros jeitos do meu nome", "ex.: Jhe, Jheninha"], ["crm", "Palavras de CRM a mais", "ex.: whitelabel, plano, reseller"], ["ignorar", "Ignorar mensagens com", "ex.: promoção, cupom"]] as const).map(([k, t, ph]) => (
+                  <label key={k} className="block"><span className="mb-1 block text-foreground">{t}</span>
+                    <textarea rows={2} value={lists[k]} placeholder={ph} onChange={(e) => { setLists({ ...lists, [k]: e.target.value }); waPrefs.setList(k, e.target.value); }} className="w-full rounded-xl border border-white/10 bg-black/30 p-2 text-sm text-foreground outline-none focus:border-cyan/50" />
+                  </label>
+                ))}
+                <p>Uma por linha ou separadas por vírgula. Já ignoro por padrão: campanha, anúncio, valor, preço, orçamento, verba, saldo, R$.</p>
+              </div>
+            </details>
             <Toggle on={voice} onChange={(v) => { setVoice(v); waPrefs.setVoice(v); }} Icon={Volume2} label="Ler o aviso em voz alta" hint="O Presence fala quem marcou e o que foi dito." />
             <div className="flex flex-wrap gap-2 pt-1">
               <button className={btn} disabled={busy} onClick={() => void act("pause", { on: st.phase === "pausado" ? "0" : "1" })}>{st.phase === "pausado" ? <><Play size={14} /> Retomar leitura</> : <><Pause size={14} /> Pausar leitura</>}</button>

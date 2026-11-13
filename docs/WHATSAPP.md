@@ -31,3 +31,11 @@ As mensagens lidas pela voz aparecem como no aplicativo (balões um embaixo do o
 
 ## Testes
 `src/test/whatsapp.test.ts` cobre a interpretação das mensagens (marcações, respostas, mídia), o armazenamento, a busca por nome e a API. **A conexão real com o WhatsApp não foi testada pela Claude** (precisa de um celular para ler o QR): teste no seu PC.
+
+## Avisos por nome e por assunto (CRM)
+
+Além de marcações e respostas, o Presence avisa (tela, notificação e voz) quando:
+- alguém escreve o seu nome, em qualquer grafia (Jheny, Jenny, Jeny, Jhenny, Jeni…), com ou sem marcar;
+- a mensagem fala de CRM (disparo em massa, usuários, templates, conexão, QR code, API oficial…), **exceto** se também falar de campanha, anúncio, valor, preço, orçamento, verba, saldo ou R$.
+
+As regras ficam em `src/lib/whatsapp/relevance.ts` (só texto, sem IA, sem custo) e podem ser ajustadas em Configurações → WhatsApp → "Ajustar as palavras dos avisos". Exige a ponte atualizada (rota `GET /recentes`); com a ponte antiga só avisa marcações.
