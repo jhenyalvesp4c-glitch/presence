@@ -26,7 +26,7 @@ server.listen(port, "127.0.0.1", () => {
   console.log(`Ponte do WhatsApp ligada em http://127.0.0.1:${port} (só neste computador).`);
   console.log(`Dados em: ${dir}`);
   console.log("Abra o Presence → Configurações → WhatsApp para ler o QR Code com o seu celular.");
-  void conn.start().catch((e) => console.error("Falha ao conectar:", e instanceof Error ? e.message : e));
+  void conn.start();
 });
 
 const prune = () => { try { const n = store.prune(days); if (n) console.log(`Apaguei ${n} mensagens com mais de ${days} dias.`); } catch { /* ok */ } };

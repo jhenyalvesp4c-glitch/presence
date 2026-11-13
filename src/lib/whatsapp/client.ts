@@ -2,7 +2,7 @@ import { authHeaders } from "@/lib/auth-token";
 
 export type WaStatus = {
   phase: "desligado" | "aguardando_qr" | "conectando" | "conectado" | "pausado"; qr: string | null; phone: string; name: string; since: number; paused: boolean;
-  chats: number; messages: number; now: number;
+  chats: number; messages: number; now: number; erro?: string;
 };
 export type WaMention = { id: string; chat: string; chat_name: string; is_group: boolean; sender_name: string; sender: string; ts: number; text: string; kind: string; mentions_me: boolean; reply_to_me: boolean };
 

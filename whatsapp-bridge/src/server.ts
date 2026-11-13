@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import type { Store } from "./store.ts";
 
 export type Phase = "desligado" | "aguardando_qr" | "conectando" | "conectado" | "pausado";
-export type BridgeState = { phase: Phase; qr: string | null; phone: string; name: string; since: number; paused: boolean };
+export type BridgeState = { phase: Phase; qr: string | null; phone: string; name: string; since: number; paused: boolean; erro?: string };
 export type Controls = { logout(): Promise<void>; pause(on: boolean): void };
 
 const json = (res: ServerResponse, status: number, body: unknown) => { res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(body)); };

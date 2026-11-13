@@ -67,6 +67,14 @@ function WhatsApp() {
           </div>
         )}
 
+        {st && !connected && st.phase !== "aguardando_qr" && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm" data-testid="wa-aguardando">
+            <p className="flex items-center gap-2 font-medium"><Loader2 size={15} className="animate-spin text-cyan" /> A ponte está ligada e tentando conectar ao WhatsApp…</p>
+            <p className="mt-1 text-xs text-muted-foreground">O QR Code costuma aparecer em até 20 segundos. Se passar disso, olhe a janela preta do whatsapp.cmd: ela mostra o que está acontecendo.</p>
+            {st.erro && <p className="mt-2 break-words rounded-xl border border-amber/30 bg-amber/5 px-3 py-2 text-xs text-amber" data-testid="wa-erro">{st.erro}</p>}
+          </div>
+        )}
+
         {st?.phase === "aguardando_qr" && (
           <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:grid-cols-[auto_1fr]" data-testid="wa-qr">
             {st.qr ? <img src={st.qr} alt="QR Code para conectar o WhatsApp" className="h-56 w-56 rounded-2xl bg-white p-2" /> : <div className="grid h-56 w-56 place-items-center"><Loader2 className="animate-spin text-cyan" /></div>}
