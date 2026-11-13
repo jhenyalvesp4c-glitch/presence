@@ -15,6 +15,7 @@ import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as CerebroRouteImport } from './routes/cerebro'
 import { Route as DemandasRouteImport } from './routes/demandas'
+import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as HabitosRouteImport } from './routes/habitos'
 import { Route as HojeRouteImport } from './routes/hoje'
 import { Route as OrganizarRouteImport } from './routes/organizar'
@@ -66,6 +67,11 @@ const CerebroRoute = CerebroRouteImport.update({
 const DemandasRoute = DemandasRouteImport.update({
   id: '/demandas',
   path: '/demandas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiagnosticoRoute = DiagnosticoRouteImport.update({
+  id: '/diagnostico',
+  path: '/diagnostico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HabitosRoute = HabitosRouteImport.update({
@@ -186,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/calendario': typeof CalendarioRoute
   '/cerebro': typeof CerebroRoute
   '/demandas': typeof DemandasRoute
+  '/diagnostico': typeof DiagnosticoRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
   '/organizar': typeof OrganizarRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/calendario': typeof CalendarioRoute
   '/cerebro': typeof CerebroRoute
   '/demandas': typeof DemandasRoute
+  '/diagnostico': typeof DiagnosticoRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
   '/organizar': typeof OrganizarRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/calendario': typeof CalendarioRoute
   '/cerebro': typeof CerebroRoute
   '/demandas': typeof DemandasRoute
+  '/diagnostico': typeof DiagnosticoRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
   '/organizar': typeof OrganizarRoute
@@ -279,6 +288,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/cerebro'
     | '/demandas'
+    | '/diagnostico'
     | '/habitos'
     | '/hoje'
     | '/organizar'
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/cerebro'
     | '/demandas'
+    | '/diagnostico'
     | '/habitos'
     | '/hoje'
     | '/organizar'
@@ -339,6 +350,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/cerebro'
     | '/demandas'
+    | '/diagnostico'
     | '/habitos'
     | '/hoje'
     | '/organizar'
@@ -370,6 +382,7 @@ export interface RootRouteChildren {
   CalendarioRoute: typeof CalendarioRoute
   CerebroRoute: typeof CerebroRoute
   DemandasRoute: typeof DemandasRoute
+  DiagnosticoRoute: typeof DiagnosticoRoute
   HabitosRoute: typeof HabitosRoute
   HojeRoute: typeof HojeRoute
   OrganizarRoute: typeof OrganizarRoute
@@ -435,6 +448,13 @@ declare module '@tanstack/react-router' {
       path: '/demandas'
       fullPath: '/demandas'
       preLoaderRoute: typeof DemandasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/diagnostico': {
+      id: '/diagnostico'
+      path: '/diagnostico'
+      fullPath: '/diagnostico'
+      preLoaderRoute: typeof DiagnosticoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/habitos': {
@@ -612,6 +632,7 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarioRoute: CalendarioRoute,
   CerebroRoute: CerebroRoute,
   DemandasRoute: DemandasRoute,
+  DiagnosticoRoute: DiagnosticoRoute,
   HabitosRoute: HabitosRoute,
   HojeRoute: HojeRoute,
   OrganizarRoute: OrganizarRoute,

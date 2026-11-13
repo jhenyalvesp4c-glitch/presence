@@ -451,3 +451,6 @@
   .lift-b { bottom: calc(var(--tabbar) + 0.75rem) !important; }
   .lift-c { bottom: calc(var(--tabbar) + 5.25rem) !important; }
 }
+
+/* Nada deve alargar a página no celular (o Safari encolhe tudo se algo passar da tela). */
+html, body { max-width: 100%; overflow-x: clip; }
