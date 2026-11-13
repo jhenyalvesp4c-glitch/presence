@@ -28,8 +28,15 @@ export type VoiceEvent =
   | { t: "acao"; a: { tipo: "navegar"; para: string } | { tipo: "encerrar" } }
   | { t: "painel"; p: Panel }
   | { t: "erro"; m: string }
+  | { t: "status"; m: string }
   | { t: "ferramenta"; estado: Record<string, unknown>[]; chamadas: { id: string; nome: string; args: Record<string, unknown> }[] }
   | { t: "fim" };
+/** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
+export const TOOL_STATUS: Record<string, string> = {
+  whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", resumo_do_dia: "Olhando o seu dia…",
+  consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
+};
 export type Turn = { role: "user" | "assistant"; content: string };
 /** Continuação de uma rodada que parou esperando o navegador executar ferramentas (ex.: WhatsApp pelo site publicado). */
 export type Resume = { estado: Record<string, unknown>[]; resultados: { id: string; content: string }[] };
@@ -74,6 +81,7 @@ Regras de fala:
 - Se ela disser como quer ser chamada, como prefere que você fale ou como começar a conversa, use ajustar_perfil. Quando ela contar algo duradouro sobre si ou pedir "lembra que…", use lembrar; "esquece que…", use esquecer.
 - Para "marcar tudo como lido" / "zerar as novas" no WhatsApp use whatsapp_marcar_lidas e explique que é o controle do Presence (não muda o WhatsApp dela).
 - WhatsApp (somente leitura, só no app do computador): "o que o grupo X mandou", "tem mensagem no grupo?", "analise as conversas" → use whatsapp_ler (com so_novas=true para o que ainda não foi lido); "alguém me marcou?" → whatsapp_mencoes; "quais conversas têm novidade" → whatsapp_conversas. Primeiro diga se há mensagens e quantas; leia citando quem falou e o que disse (e quem foi marcado, quando houver pessoas_marcadas); se forem muitas, resuma e ofereça ler tudo. Se a ponte estiver desligada, diga isso e que ela liga em Configurações. Você NUNCA envia mensagens no WhatsApp.
+- ANTES de usar qualquer ferramenta que leve alguns segundos (WhatsApp, registrar, atualizar, consultar, buscar), diga UMA frase curta e natural avisando o que vai fazer, usando o nome da pessoa. Ex.: "Ok, Jheny, vou abrir o seu WhatsApp para ver as últimas mensagens, só um minutinho." ou "Claro, Jheny, estou criando essa demanda agora." Só depois chame a ferramenta. Nunca fique em silêncio antes de agir, e não repita a mesma frase na resposta final: na resposta final conte o resultado. Para abrir uma tela basta "Claro, abrindo."
 - Para abrir telas use abrir_pagina. Quando a pessoa se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
 ${name ? `Trate a pessoa pelo nome de vez em quando, sem exagero.` : ""}`;
@@ -368,6 +376,7 @@ export async function runAgent(history: Turn[], emit: Emit, resume?: Resume): Pr
       const { text, calls } = await streamChat({ model, messages, tools: TOOLS, tool_choice: "auto", max_completion_tokens: 700, reasoning_effort: "low" }, (d) => emit({ t: "texto", d }));
       if (!calls.length) break;
       messages.push({ role: "assistant", content: text || null, tool_calls: calls.map((k) => ({ id: k.id, type: "function", function: { name: k.name, arguments: k.args || "{}" } })) });
+      for (const k of calls) { const st = TOOL_STATUS[k.name]; if (st) { emit({ t: "status", m: st }); break; } }
       const deferred: { id: string; nome: string; args: Record<string, unknown> }[] = [];
       for (const k of calls) {
         let out: unknown;

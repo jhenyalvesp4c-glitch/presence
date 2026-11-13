@@ -13,7 +13,7 @@ import { takeSentences } from "./sentences";
 
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
-  active: boolean; phase: Phase; userText: string; botText: string; interim: string; panel: Panel | null; canListen: boolean; note: string | null;
+  active: boolean; phase: Phase; status: string | null; userText: string; botText: string; interim: string; panel: Panel | null; canListen: boolean; note: string | null;
   testVoice: () => void; announce: (text: string) => Promise<void>; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
 };
 const Ctx = createContext<Voice | null>(null);
@@ -170,6 +170,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [panel, setPanel] = useState<Panel | null>(null);
   const [canListen, setCanListen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   const activeRef = useRef(false);
   const phaseRef = useRef<Phase>("idle");
@@ -186,7 +187,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const listenRef = useRef<() => void>(() => undefined);
   const turn = useRef(0);
 
-  const setP = (p: Phase) => { phaseRef.current = p; setPhase(p); };
+  const setP = (p: Phase) => { phaseRef.current = p; setPhase(p); if (p !== "thinking") setStatus(null); };
   useEffect(() => {
     setCanListen(!!recCtor() || !!navigator.mediaDevices?.getUserMedia);
     try { if (localStorage.getItem("presence.stt") === "gravado") sttMode.current = "gravado"; } catch { /* sem armazenamento */ }
@@ -199,7 +200,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     activeRef.current = false; setActive(false);
     stopListening(); vadStop.current?.(); abort.current?.abort(); speaker.current?.cancel();
     mic.current?.getTracks().forEach((t) => t.stop()); mic.current = null;
-    setP("idle"); setInterim("");
+    setP("idle"); setInterim(""); setStatus(null);
     setTimeout(() => { if (!activeRef.current) { setUserText(""); setBotText(""); } }, 6000);
   }, [stopListening]);
 
@@ -330,7 +331,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         const box: { tools: Extract<VoiceEvent, { t: "ferramenta" }> | null } = { tools: null };
         const handle = (e: VoiceEvent) => {
           if (turn.current !== my) return;
-          if (e.t === "texto") {
+          if (e.t === "status") setStatus(e.m);
+          else if (e.t === "texto") {
+            setStatus(null);
             said += e.d; buffer += e.d; setBotText(said);
             const t = takeSentences(buffer, { first });
             buffer = t.rest; first = t.first; say(t.chunks);
@@ -386,7 +389,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
     spk().unlock();
     // Se a pessoa pediu no briefing que o Presence comece a conversa, ela fala primeiro.
-    if (greetRef.current !== "esperar") void ask(GREET_MARK); else listen();
+    if (greetRef.current !== "esperar") { setStatus("Iniciando o Presence…"); void ask(GREET_MARK); } else listen();
   }, [listen, ask]);
 
   const stop = useCallback(() => { turn.current++; endSession(); }, [endSession]);
@@ -435,7 +438,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => { activeRef.current = false; speaker.current?.cancel(); stopListening(); }, [stopListening]);
 
-  const value = useMemo<Voice>(() => ({ active, phase, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText, closePanel: () => setPanel(null) }),
-    [active, phase, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText]);
+  const value = useMemo<Voice>(() => ({ active, phase, status, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText, closePanel: () => setPanel(null) }),
+    [active, phase, status, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

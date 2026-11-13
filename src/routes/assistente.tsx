@@ -174,7 +174,7 @@ function Assistente() {
             </div>
             <div className="flex items-center gap-4">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: listening ? "var(--emerald)" : "var(--cyan)", boxShadow: "0 0 8px currentColor" }} />
-              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? "Pensando…" : "Standby"}</span>
+              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? (voice.status ?? "Pensando…") : "Standby"}</span>
               <span className="h-8 w-px bg-border" />
               <button onClick={voice.toggle} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz" data-testid="voz-cabecalho"><AudioLines size={18} /></button>
               <div className="md:hidden"><AccountMenu below /></div>
@@ -224,7 +224,7 @@ function Assistente() {
             {voice.active && voice.phase !== "idle" ? (
               <div className="mx-auto flex min-h-[3.2rem] max-w-xl flex-col items-center gap-1.5 animate-rise" data-testid="voz-estado">
                 <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em]" style={{ color: voice.phase === "listening" ? "var(--emerald)" : voice.phase === "thinking" ? "oklch(0.8 0.15 75)" : "var(--cyan)" }} data-testid="voz-fase">
-                  {voice.phase === "listening" ? "Ouvindo…" : voice.phase === "thinking" ? "Pensando…" : "Falando…"}
+                  {voice.phase === "listening" ? "Ouvindo…" : voice.phase === "thinking" ? (voice.status ?? "Pensando…") : "Falando…"}
                 </span>
                 {voice.botText && voice.phase !== "listening" && <p className="line-clamp-2 max-w-xl text-balance px-4 font-serif text-lg leading-snug text-foreground/90 sm:text-xl" data-testid="voz-texto">{voice.botText}</p>}
               </div>

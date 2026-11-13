@@ -57,7 +57,7 @@ export function VoiceDock() {
           )}
           <div className="flex items-center gap-2">
             <MiniOrb phase={v.phase} onClick={v.toggle} />
-            {v.active && <span className="mono-caps rounded-full border border-border bg-background/80 px-3 py-1 !text-[0.62rem] backdrop-blur" style={{ color: COLOR[v.phase] }} data-testid="voz-fase">{SUBTITLE_LABEL[v.phase]}</span>}
+            {v.active && <span className="mono-caps rounded-full border border-border bg-background/80 px-3 py-1 !text-[0.62rem] backdrop-blur" style={{ color: COLOR[v.phase] }} data-testid="voz-fase">{v.phase === "thinking" && v.status ? v.status : SUBTITLE_LABEL[v.phase]}</span>}
           </div>
         </div>
       )}
