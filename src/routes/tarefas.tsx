@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  AlarmClock, BarChart3, CalendarDays, Check, CheckCircle2, Clock, Flag, Layers, ListTodo, Loader2, Plus, Search,
+  AlarmClock, BarChart3, CalendarDays, Check, CheckCircle2, Clock, Flag, Layers, ListTodo, ListChecks, Loader2, Plus, Search,
   SlidersHorizontal, Sparkles, Target, Trash2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,10 +16,12 @@ import { getIcon } from "@/lib/icons";
 import type { Color, Priority } from "@/lib/types";
 import { useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
+import { ListsView } from "@/components/lists/ListsView";
 
 const T0 = new Date(); T0.setHours(0, 0, 0, 0);
 
 export const Route = createFileRoute("/tarefas")({
+  validateSearch: (s: Record<string, unknown>): { aba?: "listas" } => (s["aba"] === "listas" ? { aba: "listas" } : {}),
   head: () => ({
     meta: [
       { title: "Presence · Minhas tarefas" },
@@ -45,6 +47,8 @@ const prioLabel: Record<Priority, string> = { alta: "Prioridade alta", media: "P
 const prioNext: Record<Priority, Priority> = { media: "alta", alta: "baixa", baixa: "media" };
 
 function TarefasPage() {
+  const { aba } = Route.useSearch();
+  const navigate = useNavigate();
   const catsQ = useCategories();
   const tasksQ = useTasks();
   const createTask = useCreateTask();
@@ -176,7 +180,20 @@ function TarefasPage() {
         </div>
       </section>
 
-      {/* MAIN GRID */}
+      {/* TAREFAS | LISTAS */}
+      <div className="glass mx-auto flex w-full max-w-sm gap-1 rounded-2xl p-1.5" role="tablist" data-testid="aba-tarefas-listas">
+        {([["tarefas", "Tarefas", ListChecks], ["listas", "Listas", ListTodo]] as const).map(([k, t, Icon]) => {
+          const on = (aba ?? "tarefas") === k;
+          return (
+            <button key={k} role="tab" aria-selected={on} onClick={() => void navigate({ to: "/tarefas", search: k === "listas" ? { aba: "listas" } : {}, replace: true })}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2 text-sm transition ${on ? "bg-cyan/10 text-cyan shadow-[inset_0_0_0_1px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}>
+              <Icon size={15} /> {t}
+            </button>
+          );
+        })}
+      </div>
+      {aba === "listas" ? <ListsView /> : (
+      <>
       <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
         <Panel c="violet" className="flex flex-col">
           <Head Icon={Layers} t="Categorias" s="Organize por áreas da sua vida." />
@@ -367,6 +384,8 @@ function TarefasPage() {
           </ol>
         </Panel>
       </div>
+      </>
+      )}
       {editingTask && (
         <TaskEditDialog task={editingTask} categories={categories} saving={updateTask.isPending} onClose={() => setEditingId(null)}
           onSave={(patch) => updateTask.mutate({ id: editingTask.id, patch }, { onSuccess: () => { setEditingId(null); toast.success("Tarefa atualizada"); }, onError: (e) => toast.error(e.message) })}

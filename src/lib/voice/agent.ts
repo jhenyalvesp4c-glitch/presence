@@ -18,11 +18,12 @@ import { addMemory, forgetMemories, loadBriefingState, saveBriefing } from "../d
 import { isoDay, rascunhoSchema, registroSchema, weekdayPt, TIPO_LABEL, type Registro } from "../mcp/records";
 
 /* ───────────── eventos para o navegador ───────────── */
-export type PanelItem = { rotulo: string; detalhe?: string | undefined; feita?: boolean | undefined; link?: string | undefined };
+/** `marcar` = id de item de lista (tocar marca/desmarca sem sair do painel); `incluir` = sugestão (tocar adiciona na lista). */
+export type PanelItem = { rotulo: string; detalhe?: string | undefined; feita?: boolean | undefined; link?: string | undefined; marcar?: string | undefined; incluir?: { lista: string } | undefined };
 export type ChatMsg = { quem: string; minha: boolean; dia: string; hora: string; texto: string; tipo: string; marcou: boolean; marcados?: string[] };
 /** Conversa do WhatsApp para mostrar como no aplicativo: uma mensagem embaixo da outra. */
 export type ChatView = { nome: string; grupo: boolean; mensagens: ChatMsg[] };
-export type Panel = { titulo: string; secoes: { titulo: string; itens: PanelItem[] }[]; chat?: ChatView };
+export type Panel = { titulo: string; secoes: { titulo: string; itens: PanelItem[] }[]; chat?: ChatView; abrir?: { rotulo: string; para: string } };
 export type VoiceEvent =
   | { t: "texto"; d: string }
   | { t: "acao"; a: { tipo: "navegar"; para: string } | { tipo: "encerrar" } }
@@ -44,7 +45,7 @@ export type Resume = { estado: Record<string, unknown>[]; resultados: { id: stri
 export const PAGES: Record<string, string> = {
   inicio: "/assistente", demandas: "/demandas", projetos: "/projetos", tarefas: "/tarefas", calendario: "/calendario", planejamento: "/planejamento",
   saude: "/saude", treino: "/saude/treino", dieta: "/saude/dieta", habitos: "/habitos", progresso: "/progresso", cerebro: "/cerebro",
-  organizar: "/organizar", listas: "/listas", analise: "/analise", resumo: "/resumo",
+  organizar: "/organizar", listas: "/tarefas?aba=listas", analise: "/analise", resumo: "/resumo",
 };
 
 /* ───────────── contexto (com cache curto, para responder rápido) ───────────── */

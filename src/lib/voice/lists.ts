@@ -9,13 +9,13 @@ const itemsOf = (v: unknown): NewItem[] => (Array.isArray(v) ? v.map((x) => (typ
 function panelOf(l: CList, sugestoes: string[]): Panel {
   const secoes: Panel["secoes"] = bySection(l.items).map((s) => ({
     titulo: s.secao || "Itens",
-    itens: s.itens.map((i): PanelItem => ({ rotulo: i.label, feita: i.done, link: "/listas" })),
+    itens: s.itens.map((i): PanelItem => ({ rotulo: i.label, feita: i.done, marcar: i.id })),
   }));
   const have = new Set(l.items.map((i) => i.label.toLowerCase()));
   const sug = sugestoes.filter((s) => !have.has(s.toLowerCase())).slice(0, 8);
-  if (sug.length) secoes.push({ titulo: "Sugestões (diga \"coloca\" e o nome)", itens: sug.map((s): PanelItem => ({ rotulo: s })) });
+  if (sug.length) secoes.push({ titulo: "Sugestões · toque para incluir", itens: sug.map((s): PanelItem => ({ rotulo: s, incluir: { lista: l.id } })) });
   const p = progress(l.items);
-  return { titulo: `${l.title} · ${p.feitos}/${p.total}`, secoes: secoes.length ? secoes : [{ titulo: "Itens", itens: [{ rotulo: "A lista está vazia." }] }] };
+  return { titulo: `${l.title} · ${p.feitos}/${p.total}`, secoes: secoes.length ? secoes : [{ titulo: "Itens", itens: [{ rotulo: "A lista está vazia." }] }], abrir: { rotulo: "Abrir em Tarefas", para: "/tarefas?aba=listas" } };
 }
 
 export async function runListTool(args: Record<string, unknown>): Promise<{ result: Record<string, unknown>; panel?: Panel }> {
@@ -24,7 +24,7 @@ export async function runListTool(args: Record<string, unknown>): Promise<{ resu
   let lists = await loadLists();
 
   if (acao === "listar") {
-    return { result: { ok: true, listas: lists.map((l) => ({ titulo: l.title, ...progress(l.items) })) }, panel: { titulo: "Suas listas", secoes: [{ titulo: "Listas", itens: lists.length ? lists.map((l): PanelItem => ({ rotulo: l.title, detalhe: `${progress(l.items).feitos} de ${l.items.length} feitos`, link: "/listas" })) : [{ rotulo: "Você ainda não tem listas." }] }] } };
+    return { result: { ok: true, listas: lists.map((l) => ({ titulo: l.title, ...progress(l.items) })) }, panel: { titulo: "Suas listas", secoes: [{ titulo: "Listas", itens: lists.length ? lists.map((l): PanelItem => ({ rotulo: l.title, detalhe: `${progress(l.items).feitos} de ${l.items.length} feitos`, link: "/tarefas?aba=listas" })) : [{ rotulo: "Você ainda não tem listas." }] }] } };
   }
 
   if (acao === "criar") {

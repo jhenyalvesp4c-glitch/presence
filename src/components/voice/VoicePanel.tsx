@@ -1,7 +1,8 @@
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { AlarmClock, ArrowUpRight, Bell, CalendarDays, Check, ClipboardList, Flame, ListChecks, Rocket, Sparkles, StickyNote, X } from "lucide-react";
 
+import { addItems, setItemDone } from "@/lib/data/checklists";
 import { normalize } from "@/lib/orion";
 import type { Panel } from "@/lib/voice/agent";
 
@@ -29,6 +30,14 @@ const splitTime = (d?: string) => { const m = d ? /^(\d{2}:\d{2}(?:–\d{2}:\d{2
 
 /** Modal do que o Presence mostra por voz (o dia, registros, o que foi criado): bonito, organizado e clicável. */
 export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: () => void; onOpen: (href: string) => void }) {
+  /** Itens de lista tocados aqui: marcar/incluir sem fechar o painel. */
+  const [local, setLocal] = useState<Record<string, boolean>>({});
+  const act = async (key: string, it: Panel["secoes"][number]["itens"][number]) => {
+    try {
+      if (it.marcar) { const next = !(key in local ? local[key] : it.feita); setLocal((m) => ({ ...m, [key]: next })); await setItemDone(it.marcar, next); }
+      else if (it.incluir && !local[key]) { setLocal((m) => ({ ...m, [key]: true })); await addItems(it.incluir.lista, [{ texto: it.rotulo }]); }
+    } catch { setLocal((m) => { const n = { ...m }; delete n[key]; return n; }); }
+  };
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", k);
@@ -86,20 +95,21 @@ export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: 
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {s.itens.map((it, k) => {
                     const { time, rest } = splitTime(it.detalhe);
+                    const key = `${i}-${k}`, feita = key in local ? !!local[key] : !!it.feita, acts = !!(it.marcar || it.incluir);
                     return (
                       <li key={k} style={{ animation: `vp-item .45s ease ${0.2 + i * 0.09 + k * 0.035}s both` }}>
-                        <button onClick={() => { if (it.link) { onClose(); onOpen(it.link); } }} disabled={!it.link}
+                        <button onClick={() => { if (acts) void act(key, it); else if (it.link) { onClose(); onOpen(it.link); } }} disabled={!it.link && !acts}
                           className="group relative flex h-full w-full items-start gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition duration-300 enabled:hover:-translate-y-0.5 enabled:hover:bg-white/[0.08]"
                           onMouseEnter={(e) => { e.currentTarget.style.borderColor = "color-mix(in oklab, var(--tone) 55%, transparent)"; e.currentTarget.style.boxShadow = "0 10px 30px -16px var(--tone)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.boxShadow = ""; }}>
-                          <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: "var(--tone)", opacity: it.feita ? 0.35 : 0.9 }} />
+                          <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: "var(--tone)", opacity: feita ? 0.35 : 0.9 }} />
                           {time ? <span className="mt-0.5 shrink-0 rounded-lg px-2 py-1 font-mono text-[0.7rem] font-medium" style={{ background: "color-mix(in oklab, var(--tone) 14%, transparent)", color: "var(--tone)" }}>{time}</span>
-                            : <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full" style={{ background: "color-mix(in oklab, var(--tone) 14%, transparent)", color: "var(--tone)" }}>{it.feita ? <Check size={12} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span>}
+                            : <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full" style={{ background: "color-mix(in oklab, var(--tone) 14%, transparent)", color: "var(--tone)" }}>{feita ? <Check size={12} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span>}
                           <span className="min-w-0 flex-1">
-                            <span className={`block break-words text-sm leading-snug ${it.feita ? "text-muted-foreground line-through" : "text-foreground"}`}>{it.rotulo}</span>
+                            <span className={`block break-words text-sm leading-snug ${feita && !it.incluir ? "text-muted-foreground line-through" : "text-foreground"}`}>{it.rotulo}</span>
                             {rest && <span className="mt-0.5 block text-[0.72rem] text-muted-foreground">{rest}</span>}
                           </span>
-                          {it.link && <ArrowUpRight size={13} className="mt-1 shrink-0 opacity-0 transition group-hover:opacity-100" style={{ color: "var(--tone)" }} />}
+                          {it.link && !acts && <ArrowUpRight size={13} className="mt-1 shrink-0 opacity-0 transition group-hover:opacity-100" style={{ color: "var(--tone)" }} />}
                         </button>
                       </li>
                     );
@@ -112,8 +122,11 @@ export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: 
         </div>
 
         <footer className="relative flex items-center justify-between gap-3 border-t border-white/10 px-6 py-3 text-[0.7rem] text-muted-foreground sm:px-8">
-          <span>Toque num item para abrir · Esc fecha</span>
-          <button onClick={onClose} className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-foreground transition hover:border-cyan/50 hover:text-cyan">Fechar</button>
+          <span>{sections.some((x) => x.itens.some((y) => y.marcar || y.incluir)) ? "Toque para marcar ou incluir · Esc fecha" : "Toque num item para abrir · Esc fecha"}</span>
+          <span className="flex items-center gap-2">
+            {panel.abrir && <button onClick={() => { onClose(); onOpen(panel.abrir!.para); }} className="rounded-full border border-cyan/40 bg-cyan/10 px-4 py-1.5 text-xs font-medium text-cyan transition hover:bg-cyan/20">{panel.abrir.rotulo}</button>}
+            <button onClick={onClose} className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-foreground transition hover:border-cyan/50 hover:text-cyan">Fechar</button>
+          </span>
         </footer>
       </div>
     </div>,
