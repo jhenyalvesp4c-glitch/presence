@@ -22,7 +22,7 @@ const rail = [
   { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" as const },
   { Icon: BarChart3, label: "Progresso", c: "violet" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" as const },
-  { Icon: Settings, label: "Ajustes", c: "cyan" },
+  { Icon: Settings, label: "Configurações", c: "cyan", to: "/configuracoes" as const },
   { Icon: Brain, label: "Segundo cérebro", c: "violet", to: "/cerebro" as const },
 ];
 

@@ -65,6 +65,7 @@ Regras de fala:
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
 - Se ela disser como quer ser chamada, como prefere que você fale ou como começar a conversa, use ajustar_perfil. Quando ela contar algo duradouro sobre si ou pedir "lembra que…", use lembrar; "esquece que…", use esquecer.
+- WhatsApp (somente leitura, só no app do computador): "o que o grupo X mandou", "tem mensagem no grupo?", "analise as conversas" → use whatsapp_ler (com so_novas=true para o que ainda não foi lido); "alguém me marcou?" → whatsapp_mencoes; "quais conversas têm novidade" → whatsapp_conversas. Primeiro diga se há mensagens e quantas; leia citando quem falou e o que disse; se forem muitas, resuma e ofereça ler tudo. Se a ponte estiver desligada, diga isso e que ela liga em Configurações. Você NUNCA envia mensagens no WhatsApp.
 - Para abrir telas use abrir_pagina. Quando a pessoa se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
 ${name ? `Trate a pessoa pelo nome de vez em quando, sem exagero.` : ""}`;
@@ -118,10 +119,27 @@ export const TOOLS = [
     nome: { type: "string", description: "Como chamá-la." }, jeito: { type: "string", description: "Tom e jeito de conversar, em uma frase." },
     saudacao: { type: "string", enum: ["esperar", "saudacao", "saudacao_hoje", "saudacao_pergunta"], description: "Como iniciar a conversa." },
   } }),
+  fn("whatsapp_conversas", "Lista as conversas e grupos do WhatsApp da pessoa, com quantas mensagens novas há em cada (novas = ainda não lidas por você). Só funciona no app do computador, com a ponte do WhatsApp ligada.", { type: "object", properties: { busca: { type: "string", description: "Parte do nome de um grupo ou contato (opcional)." } } }),
+  fn("whatsapp_ler", "Lê as mensagens de uma conversa ou grupo do WhatsApp (somente leitura). Use para 'o que o grupo X mandou', 'tem mensagem no grupo?', 'analise as conversas'. Com so_novas=true traz só o que ainda não foi lido por você e marca como lido AQUI (não muda nada no WhatsApp dela).", { type: "object", properties: {
+    conversa: { type: "string", description: "Nome (aproximado) do grupo ou contato." },
+    desde: { type: "string", description: "hoje, ontem, esta semana ou AAAA-MM-DD (opcional)." },
+    so_novas: { type: "boolean", description: "true = só as mensagens novas desde a última leitura." },
+    buscar: { type: "string", description: "Palavra a procurar nas mensagens (opcional)." },
+    limite: { type: "number", description: "Quantas mensagens trazer (padrão 30, máximo 60)." },
+  }, required: ["conversa"] }),
+  fn("whatsapp_mencoes", "Mostra as mensagens em que alguém marcou a pessoa ou respondeu a uma mensagem dela no WhatsApp.", { type: "object", properties: { desde: { type: "string", description: "hoje, ontem, esta semana ou AAAA-MM-DD. Padrão: últimas 24 horas." } } }),
   fn("encerrar_conversa", "Encerra a conversa por voz quando a pessoa se despedir ou pedir para parar.", { type: "object", properties: {} }),
 ];
 
 type Emit = (e: VoiceEvent) => void;
+type WaMessage = { sender_name: string; from_me: boolean; ts: number; text: string; kind: string; mentions_me: boolean; reply_to_me: boolean; is_group: boolean; chat_name: string };
+/** "hoje", "ontem", "esta semana"… ou AAAA-MM-DD → segundos desde 1970 (início do dia, horário de Brasília). */
+function sinceOf(v: unknown, today: string): number | undefined {
+  const t = String(v ?? "").trim();
+  if (!t) return undefined;
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : periodOf(t, today)?.from;
+  return day ? Math.floor(new Date(`${day}T00:00:00-03:00`).getTime() / 1000) : undefined;
+}
 const parseArgs = (s: string): Record<string, unknown> => { try { const v = JSON.parse(s || "{}"); return v && typeof v === "object" ? (v as Record<string, unknown>) : {}; } catch { return {}; } };
 const resolveDay = (q: unknown, today: string) => {
   const s = String(q ?? "hoje").toLowerCase();
@@ -314,6 +332,39 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       await saveBriefing(next, false);
       cacheByOwner.delete(ownerId());
       return { ok: true };
+    }
+
+    case "whatsapp_conversas": {
+      const { bridge } = await import("../whatsapp/bridge");
+      const r = await bridge<{ chats: { name: string; is_group: boolean; novas: number; last_ts: number }[] }>(`/chats?q=${encodeURIComponent(String(args["busca"] ?? ""))}&limit=15`);
+      if (!r.ok) return { ok: false, erro: r.erro };
+      return { ok: true, conversas: r.data.chats.map((c) => ({ nome: c.name, tipo: c.is_group ? "grupo" : "contato", mensagens_novas: c.novas, ultima: c.last_ts ? new Date(c.last_ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "sem mensagens guardadas" })), total_novas: r.data.chats.reduce((n, c) => n + c.novas, 0) };
+    }
+
+    case "whatsapp_ler": {
+      const { bridge } = await import("../whatsapp/bridge");
+      const since = sinceOf(args["desde"], ctx.today);
+      const params = new URLSearchParams({ chat: String(args["conversa"] ?? ""), limit: String(Math.min(60, Math.max(1, Number(args["limite"]) || 30))) });
+      if (since) params.set("since", String(since));
+      if (args["so_novas"] === true) { params.set("novas", "1"); params.set("marcar", "1"); }
+      if (args["buscar"]) params.set("q", String(args["buscar"]));
+      const r = await bridge<{ ok: boolean; erro?: string; opcoes?: string[]; chat?: { name: string; is_group: boolean }; messages?: WaMessage[]; total?: number }>(`/messages?${params}`);
+      if (!r.ok) return { ok: false, erro: r.erro };
+      if (!r.data.ok) return { ok: false, erro: r.data.erro, ...(r.data.opcoes ? { opcoes: r.data.opcoes } : {}) };
+      const msgs = r.data.messages ?? [];
+      const hhmmBR = (ts: number) => new Date(ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      if (msgs.length) emit({ t: "painel", p: { titulo: `WhatsApp · ${r.data.chat?.name ?? ""}`, secoes: [{ titulo: `${msgs.length} mensagem(ns)`, itens: msgs.map((m) => ({ rotulo: `${m.from_me ? "Você" : (m.sender_name || "Alguém")}: ${m.text || `(${m.kind})`}`.slice(0, 300), detalhe: hhmmBR(m.ts) + (m.mentions_me ? " · marcou você" : m.reply_to_me ? " · respondeu a você" : "") })) }] } });
+      return { ok: true, conversa: r.data.chat?.name, grupo: !!r.data.chat?.is_group, total: msgs.length, mensagens: msgs.map((m) => ({ quem: m.from_me ? "Você" : (m.sender_name || "Alguém"), quando: hhmmBR(m.ts), texto: (m.text || `(${m.kind})`).slice(0, 500), marcou_voce: m.mentions_me || m.reply_to_me })),
+        dica: msgs.length ? "Diga quantas mensagens há e leia: cite quem falou e o que disse. Se forem muitas, resuma e ofereça ler tudo." : "Diga que não há mensagens nesse período." };
+    }
+
+    case "whatsapp_mencoes": {
+      const { bridge } = await import("../whatsapp/bridge");
+      const since = sinceOf(args["desde"], ctx.today) ?? Math.floor(Date.now() / 1000) - 86400;
+      const r = await bridge<{ mentions: WaMessage[] }>(`/mentions?after=${since}&limit=30`);
+      if (!r.ok) return { ok: false, erro: r.erro };
+      const m = r.data.mentions;
+      return { ok: true, total: m.length, mencoes: m.map((x) => ({ quem: x.sender_name || "Alguém", onde: x.is_group ? `grupo ${x.chat_name}` : "conversa direta", texto: (x.text || `(${x.kind})`).slice(0, 400), tipo: x.mentions_me ? "marcou você" : "respondeu a você" })) };
     }
 
     case "documentar": {

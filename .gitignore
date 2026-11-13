@@ -33,3 +33,6 @@ dist-ssr
 
 # Env
 .env
+
+# Ponte do WhatsApp: dependências locais
+whatsapp-bridge/node_modules

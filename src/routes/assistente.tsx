@@ -37,7 +37,7 @@ export const Route = createFileRoute("/assistente")({
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
-const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" }[] = [
+const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" | "/configuracoes" }[] = [
   { Icon: Home, label: "Início", c: "cyan" },
   { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/projetos" },
   { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" },
@@ -46,9 +46,9 @@ const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/pro
   { Icon: BarChart3, label: "Progresso", c: "violet" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" },
   { Icon: Brain, label: "Segundo cérebro", c: "violet", to: "/cerebro" },
-  { Icon: Puzzle, label: "Integrações", c: "cyan" },
+  { Icon: Puzzle, label: "Integrações", c: "cyan", to: "/configuracoes" },
   { Icon: Workflow, label: "Fluxos", c: "violet" },
-  { Icon: Settings, label: "Ajustes", c: "cyan" },
+  { Icon: Settings, label: "Configurações", c: "cyan", to: "/configuracoes" },
 ];
 
 
@@ -73,7 +73,7 @@ const cards = [
 
 function RailIcon({ Icon, label, c, on = false, to, onClick, delay = "0s" }: {
   Icon: typeof Home; label: string; c: string; on?: boolean;
-  to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" | undefined; onClick?: () => void; delay?: string;
+  to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" | "/configuracoes" | undefined; onClick?: () => void; delay?: string;
 
 }) {
   const cls = `group relative grid h-10 w-10 place-items-center rounded-full transition duration-500 hover:-translate-y-0.5 hover:scale-[1.14] ${

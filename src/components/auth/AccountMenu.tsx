@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { LogOut, Sparkles } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { LogOut, Settings, Sparkles } from "lucide-react";
 import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
 
 import { useAuth } from "@/lib/auth";
@@ -27,6 +28,7 @@ export function AccountMenu({ below = false }: { below?: boolean }) {
           <p className="truncate text-sm font-medium">{account.name}</p>
           <p className="truncate text-xs text-muted-foreground">{account.email}</p>
           {briefing?.available && <button onClick={() => { setOpen(false); openBriefing(); }} data-testid="conta-briefing" className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-white/10 py-1.5 text-xs transition hover:border-violet/50 hover:text-violet"><Sparkles size={13} /> Meu briefing</button>}
+          <Link to="/configuracoes" onClick={() => setOpen(false)} data-testid="conta-config" className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-white/10 py-1.5 text-xs transition hover:border-cyan/50 hover:text-cyan"><Settings size={13} /> Configurações</Link>
           <button onClick={() => void signOut()} className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-white/10 py-1.5 text-xs transition hover:border-destructive/50 hover:text-destructive" data-testid="conta-sair"><LogOut size={13} /> Sair</button>
         </div>
       )}

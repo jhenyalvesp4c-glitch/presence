@@ -14,6 +14,7 @@ import { HealthPreviewProvider } from "@/components/health-preview-provider";
 import { OrionDock } from "@/components/orion/OrionDock";
 import { VoiceDock } from "@/components/voice/VoiceDock";
 import { ReminderWatcher } from "@/components/reminders/ReminderWatcher";
+import { WhatsAppWatcher } from "@/components/whatsapp/WhatsAppWatcher";
 import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { ZoomHint } from "@/components/ZoomHint";
@@ -144,6 +145,7 @@ function RootComponent() {
         <OrionDock />
         <VoiceDock />
         <ReminderWatcher />
+        <WhatsAppWatcher />
       </VoiceProvider>
         <BriefingFlow />
       </BriefingProvider></AuthGate></AuthProvider>

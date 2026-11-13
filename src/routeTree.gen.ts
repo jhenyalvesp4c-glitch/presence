@@ -14,6 +14,7 @@ import { Route as AnaliseRouteImport } from './routes/analise'
 import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as CerebroRouteImport } from './routes/cerebro'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as DemandasRouteImport } from './routes/demandas'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as HabitosRouteImport } from './routes/habitos'
@@ -29,6 +30,7 @@ import { Route as TreinoRouteImport } from './routes/treino'
 import { Route as ApiMcpRouteImport } from './routes/api.mcp'
 import { Route as ApiTtsRouteImport } from './routes/api.tts'
 import { Route as ApiVozRouteImport } from './routes/api.voz'
+import { Route as ApiWhatsappRouteImport } from './routes/api.whatsapp'
 import { Route as DietaNovaRouteImport } from './routes/dieta.nova'
 import { Route as MedidasNovaRouteImport } from './routes/medidas.nova'
 import { Route as OrganizarProntoRouteImport } from './routes/organizar_.pronto'
@@ -62,6 +64,11 @@ const CalendarioRoute = CalendarioRouteImport.update({
 const CerebroRoute = CerebroRouteImport.update({
   id: '/cerebro',
   path: '/cerebro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemandasRoute = DemandasRouteImport.update({
@@ -139,6 +146,11 @@ const ApiVozRoute = ApiVozRouteImport.update({
   path: '/api/voz',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
+  id: '/api/whatsapp',
+  path: '/api/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DietaNovaRoute = DietaNovaRouteImport.update({
   id: '/dieta/nova',
   path: '/dieta/nova',
@@ -191,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
   '/cerebro': typeof CerebroRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/habitos': typeof HabitosRoute
@@ -206,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
   '/api/voz': typeof ApiVozRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
@@ -222,6 +236,7 @@ export interface FileRoutesByTo {
   '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
   '/cerebro': typeof CerebroRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/habitos': typeof HabitosRoute
@@ -237,6 +252,7 @@ export interface FileRoutesByTo {
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
   '/api/voz': typeof ApiVozRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
@@ -254,6 +270,7 @@ export interface FileRoutesById {
   '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
   '/cerebro': typeof CerebroRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/habitos': typeof HabitosRoute
@@ -269,6 +286,7 @@ export interface FileRoutesById {
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
   '/api/voz': typeof ApiVozRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
   '/dieta/nova': typeof DietaNovaRoute
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar_/pronto': typeof OrganizarProntoRoute
@@ -287,6 +305,7 @@ export interface FileRouteTypes {
     | '/assistente'
     | '/calendario'
     | '/cerebro'
+    | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
     | '/habitos'
@@ -302,6 +321,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/api/tts'
     | '/api/voz'
+    | '/api/whatsapp'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar/pronto'
@@ -318,6 +338,7 @@ export interface FileRouteTypes {
     | '/assistente'
     | '/calendario'
     | '/cerebro'
+    | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
     | '/habitos'
@@ -333,6 +354,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/api/tts'
     | '/api/voz'
+    | '/api/whatsapp'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar/pronto'
@@ -349,6 +371,7 @@ export interface FileRouteTypes {
     | '/assistente'
     | '/calendario'
     | '/cerebro'
+    | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
     | '/habitos'
@@ -364,6 +387,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/api/tts'
     | '/api/voz'
+    | '/api/whatsapp'
     | '/dieta/nova'
     | '/medidas/nova'
     | '/organizar_/pronto'
@@ -381,6 +405,7 @@ export interface RootRouteChildren {
   AssistenteRoute: typeof AssistenteRoute
   CalendarioRoute: typeof CalendarioRoute
   CerebroRoute: typeof CerebroRoute
+  ConfiguracoesRoute: typeof ConfiguracoesRoute
   DemandasRoute: typeof DemandasRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   HabitosRoute: typeof HabitosRoute
@@ -396,6 +421,7 @@ export interface RootRouteChildren {
   ApiMcpRoute: typeof ApiMcpRouteWithChildren
   ApiTtsRoute: typeof ApiTtsRoute
   ApiVozRoute: typeof ApiVozRoute
+  ApiWhatsappRoute: typeof ApiWhatsappRoute
   DietaNovaRoute: typeof DietaNovaRoute
   MedidasNovaRoute: typeof MedidasNovaRoute
   OrganizarProntoRoute: typeof OrganizarProntoRoute
@@ -441,6 +467,13 @@ declare module '@tanstack/react-router' {
       path: '/cerebro'
       fullPath: '/cerebro'
       preLoaderRoute: typeof CerebroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracoes': {
+      id: '/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demandas': {
@@ -548,6 +581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVozRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/whatsapp': {
+      id: '/api/whatsapp'
+      path: '/api/whatsapp'
+      fullPath: '/api/whatsapp'
+      preLoaderRoute: typeof ApiWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dieta/nova': {
       id: '/dieta/nova'
       path: '/dieta/nova'
@@ -631,6 +671,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssistenteRoute: AssistenteRoute,
   CalendarioRoute: CalendarioRoute,
   CerebroRoute: CerebroRoute,
+  ConfiguracoesRoute: ConfiguracoesRoute,
   DemandasRoute: DemandasRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   HabitosRoute: HabitosRoute,
@@ -646,6 +687,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMcpRoute: ApiMcpRouteWithChildren,
   ApiTtsRoute: ApiTtsRoute,
   ApiVozRoute: ApiVozRoute,
+  ApiWhatsappRoute: ApiWhatsappRoute,
   DietaNovaRoute: DietaNovaRoute,
   MedidasNovaRoute: MedidasNovaRoute,
   OrganizarProntoRoute: OrganizarProntoRoute,
