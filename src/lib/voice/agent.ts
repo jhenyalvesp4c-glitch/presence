@@ -12,6 +12,8 @@ import { contextText, DEFAULT_MODEL, type Context } from "../mcp/interpret";
 import { listCategories, listDossiers, listProjects, resolveProject } from "../mcp/lookup";
 import { OpenAIError, explain, streamChat } from "../mcp/openai";
 import { prepare } from "../mcp/plan";
+import { GREET_MARK, MEMORY_KINDS, briefingPrompt, greetingDirective, type MemoryKind } from "../briefing";
+import { addMemory, forgetMemories, loadBriefingState, saveBriefing } from "../data/briefing";
 import { isoDay, rascunhoSchema, registroSchema, weekdayPt, TIPO_LABEL, type Registro } from "../mcp/records";
 
 /* ───────────── eventos para o navegador ───────────── */
@@ -33,16 +35,21 @@ export const PAGES: Record<string, string> = {
 
 /* ───────────── contexto (com cache curto, para responder rápido) ───────────── */
 type Cached = { at: number; ctx: Context; name: string | null };
-let cache: Cached | undefined;
+/** Um cache por pessoa (nunca misturar dados de contas diferentes). */
+const cacheByOwner = new Map<string, Cached>();
 async function voiceContext(): Promise<Cached> {
+  const me = ownerId();
+  const cache = cacheByOwner.get(me);
   if (cache && Date.now() - cache.at < 60_000) { const now = new Date(); return { ...cache, ctx: { ...cache.ctx, today: isoDay(now), weekday: weekdayPt(now) } }; }
   const [projects, categories, profile] = await Promise.all([
     listProjects(), listCategories(), supabase.from("profiles").select("display_name").eq("id", ownerId()).maybeSingle(),
   ]);
   const full = await Promise.all(projects.map(async (p) => ({ ...p, dossiers: await listDossiers(p.id) })));
   const now = new Date();
-  cache = { at: Date.now(), ctx: { today: isoDay(now), weekday: weekdayPt(now), projects: full, categories }, name: (profile.data as { display_name: string | null } | null)?.display_name ?? null };
-  return cache;
+  const fresh: Cached = { at: Date.now(), ctx: { today: isoDay(now), weekday: weekdayPt(now), projects: full, categories }, name: (profile.data as { display_name: string | null } | null)?.display_name ?? null };
+  if (cacheByOwner.size > 50) cacheByOwner.clear();
+  cacheByOwner.set(me, fresh);
+  return fresh;
 }
 
 const PERSONA = (name: string | null) => `Você é a Presence, a assistente pessoal${name ? ` de ${name}` : ""}, no estilo do Jarvis: elegante, calma, muito eficiente e com um leve toque de humor sofisticado. Está conversando POR VOZ.
@@ -57,6 +64,7 @@ Regras de fala:
 - Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
+- Se ela disser como quer ser chamada, como prefere que você fale ou como começar a conversa, use ajustar_perfil. Quando ela contar algo duradouro sobre si ou pedir "lembra que…", use lembrar; "esquece que…", use esquecer.
 - Para abrir telas use abrir_pagina. Quando a usuária se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
 ${name ? `Trate a usuária pelo nome de vez em quando, sem exagero.` : ""}`;
@@ -101,6 +109,15 @@ export const TOOLS = [
     texto: { type: "string", description: "Filtra por palavra no título/projeto/polo (opcional)." },
   } }),
   fn("documentar", "Guarda uma anotação no segundo cérebro (Orion) com a data do acontecimento.", { type: "object", properties: { texto: { type: "string" }, data: { type: "string", description: "AAAA-MM-DD; padrão hoje." } }, required: ["texto"] }),
+  fn("lembrar", "Guarda na memória algo DURADOURO sobre a pessoa (preferência, rotina, regra, fato do trabalho, pessoa importante) para lembrar nas próximas conversas. Não use para pedidos do momento.", { type: "object", properties: {
+    texto: { type: "string", description: "A informação, em uma frase clara, na 3ª pessoa. Ex.: Prefere resumos curtos pela manhã." },
+    tipo: { type: "string", enum: MEMORY_KINDS, description: "aprendizado, preferencia, rotina, pessoa ou regra." },
+  }, required: ["texto"] }),
+  fn("esquecer", "Apaga da memória o que combina com um trecho, quando a pessoa pedir para você esquecer algo.", { type: "object", properties: { sobre: { type: "string", description: "Palavra ou trecho do que deve ser esquecido." } }, required: ["sobre"] }),
+  fn("ajustar_perfil", "Muda como a pessoa quer ser chamada, o jeito de você conversar ou como começar a conversa (quando ela pedir).", { type: "object", properties: {
+    nome: { type: "string", description: "Como chamá-la." }, jeito: { type: "string", description: "Tom e jeito de conversar, em uma frase." },
+    saudacao: { type: "string", enum: ["esperar", "saudacao", "saudacao_hoje", "saudacao_pergunta"], description: "Como iniciar a conversa." },
+  } }),
   fn("encerrar_conversa", "Encerra a conversa por voz quando a usuária se despedir ou pedir para parar.", { type: "object", properties: {} }),
 ];
 
@@ -275,6 +292,30 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       return { ok: true, ...out, dica: "Responda com as contagens e os destaques; se houver muitos, cite os principais. Cheque o campo 'periodo'." };
     }
 
+    case "lembrar": {
+      const kind = MEMORY_KINDS.includes(String(args["tipo"]) as MemoryKind) ? (String(args["tipo"]) as MemoryKind) : "aprendizado";
+      const r = await addMemory(String(args["texto"] ?? ""), kind, "conversa");
+      return r.ok ? { ok: true, guardado: true } : { ok: true, guardado: false, motivo: r.motivo === "ja_sei" ? "Já sabia disso." : r.motivo === "indisponivel" ? "A memória ainda não está ativada." : "Não guardei." };
+    }
+
+    case "esquecer": {
+      const n = await forgetMemories(String(args["sobre"] ?? ""));
+      return n ? { ok: true, apagados: n } : { ok: false, erro: "Não encontrei nada na memória sobre isso." };
+    }
+
+    case "ajustar_perfil": {
+      const st = await loadBriefingState();
+      if (!st.available) return { ok: false, erro: "O briefing ainda não está ativado." };
+      const cur = st.briefing ?? { call_name: "", tone: "", greeting: "esperar" as const, greeting_note: "", work: "", biggest_demand: "", routine: "", goals: "", preferences: "", completed_at: null };
+      const g = String(args["saudacao"] ?? "");
+      const next = { ...cur,
+        ...(args["nome"] ? { call_name: String(args["nome"]) } : {}), ...(args["jeito"] ? { tone: String(args["jeito"]) } : {}),
+        ...(["esperar", "saudacao", "saudacao_hoje", "saudacao_pergunta"].includes(g) ? { greeting: g as typeof cur.greeting } : {}) };
+      await saveBriefing(next, false);
+      cacheByOwner.delete(ownerId());
+      return { ok: true };
+    }
+
     case "documentar": {
       const texto = String(args["texto"] ?? "").trim().slice(0, 6000);
       if (!texto) return { ok: false, erro: "Sem texto para guardar." };
@@ -293,9 +334,14 @@ export async function runAgent(history: Turn[], emit: Emit): Promise<void> {
   if (!process.env["OPENAI_API_KEY"]) { emit({ t: "erro", m: "A conversa por voz precisa da OPENAI_API_KEY no servidor." }); return; }
   const model = process.env["OPENAI_VOICE_MODEL"]?.trim() || process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
   const c = await voiceContext();
+  const st = await loadBriefingState().catch(() => ({ available: false, briefing: null, memories: [] }));
+  const starting = history.at(-1)?.role === "user" && history.at(-1)?.content === GREET_MARK;
+  const directive = starting ? greetingDirective(st.briefing) : "";
+  if (starting && !directive) { emit({ t: "fim" }); return; } // quer esperar: não fala nada
+  const known = briefingPrompt(st.briefing, st.memories);
   const messages: Record<string, unknown>[] = [
-    { role: "system", content: `${PERSONA(c.name)}\n\n${contextText(c.ctx)}` },
-    ...history.slice(-12).map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })),
+    { role: "system", content: `${PERSONA(st.briefing?.call_name || c.name)}${known ? `\n\n${known}` : ""}${directive ? `\n\nAGORA: ${directive}` : ""}\n\n${contextText(c.ctx)}` },
+    ...history.slice(-12).map((m) => ({ role: m.role, content: m.content === GREET_MARK ? "(a conversa por voz acabou de começar)" : m.content.slice(0, 2000) })),
   ];
   try {
     for (let round = 0; round < 5; round++) {

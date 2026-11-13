@@ -11,6 +11,7 @@ import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { ActionChooser, type HomeAction } from "@/components/home/ActionChooser";
 import { OrionPanel } from "@/components/orion/OrionPanel";
 import { AccountMenu } from "@/components/auth/AccountMenu";
+import { useBriefingSafe } from "@/lib/use-briefing";
 import { useVoice } from "@/lib/voice/use-voice";
 import { useHome } from "@/lib/use-home";
 import { useSpeech } from "@/lib/use-speech";
@@ -110,6 +111,7 @@ function Assistente() {
 
   const home = useHome();
   const voice = useVoice();
+  const briefing = useBriefingSafe();
   // Central de entrada: texto, prints e arquivos interpretados e levados ao módulo certo.
   // Painel aberto abaixo do botão: registrar demanda (Central de entrada) ou Orion (documentar / perguntar).
   const [panel, setPanel] = useState<HomeAction | null>(null);
@@ -257,6 +259,19 @@ function Assistente() {
               <p className="text-center text-xs text-muted-foreground">
                 {home.pendingCount === 0 ? "Nenhuma demanda em aberto" : `${home.pendingCount} demanda${home.pendingCount > 1 ? "s" : ""} em aberto`}
               </p>
+            )}
+
+            {briefing?.available && (
+              <button onClick={briefing.openFlow} data-testid="briefing-abrir"
+                className={`group relative mx-auto flex w-full max-w-xl items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left transition hover:-translate-y-0.5 ${briefing.completed ? "border-white/10 bg-white/[0.03]" : "border-violet/40 bg-[color-mix(in_oklab,var(--violet)_10%,transparent)] shadow-[0_0_40px_-18px_var(--violet)]"}`}>
+                {!briefing.completed && <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{ animation: "vp-sweep 4s ease-in-out infinite" }} />}
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-violet/15 text-violet"><Sparkles size={18} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{briefing.completed ? "Meu briefing" : "Personalize a Presence"}</span>
+                  <span className="block text-xs text-muted-foreground">{briefing.completed ? "Veja ou mude como ela fala com você e o que já aprendeu." : "Responda umas perguntas rápidas e ela aprende o seu jeito, o seu trabalho e como começar a conversa."}</span>
+                </span>
+                <ArrowRight size={16} className="shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
+              </button>
             )}
 
             <div ref={panelRef}>

@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useRouter } from "@tanstack/react-router";
 
 import { authHeaders } from "@/lib/auth-token";
+import { GREET_MARK } from "@/lib/briefing";
+import { useBriefingSafe } from "@/lib/use-briefing";
 import { ownerId, supabase } from "@/lib/supabase";
 import { transcribeAudio } from "@/lib/audio.functions";
 import type { Panel, Turn, VoiceEvent } from "./agent";
@@ -309,7 +311,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     const my = ++turn.current;
     stopListening();
     const sp = spk(); sp.reset();
-    setUserText(text); setBotText(""); setP("thinking");
+    const greeting = text === GREET_MARK;
+    setUserText(greeting ? "" : text); setBotText(""); setP("thinking");
     history.current = [...history.current, { role: "user" as const, content: text }].slice(-16);
     const ctrl = new AbortController(); abort.current = ctrl;
     let said = "", buffer = "", first = true;
@@ -342,7 +345,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       say(takeSentences(buffer, { first, flush: true }).chunks);
       if (said.trim()) {
         history.current = [...history.current, { role: "assistant" as const, content: said.trim() }].slice(-16);
-        void supabase.from("assistant_messages").insert([{ user_id: ownerId(), role: "user", content: text }, { user_id: ownerId(), role: "assistant", content: said.trim() }]).then(() => undefined);
+        void supabase.from("assistant_messages").insert([...(greeting ? [] : [{ user_id: ownerId(), role: "user", content: text }]), { user_id: ownerId(), role: "assistant", content: said.trim() }]).then(() => undefined);
       }
     } catch (e) {
       if (ctrl.signal.aborted || turn.current !== my) return;
@@ -357,11 +360,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, [endSession, listen, router, stopListening]);
   askRef.current = ask;
 
+  const briefingCtx = useBriefingSafe();
+  const greetRef = useRef<string>("esperar");
+  greetRef.current = briefingCtx?.briefing?.greeting ?? "esperar";
   const start = useCallback(() => {
     activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
     spk().unlock();
-    listen();
-  }, [listen]);
+    // Se a pessoa pediu no briefing que a Presence comece a conversa, ela fala primeiro.
+    if (greetRef.current !== "esperar") void ask(GREET_MARK); else listen();
+  }, [listen, ask]);
 
   const stop = useCallback(() => { turn.current++; endSession(); }, [endSession]);
 

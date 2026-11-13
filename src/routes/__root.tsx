@@ -20,6 +20,8 @@ import { ZoomHint } from "@/components/ZoomHint";
 import { VoiceProvider } from "@/lib/voice/use-voice";
 import { AuthProvider } from "@/lib/auth";
 import { AuthGate } from "@/components/auth/AuthGate";
+import { BriefingProvider } from "@/lib/use-briefing";
+import { BriefingFlow } from "@/components/briefing/BriefingFlow";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -133,7 +135,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <AuthProvider><AuthGate>
+      <AuthProvider><AuthGate><BriefingProvider>
       <VoiceProvider>
         <GlobalRail />
         <MobileTabBar />
@@ -143,7 +145,8 @@ function RootComponent() {
         <VoiceDock />
         <ReminderWatcher />
       </VoiceProvider>
-      </AuthGate></AuthProvider>
+        <BriefingFlow />
+      </BriefingProvider></AuthGate></AuthProvider>
       <Toaster position="top-center" theme="dark" />
     </QueryClientProvider>
   );
