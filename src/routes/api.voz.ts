@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/voz")({
           const { streamChat } = await import("@/lib/mcp/openai");
           const t0 = Date.now();
           let first = 0;
-          const r = await streamChat({ model, messages: [{ role: "user", content: "Responda só: ok" }], max_completion_tokens: 20, reasoning_effort: "low" }, () => { if (!first) first = Date.now() - t0; });
+          const r = await streamChat({ model, messages: [{ role: "user", content: "Responda só: ok" }], max_completion_tokens: 20, reasoning_effort: "low", tools: [{ type: "function", function: { name: "ping", description: "teste", parameters: { type: "object", properties: {} } } }], tool_choice: "auto" }, () => { if (!first) first = Date.now() - t0; });
           return out({ ok: !!r.text, modelo: model, resposta: r.text.slice(0, 40), primeiro_texto_ms: first, total_ms: Date.now() - t0 });
         } catch (e) {
           const { OpenAIError, explain } = await import("@/lib/mcp/openai");

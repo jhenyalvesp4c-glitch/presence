@@ -80,14 +80,21 @@ export type ChatCall = { id: string; name: string; args: string };
 export async function streamChat(body: Record<string, unknown>, onText: (d: string) => void, env: Record<string, string | undefined> = process.env): Promise<{ text: string; calls: ChatCall[] }> {
   const params: Record<string, unknown> = { ...body, stream: true };
   let res: Response | undefined;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  let triedDrop = false;
+  const effortLadder = ["none", "minimal"];
+  for (let attempt = 0; attempt < 6; attempt++) {
     res = await fetch(`${baseUrl(env)}/chat/completions`, {
       method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${env["OPENAI_API_KEY"] ?? ""}` },
       body: JSON.stringify(params), signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (res.status === 400) {
       const peek = await res.clone().text();
-      if (/reasoning_effort/i.test(peek) && "reasoning_effort" in params) { delete params["reasoning_effort"]; continue; }
+      if (/reasoning/i.test(peek)) {
+        // "Function tools with reasoning effort are not supported…": primeiro tira o parâmetro; se o modelo ainda raciocina por padrão, pede "none"/"minimal".
+        if ("reasoning_effort" in params && params["reasoning_effort"] !== "none" && !triedDrop) { delete params["reasoning_effort"]; triedDrop = true; continue; }
+        const next = effortLadder.shift();
+        if (next) { params["reasoning_effort"] = next; continue; }
+      }
       if (/max_completion_tokens/i.test(peek) && "max_completion_tokens" in params) { params["max_tokens"] = params["max_completion_tokens"]; delete params["max_completion_tokens"]; continue; }
     }
     if ((res.status === 429 || res.status >= 500) && attempt === 0) { await sleep(800); continue; }
