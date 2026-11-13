@@ -3,7 +3,7 @@
  * texto em demand_materials, um registro por arquivo em demand_files e o arquivo em si no bucket
  * privado presence-app-demand-files. A chave é `${projeto}:${código da demanda}`.
  */
-import { SINGLE_USER_ID, must, supabase } from "./data/db";
+import { ownerId, must, supabase } from "./data/db";
 
 /**
  * Um arquivo da demanda. Arquivo novo (ainda não enviado) traz `blob`; o que já está no banco traz
@@ -44,7 +44,7 @@ export function parseKey(key: string): { projectId: string; code: string } {
 /** "#G040" -> "G040": nomes de pasta sem caracteres estranhos. */
 const slug = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, "") || "x";
 const safeName = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9._-]+/g, "_").slice(-120) || "arquivo";
-export const folderOf = (projectId: string, code: string) => `${SINGLE_USER_ID}/${slug(projectId)}/${slug(code)}`;
+export const folderOf = (projectId: string, code: string) => `${ownerId()}/${slug(projectId)}/${slug(code)}`;
 export const pathOf = (projectId: string, code: string, f: Pick<MaterialFile, "id" | "name">) => `${folderOf(projectId, code)}/${slug(f.id)}-${safeName(f.name)}`;
 
 /* ───────────── banco ───────────── */
@@ -145,7 +145,7 @@ export async function deleteMaterials(key: string): Promise<void> {
 
 /** Projeto excluído: apaga o material de todas as demandas dele. */
 export async function deleteProjectMaterials(projectId: string): Promise<void> {
-  const root = `${SINGLE_USER_ID}/${slug(projectId)}`;
+  const root = `${ownerId()}/${slug(projectId)}`;
   const dirs = await supabase.storage.from(BUCKET).list(root, { limit: 1000 });
   for (const d of dirs.data ?? []) await removeFolder(`${root}/${d.name}`);
   must(await supabase.from("demand_files").delete().eq("project_id", projectId).select("id"));

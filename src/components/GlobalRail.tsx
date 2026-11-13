@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
+import { AccountMenu } from "@/components/auth/AccountMenu";
 import { Brain, CalendarCheck, Calendar, ClipboardList, Heart, Home, ListChecks, Sprout } from "lucide-react";
 
 /** Telas que já desenham a própria barra lateral (assistente, PlanShell). Nas demais, a barra global aparece. */
@@ -40,6 +41,7 @@ export function GlobalRail() {
           </div>
         );
       })}
+      <div className="absolute bottom-24 left-3"><AccountMenu /></div>
     </aside>
   );
 }

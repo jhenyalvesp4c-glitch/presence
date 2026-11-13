@@ -1,5 +1,5 @@
 /** Documentação (Biblioteca): documentos e pastas editáveis, salvos no banco (library_docs / library_folders). */
-import { must, supabase, SINGLE_USER_ID } from "./db";
+import { must, supabase, ownerId } from "./db";
 import { BUCKET, type Attachment } from "./brain";
 
 export type DocRow = {
@@ -22,7 +22,7 @@ export async function loadLibraryRows(): Promise<{ docs: DocRow[]; folders: Fold
 
 export async function saveDocRow(row: DocRow) {
   must(await supabase.from("library_docs").upsert({
-    user_id: SINGLE_USER_ID, ...row, title: row.title.slice(0, 200), description: row.description.slice(0, 6000), ai_summary: row.ai_summary.slice(0, 20000),
+    user_id: ownerId(), ...row, title: row.title.slice(0, 200), description: row.description.slice(0, 6000), ai_summary: row.ai_summary.slice(0, 20000),
   }, { onConflict: "user_id,id" }).select("id"));
 }
 
@@ -38,5 +38,5 @@ export async function removeFiles(paths: string[]) {
 }
 
 export async function saveFolderRow(f: FolderRow) {
-  must(await supabase.from("library_folders").upsert({ user_id: SINGLE_USER_ID, ...f }, { onConflict: "user_id,id" }).select("id"));
+  must(await supabase.from("library_folders").upsert({ user_id: ownerId(), ...f }, { onConflict: "user_id,id" }).select("id"));
 }

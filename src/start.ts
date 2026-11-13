@@ -24,6 +24,21 @@ const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
+// Login: o navegador manda o token em todo pedido a uma função do servidor; o servidor valida e roda com o acesso dessa pessoa.
+const authFnMiddleware = createMiddleware({ type: "function" })
+  .client(async ({ next }) => {
+    const { accessToken } = await import("./lib/auth-token");
+    const token = await accessToken();
+    return next({ headers: token ? { authorization: `Bearer ${token}` } : {} });
+  })
+  .server(async ({ next }) => {
+    const [{ getRequest }, auth] = await Promise.all([import("@tanstack/react-start/server"), import("./lib/server-auth")]);
+    const scope = await auth.resolveScope(auth.bearer(getRequest()));
+    if (!scope) throw new Response(JSON.stringify({ error: "Entre na sua conta para continuar." }), { status: 401, headers: { "content-type": "application/json" } });
+    return auth.runWithScope(scope, () => next());
+  });
+
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware, csrfMiddleware],
+  functionMiddleware: [authFnMiddleware],
 }));

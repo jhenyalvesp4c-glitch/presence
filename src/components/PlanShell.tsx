@@ -5,6 +5,7 @@ import {
   Settings, ShowerHead, Sprout, Star, Sun, Utensils, LayoutGrid, Activity as ActivityIcon,
 } from "lucide-react";
 import type { IconKey } from "@/lib/plan-data";
+import { AccountMenu } from "@/components/auth/AccountMenu";
 
 export const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 export const colorVar = (c: string) => (c === "amber" ? "oklch(0.8 0.15 75)" : c === "rose" ? "oklch(0.7 0.18 10)" : `var(--${c})`);
@@ -53,6 +54,7 @@ export function PlanShell({ children, active = 1 }: { children: ReactNode; activ
               </div>
             );
           })}
+          <div className="absolute bottom-24 left-3"><AccountMenu /></div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col gap-5 pb-4">

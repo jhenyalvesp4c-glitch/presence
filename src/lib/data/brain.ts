@@ -1,6 +1,6 @@
 /** Segundo cérebro (Orion): anotações, arquivos e espelhos da Documentação (presence_app.brain_entries + Storage). */
 import { mentionedDossiers } from "../orion";
-import { must, supabase, SINGLE_USER_ID } from "./db";
+import { must, supabase, ownerId } from "./db";
 
 export const BUCKET = "presence-app-brain-files";
 export type Attachment = { path: string; name: string; mime: string; size: number };
@@ -40,7 +40,7 @@ export async function uploadFiles(folder: string, files: NewFile[]): Promise<Att
   const done: Attachment[] = [];
   try {
     for (const f of files) {
-      const path = `${SINGLE_USER_ID}/${folder}/${Date.now().toString(36)}${done.length}-${safeName(f.name)}`;
+      const path = `${ownerId()}/${folder}/${Date.now().toString(36)}${done.length}-${safeName(f.name)}`;
       const up = await supabase.storage.from(BUCKET).upload(path, f.blob, { contentType: f.mime || "application/octet-stream", upsert: true });
       if (up.error) throw new Error(`Não consegui guardar "${f.name}": ${up.error.message}`);
       done.push({ path, name: f.name, mime: f.mime, size: f.blob.size });
@@ -63,7 +63,7 @@ export async function addEntry(input: { text: string; date?: string; title?: str
   try {
     attachments.push(...(await uploadFiles(id, files)));
     const row = must(await supabase.from("brain_entries").insert({
-      id, user_id: SINGLE_USER_ID, text: clean, title: (input.title ?? "").slice(0, 200), entry_date: input.date || todayIso(),
+      id, user_id: ownerId(), text: clean, title: (input.title ?? "").slice(0, 200), entry_date: input.date || todayIso(),
       dossier_names: mentionedDossiers(`${clean} ${input.title ?? ""} ${files.map((f) => f.name).join(" ")}`, names),
       attachments, ai_summary: (input.summary ?? "").slice(0, 20000),
     }).select(COLS).single()) as Row;
@@ -110,7 +110,7 @@ export async function upsertMirrors(list: Mirror[]) {
   if (!list.length) return;
   const names = await dossierNames();
   const rows = list.map((m) => ({
-    user_id: SINGLE_USER_ID, ref_id: m.refId, source: "documentacao", title: m.title.slice(0, 200), text: m.text.slice(0, 6000),
+    user_id: ownerId(), ref_id: m.refId, source: "documentacao", title: m.title.slice(0, 200), text: m.text.slice(0, 6000),
     dossier_names: [...new Set([...(m.dossier ? [m.dossier] : []), ...mentionedDossiers(m.text, names)])],
     attachments: m.attachments ?? [], ai_summary: (m.summary ?? "").slice(0, 20000),
   }));
@@ -119,7 +119,7 @@ export async function upsertMirrors(list: Mirror[]) {
 
 export async function deleteMirrors(refIds: string[]) {
   if (!refIds.length) return;
-  must(await supabase.from("brain_entries").delete().eq("user_id", SINGLE_USER_ID).in("ref_id", refIds).select("id"));
+  must(await supabase.from("brain_entries").delete().eq("user_id", ownerId()).in("ref_id", refIds).select("id"));
 }
 
 const mirrorHash = new Map<string, string>();

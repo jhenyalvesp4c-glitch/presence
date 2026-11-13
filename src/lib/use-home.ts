@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { supabase, SINGLE_USER_ID, type AssistantMessage, type Demand } from "./supabase";
+import { supabase, ownerId, type AssistantMessage, type Demand } from "./supabase";
 import { askAssistant } from "./assistant.functions";
 
 /** Dados e ações da página principal: perfil, conversa com a assistente e demandas. */
@@ -23,7 +23,7 @@ export function useHome() {
     let cancelled = false;
     (async () => {
       const [{ data: profile }, { data: msgs }] = await Promise.all([
-        supabase.from("profiles").select("display_name").eq("id", SINGLE_USER_ID).maybeSingle(),
+        supabase.from("profiles").select("display_name").eq("id", ownerId()).maybeSingle(),
         supabase
           .from("assistant_messages")
           .select("id, role, content, created_at")
@@ -72,7 +72,7 @@ export function useHome() {
     async (title: string, source: Demand["source"]) => {
       const { data, error } = await supabase
         .from("demands")
-        .insert({ user_id: SINGLE_USER_ID, title: title.trim().slice(0, 300), source })
+        .insert({ user_id: ownerId(), title: title.trim().slice(0, 300), source })
         .select("id, title, description, source, status, created_at")
         .single();
       if (error) {
@@ -86,7 +86,7 @@ export function useHome() {
   );
 
   const clearConversation = useCallback(async () => {
-    await supabase.from("assistant_messages").delete().eq("user_id", SINGLE_USER_ID);
+    await supabase.from("assistant_messages").delete().eq("user_id", ownerId());
     setMessages([]);
   }, []);
 

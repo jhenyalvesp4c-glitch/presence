@@ -1,3 +1,4 @@
+import { ownerId, SINGLE_USER_ID } from "./supabase";
 /**
  * Dossiês: unidades de trabalho dentro de um projeto (no P4C são os polos; em outro projeto podem ser
  * clientes, turmas etc.). Só front por enquanto: fica no localStorage, uma lista por projeto.
@@ -10,6 +11,8 @@ const VERSION = 2;
 
 /** Projeto padrão da página de Demandas (quando não vem `?projeto=`). */
 export const P4C_ID = "p4c";
+/** Projeto padrão de quem está logado: "p4c" para a conta principal (dados legados) e um id próprio para as demais. */
+export const defaultProjectId = (): string => { const o = ownerId(); return o === SINGLE_USER_ID ? P4C_ID : `${P4C_ID}-${o.slice(0, 8)}`; };
 export const DEFAULT_LABEL: DossierLabel = { singular: "Dossiê", plural: "Dossiês" };
 export const LABEL_PRESETS: DossierLabel[] = [
   { singular: "Dossiê", plural: "Dossiês" },

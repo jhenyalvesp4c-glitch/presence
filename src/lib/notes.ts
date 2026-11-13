@@ -2,7 +2,6 @@
  * Notas (lembretes) da página de Demandas. Cada nota pode estar ligada a um dossiê ou ficar "Geral"
  * (sem vínculo). Assim como os dossiês, ficam no localStorage, uma lista por projeto.
  */
-import { P4C_ID } from "@/lib/dossiers";
 
 export type Note = { id: number; text: string; date: string; color: string; dossierId?: string | undefined };
 export const NOTE_COLORS = ["violet", "cyan", "emerald", "amber", "pink"] as const;

@@ -4,11 +4,11 @@
  * Na primeira vez, o que estava só no navegador (localStorage) sobe para o banco, uma vez só.
  */
 import { demandToRows, diffDemands, rowsToDemands, type Demand, type DemandRows } from "../demands";
-import { DEFAULT_LABEL, P4C_ID, loadDossierState, seedDossiers, type Dossier, type DossierState } from "../dossiers";
+import { DEFAULT_LABEL, P4C_ID, defaultProjectId, loadDossierState, seedDossiers, type Dossier, type DossierState } from "../dossiers";
 import { loadNotes, type Note } from "../notes";
 import { loadProjects as loadLocalProjects, seedProjects, type Project } from "../projects";
 import { deleteProjectMaterials } from "../demand-materials";
-import { must, supabase } from "./db";
+import { must, ownerId, SINGLE_USER_ID, supabase } from "./db";
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const ignoreLocal = (fn: () => void) => { try { fn(); } catch { /* sem armazenamento */ } };
@@ -27,15 +27,15 @@ const projectRow = (p: Project, position: number) => ({
 
 /** Projetos para a tela /projetos. O padrão "p4c" (página de Demandas sem `?projeto=`) não aparece como cartão. */
 export async function loadProjects(): Promise<Project[]> {
-  let rows = must(await supabase.from("projects").select("id, name, description, color, status, due, position, created_at").neq("id", P4C_ID).order("position").order("created_at")) as ProjectRow[];
+  let rows = must(await supabase.from("projects").select("id, name, description, color, status, due, position, created_at").neq("id", defaultProjectId()).order("position").order("created_at")) as ProjectRow[];
   let migrated = false;
   try { migrated = localStorage.getItem(MIGRATED_KEY) === "1"; } catch { /* ignora */ }
-  if (!rows.length && !migrated) {
+  if (!rows.length && !migrated && ownerId() === SINGLE_USER_ID) {
     // Primeira vez: leva os projetos do navegador (ou os de exemplo) para o banco.
     const list = loadLocalProjects();
     if (list.length) must(await supabase.from("projects").upsert(list.map(projectRow), { onConflict: "id" }).select("id"));
     ignoreLocal(() => localStorage.setItem(MIGRATED_KEY, "1"));
-    rows = list.length ? (must(await supabase.from("projects").select("id, name, description, color, status, due, position, created_at").neq("id", P4C_ID).order("position").order("created_at")) as ProjectRow[]) : [];
+    rows = list.length ? (must(await supabase.from("projects").select("id, name, description, color, status, due, position, created_at").neq("id", defaultProjectId()).order("position").order("created_at")) as ProjectRow[]) : [];
   } else if (!migrated) {
     ignoreLocal(() => localStorage.setItem(MIGRATED_KEY, "1"));
   }
@@ -75,9 +75,10 @@ export async function ensureProject(pid: string) {
   const found = must(await supabase.from("projects").select("id, legacy_imported, label_singular, label_plural").eq("id", pid).limit(1)) as
     { id: string; legacy_imported: boolean; label_singular: string; label_plural: string }[];
   if (found[0]) return found[0];
-  if (pid !== P4C_ID) return null;
-  must(await supabase.from("projects").upsert({ id: P4C_ID, name: "P4C", description: "Juntos por dossiês mais fortes.", color: "cyan", status: "Ativo", position: -1 }, { onConflict: "id" }).select("id"));
-  return { id: P4C_ID, legacy_imported: false, label_singular: DEFAULT_LABEL.singular, label_plural: DEFAULT_LABEL.plural };
+  if (pid !== defaultProjectId()) return null;
+  const legacy = pid === P4C_ID;
+  must(await supabase.from("projects").upsert({ id: pid, name: legacy ? "P4C" : "Geral", description: legacy ? "Juntos por dossiês mais fortes." : "", color: "cyan", status: "Ativo", position: -1 }, { onConflict: "id" }).select("id"));
+  return { id: pid, legacy_imported: false, label_singular: DEFAULT_LABEL.singular, label_plural: DEFAULT_LABEL.plural };
 }
 
 const dossierRow = (pid: string, d: Dossier, position: number) => ({ project_id: pid, id: d.id, name: d.name.trim().slice(0, 120), description: d.desc.slice(0, 500), position });

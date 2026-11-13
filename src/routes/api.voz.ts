@@ -31,6 +31,8 @@ export const Route = createFileRoute("/api/voz")({
         const { guard } = await import("@/lib/voice/http");
         const blocked = guard(request, "voz");
         if (blocked) return blocked;
+        const { withUser } = await import("@/lib/server-auth");
+        return withUser(request, async () => {
         let parsed: z.infer<typeof body>;
         try { parsed = body.parse(await request.json()); } catch { return new Response(JSON.stringify({ error: "Pedido inválido." }), { status: 400, headers: { "content-type": "application/json" } }); }
         const { runAgent } = await import("@/lib/voice/agent");
@@ -45,6 +47,7 @@ export const Route = createFileRoute("/api/voz")({
           },
         });
         return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" } });
+        });
       },
     },
   },

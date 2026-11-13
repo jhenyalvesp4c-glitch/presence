@@ -6,7 +6,7 @@ import { nextCode, type DType, type Demand, type Hist, type Priority, type PoloE
 import { loadDemands, loadProjectState, loadProjects, saveDemands, saveDossiers, saveNotesDb, type ProjectState } from "@/lib/data/project-data";
 import { useDbState } from "@/lib/data/use-db-state";
 import {
-  DEFAULT_LABEL, LABEL_PRESETS, P4C_ID, dossierColor, gender,
+  DEFAULT_LABEL, LABEL_PRESETS, defaultProjectId, dossierColor, gender,
   type Dossier, type DossierLabel, type DossierState,
 } from "@/lib/dossiers";
 import {
@@ -113,7 +113,7 @@ function Demandas() {
     loadProjects().then((l) => alive && setKnown(l)).catch(() => alive && setKnown([]));
     return () => { alive = false; };
   }, []);
-  const pid: string | null = known === null ? null : projeto && known.some((p) => p.id === projeto) ? projeto : P4C_ID;
+  const pid: string | null = known === null ? null : projeto && known.some((p) => p.id === projeto) ? projeto : defaultProjectId();
   const project = known?.find((x) => x.id === pid);
   // Dossiês (polos no P4C) e notas do projeto: no banco.
   const [st, setSt, stReady] = useDbState<ProjectState>(
@@ -161,7 +161,7 @@ function Demandas() {
   const catsQ = useCategories();
   const compId = (catsQ.data ?? []).find((c) => c.slug === "comp")?.id;
   const appts = useMemo(() => calendarItems(tasksQ.data ?? [], compId), [tasksQ.data, compId]);
-  const saveApptM = useSaveAppointment(compId, pid ?? P4C_ID);
+  const saveApptM = useSaveAppointment(compId, pid ?? defaultProjectId());
   const delTask = useDeleteCalendarItem();
   const toggleTask = useToggleTask();
   // Compromissos antigos que estavam só neste navegador sobem para o banco uma única vez.
@@ -301,7 +301,7 @@ function Demandas() {
     }));
     setPoloF((f) => (f === name ? null : f));
     const gone = ds.dossiers.find((x) => x.name === name);
-    if (gone) { changeNotes((xs) => unlinkDossier(xs, gone.id)); unlinkDossierAppointments(pid ?? P4C_ID, gone.id).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch(() => {}); }
+    if (gone) { changeNotes((xs) => unlinkDossier(xs, gone.id)); unlinkDossierAppointments(pid ?? defaultProjectId(), gone.id).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch(() => {}); }
   };
   const usage = (name: string) => items.filter((d) => d.polo === name || d.polos?.some((p) => p.name === name)).length;
 
@@ -413,7 +413,7 @@ function Demandas() {
               <Loader size={22} className="animate-[spin_3s_linear_infinite] text-cyan" /> Carregando suas demandas…
             </div>
           ) : tab === "docs" ? (
-            <DocsLibrary projectId={pid ?? P4C_ID} />
+            <DocsLibrary projectId={pid ?? defaultProjectId()} />
           ) : tab === "agenda" ? (
             <DemandCalendar items={appts} dossiers={ds.dossiers} label={L} onSave={saveAppt} onDelete={removeAppt} onToggle={toggleAppt} saving={saveApptM.isPending} />
           ) : tab === "notas" ? (

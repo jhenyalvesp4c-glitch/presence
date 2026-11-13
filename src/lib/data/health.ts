@@ -4,7 +4,7 @@ import { todayIso } from "../dates";
 import { dietFromRows, dietToRow, measurementFromRow, measurementToRow, photoSlug, splitFromSessions, uniqueMuscles, workoutSheetFromRows } from "../health-db";
 import type { DietSheet, MeasurementSheet, WorkoutSheet } from "../health-preview";
 import type { Exercise, Workout } from "../types";
-import { must, SINGLE_USER_ID, supabase } from "./db";
+import { must, ownerId, supabase } from "./db";
 
 export const PHOTO_BUCKET = "presence-app-photos";
 export const healthKeys = {
@@ -187,7 +187,7 @@ export function upsertEntry(list: MeasurementEntry[], entry: MeasurementEntry): 
 async function uploadPhoto(slot: string, blobUrl: string, date: string): Promise<string> {
   const blob = await (await fetch(blobUrl)).blob();
   const ext = (blob.type.split("/")[1] ?? "jpg").replace("jpeg", "jpg").replace(/[^a-z0-9]/g, "") || "jpg";
-  const path = `${SINGLE_USER_ID}/${date}-${photoSlug(slot)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `${ownerId()}/${date}-${photoSlug(slot)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false });
   if (error) throw new Error(`Não consegui enviar a foto "${slot}": ${error.message}`);
   return path;

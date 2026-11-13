@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { createServerClient, SINGLE_USER_ID, type Demand } from "./supabase";
+import { createServerClient, ownerId, type Demand } from "./supabase";
 
 const MODEL = "claude-opus-5-5";
 const HISTORY_LIMIT = 20;
@@ -190,7 +190,7 @@ export const askAssistant = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => askInput.parse(data))
   .handler(async ({ data }): Promise<AskResult> => {
     const db = createServerClient();
-    const userId = SINGLE_USER_ID;
+    const userId = ownerId();
 
     // Histórico anterior + perfil, antes de salvar a nova mensagem.
     const [{ data: history }, { data: profile }] = await Promise.all([

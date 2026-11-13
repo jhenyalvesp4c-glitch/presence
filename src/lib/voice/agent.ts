@@ -5,7 +5,7 @@
  */
 import { z } from "zod/v4";
 
-import { must, supabase, SINGLE_USER_ID } from "../data/db";
+import { must, supabase, ownerId } from "../data/db";
 import { mentionedDossiers, normalize, periodOf, rank, snippet } from "../orion";
 import { commitRecords } from "../mcp/commit";
 import { contextText, DEFAULT_MODEL, type Context } from "../mcp/interpret";
@@ -37,7 +37,7 @@ let cache: Cached | undefined;
 async function voiceContext(): Promise<Cached> {
   if (cache && Date.now() - cache.at < 60_000) { const now = new Date(); return { ...cache, ctx: { ...cache.ctx, today: isoDay(now), weekday: weekdayPt(now) } }; }
   const [projects, categories, profile] = await Promise.all([
-    listProjects(), listCategories(), supabase.from("profiles").select("display_name").eq("id", SINGLE_USER_ID).maybeSingle(),
+    listProjects(), listCategories(), supabase.from("profiles").select("display_name").eq("id", ownerId()).maybeSingle(),
   ]);
   const full = await Promise.all(projects.map(async (p) => ({ ...p, dossiers: await listDossiers(p.id) })));
   const now = new Date();
@@ -248,7 +248,7 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       if (!texto) return { ok: false, erro: "Sem texto para guardar." };
       const names = (must(await supabase.from("dossiers").select("name")) as { name: string }[]).map((x) => x.name);
       const date = resolveDay(args["data"], ctx.today);
-      must(await supabase.from("brain_entries").insert({ user_id: SINGLE_USER_ID, text: texto, entry_date: date, dossier_names: mentionedDossiers(texto, names) }).select("id"));
+      must(await supabase.from("brain_entries").insert({ user_id: ownerId(), text: texto, entry_date: date, dossier_names: mentionedDossiers(texto, names) }).select("id"));
       emit({ t: "painel", p: { titulo: "Documentado no Orion", secoes: [{ titulo: date.split("-").reverse().join("/"), itens: [{ rotulo: texto.slice(0, 160), link: "/cerebro" }] }] } });
       return { ok: true };
     }

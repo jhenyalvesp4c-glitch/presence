@@ -16,6 +16,8 @@ import { VoiceDock } from "@/components/voice/VoiceDock";
 import { ReminderWatcher } from "@/components/reminders/ReminderWatcher";
 import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { VoiceProvider } from "@/lib/voice/use-voice";
+import { AuthProvider } from "@/lib/auth";
+import { AuthGate } from "@/components/auth/AuthGate";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -129,6 +131,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <AuthProvider><AuthGate>
       <VoiceProvider>
         <GlobalRail />
         <div className={railPad}><HealthPreviewProvider><Outlet /></HealthPreviewProvider></div>
@@ -136,6 +139,7 @@ function RootComponent() {
         <VoiceDock />
         <ReminderWatcher />
       </VoiceProvider>
+      </AuthGate></AuthProvider>
       <Toaster position="top-center" theme="dark" />
     </QueryClientProvider>
   );

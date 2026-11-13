@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@tanstack/react-router";
 
-import { SINGLE_USER_ID, supabase } from "@/lib/supabase";
+import { authHeaders } from "@/lib/auth-token";
+import { ownerId, supabase } from "@/lib/supabase";
 import { transcribeAudio } from "@/lib/audio.functions";
 import type { Panel, Turn, VoiceEvent } from "./agent";
 import { takeSentences } from "./sentences";
@@ -64,7 +65,7 @@ class Speaker {
 
   private fetchAudio(text: string): Promise<Blob | null> {
     if (this.fallback) return Promise.resolve(null);
-    return fetch("/api/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }), signal: this.ctrl.signal })
+    return authHeaders().then((ah) => fetch("/api/tts", { method: "POST", headers: { "content-type": "application/json", ...ah }, body: JSON.stringify({ text }), signal: this.ctrl.signal })
       .then(async (r) => {
         if (!r.ok) {
           this.fallback = r.status === 501 || r.status === 401 || r.status === 403;
@@ -75,7 +76,7 @@ class Speaker {
         if (b.size < 200) { this.onNote("A voz do ElevenLabs veio vazia: usando a voz do navegador."); return null; }
         return b;
       })
-      .catch((e) => { if (!this.cancelled) this.onNote(`Não consegui falar com o servidor de voz (${e instanceof Error ? e.message : "erro"}).`); return null; });
+      .catch((e) => { if (!this.cancelled) this.onNote(`Não consegui falar com o servidor de voz (${e instanceof Error ? e.message : "erro"}).`); return null; }));
   }
 
   enqueue(text: string) {
@@ -315,7 +316,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     endAfter.current = false;
     const say = (chunks: string[]) => chunks.forEach((c) => sp.enqueue(c));
     try {
-      const res = await fetch("/api/voz", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: history.current }), signal: ctrl.signal });
+      const res = await fetch("/api/voz", { method: "POST", headers: { "content-type": "application/json", ...(await authHeaders()) }, body: JSON.stringify({ messages: history.current }), signal: ctrl.signal });
       if (!res.ok || !res.body) throw new Error(res.status === 429 ? "Calma, estou recebendo pedidos demais. Tente em instantes." : "Não consegui falar com o servidor.");
       const reader = res.body.getReader(), dec = new TextDecoder();
       let carry = "";
@@ -341,7 +342,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       say(takeSentences(buffer, { first, flush: true }).chunks);
       if (said.trim()) {
         history.current = [...history.current, { role: "assistant" as const, content: said.trim() }].slice(-16);
-        void supabase.from("assistant_messages").insert([{ user_id: SINGLE_USER_ID, role: "user", content: text }, { user_id: SINGLE_USER_ID, role: "assistant", content: said.trim() }]).then(() => undefined);
+        void supabase.from("assistant_messages").insert([{ user_id: ownerId(), role: "user", content: text }, { user_id: ownerId(), role: "assistant", content: said.trim() }]).then(() => undefined);
       }
     } catch (e) {
       if (ctrl.signal.aborted || turn.current !== my) return;

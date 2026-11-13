@@ -27,6 +27,8 @@ export const Route = createFileRoute("/api/tts")({
         const { guard } = await import("@/lib/voice/http");
         const blocked = guard(request, "tts");
         if (blocked) return blocked;
+        const { withUser } = await import("@/lib/server-auth");
+        return withUser(request, async () => {
         if (!process.env["ELEVENLABS_API_KEY"]) return json(501, { error: "Voz do ElevenLabs não configurada." });
         let text: string;
         try { text = body.parse(await request.json()).text; } catch { return json(400, { error: "Texto inválido." }); }
@@ -36,6 +38,7 @@ export const Route = createFileRoute("/api/tts")({
           if (!res.ok || !res.body) { const t = await res.text().catch(() => ""); console.error("[tts] ElevenLabs", res.status, t.slice(0, 200)); return json(502, { error: "A voz não respondeu.", status: res.status }); }
           return new Response(res.body, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
         } catch (e) { console.error("[tts]", e instanceof Error ? e.message : e); return json(502, { error: "A voz não respondeu." }); }
+        });
       },
     },
   },

@@ -10,6 +10,7 @@ import { LivingOrb } from "@/components/LivingOrb";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { ActionChooser, type HomeAction } from "@/components/home/ActionChooser";
 import { OrionPanel } from "@/components/orion/OrionPanel";
+import { AccountMenu } from "@/components/auth/AccountMenu";
 import { useVoice } from "@/lib/voice/use-voice";
 import { useHome } from "@/lib/use-home";
 import { useSpeech } from "@/lib/use-speech";
@@ -157,6 +158,7 @@ function Assistente() {
                 onClick={() => setActive(i)} delay={`${(i % 5) * 0.7}s`} />
             ))}
           </div>
+          <div className="absolute bottom-24 left-3"><AccountMenu /></div>
         </aside>
 
 

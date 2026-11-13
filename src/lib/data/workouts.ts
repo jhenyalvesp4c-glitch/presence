@@ -3,7 +3,7 @@ import { subDays } from "date-fns";
 
 import { isoDate, todayIso } from "../dates";
 import type { Exercise, ExerciseLog, SplitDay, Workout, WorkoutSession } from "../types";
-import { must, SINGLE_USER_ID, supabase } from "./db";
+import { must, ownerId, supabase } from "./db";
 
 const SESSION_COLS = "id, workout_id, workout_name, session_date, started_at, finished_at, duration_min, kcal";
 
@@ -31,7 +31,7 @@ export function useWeeklyGoal() {
   return useQuery({
     queryKey: ["weekly-goal"],
     queryFn: async () => {
-      const row = must(await supabase.from("profiles").select("weekly_workout_goal").eq("id", SINGLE_USER_ID).maybeSingle()) as { weekly_workout_goal: number } | null;
+      const row = must(await supabase.from("profiles").select("weekly_workout_goal").eq("id", ownerId()).maybeSingle()) as { weekly_workout_goal: number } | null;
       return row?.weekly_workout_goal ?? 5;
     },
   });
@@ -209,7 +209,7 @@ export function useSaveSplit() {
           .upsert(days.map((d) => ({ weekday: d.weekday, title: d.title.trim().slice(0, 80) || "Livre", workout_id: d.workout_id })), { onConflict: "user_id,weekday" })
           .select("id"),
       );
-      must(await supabase.from("profiles").update({ weekly_workout_goal: Math.min(14, Math.max(1, Math.round(goal))) }).eq("id", SINGLE_USER_ID).select("id"));
+      must(await supabase.from("profiles").update({ weekly_workout_goal: Math.min(14, Math.max(1, Math.round(goal))) }).eq("id", ownerId()).select("id"));
     },
     onSuccess: invalidate,
   });
