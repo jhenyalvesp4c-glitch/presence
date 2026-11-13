@@ -1,6 +1,7 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { ArrowUpRight, Check, Mic, X } from "lucide-react";
+import { Mic } from "lucide-react";
 
+import { VoicePanel } from "@/components/voice/VoicePanel";
 import { useVoice, type Phase } from "@/lib/voice/use-voice";
 
 const LABEL: Record<Phase, string> = { idle: "Pronta", listening: "Ouvindo…", thinking: "Pensando…", speaking: "Falando…" };
@@ -63,36 +64,7 @@ export function VoiceDock() {
         <p className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,34rem)] -translate-x-1/2 rounded-xl border border-amber/40 bg-background/90 px-3 py-2 text-center text-[0.75rem] leading-snug text-amber backdrop-blur" role="alert" data-testid="voz-aviso">{v.note}</p>
       )}
 
-      {v.panel && (
-        <aside className="fixed right-4 top-20 z-50 w-[min(92vw,420px)] animate-rise max-sm:top-16" data-testid="voz-painel">
-          <div className="relative max-h-[68vh] overflow-y-auto rounded-3xl border border-cyan/30 bg-background/95 p-4 shadow-[0_0_60px_-20px_var(--cyan)] backdrop-blur-2xl">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="icon-tile h-9 w-9 !rounded-xl"><Check size={15} /></span>
-              <h3 className="mr-auto font-display text-base font-semibold leading-tight first-letter:uppercase">{v.panel.titulo}</h3>
-              <button onClick={v.closePanel} aria-label="Fechar painel" className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
-            </div>
-            <div className="space-y-4">
-              {v.panel.secoes.map((s, i) => (
-                <section key={i}>
-                  <p className="mono-caps mb-1.5 !text-[0.6rem]">{s.titulo}</p>
-                  <ul className="space-y-1.5">
-                    {s.itens.map((it, k) => (
-                      <li key={k}>
-                        <button onClick={() => it.link && go(it.link)} disabled={!it.link} style={{ animationDelay: `${(i * 3 + k) * 40}ms` }}
-                          className="group flex w-full items-start gap-2 rounded-xl border border-border bg-secondary/25 px-3 py-2 text-left text-sm animate-rise transition enabled:hover:-translate-y-0.5 enabled:hover:border-cyan/50">
-                          <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${it.feita ? "bg-emerald" : "bg-cyan"}`} />
-                          <span className="min-w-0 flex-1"><span className={`block break-words ${it.feita ? "text-muted-foreground line-through" : ""}`}>{it.rotulo}</span>{it.detalhe && <span className="block text-[0.7rem] text-muted-foreground">{it.detalhe}</span>}</span>
-                          {it.link && <ArrowUpRight size={12} className="mt-1 shrink-0 opacity-0 transition group-hover:opacity-100" />}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </div>
-        </aside>
-      )}
+      {v.panel && <VoicePanel panel={v.panel} onClose={v.closePanel} onOpen={go} />}
     </>
   );
 }
