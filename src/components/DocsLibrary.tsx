@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { signedUrls, syncMirrors, type Attachment, type Mirror } from "@/lib/data/brain";
 import { loadLibraryRows, removeDocRow, removeFiles, saveDocRow, saveFolderRow, type DocRow, type FolderRow } from "@/lib/data/library";
 import { DocEditor, type EditableDoc } from "@/components/library-doc-editor";
+import { fieldsOf } from "@/lib/library-doc-fields";
 import { toast } from "sonner";
 import { loadProjectState } from "@/lib/data/project-data";
 import { backdropProps } from "@/lib/backdrop";
@@ -195,7 +196,7 @@ function Library({ projectId }: { projectId: string }) {
       if (d.login || !touched.has(d.id)) continue; // só o que a usuária criou ou editou (os exemplos intactos não entram)
       list.push({
         refId: `doc:${d.id}`, title: d.title,
-        text: [`${d.kind} na pasta ${d.folder}.`, d.desc, d.rules?.length ? `Regras importantes:\n- ${d.rules.join("\n- ")}` : "", d.steps?.length ? `Passo a passo:\n${d.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : ""].filter(Boolean).join("\n"),
+        text: [`${d.kind} na pasta ${d.folder}.`, d.desc, d.rules?.length ? `${fieldsOf(d.kind).rules?.label ?? "Regras importantes"}:\n- ${d.rules.join("\n- ")}` : "", d.steps?.length ? `${fieldsOf(d.kind).steps?.label ?? "Passo a passo"}:\n${d.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : ""].filter(Boolean).join("\n"),
         attachments: d.attachments ?? [], summary: d.summary ?? "",
       });
     }
@@ -538,14 +539,23 @@ function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, urls }: { d?: Doc 
 
       {d.rules && (
         <div className="mt-4 rounded-2xl border border-cyan/50 bg-cyan/5 p-4 shadow-[0_0_30px_-12px_var(--cyan)]">
-          <p className="flex items-center gap-2 font-semibold"><Lightbulb size={16} className="text-cyan" /> Regras importantes</p>
+          <p className="flex items-center gap-2 font-semibold"><Lightbulb size={16} className="text-cyan" /> {fieldsOf(d.kind).rules?.label ?? "Regras importantes"}</p>
           <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[0.8rem] leading-snug text-foreground/85">{d.rules.map((r) => <li key={r}>{r}</li>)}</ul>
         </div>
       )}
 
       {d.steps && (
         <>
-          <h4 className="mt-4 font-semibold">Passo a passo</h4>
+          <h4 className="mt-4 font-semibold">{fieldsOf(d.kind).steps?.label ?? "Passo a passo"}</h4>
+          {d.kind === "FAQ" ? (
+            <ul className="mt-2 space-y-2" data-testid="faq-lista">
+              {d.steps.map((s) => { const [q, ...a] = s.split("|"); return (
+                <li key={s} className="rounded-xl border border-border bg-secondary/25 px-3 py-2.5">
+                  <p className="text-[0.82rem] font-semibold">{q?.trim()}</p>
+                  {a.length > 0 && <p className="mt-1 text-[0.8rem] leading-snug text-foreground/80">{a.join("|").trim()}</p>}
+                </li>); })}
+            </ul>
+          ) : (
           <ol className="mt-2 space-y-2">
             {d.steps.map((s, i) => {
               const ok = done.includes(i);
@@ -559,6 +569,7 @@ function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, urls }: { d?: Doc 
               );
             })}
           </ol>
+          )}
         </>
       )}
 

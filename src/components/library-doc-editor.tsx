@@ -9,6 +9,7 @@ import {
 import { backdropProps } from "@/lib/backdrop";
 import { MAX_PENDING, filesFromClipboard, readPending, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { uploadFiles, type Attachment } from "@/lib/data/brain";
+import { fieldsOf } from "@/lib/library-doc-fields";
 
 export type DocKind = { kind: string; color: string; Icon: LucideIcon; group: string; what: string; example: string };
 /** Tipos de documento: o que é cada um e um exemplo (aparece no seletor). A ordem aqui é a do seletor. */
@@ -119,6 +120,7 @@ export function DocEditor({ initial, isNew, folderName, onSave, onClose }: {
   const input = useRef<HTMLInputElement>(null);
   const busy = !!stage;
   const ok = !!title.trim();
+  const fields = fieldsOf(kind);
 
   const add = async (list: File[]) => {
     if (!list.length) return;
@@ -169,23 +171,29 @@ export function DocEditor({ initial, isNew, folderName, onSave, onClose }: {
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_11rem]">
           <label className="block text-xs text-muted-foreground">Título
-            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Como arquivar leads" className={field} data-testid="doc-titulo" />
+            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder={fields.title} className={field} data-testid="doc-titulo" />
           </label>
           <div className="block text-xs text-muted-foreground">Tipo
             <KindPicker value={kind} onChange={setKind} />
           </div>
         </div>
-        <label className="mt-3 block text-xs text-muted-foreground">Descrição
-          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={5} placeholder="Escreva o que é este documento, o contexto, o que aconteceu…" className={`${field} resize-y`} data-testid="doc-descricao" />
+        <label className="mt-3 block text-xs text-muted-foreground">{fields.desc.label}
+          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={fields.desc.rows ?? 5} placeholder={fields.desc.ph} className={`${field} resize-y`} data-testid="doc-descricao" />
         </label>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs text-muted-foreground">Regras importantes <span className="opacity-60">(uma por linha)</span>
-            <textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={4} className={`${field} resize-y`} data-testid="doc-regras" />
-          </label>
-          <label className="block text-xs text-muted-foreground">Passo a passo <span className="opacity-60">(um por linha)</span>
-            <textarea value={steps} onChange={(e) => setSteps(e.target.value)} rows={4} className={`${field} resize-y`} data-testid="doc-passos" />
-          </label>
-        </div>
+        {(fields.rules || fields.steps) && (
+          <div className={`mt-3 grid gap-3 ${fields.rules && fields.steps ? "sm:grid-cols-2" : ""}`}>
+            {fields.rules && (
+              <label className="block text-xs text-muted-foreground">{fields.rules.label} {fields.rules.hint && <span className="opacity-60">({fields.rules.hint})</span>}
+                <textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={fields.rules.rows ?? 4} placeholder={fields.rules.ph} className={`${field} resize-y`} data-testid="doc-regras" />
+              </label>
+            )}
+            {fields.steps && (
+              <label className="block text-xs text-muted-foreground">{fields.steps.label} {fields.steps.hint && <span className="opacity-60">({fields.steps.hint})</span>}
+                <textarea value={steps} onChange={(e) => setSteps(e.target.value)} rows={fields.steps.rows ?? 4} placeholder={fields.steps.ph} className={`${field} resize-y`} data-testid="doc-passos" />
+              </label>
+            )}
+          </div>
+        )}
 
         <div className="mt-4">
           <div className="flex items-center gap-2">
