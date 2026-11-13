@@ -21,3 +21,7 @@ Cada conversa também fica salva em `assistant_messages` (o Orion encontra depoi
 - `/api/tts`: ElevenLabs (`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`; modelo `eleven_flash_v2_5`, troque com `ELEVENLABS_MODEL`). Sem a chave, usa a voz do próprio navegador.
 - IA: `OPENAI_API_KEY`; modelo `OPENAI_VOICE_MODEL` (ou `OPENAI_MODEL`).
 - Proteções: só mesma origem + limite por IP (o app não tem login).
+
+## Listas (checklists) por conversa
+
+Ferramenta `lista` (`src/lib/voice/lists.ts`): criar, adicionar, remover, marcar/desmarcar, mostrar, listar, renomear e excluir. As listas ficam salvas no banco (`presence_app.checklists` e `checklist_items`, migração `20261120000100`) e aparecem na página `/listas`, onde também dá para marcar e adicionar itens com o dedo. A voz sempre oferece sugestões do que mais incluir (aparecem no painel e são faladas). Pedido ambíguo ("toalha" com duas toalhas) vira pergunta; nunca mexe num item por meia-correspondência. Excluir lista ou remover todos os itens pede confirmação.

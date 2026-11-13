@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { Brain, CalendarCheck, Calendar, ClipboardList, Heart, Home, ListChecks, Settings, Sprout } from "lucide-react";
+import { Brain, CalendarCheck, Calendar, ClipboardList, Heart, Home, ListChecks, ListTodo, Settings, Sprout } from "lucide-react";
 
 /** Telas que já desenham a própria barra lateral (assistente, PlanShell). Nas demais, a barra global aparece. */
 const OWN_RAIL = ["/assistente", "/planejamento", "/projetos", "/tarefas", "/cerebro", "/organizar"];
@@ -12,6 +12,7 @@ const items = [
   { Icon: CalendarCheck, label: "Planejamento", c: "cyan", to: "/planejamento" },
   { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/projetos" },
   { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" },
+  { Icon: ListTodo, label: "Listas", c: "emerald", to: "/listas" },
   { Icon: Calendar, label: "Calendário", c: "cyan", to: "/calendario" },
   { Icon: Sprout, label: "Hábitos", c: "emerald", to: "/habitos" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" },
