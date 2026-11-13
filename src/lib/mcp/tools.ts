@@ -11,13 +11,13 @@ import { claimProposal, expireProposal, getOperation, getProposal, logOperation,
 import { TIPO_LABEL, hhmmNow, isoDay, normalize, registroSchema, weekdayPt, type Registro } from "./records";
 import type { ToolDef, ToolResult, ToolSet } from "./protocol";
 
-export const INSTRUCTIONS = `Você opera o Presence, o assistente pessoal e de projetos da usuária. Seu trabalho é ENCAMINHAR cada informação ao módulo certo, sem inventar destino.
+export const INSTRUCTIONS = `Você opera o Presence, o assistente pessoal e de projetos da pessoa. Seu trabalho é ENCAMINHAR cada informação ao módulo certo, sem inventar destino.
 
 FLUXO OBRIGATÓRIO
 1. Interprete o conteúdo (texto, print, documento, transcrição) e identifique o(s) tipo(s) de informação.
-2. CONSULTE antes de cadastrar: listar_projetos, listar_dossies, listar_demandas, listar_calendario, listar_tarefas, listar_lembretes, listar_anotacoes, consultar_documentacao ou buscar_registros. NUNCA escolha projeto, polo (dossiê) ou demanda por suposição: se houver dúvida, pergunte à usuária mostrando as opções reais.
+2. CONSULTE antes de cadastrar: listar_projetos, listar_dossies, listar_demandas, listar_calendario, listar_tarefas, listar_lembretes, listar_anotacoes, consultar_documentacao ou buscar_registros. NUNCA escolha projeto, polo (dossiê) ou demanda por suposição: se houver dúvida, pergunte à pessoa mostrando as opções reais.
 3. Chame propor_registros com os registros estruturados. Ele valida tudo, procura duplicidades e devolve um resumo e um código de 4 dígitos. NADA é gravado ainda.
-4. Mostre o resumo à usuária e peça: "Responda CONFIRMAR <código> para criar". Só depois da resposta dela, chame confirmar_registros com o código. Nunca confirme por conta própria.
+4. Mostre o resumo à pessoa e peça: "Responda CONFIRMAR <código> para criar". Só depois da resposta dela, chame confirmar_registros com o código. Nunca confirme por conta própria.
 5. Depois de confirmar, diga onde cada registro foi criado e o identificador. Para reverter, use desfazer_operacao (também só com autorização).
 
 ONDE CADA INFORMAÇÃO VAI
@@ -30,7 +30,7 @@ Uma mensagem pode gerar vários registros relacionados (ex.: demanda + compromis
 
 REGRAS
 - Datas: use AAAA-MM-DD e horas HH:MM, no fuso de São Paulo. Resolva "amanhã", "sexta" etc. a partir de presence_guia.
-- Se já existir algo equivalente, o servidor avisa e ignora; só repita com permitir_duplicado se a usuária mandar.
+- Se já existir algo equivalente, o servidor avisa e ignora; só repita com permitir_duplicado se a pessoa mandar.
 - Os módulos Lembretes e Documentação têm limites (veja presence_guia). Seja honesto sobre o que foi ou não possível.`;
 
 const text = (t: string, structured?: Record<string, unknown>): ToolResult => ({ content: [{ type: "text", text: t }], ...(structured ? { structuredContent: structured } : {}) });
@@ -47,7 +47,7 @@ function def<S extends z.ZodType>(d: { name: string; title: string; description:
       const parsed = d.input.safeParse(raw);
       if (!parsed.success) return fail(`Parâmetros inválidos: ${parsed.error.issues.map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`).join("; ")}`);
       try { return await d.run(parsed.data, ctx); } catch (e) {
-        if (e instanceof NeedsChoice) return fail(`${e.message} Opções: ${e.options.join("; ")}. Pergunte à usuária qual usar.`);
+        if (e instanceof NeedsChoice) return fail(`${e.message} Opções: ${e.options.join("; ")}. Pergunte à pessoa qual usar.`);
         throw e;
       }
     },
@@ -202,29 +202,29 @@ const buscar = def({
 
 const propor = def({
   name: "propor_registros", title: "Propor registros (aguarda confirmação)",
-  description: "Valida e prepara um ou mais registros para o Presence, procura duplicidades e devolve um RESUMO + código de confirmação. NÃO grava nos módulos. Mostre o resumo à usuária e só chame confirmar_registros depois que ela responder CONFIRMAR <código>. Se houver ambiguidade de projeto/polo/dossiê, a ferramenta devolve as opções reais: pergunte à usuária.",
+  description: "Valida e prepara um ou mais registros para o Presence, procura duplicidades e devolve um RESUMO + código de confirmação. NÃO grava nos módulos. Mostre o resumo à pessoa e só chame confirmar_registros depois que ela responder CONFIRMAR <código>. Se houver ambiguidade de projeto/polo/dossiê, a ferramenta devolve as opções reais: pergunte à pessoa.",
   input: z.object({ registros: z.array(registroSchema).min(1).max(12).describe("Registros relacionados da mesma mensagem.") }), annotations: WRITE,
   run: async (a, ctx) => {
     const prep = await prepare(a.registros as Registro[]);
-    if (prep.problems.length) return fail(`Não foi possível preparar a proposta. Corrija ou pergunte à usuária:\n- ${prep.problems.join("\n- ")}`);
+    if (prep.problems.length) return fail(`Não foi possível preparar a proposta. Corrija ou pergunte à pessoa:\n- ${prep.problems.join("\n- ")}`);
     const live = prep.resolved.filter((r) => !r._ignorar).length;
-    if (!live) return fail(`Tudo que você enviou já existe (duplicado):\n${prep.summary}\nSe a usuária quiser criar mesmo assim, reenvie com permitir_duplicado.`);
+    if (!live) return fail(`Tudo que você enviou já existe (duplicado):\n${prep.summary}\nSe a pessoa quiser criar mesmo assim, reenvie com permitir_duplicado.`);
     const p = await saveProposal({ records: prep.resolved, summary: prep.summary, warnings: prep.warnings, client: ctx.client });
-    const body = `PROPOSTA ${p.id}\n${prep.summary}\n${prep.warnings.length ? `\nAvisos:\n- ${prep.warnings.join("\n- ")}\n` : ""}\nNada foi gravado ainda. Peça à usuária para responder: CONFIRMAR ${p.code}\n(a proposta vale por 30 minutos)`;
+    const body = `PROPOSTA ${p.id}\n${prep.summary}\n${prep.warnings.length ? `\nAvisos:\n- ${prep.warnings.join("\n- ")}\n` : ""}\nNada foi gravado ainda. Peça à pessoa para responder: CONFIRMAR ${p.code}\n(a proposta vale por 30 minutos)`;
     return text(body, { proposta_id: p.id, codigo_confirmacao: p.code, expira_em: p.expires_at, resumo: prep.summary, avisos: prep.warnings, registros: prep.resolved.length, a_criar: live });
   },
 });
 
 const confirmar = def({
   name: "confirmar_registros", title: "Confirmar e criar os registros",
-  description: "Cria no Presence os registros de uma proposta aprovada. Exige o código de 4 dígitos que a usuária digitou ao responder CONFIRMAR e confirmacao_do_usuario=true. Nunca chame sem a resposta dela.",
-  input: z.object({ proposta_id: z.string().uuid(), codigo_confirmacao: z.string().regex(/^[0-9]{4}$/), confirmacao_do_usuario: z.literal(true).describe("Só true se a usuária respondeu CONFIRMAR neste turno.") }), annotations: WRITE,
+  description: "Cria no Presence os registros de uma proposta aprovada. Exige o código de 4 dígitos que a pessoa digitou ao responder CONFIRMAR e confirmacao_do_usuario=true. Nunca chame sem a resposta dela.",
+  input: z.object({ proposta_id: z.string().uuid(), codigo_confirmacao: z.string().regex(/^[0-9]{4}$/), confirmacao_do_usuario: z.literal(true).describe("Só true se a pessoa respondeu CONFIRMAR neste turno.") }), annotations: WRITE,
   run: async (a, ctx) => {
     const p = await getProposal(a.proposta_id);
     if (!p) return fail("Proposta não encontrada.");
     if (p.status !== "pendente") return fail(`Esta proposta já está ${p.status}. Crie uma nova com propor_registros.`);
     if (new Date(p.expires_at).getTime() < Date.now()) { await expireProposal(p.id); return fail("A proposta expirou (30 minutos). Crie uma nova com propor_registros."); }
-    if (p.code !== a.codigo_confirmacao) return fail("Código de confirmação incorreto. Peça à usuária para repetir o código do resumo.");
+    if (p.code !== a.codigo_confirmacao) return fail("Código de confirmação incorreto. Peça à pessoa para repetir o código do resumo.");
     // Reconfere tudo contra o estado atual (algo pode ter mudado desde a proposta).
     const parsed = (p.records as unknown[]).map((r) => registroSchema.safeParse(r));
     if (parsed.some((x) => !x.success)) return fail("A proposta guardada está inválida. Crie uma nova.");
@@ -252,8 +252,8 @@ const operacoes = def({
 });
 
 const desfazer = def({
-  name: "desfazer_operacao", title: "Desfazer uma operação", description: "Remove os registros que uma operação criou (demandas, compromissos, lembretes, anotações…). Só chame se a usuária pedir e autorizar.",
-  input: z.object({ operacao_id: z.string().uuid(), confirmacao_do_usuario: z.literal(true).describe("Só true se a usuária pediu para desfazer neste turno.") }),
+  name: "desfazer_operacao", title: "Desfazer uma operação", description: "Remove os registros que uma operação criou (demandas, compromissos, lembretes, anotações…). Só chame se a pessoa pedir e autorizar.",
+  input: z.object({ operacao_id: z.string().uuid(), confirmacao_do_usuario: z.literal(true).describe("Só true se a pessoa pediu para desfazer neste turno.") }),
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   run: async (a, ctx) => {
     const op = await getOperation(a.operacao_id);

@@ -1,4 +1,4 @@
-/** Briefing: o que a Presence sabe sobre a pessoa (como chamar, jeito de conversar, trabalho, rotina) e o que aprende com o tempo. Puro, sem banco. */
+/** Briefing: o que o Presence sabe sobre a pessoa (como chamar, jeito de conversar, trabalho, rotina) e o que aprende com o tempo. Puro, sem banco. */
 
 export type Greeting = "esperar" | "saudacao" | "saudacao_hoje" | "saudacao_pergunta";
 export type Briefing = {
@@ -25,12 +25,12 @@ export const GREETING_OPTIONS: { v: Greeting; label: string; hint: string }[] = 
   { v: "saudacao_hoje", label: "Cumprimentar e mostrar meu dia", hint: "Já me diz o que tenho para hoje" },
   { v: "saudacao", label: "Só me cumprimentar", hint: "Uma saudação curta e espera eu falar" },
   { v: "saudacao_pergunta", label: "Cumprimentar e perguntar como ajudar", hint: "“Como posso te ajudar hoje?”" },
-  { v: "esperar", label: "Esperar eu falar primeiro", hint: "Fica quieta até eu começar" },
+  { v: "esperar", label: "Esperar eu falar primeiro", hint: "Fica quieto até eu começar" },
 ];
 
 const clean = (s: string, max: number) => s.replace(/\s+/g, " ").trim().slice(0, max);
 
-/** O briefing está completo o bastante para a Presence usar? (nome e jeito de conversar) */
+/** O briefing está completo o bastante para o Presence usar? (nome e jeito de conversar) */
 export const isComplete = (b: Briefing | null): boolean => !!b?.completed_at;
 
 /** Normaliza o que veio da tela antes de gravar. */
@@ -43,7 +43,7 @@ export function sanitize(b: Briefing): Briefing {
   };
 }
 
-/** Bloco do prompt da Presence com tudo que ela sabe sobre a pessoa. Vazio se não há nada. */
+/** Bloco do prompt do Presence com tudo que ela sabe sobre a pessoa. Vazio se não há nada. */
 export function briefingPrompt(b: Briefing | null, memories: Pick<Memory, "text" | "kind">[]): string {
   const lines: string[] = [];
   if (b?.call_name) lines.push(`- Chame a pessoa de "${b.call_name}" (é assim que ela pediu; use de vez em quando, sem exagero).`);
@@ -51,7 +51,7 @@ export function briefingPrompt(b: Briefing | null, memories: Pick<Memory, "text"
   if (b?.work) lines.push(`- Com o que ela trabalha: ${b.work}`);
   if (b?.biggest_demand) lines.push(`- O que mais pesa no dia dela / maior demanda: ${b.biggest_demand}`);
   if (b?.routine) lines.push(`- Como é o dia a dia: ${b.routine}`);
-  if (b?.goals) lines.push(`- O que ela quer conquistar com a Presence: ${b.goals}`);
+  if (b?.goals) lines.push(`- O que ela quer conquistar com o Presence: ${b.goals}`);
   if (b?.preferences) lines.push(`- Preferências e regras que ela pediu para você seguir SEMPRE: ${b.preferences}`);
   const mem = memories.slice(0, 40).map((m) => `- (${m.kind}) ${m.text}`);
   if (!lines.length && !mem.length) return "";

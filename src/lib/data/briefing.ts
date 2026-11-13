@@ -1,4 +1,4 @@
-/** Banco do briefing e da memória da Presence (cada pessoa vê só o seu, pela regra de acesso). */
+/** Banco do briefing e da memória do Presence (cada pessoa vê só o seu, pela regra de acesso). */
 import { sanitize, EMPTY_BRIEFING, isDuplicateMemory, MAX_MEMORIES, type Briefing, type Memory, type MemoryKind } from "../briefing";
 import { supabase, ownerId } from "./db";
 

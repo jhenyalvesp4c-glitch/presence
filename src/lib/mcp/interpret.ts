@@ -20,7 +20,7 @@ export const itemSchema = z.object({
 export const outputSchema = z.object({
   resumo: z.string().max(600).describe("Resumo curto do que foi entendido."),
   itens: z.array(itemSchema).max(12).describe("Registros identificados. Vazio se faltar informação para qualquer registro."),
-  duvidas: z.array(z.string().max(300)).max(10).describe("Perguntas à usuária quando algo não está claro (projeto, polo, data…). Nunca preencha por suposição."),
+  duvidas: z.array(z.string().max(300)).max(10).describe("Perguntas à pessoa quando algo não está claro (projeto, polo, data…). Nunca preencha por suposição."),
   pendencias: z.array(z.string().max(300)).max(10).describe("Informações que ficaram faltando ou que ela precisa providenciar."),
 });
 export type Output = z.infer<typeof outputSchema>;
@@ -31,7 +31,7 @@ const toolSchema = () => { const { $schema: _s, ...rest } = z.toJSONSchema(outpu
 export type InputFile = { name: string; mime: string; data: string };
 export type Context = { today: string; weekday: string; projects: (ProjectInfo & { dossiers: DossierInfo[] })[]; categories: CategoryInfo[] };
 
-export const SYSTEM = `Você é o classificador de entrada do Presence, o assistente pessoal e de projetos da usuária. Ela cola textos e envia prints, imagens, PDFs e documentos. Você transforma isso em REGISTROS estruturados para os módulos do Presence. Você NÃO grava nada: chame a função ${TOOL_NAME}; a usuária revisa, edita e confirma tudo antes.
+export const SYSTEM = `Você é o classificador de entrada do Presence, o assistente pessoal e de projetos da pessoa. Ela cola textos e envia prints, imagens, PDFs e documentos. Você transforma isso em REGISTROS estruturados para os módulos do Presence. Você NÃO grava nada: chame a função ${TOOL_NAME}; a pessoa revisa, edita e confirma tudo antes.
 
 COMO DECIDIR O DESTINO
 - demanda: pedido de trabalho a executar dentro de um projeto. escopo "geral" (sem polo), "polo" (um polo/dossiê) ou "multipolo" (vários, cada um com andamento próprio). Passos a cumprir vão em "checklist"; quem deve fazer em "responsavel".
@@ -69,7 +69,7 @@ type Block = { type: string; [k: string]: unknown };
 export type Message = { status?: string; incomplete_details?: { reason?: string } | null; output: Block[] };
 export type Create = (params: Record<string, unknown>) => Promise<Message>;
 
-/** Conteúdo da mensagem da usuária no formato da API Responses (input_text, input_image, input_file). */
+/** Conteúdo da mensagem da pessoa no formato da API Responses (input_text, input_image, input_file). */
 export function userContent(text: string, files: InputFile[]): Block[] {
   const parts: Block[] = [];
   for (const f of files) {
@@ -89,7 +89,7 @@ export function requestBase(model: string, ctx: Context) {
   return {
     model,
     instructions: `${SYSTEM}\n\n${contextText(ctx)}`,
-    tools: [{ type: "function", name: TOOL_NAME, description: "Devolve os registros identificados, dúvidas e pendências para a usuária revisar.", parameters: toolSchema(), strict: false }],
+    tools: [{ type: "function", name: TOOL_NAME, description: "Devolve os registros identificados, dúvidas e pendências para a pessoa revisar.", parameters: toolSchema(), strict: false }],
     tool_choice: { type: "function", name: TOOL_NAME },
     max_output_tokens: 12000,
     reasoning: { effort: "low" },

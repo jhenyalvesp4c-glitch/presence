@@ -16,7 +16,7 @@ const STEPS = ["Lendo o conteúdo enviado", "Identificando projeto, polo e dossi
 type Phase = "idle" | "processing" | "review" | "done";
 
 /**
- * Central de entrada da tela inicial: a usuária cola texto, prints e documentos (ou dita); a Presence interpreta,
+ * Central de entrada da tela inicial: a usuária cola texto, prints e documentos (ou dita); o Presence interpreta,
  * mostra cada registro em um cartão por destino para revisar/editar/remover e só distribui depois de confirmar.
  */
 export function InboxPanel({ incoming, onClose, onListen, listening, interim }: {
@@ -138,7 +138,7 @@ export function InboxPanel({ incoming, onClose, onListen, listening, interim }: 
         <span className="icon-tile h-10 w-10 !rounded-2xl"><Inbox size={18} /></span>
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-lg font-semibold">Central de entrada</h2>
-          <p className="text-xs text-muted-foreground">Cole ou envie textos, prints, PDFs e documentos. A Presence interpreta e leva cada informação ao lugar certo, depois da sua revisão.</p>
+          <p className="text-xs text-muted-foreground">Cole ou envie textos, prints, PDFs e documentos. O Presence interpreta e leva cada informação ao lugar certo, depois da sua revisão.</p>
         </div>
         <button onClick={onClose} aria-label="Fechar central de entrada" className="rounded-full p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"><X size={18} /></button>
       </header>

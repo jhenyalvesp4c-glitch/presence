@@ -98,7 +98,7 @@ export async function loadCorpus() {
   }
 
   for (const m of rows(msgs as Rows<{ id: string; role: string; content: string; created_at: string }>, "conversa")) {
-    docs.push({ id: `conversa:${m.id}`, kind: "conversa", title: m.role === "user" ? "Você disse à assistente" : "A assistente respondeu", text: m.content, date: day(m.created_at), link: "/assistente" });
+    docs.push({ id: `conversa:${m.id}`, kind: "conversa", title: m.role === "user" ? "Você disse ao assistente" : "O assistente respondeu", text: m.content, date: day(m.created_at), link: "/assistente" });
   }
 
   for (const s of rows(trains as Rows<{ id: string; group_name: string; people: number; script_title: string; notes: string; created_at: string }>, "treinamentos")) {

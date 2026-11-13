@@ -23,9 +23,9 @@ export const Route = createFileRoute("/tarefas")({
   head: () => ({
     meta: [
       { title: "Presence · Minhas tarefas" },
-      { name: "description", content: "Central de tarefas da Presence: rotina, compromissos e autocuidado em um só lugar." },
+      { name: "description", content: "Central de tarefas do Presence: rotina, compromissos e autocuidado em um só lugar." },
       { property: "og:title", content: "Presence · Minhas tarefas" },
-      { property: "og:description", content: "Organize rotina, compromissos e autocuidado com a Presence." },
+      { property: "og:description", content: "Organize rotina, compromissos e autocuidado com o Presence." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

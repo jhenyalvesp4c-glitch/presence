@@ -23,7 +23,7 @@ export type OrionDoc = {
 export type OrionSource = { n: number; id: string; kind: OrionKind; title: string; snippet: string; date?: string | undefined; where?: string | undefined; link: string; files: FileRef[] };
 
 export const KIND_LABEL: Record<OrionKind, string> = {
-  registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com a assistente", treinamento: "Treinamento",
+  registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com o assistente", treinamento: "Treinamento",
 };
 
 export const normalize = (s: string) =>
@@ -141,7 +141,7 @@ export function mentionedDossiers(text: string, names: string[]): string[] {
   return [...new Set(names.filter((n) => n.trim() && t.includes(hay(n))))];
 }
 
-export const SYSTEM = `Você é o Orion, o "segundo cérebro" da usuária: ele responde com base nas FONTES que o Presence reúne (anotações que ela documentou, demandas e seu histórico, tarefas e compromissos, notas de projeto, conversas com a assistente).
+export const SYSTEM = `Você é o Orion, o "segundo cérebro" da pessoa: ele responde com base nas FONTES que o Presence reúne (anotações que ela documentou, demandas e seu histórico, tarefas e compromissos, notas de projeto, conversas com o assistente).
 Regras:
 - Responda SOMENTE com o que está nas fontes. Se não houver informação suficiente, diga isso com clareza e sugira o que ela poderia documentar; nunca invente.
 - Cite as fontes pelo número entre colchetes, ex.: [2]. Datas sempre no formato dia/mês/ano.

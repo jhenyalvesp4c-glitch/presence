@@ -14,20 +14,20 @@ type StepKey = "nome" | "tom" | "saudacao" | "trabalho" | "demanda" | "rotina" |
 type Step = { key: StepKey; ask: (name: string) => string; sub?: string; optional?: boolean };
 
 const STEPS: Step[] = [
-  { key: "nome", ask: () => "Oi! Eu sou a Presence, sua assistente pessoal. Como você quer que eu te chame?", sub: "Pode ser seu nome, um apelido… do jeito que você preferir." },
+  { key: "nome", ask: () => "Oi! Eu sou o Presence, seu assistente pessoal. Como você quer que eu te chame?", sub: "Pode ser seu nome, um apelido… do jeito que você preferir." },
   { key: "tom", ask: (n) => `Prazer${n ? `, ${n}` : ""}! Como você quer que eu converse com você?`, sub: "Escolha um jeito ou descreva o seu." },
   { key: "saudacao", ask: () => "E quando a gente começar a conversar, como você quer que eu inicie?", sub: "Por exemplo: me cumprimentar e já mostrar o que tenho para hoje." },
   { key: "trabalho", ask: () => "Com o que você trabalha?", sub: "Conte o que você faz, onde atua, com quem trabalha. Pode falar, se preferir." },
   { key: "demanda", ask: () => "Qual é a sua maior demanda hoje? O que mais pesa no seu dia?", sub: "Isso me ajuda a entender o que priorizar para você." },
   { key: "rotina", ask: () => "Como é o seu dia a dia?", sub: "Horários, reuniões, tarefas que se repetem, quando você rende mais…", optional: true },
-  { key: "objetivos", ask: () => "O que você quer conquistar com a Presence?", sub: "Organizar o trabalho, não esquecer compromissos, cuidar da saúde…", optional: true },
+  { key: "objetivos", ask: () => "O que você quer conquistar com o Presence?", sub: "Organizar o trabalho, não esquecer compromissos, cuidar da saúde…", optional: true },
   { key: "regras", ask: () => "Tem alguma regra ou preferência que eu deva sempre seguir?", sub: "Ex.: “nunca me ligue antes das 9h”, “sempre me avise de prazos”.", optional: true },
   { key: "resumo", ask: (n) => `Pronto${n ? `, ${n}` : ""}! Foi isso que eu entendi.`, sub: "Confira. Você pode mudar qualquer resposta ou refazer o briefing quando quiser." },
 ];
 
 const field = "w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-base outline-none transition placeholder:text-muted-foreground/60 focus:border-cyan/60 focus:bg-white/[0.08]";
 
-/** Efeito de digitação para a pergunta da Presence. */
+/** Efeito de digitação para a pergunta do Presence. */
 function useTypewriter(text: string) {
   const [n, setN] = useState(0);
   useEffect(() => {
@@ -39,7 +39,7 @@ function useTypewriter(text: string) {
   return text.slice(0, n);
 }
 
-/** Briefing: a Presence conversa com a pessoa para aprender como chamar, como falar e como ajudar. */
+/** Briefing: o Presence conversa com a pessoa para aprender como chamar, como falar e como ajudar. */
 export function BriefingFlow() {
   const ctx = useBriefing();
   if (!ctx.open || !ctx.available || typeof document === "undefined") return null;
@@ -116,7 +116,7 @@ function Flow() {
   const stepOf: Record<string, number> = { "Nome": 0, "Jeito de conversar": 1, "Como começar a conversa": 2, "Trabalho": 3, "Maior demanda": 4, "Dia a dia": 5, "Objetivos": 6, "Regras e preferências": 7 };
 
   return (
-    <div className="fixed inset-0 z-[95] overflow-y-auto bg-[oklch(0.1_0.025_265/0.96)] backdrop-blur-xl" data-testid="briefing" role="dialog" aria-label="Briefing da Presence">
+    <div className="fixed inset-0 z-[95] overflow-y-auto bg-[oklch(0.1_0.025_265/0.96)] backdrop-blur-xl" data-testid="briefing" role="dialog" aria-label="Briefing do Presence">
       <div aria-hidden className="pointer-events-none fixed -left-24 -top-28 h-96 w-96 rounded-full bg-[var(--violet)] opacity-30 blur-3xl" style={{ animation: "vp-aurora 14s ease-in-out infinite" }} />
       <div aria-hidden className="pointer-events-none fixed -bottom-32 -right-24 h-96 w-96 rounded-full bg-[var(--cyan)] opacity-20 blur-3xl" style={{ animation: "vp-aurora 17s ease-in-out infinite reverse" }} />
 
@@ -135,8 +135,8 @@ function Flow() {
 
         {tab === "memoria" ? (
           <section className="mt-6 flex-1" data-testid="briefing-memoria">
-            <h2 className="font-serif text-3xl leading-tight"><span className="text-gradient">O que a Presence aprendeu sobre você</span></h2>
-            <p className="mt-1 text-sm text-muted-foreground">Ela guarda o que você conta e pede para lembrar. Apague o que não quiser que ela use.</p>
+            <h2 className="font-serif text-3xl leading-tight"><span className="text-gradient">O que o Presence aprendeu sobre você</span></h2>
+            <p className="mt-1 text-sm text-muted-foreground">Ele guarda o que você conta e pede para lembrar. Apague o que não quiser que ela use.</p>
             <form className="mt-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); const t = newMem.trim(); if (!t) return; void addMemory(t, "aprendizado", "manual").then(() => { setNewMem(""); ctx.refresh(); }).catch((x) => setError(x.message)); }}>
               <input value={newMem} onChange={(e) => setNewMem(e.target.value)} placeholder="Ensinar algo novo: ex.: prefiro reuniões à tarde" className={field} maxLength={500} data-testid="briefing-nova-memoria" />
               <button type="submit" aria-label="Adicionar" className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-brand text-primary-foreground"><Plus size={18} /></button>

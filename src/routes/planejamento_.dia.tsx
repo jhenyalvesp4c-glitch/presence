@@ -14,7 +14,7 @@ export const Route = createFileRoute("/planejamento_/dia")({
   head: () => ({
     meta: [
       { title: "Seu plano do dia · Presence" },
-      { name: "description", content: "Sua programação completa do dia, em uma timeline por horários, gerada pela Presence." },
+      { name: "description", content: "Sua programação completa do dia, em uma timeline por horários, gerada pelo Presence." },
       { property: "og:title", content: "Seu plano do dia · Presence" },
       { property: "og:description", content: "Conclua, edite e reorganize as atividades do seu dia." },
       { property: "og:type", content: "website" },

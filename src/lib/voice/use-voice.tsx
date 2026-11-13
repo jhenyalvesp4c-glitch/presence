@@ -366,7 +366,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const start = useCallback(() => {
     activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
     spk().unlock();
-    // Se a pessoa pediu no briefing que a Presence comece a conversa, ela fala primeiro.
+    // Se a pessoa pediu no briefing que o Presence comece a conversa, ela fala primeiro.
     if (greetRef.current !== "esperar") void ask(GREET_MARK); else listen();
   }, [listen, ask]);
 

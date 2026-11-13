@@ -23,7 +23,7 @@ const SUBTITLE_LABEL: Record<Phase, string> = { idle: "Toque para falar", listen
 function MiniOrb({ phase, onClick }: { phase: Phase; onClick: () => void }) {
   const c = COLOR[phase];
   return (
-    <button onClick={onClick} aria-label={phase === "idle" ? "Falar com a Presence" : "Parar ou interromper"} data-testid={phase === "idle" ? "voz-abrir" : "voz-esfera"}
+    <button onClick={onClick} aria-label={phase === "idle" ? "Falar com o Presence" : "Parar ou interromper"} data-testid={phase === "idle" ? "voz-abrir" : "voz-esfera"}
       className="group relative grid h-16 w-16 place-items-center rounded-full outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-cyan">
       <span className="absolute inset-0 rounded-full blur-xl transition-colors duration-700" style={{ background: `color-mix(in oklab, ${c} 45%, transparent)`, opacity: phase === "idle" ? 0.45 : 0.9 }} />
       {phase !== "idle" && <span className="absolute inset-0 animate-ping rounded-full" style={{ border: `1.5px solid ${c}`, animationDuration: phase === "listening" ? "1.8s" : phase === "speaking" ? "0.9s" : "2.6s" }} />}

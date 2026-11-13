@@ -52,7 +52,7 @@ async function voiceContext(): Promise<Cached> {
   return fresh;
 }
 
-const PERSONA = (name: string | null) => `Você é a Presence, a assistente pessoal${name ? ` de ${name}` : ""}, no estilo do Jarvis: elegante, calma, muito eficiente e com um leve toque de humor sofisticado. Está conversando POR VOZ.
+const PERSONA = (name: string | null) => `Você é o Presence, o assistente pessoal${name ? ` de ${name}` : ""}, no estilo do Jarvis: elegante, calmo, muito eficiente e com um leve toque de humor sofisticado. Está conversando POR VOZ.
 Regras de fala:
 - Responda em português do Brasil, em UMA ou DUAS frases curtas. Nada de listas, markdown, emojis, URLs ou códigos; diga datas e horas do jeito que se fala ("amanhã às três da tarde").
 - Faça o pedido na hora usando as ferramentas e depois confirme em uma frase ("Pronto, criei a demanda…"). Não peça permissão para o que foi pedido com clareza.
@@ -60,29 +60,29 @@ Regras de fala:
 - Para "o que tenho hoje", "me mostra tudo", "minha agenda/pendências" (ou amanhã) use SOMENTE resumo_do_dia, sem abrir nenhuma página (a tela de Saúde "Hoje" é outra coisa: só abra saude se ela pedir saúde). O painel mostra tudo: compromissos, lembretes, tarefas, atrasadas e demandas. Fale só os destaques em até três frases, citando as quantidades.
 - Perguntas sobre o que ela FEZ, CRIOU, CONCLUIU ou DOCUMENTOU (ontem, esta semana, mês passado, quantas demandas, quais tarefas, o que anotei) → use consultar_registros: ele traz as listas e contagens reais. Pergunte-se sempre se precisa dele antes de dizer que não sabe.
 - Perguntas sobre o CONTEÚDO de algo (o que disse um documento, detalhes de uma demanda, o que foi combinado, arquivos) → use buscar_no_orion. Se uma ferramenta não bastar, tente a outra antes de responder que não encontrou.
-- Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (Orion), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a usuária contou, use documentar.
+- Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (Orion), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a pessoa contou, use documentar.
 - Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
 - Se ela disser como quer ser chamada, como prefere que você fale ou como começar a conversa, use ajustar_perfil. Quando ela contar algo duradouro sobre si ou pedir "lembra que…", use lembrar; "esquece que…", use esquecer.
-- Para abrir telas use abrir_pagina. Quando a usuária se despedir ou pedir para parar, use encerrar_conversa.
+- Para abrir telas use abrir_pagina. Quando a pessoa se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
-${name ? `Trate a usuária pelo nome de vez em quando, sem exagero.` : ""}`;
+${name ? `Trate a pessoa pelo nome de vez em quando, sem exagero.` : ""}`;
 
 /* ───────────── ferramentas ───────────── */
 const fn = (name: string, description: string, parameters: Record<string, unknown>) => ({ type: "function", function: { name, description, parameters } });
 const schemaOf = (z_: z.ZodType) => { const { $schema: _s, ...rest } = z.toJSONSchema(z_, { target: "draft-2020-12" }) as Record<string, unknown>; return rest; };
 
 export const TOOLS = [
-  fn("abrir_pagina", "Abre uma tela do Presence para a usuária.", { type: "object", properties: {
+  fn("abrir_pagina", "Abre uma tela do Presence para a pessoa.", { type: "object", properties: {
     pagina: { type: "string", enum: Object.keys(PAGES), description: "inicio, demandas, projetos, tarefas, calendario, planejamento, saude, treino, dieta, habitos, progresso, cerebro (segundo cérebro/Orion), organizar, analise, resumo" },
     projeto: { type: "string", description: "Só para demandas: nome do projeto, se ela pedir um específico." },
   }, required: ["pagina"] }),
   fn("registrar", "Cria registros reais no Presence (demanda, tarefa, compromisso, lembrete, rotina, anotação). Use os nomes EXATOS de projetos e polos do contexto. Datas em AAAA-MM-DD, horas em HH:MM.", schemaOf(z.object({
     itens: z.array(rascunhoSchema).min(1).max(8),
-    permitir_duplicado: z.boolean().optional().describe("true só se a usuária pediu para criar mesmo já existindo algo igual."),
+    permitir_duplicado: z.boolean().optional().describe("true só se a pessoa pediu para criar mesmo já existindo algo igual."),
   }))),
-  fn("resumo_do_dia", "Traz o que a usuária tem para um dia (compromissos, tarefas, atrasadas) e as demandas em andamento. A tela mostra o painel completo.", { type: "object", properties: { quando: { type: "string", description: "hoje, amanha ou AAAA-MM-DD. Padrão: hoje." } } }),
+  fn("resumo_do_dia", "Traz o que a pessoa tem para um dia (compromissos, tarefas, atrasadas) e as demandas em andamento. A tela mostra o painel completo.", { type: "object", properties: { quando: { type: "string", description: "hoje, amanha ou AAAA-MM-DD. Padrão: hoje." } } }),
   fn("atualizar_demanda", "Muda, edita ou exclui uma demanda que já existe: coloca em andamento, conclui, reabre, troca título, descrição, prazo ou prioridade, adiciona observação, conclui só um dossiê (demanda para vários) ou exclui. Identifique pelo código (ex.: P049, G042) ou por palavras do título.", { type: "object", properties: {
     demanda: { type: "string", description: "Código (P049, #G042) ou palavras do título." },
     status: { type: "string", enum: ["todo", "doing", "done"], description: "todo = a fazer/reabrir, doing = em andamento, done = concluída." },
@@ -101,7 +101,7 @@ export const TOOLS = [
     confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
   }, required: ["item", "acao"] }),
   fn("buscar_no_orion", "Pesquisa no segundo cérebro (anotações, demandas, tarefas, documentos, arquivos, roteiros, conversas) e devolve os trechos mais relevantes.", { type: "object", properties: { pergunta: { type: "string" } }, required: ["pergunta"] }),
-  fn("consultar_registros", "Lista e conta, com datas, o que a usuária criou, concluiu ou documentou: demandas, tarefas/compromissos/lembretes e anotações do segundo cérebro. Use para 'o que fiz ontem', 'quais demandas concluí esta semana', 'quantas tarefas criei', 'o que documentei'. A tela mostra o painel completo.", { type: "object", properties: {
+  fn("consultar_registros", "Lista e conta, com datas, o que a pessoa criou, concluiu ou documentou: demandas, tarefas/compromissos/lembretes e anotações do segundo cérebro. Use para 'o que fiz ontem', 'quais demandas concluí esta semana', 'quantas tarefas criei', 'o que documentei'. A tela mostra o painel completo.", { type: "object", properties: {
     assunto: { type: "string", enum: ["tudo", "demandas", "tarefas", "anotacoes"], description: "Padrão: tudo." },
     situacao: { type: "string", enum: ["concluidas", "criadas", "abertas", "todas"], description: "concluidas = finalizadas; criadas = registradas no período; abertas = ainda pendentes. Padrão: todas." },
     periodo: { type: "string", description: "hoje, ontem, anteontem, esta semana, semana passada, este mes, mes passado. Vazio = sem limite de data." },
@@ -118,7 +118,7 @@ export const TOOLS = [
     nome: { type: "string", description: "Como chamá-la." }, jeito: { type: "string", description: "Tom e jeito de conversar, em uma frase." },
     saudacao: { type: "string", enum: ["esperar", "saudacao", "saudacao_hoje", "saudacao_pergunta"], description: "Como iniciar a conversa." },
   } }),
-  fn("encerrar_conversa", "Encerra a conversa por voz quando a usuária se despedir ou pedir para parar.", { type: "object", properties: {} }),
+  fn("encerrar_conversa", "Encerra a conversa por voz quando a pessoa se despedir ou pedir para parar.", { type: "object", properties: {} }),
 ];
 
 type Emit = (e: VoiceEvent) => void;
@@ -157,9 +157,9 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
         const p = registroSchema.safeParse({ ...(r as object), ...(args["permitir_duplicado"] ? { permitir_duplicado: true } : {}) });
         if (p.success) valid.push(p.data); else problems.push(`item ${i + 1}: ${p.error.issues.map((x) => `${x.path.join(".") || "registro"}: ${x.message}`).join("; ")}`);
       });
-      if (problems.length || !valid.length) return { ok: false, faltando: problems.length ? problems : ["nada para registrar"], dica: "Pergunte à usuária o que falta, em uma frase." };
+      if (problems.length || !valid.length) return { ok: false, faltando: problems.length ? problems : ["nada para registrar"], dica: "Pergunte à pessoa o que falta, em uma frase." };
       const prep = await prepare(valid);
-      if (prep.problems.length) return { ok: false, faltando: prep.problems.slice(0, 5), dica: "Pergunte à usuária o que falta ou qual opção, em uma frase." };
+      if (prep.problems.length) return { ok: false, faltando: prep.problems.slice(0, 5), dica: "Pergunte à pessoa o que falta ou qual opção, em uma frase." };
       const active = prep.resolved.filter((r) => !r._ignorar);
       if (!active.length) return { ok: false, duplicado: prep.resolved.map((r) => r._duplicado).filter(Boolean), dica: "Já existe algo equivalente. Pergunte se ela quer criar mesmo assim (então chame registrar de novo com permitir_duplicado=true)." };
       const r = await commitRecords(prep.resolved, { client: "Presence · Voz", summary: prep.summary });

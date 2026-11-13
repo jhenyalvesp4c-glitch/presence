@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase, ownerId, type AssistantMessage, type Demand } from "./supabase";
 import { askAssistant } from "./assistant.functions";
 
-/** Dados e ações da página principal: perfil, conversa com a assistente e demandas. */
+/** Dados e ações da página principal: perfil, conversa com o assistente e demandas. */
 export function useHome() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
@@ -60,7 +60,7 @@ export function useHome() {
         ]);
         if (res.demandsCreated.length) await refreshPending();
       } catch {
-        setError("Não consegui falar com a assistente. Verifique sua conexão.");
+        setError("Não consegui falar com o assistente. Verifique sua conexão.");
       } finally {
         setThinking(false);
       }

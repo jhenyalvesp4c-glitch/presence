@@ -189,7 +189,7 @@ function Assistente() {
                 Como posso<br /><span className="text-gradient">te ajudar hoje?</span>
               </h1>
               <p className="mt-5 max-w-sm text-[0.95rem] leading-relaxed text-muted-foreground max-sm:hidden">
-                Organize sua rotina, acompanhe seus objetivos e conte com a Presence para facilitar seu dia.
+                Organize sua rotina, acompanhe seus objetivos e conte com o Presence para facilitar seu dia.
               </p>
               <Link to="/planejamento" className="glass group mt-7 inline-flex max-sm:hidden items-center gap-4 rounded-full px-6 py-3 text-sm transition hover:shadow-[0_0_30px_-8px_var(--cyan)]">
                 <Sparkles size={18} className="text-cyan" /> "Planeje meu dia de hoje"
@@ -267,8 +267,8 @@ function Assistente() {
                 {!briefing.completed && <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{ animation: "vp-sweep 4s ease-in-out infinite" }} />}
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-violet/15 text-violet"><Sparkles size={18} /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{briefing.completed ? "Meu briefing" : "Personalize a Presence"}</span>
-                  <span className="block text-xs text-muted-foreground">{briefing.completed ? "Veja ou mude como ela fala com você e o que já aprendeu." : "Responda umas perguntas rápidas e ela aprende o seu jeito, o seu trabalho e como começar a conversa."}</span>
+                  <span className="block text-sm font-semibold">{briefing.completed ? "Meu briefing" : "Personalize o Presence"}</span>
+                  <span className="block text-xs text-muted-foreground">{briefing.completed ? "Veja ou mude como ele fala com você e o que já aprendeu." : "Responda umas perguntas rápidas e ele aprende o seu jeito, o seu trabalho e como começar a conversa."}</span>
                 </span>
                 <ArrowRight size={16} className="shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
               </button>

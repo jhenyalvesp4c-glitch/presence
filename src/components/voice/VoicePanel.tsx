@@ -27,7 +27,7 @@ const bare = (title: string) => title.replace(/\s*\(\d+\)\s*$/, "");
 /** "09:00–10:00 · local" → hora separada do resto. */
 const splitTime = (d?: string) => { const m = d ? /^(\d{2}:\d{2}(?:–\d{2}:\d{2})?)(?:\s*·\s*)?(.*)$/.exec(d) : null; return m ? { time: m[1]!, rest: m[2] || undefined } : { time: undefined, rest: d }; };
 
-/** Modal do que a Presence mostra por voz (o dia, registros, o que foi criado): bonito, organizado e clicável. */
+/** Modal do que o Presence mostra por voz (o dia, registros, o que foi criado): bonito, organizado e clicável. */
 export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: () => void; onOpen: (href: string) => void }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };

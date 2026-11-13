@@ -16,9 +16,9 @@ export const Route = createFileRoute("/planejamento")({
   head: () => ({
     meta: [
       { title: "Planejamento Inteligente · Presence" },
-      { name: "description", content: "Conte como você está hoje e a Presence monta um plano personalizado para o seu dia." },
+      { name: "description", content: "Conte como você está hoje e o Presence monta um plano personalizado para o seu dia." },
       { property: "og:title", content: "Planejamento Inteligente · Presence" },
-      { property: "og:description", content: "Planeje seu dia com a Presence: disposição, tempo, prioridades e pausas." },
+      { property: "og:description", content: "Planeje seu dia com o Presence: disposição, tempo, prioridades e pausas." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -211,7 +211,7 @@ function Planejamento() {
 
         <div className="flex flex-col gap-5">
           <Panel c="violet" style={{ animationDelay: ".46s" }}>
-            <h2 className="mb-3 flex items-center gap-2.5 font-display text-lg font-semibold"><Sparkles size={20} className="text-violet" /> Análise da Presence</h2>
+            <h2 className="mb-3 flex items-center gap-2.5 font-display text-lg font-semibold"><Sparkles size={20} className="text-violet" /> Análise do Presence</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">Hoje você tem {nTarefas} tarefa{nTarefas === 1 ? "" : "s"}, {nComp} compromisso{nComp === 1 ? "" : "s"} e {nHabitos} hábito{nHabitos === 1 ? "" : "s"} previstos{todaySplit?.workout_id ? `, além do treino ${todaySplit.title}` : ""}.</p>
             <div className="mt-4 flex gap-3 border-t border-border pt-4">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" style={{ color: colorVar("amber") }} />

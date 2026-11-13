@@ -20,7 +20,7 @@ export const Route = createFileRoute("/organizar")({
   head: () => ({
     meta: [
       { title: "Organize o seu dia · Presence" },
-      { name: "description", content: "Centralize tarefas, prioridades e compromissos numa rotina prática e equilibrada com a Presence." },
+      { name: "description", content: "Centralize tarefas, prioridades e compromissos numa rotina prática e equilibrada com o Presence." },
       { property: "og:title", content: "Organize o seu dia · Presence" },
       { property: "og:description", content: "Tarefas, agenda, prioridades e equilíbrio da rotina num só lugar." },
       { property: "og:type", content: "website" },
@@ -194,7 +194,7 @@ function Organizar() {
           <p className="mono-caps mb-2 !tracking-[0.4em] text-cyan">Organização diária</p>
           <h1 className="font-serif text-4xl leading-tight sm:text-5xl">Organize o <span className="text-gradient">seu dia</span></h1>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground lg:mx-0">
-            Centralize suas tarefas, prioridades e compromissos. A Presence organiza tudo para você em uma rotina prática e equilibrada.
+            Centralize suas tarefas, prioridades e compromissos. O Presence organiza tudo para você em uma rotina prática e equilibrada.
           </p>
         </div>
         <div className="relative mx-auto h-44 w-64 animate-rise">

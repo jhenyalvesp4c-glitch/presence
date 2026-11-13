@@ -17,7 +17,7 @@ export type AskResult =
   | { ok: false; error: string };
 
 // Prompt estável primeiro (cacheável); dados voláteis (data, nome, demandas) vêm depois.
-const SYSTEM_PROMPT = `Você é a Presence, assistente pessoal da usuária para rotina, saúde, foco, finanças e projetos.
+const SYSTEM_PROMPT = `Você é o Presence, assistente pessoal da pessoa para rotina, saúde, foco, finanças e projetos.
 Fale sempre em português do Brasil, de forma calorosa, direta e breve (no máximo 3 parágrafos curtos, a menos que ela peça detalhes).
 
 Você tem acesso às demandas e às tarefas dela pelas ferramentas:
@@ -33,7 +33,7 @@ Nunca invente dados que não vieram das ferramentas.`;
 const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "registrar_demanda",
-    description: "Registra uma nova demanda (pendência) para a usuária.",
+    description: "Registra uma nova demanda (pendência) para a pessoa.",
     strict: true,
     input_schema: {
       type: "object",
@@ -47,7 +47,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "listar_demandas",
-    description: "Lista as demandas da usuária, das mais recentes para as mais antigas.",
+    description: "Lista as demandas da pessoa, das mais recentes para as mais antigas.",
     strict: true,
     input_schema: {
       type: "object",
@@ -85,7 +85,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "listar_tarefas",
-    description: "Lista as tarefas da usuária (nunca inclui tarefas apagadas).",
+    description: "Lista as tarefas da pessoa (nunca inclui tarefas apagadas).",
     strict: true,
     input_schema: {
       type: "object",
@@ -209,12 +209,12 @@ export const askAssistant = createServerFn({ method: "POST" })
 
     // A mensagem já está salva; sem a chave da IA, avisa e para por aqui.
     if (!process.env["ANTHROPIC_API_KEY"]) {
-      return { ok: false, error: "Mensagem salva, mas a assistente ainda não está configurada (falta ANTHROPIC_API_KEY no servidor)." };
+      return { ok: false, error: "Mensagem salva, mas o assistente ainda não está configurada (falta ANTHROPIC_API_KEY no servidor)." };
     }
 
     const messages: Anthropic.Beta.BetaMessageParam[] = [];
     for (const m of (history ?? []).reverse()) {
-      // A API exige que a conversa comece pela usuária.
+      // A API exige que a conversa comece pela pessoa.
       if (messages.length === 0 && m.role !== "user") continue;
       messages.push({ role: m.role as "user" | "assistant", content: m.content });
     }
@@ -225,7 +225,7 @@ export const askAssistant = createServerFn({ method: "POST" })
       timeStyle: "short",
       timeZone: "America/Sao_Paulo",
     }).format(new Date());
-    const name = profile?.display_name || "usuária";
+    const name = profile?.display_name || "pessoa";
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
     const { default: AnthropicClient } = await import("@anthropic-ai/sdk");
@@ -243,7 +243,7 @@ export const askAssistant = createServerFn({ method: "POST" })
           output_config: { effort: "low" },
           system: [
             { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-            { type: "text", text: `Agora: ${now} (horário de Brasília), data de hoje ${today}. Nome da usuária: ${name}.` },
+            { type: "text", text: `Agora: ${now} (horário de Brasília), data de hoje ${today}. Nome da pessoa: ${name}.` },
           ],
           tools,
           messages,
@@ -282,11 +282,11 @@ export const askAssistant = createServerFn({ method: "POST" })
         return { ok: false, error: "Muitas mensagens seguidas. Tente de novo em instantes." };
       }
       if (error instanceof AnthropicClient.AuthenticationError) {
-        return { ok: false, error: "A chave da API da assistente é inválida." };
+        return { ok: false, error: "A chave da API do assistente é inválida." };
       }
       if (error instanceof AnthropicClient.APIError) {
         console.error("Claude API error", error.status, error.message);
-        return { ok: false, error: "A assistente está indisponível agora. Tente novamente." };
+        return { ok: false, error: "O assistente está indisponível agora. Tente novamente." };
       }
       throw error;
     }
