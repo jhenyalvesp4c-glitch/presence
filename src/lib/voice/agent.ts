@@ -54,6 +54,9 @@ Regras de fala:
 - Perguntas sobre o que ela FEZ, CRIOU, CONCLUIU ou DOCUMENTOU (ontem, esta semana, mês passado, quantas demandas, quais tarefas, o que anotei) → use consultar_registros: ele traz as listas e contagens reais. Pergunte-se sempre se precisa dele antes de dizer que não sabe.
 - Perguntas sobre o CONTEÚDO de algo (o que disse um documento, detalhes de uma demanda, o que foi combinado, arquivos) → use buscar_no_orion. Se uma ferramenta não bastar, tente a outra antes de responder que não encontrou.
 - Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (Orion), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a usuária contou, use documentar.
+- Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
+- EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
+- Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
 - Para abrir telas use abrir_pagina. Quando a usuária se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
 ${name ? `Trate a usuária pelo nome de vez em quando, sem exagero.` : ""}`;
@@ -72,7 +75,23 @@ export const TOOLS = [
     permitir_duplicado: z.boolean().optional().describe("true só se a usuária pediu para criar mesmo já existindo algo igual."),
   }))),
   fn("resumo_do_dia", "Traz o que a usuária tem para um dia (compromissos, tarefas, atrasadas) e as demandas em andamento. A tela mostra o painel completo.", { type: "object", properties: { quando: { type: "string", description: "hoje, amanha ou AAAA-MM-DD. Padrão: hoje." } } }),
-  fn("concluir_tarefa", "Marca uma tarefa pendente como feita, pelo título (aproximado).", { type: "object", properties: { titulo: { type: "string" } }, required: ["titulo"] }),
+  fn("atualizar_demanda", "Muda, edita ou exclui uma demanda que já existe: coloca em andamento, conclui, reabre, troca título, descrição, prazo ou prioridade, adiciona observação, conclui só um dossiê (demanda para vários) ou exclui. Identifique pelo código (ex.: P049, G042) ou por palavras do título.", { type: "object", properties: {
+    demanda: { type: "string", description: "Código (P049, #G042) ou palavras do título." },
+    status: { type: "string", enum: ["todo", "doing", "done"], description: "todo = a fazer/reabrir, doing = em andamento, done = concluída." },
+    dossie: { type: "string", description: "Só para demanda de vários dossiês: muda o status apenas desse dossiê." },
+    titulo: { type: "string" }, descricao: { type: "string" }, prioridade: { type: "string", enum: ["alta", "media", "baixa"] },
+    prazo: { type: "string", description: "AAAA-MM-DD ou dd/mm." }, nota: { type: "string", description: "Observação a acrescentar." },
+    excluir: { type: "boolean", description: "true para excluir a demanda (pede confirmação)." },
+    confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
+  }, required: ["demanda"] }),
+  fn("gerenciar_tarefa", "Conclui, reabre, edita ou exclui uma tarefa, lembrete ou compromisso que já existe (para criar um novo use registrar). Identifique pelo título aproximado.", { type: "object", properties: {
+    item: { type: "string", description: "Título (aproximado) do item." },
+    tipo: { type: "string", enum: ["tarefa", "lembrete", "compromisso", "qualquer"], description: "Padrão: qualquer." },
+    acao: { type: "string", enum: ["concluir", "reabrir", "editar", "excluir"] },
+    novo_titulo: { type: "string" }, nova_data: { type: "string", description: "AAAA-MM-DD" }, nova_hora: { type: "string", description: "HH:MM" },
+    prioridade: { type: "string", enum: ["alta", "media", "baixa"] }, local: { type: "string" },
+    confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
+  }, required: ["item", "acao"] }),
   fn("buscar_no_orion", "Pesquisa no segundo cérebro (anotações, demandas, tarefas, documentos, arquivos, roteiros, conversas) e devolve os trechos mais relevantes.", { type: "object", properties: { pergunta: { type: "string" } }, required: ["pergunta"] }),
   fn("consultar_registros", "Lista e conta, com datas, o que a usuária criou, concluiu ou documentou: demandas, tarefas/compromissos/lembretes e anotações do segundo cérebro. Use para 'o que fiz ontem', 'quais demandas concluí esta semana', 'quantas tarefas criei', 'o que documentei'. A tela mostra o painel completo.", { type: "object", properties: {
     assunto: { type: "string", enum: ["tudo", "demandas", "tarefas", "anotacoes"], description: "Padrão: tudo." },
@@ -165,13 +184,26 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       };
     }
 
-    case "concluir_tarefa": {
-      const want = normalize(String(args["titulo"] ?? ""));
-      const rows = must(await supabase.from("tasks").select("id, title").eq("done", false).limit(300)) as { id: string; title: string }[];
-      const hits = rows.filter((r) => { const n = normalize(r.title); return n.includes(want) || want.includes(n); });
-      if (hits.length !== 1) return hits.length ? { ok: false, ambiguo: hits.slice(0, 4).map((h) => h.title), dica: "Pergunte qual delas." } : { ok: false, erro: "Não achei essa tarefa pendente." };
-      must(await supabase.from("tasks").update({ done: true, done_at: new Date().toISOString() }).eq("id", hits[0]!.id).select("id"));
-      return { ok: true, tarefa: hits[0]!.title };
+    case "atualizar_demanda": {
+      const { changeDemand } = await import("./manage");
+      const r = await changeDemand({
+        demanda: String(args["demanda"] ?? ""), status: ["todo", "doing", "done"].includes(String(args["status"])) ? (args["status"] as "todo" | "doing" | "done") : undefined,
+        titulo: args["titulo"] as string | undefined, descricao: args["descricao"] as string | undefined, prioridade: args["prioridade"] as "alta" | "media" | "baixa" | undefined,
+        prazo: args["prazo"] as string | undefined, nota: args["nota"] as string | undefined, dossie: args["dossie"] as string | undefined,
+        excluir: args["excluir"] === true, confirmado: args["confirmado"] === true,
+      }).catch((e): Record<string, unknown> => ({ ok: false, erro: e instanceof Error ? e.message : "Não consegui alterar a demanda." }));
+      if (r["ok"]) emit({ t: "painel", p: { titulo: r["acao"] === "excluida" ? "Demanda excluída" : "Demanda atualizada", secoes: [{ titulo: String(r["acao"] === "excluida" ? "Excluída" : (r["status_agora"] ?? "Atualizada")), itens: [{ rotulo: String(r["demanda"]), detalhe: Array.isArray(r["mudou"]) ? (r["mudou"] as string[]).join(" · ") : undefined, link: r["acao"] === "excluida" ? undefined : "/demandas" }] }] } });
+      return r;
+    }
+
+    case "gerenciar_tarefa": {
+      const { changeTask } = await import("./manage");
+      const r = await changeTask({
+        item: String(args["item"] ?? ""), tipo: (args["tipo"] as "tarefa" | "lembrete" | "compromisso" | "qualquer" | undefined), acao: String(args["acao"]) as "concluir" | "reabrir" | "editar" | "excluir",
+        novo_titulo: args["novo_titulo"] as string | undefined, nova_data: args["nova_data"] as string | undefined, nova_hora: args["nova_hora"] as string | undefined,
+        prioridade: args["prioridade"] as "alta" | "media" | "baixa" | undefined, local: args["local"] as string | undefined, confirmado: args["confirmado"] === true,
+      }).catch((e): Record<string, unknown> => ({ ok: false, erro: e instanceof Error ? e.message : "Não consegui alterar o item." }));
+      return r;
     }
 
     case "buscar_no_orion": {
