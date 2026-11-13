@@ -151,3 +151,26 @@ describe("whatsapp: marcar como lido pelo Presence", () => {
     expect(store.counts().messages).toBe(4); // nada foi apagado
   });
 });
+
+describe("whatsapp: nomes de quem foi marcado", () => {
+  const store = new Store(":memory:");
+  const g = "120363000000000001@g.us";
+  const msg = (text: string) => store.addMessage({ id: `m${Math.random()}`, chat: g, chat_name: "BH Floresta", is_group: true, sender: "5521988880000@s.whatsapp.net", sender_name: "Rossana Nogueira", from_me: false, ts: 1_800_000_000, text, kind: "texto", mentions_me: false, reply_to_me: false });
+  it("troca o número interno pelo nome quando o nome é conhecido", () => {
+    store.setContactName("221160918773763@lid", "Rebeca Assis");
+    store.setContactName("5531999990001@s.whatsapp.net", "Carlos Lima");
+    store.link("33423569719333@lid", "5531999990001@s.whatsapp.net"); // o id interno aponta para o telefone do Carlos
+    msg("Seria possível? @221160918773763 @33423569719333");
+    const m = store.messages(g)[0]!;
+    expect(m.text).toBe("Seria possível? @Rebeca Assis @Carlos Lima");
+    expect(m.marcados).toEqual(["Rebeca Assis", "Carlos Lima"]);
+  });
+  it("sem nome salvo: não mostra número interno confuso", () => {
+    const s = new Store(":memory:");
+    expect(s.resolveMentions("oi @221160918773763 e @5531977770000")).toEqual({ text: "oi @contato sem nome salvo e @+5531977770000", marcados: ["contato sem nome salvo", "+5531977770000"] });
+  });
+  it("não mexe em e-mails nem em números curtos", () => {
+    const s = new Store(":memory:");
+    expect(s.resolveMentions("fale em joao@empresa.com ou @123").text).toBe("fale em joao@empresa.com ou @123");
+  });
+});

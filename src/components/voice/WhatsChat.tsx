@@ -24,6 +24,7 @@ function Bubble({ m, group, showName }: { m: ChatMsg; group: boolean; showName: 
         {group && !mine && showName && <p className="mb-0.5 text-[0.78rem] font-semibold leading-tight" style={{ color: colorOf(m.quem) }}>{m.quem}</p>}
         {m.marcou && <p className="mb-0.5 flex items-center gap-1 text-[0.65rem] font-medium text-amber"><AtSign size={10} /> marcou ou respondeu a você</p>}
         <p className={`whitespace-pre-wrap break-words text-[0.9rem] leading-snug ${m.texto ? "" : "italic text-foreground/70"}`}>{m.texto || KIND[m.tipo] || "Mensagem"}</p>
+        {m.marcados && m.marcados.length > 0 && <p className="mt-1 flex flex-wrap items-center gap-1 text-[0.68rem] text-sky-300/90" data-testid="whats-marcados"><AtSign size={10} /> Marcou: {m.marcados.join(", ")}</p>}
         <p className={`mt-0.5 text-right text-[0.65rem] leading-none ${mine ? "text-white/60" : "text-muted-foreground"}`}>{m.hora}</p>
       </div>
     </div>

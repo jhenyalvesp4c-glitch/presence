@@ -5,6 +5,8 @@ export type Me = { jids: string[]; name: string };
 export type Msg = {
   id: string; chat: string; chat_name: string; is_group: boolean; sender: string; sender_name: string; from_me: boolean;
   ts: number; text: string; kind: string; mentions_me: boolean; reply_to_me: boolean;
+  /** Nomes de quem foi marcado na mensagem (preenchido ao ler do banco). */
+  marcados?: string[];
 };
 
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any

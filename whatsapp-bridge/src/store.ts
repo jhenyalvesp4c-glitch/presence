@@ -8,6 +8,9 @@ export const norm = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g
 const FILLER = new Set(["grupo", "conversa", "chat", "do", "da", "de", "dos", "das", "o", "a", "os", "as", "no", "na", "com", "meu", "minha"]);
 export const nameWords = (q: string): string[] => { const all = norm(q).split(" ").filter(Boolean); const core = all.filter((w) => !FILLER.has(w)); return core.length ? core : all; };
 
+/** "5511999:12@s.whatsapp.net" → "5511999". */
+const userOf = (j: string): string => String(j ?? "").split("@")[0]!.split(":")[0]!;
+
 export type ChatRow = { jid: string; name: string; is_group: number; last_ts: number; checked_ts: number };
 export type ChatInfo = { jid: string; name: string; is_group: boolean; last_ts: number; novas: number };
 
@@ -29,6 +32,7 @@ export class Store {
       create index if not exists messages_ts_idx on messages (ts);
       create index if not exists messages_chat_ts_idx on messages (chat, ts);
       create table if not exists names (jid text primary key, name text not null);
+      create table if not exists aliases (a text not null, b text not null, primary key (a, b));
     `);
   }
 
@@ -38,7 +42,33 @@ export class Store {
     this.db.prepare("insert into chats (jid, name, is_group) values (?, ?, ?) on conflict(jid) do update set name = excluded.name").run(jid, n, isGroup ?? jid.endsWith("@g.us") ? 1 : 0);
   }
   setContactName(jid: string, name: string) { if (name.trim()) this.db.prepare("insert into names (jid, name) values (?, ?) on conflict(jid) do update set name = excluded.name").run(jid, name.trim()); }
-  nameOf(jid: string): string { const r = this.db.prepare("select name from names where jid = ?").get(jid) as { name: string } | undefined; return r?.name ?? ""; }
+  /** Liga dois identificadores da mesma pessoa (número de telefone e o id interno novo do WhatsApp). */
+  link(a: string, b: string) {
+    const x = userOf(a), y = userOf(b);
+    if (!x || !y || x === y) return;
+    const st = this.db.prepare("insert or ignore into aliases (a, b) values (?, ?)");
+    st.run(x, y); st.run(y, x);
+  }
+  private nameByUser(user: string): string {
+    if (!user) return "";
+    const r = this.db.prepare("select name from names where jid = ? or jid like ? or jid like ? limit 1").get(user, `${user}@%`, `${user}:%@%`) as { name: string } | undefined;
+    return r?.name ?? "";
+  }
+  /** Nome da pessoa pelo identificador (aceita telefone, id interno e variações; tenta os identificadores ligados). */
+  nameOf(jid: string): string {
+    const user = userOf(jid);
+    const direct = this.nameByUser(user);
+    if (direct) return direct;
+    const others = this.db.prepare("select b from aliases where a = ?").all(user) as { b: string }[];
+    for (const o of others) { const n = this.nameByUser(o.b); if (n) return n; }
+    return "";
+  }
+  /** Troca "@número" do texto pelo "@Nome" e devolve quem foi marcado. Números sem nome ficam como estão. */
+  resolveMentions(text: string): { text: string; marcados: string[] } {
+    const marcados: string[] = [];
+    const out = text.replace(/@(\d{6,20})/g, (m, num: string) => { const n = this.nameOf(num); if (n) { if (!marcados.includes(n)) marcados.push(n); return `@${n}`; } const phone = num.length <= 13; const label = phone ? `+${num}` : "contato sem nome salvo"; if (!marcados.includes(label)) marcados.push(label); return `@${label}`; });
+    return { text: out, marcados };
+  }
 
   /** Guarda a mensagem (ignora repetidas). Devolve true se era nova. */
   addMessage(m: Msg): boolean {
@@ -119,9 +149,10 @@ export class Store {
 
   private toMsg(r: Record<string, unknown>, chatName: string, group: boolean): Msg {
     const sender = String(r["sender"] ?? "");
+    const { text, marcados } = this.resolveMentions(String(r["text"] ?? ""));
     return {
       id: String(r["id"]), chat: String(r["chat"]), chat_name: chatName || this.nameOf(String(r["chat"])), is_group: group, sender,
-      sender_name: String(r["sender_name"] || this.nameOf(sender) || sender.split("@")[0] || ""), from_me: !!r["from_me"], ts: Number(r["ts"]), text: String(r["text"] ?? ""),
+      sender_name: String(r["sender_name"] || this.nameOf(sender) || sender.split("@")[0] || ""), from_me: !!r["from_me"], ts: Number(r["ts"]), text, marcados,
       kind: String(r["kind"] ?? "texto"), mentions_me: !!r["mentions_me"], reply_to_me: !!r["reply_to_me"],
     };
   }

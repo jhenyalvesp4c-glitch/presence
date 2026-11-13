@@ -36,7 +36,7 @@ export function startConnection(store: Store, state: BridgeState, authDir: strin
         const user = sock.user ?? {};
         me = { jids: [user.id, user.lid].filter(Boolean), name: String(user.name ?? "") };
         state.phone = String(user.id ?? "").split("@")[0]!.split(":")[0]!; state.name = me.name;
-        try { const groups = await sock.groupFetchAllParticipating(); for (const g of Object.values<any>(groups)) store.setChatName(g.id, g.subject ?? "", true); } catch { /* sem nomes de grupos por enquanto */ }
+        try { const groups = await sock.groupFetchAllParticipating(); for (const g of Object.values<any>(groups)) { store.setChatName(g.id, g.subject ?? "", true); for (const p of g.participants ?? []) { if (p.id && p.lid) store.link(p.id, p.lid); if (p.id && p.phoneNumber) store.link(p.id, p.phoneNumber); } } } catch { /* sem nomes de grupos por enquanto */ }
       }
       if (u.connection === "close") {
         const code = u.lastDisconnect?.error?.output?.statusCode;
@@ -49,17 +49,29 @@ export function startConnection(store: Store, state: BridgeState, authDir: strin
       }
     });
 
-    const save = (raw: any) => { if (state.paused) return; const m = normalizeMessage(raw, me, ""); if (m) store.addMessage({ ...m, chat_name: store.chats(m.chat, 1)[0]?.name ?? "" }); };
+    const learn = (raw: any) => {
+      const k = raw?.key ?? {}; const alt = k.participantAlt ?? k.participantPn ?? k.remoteJidAlt;
+      if (k.participant && alt) store.link(k.participant, alt);
+      if (raw?.pushName && !k.fromMe) { for (const j of [k.participant, alt]) if (j) store.setContactName(j, raw.pushName); }
+    };
+    const learnContact = (c: any) => {
+      const name = c?.name || c?.notify || c?.verifiedName;
+      for (const j of [c?.id, c?.lid, c?.phoneNumber]) { if (j && name) store.setContactName(j, name); }
+      if (c?.id && c?.lid) store.link(c.id, c.lid);
+      if (c?.id && c?.phoneNumber) store.link(c.id, c.phoneNumber);
+    };
+    const save = (raw: any) => { learn(raw); if (state.paused) return; const m = normalizeMessage(raw, me, ""); if (m) store.addMessage({ ...m, chat_name: store.chats(m.chat, 1)[0]?.name ?? "" }); };
     sock.ev.on("messages.upsert", ({ messages }: any) => { for (const m of messages ?? []) save(m); });
     sock.ev.on("messaging-history.set", ({ chats, contacts, messages }: any) => {
       for (const c of chats ?? []) if (c.name) store.setChatName(c.id, c.name);
-      for (const c of contacts ?? []) if (c.id && (c.name || c.notify)) store.setContactName(c.id, c.name || c.notify);
+      for (const c of contacts ?? []) learnContact(c);
       for (const m of messages ?? []) save(m);
     });
     sock.ev.on("groups.upsert", (gs: any[]) => { for (const g of gs ?? []) store.setChatName(g.id, g.subject ?? "", true); });
     sock.ev.on("groups.update", (gs: any[]) => { for (const g of gs ?? []) if (g.subject) store.setChatName(g.id, g.subject, true); });
     sock.ev.on("chats.upsert", (cs: any[]) => { for (const c of cs ?? []) if (c.name) store.setChatName(c.id, c.name); });
-    sock.ev.on("contacts.upsert", (cs: any[]) => { for (const c of cs ?? []) if (c.id && (c.name || c.notify)) store.setContactName(c.id, c.name || c.notify); });
+    sock.ev.on("contacts.upsert", (cs: any[]) => { for (const c of cs ?? []) learnContact(c); });
+    sock.ev.on("contacts.update", (cs: any[]) => { for (const c of cs ?? []) learnContact(c); });
   }
 
   async function retry() { try { await connect(); } catch (e) { state.erro = `Falha ao conectar: ${e instanceof Error ? e.message : e}`; log(state.erro); if (!stopped) setTimeout(() => void retry(), 8000); } }
