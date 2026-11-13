@@ -19,7 +19,10 @@ import { isoDay, rascunhoSchema, registroSchema, weekdayPt, TIPO_LABEL, type Reg
 
 /* ───────────── eventos para o navegador ───────────── */
 export type PanelItem = { rotulo: string; detalhe?: string | undefined; feita?: boolean | undefined; link?: string | undefined };
-export type Panel = { titulo: string; secoes: { titulo: string; itens: PanelItem[] }[] };
+export type ChatMsg = { quem: string; minha: boolean; dia: string; hora: string; texto: string; tipo: string; marcou: boolean };
+/** Conversa do WhatsApp para mostrar como no aplicativo: uma mensagem embaixo da outra. */
+export type ChatView = { nome: string; grupo: boolean; mensagens: ChatMsg[] };
+export type Panel = { titulo: string; secoes: { titulo: string; itens: PanelItem[] }[]; chat?: ChatView };
 export type VoiceEvent =
   | { t: "texto"; d: string }
   | { t: "acao"; a: { tipo: "navegar"; para: string } | { tipo: "encerrar" } }
@@ -69,6 +72,7 @@ Regras de fala:
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
 - Se ela disser como quer ser chamada, como prefere que você fale ou como começar a conversa, use ajustar_perfil. Quando ela contar algo duradouro sobre si ou pedir "lembra que…", use lembrar; "esquece que…", use esquecer.
+- Para "marcar tudo como lido" / "zerar as novas" no WhatsApp use whatsapp_marcar_lidas e explique que é o controle do Presence (não muda o WhatsApp dela).
 - WhatsApp (somente leitura, só no app do computador): "o que o grupo X mandou", "tem mensagem no grupo?", "analise as conversas" → use whatsapp_ler (com so_novas=true para o que ainda não foi lido); "alguém me marcou?" → whatsapp_mencoes; "quais conversas têm novidade" → whatsapp_conversas. Primeiro diga se há mensagens e quantas; leia citando quem falou e o que disse; se forem muitas, resuma e ofereça ler tudo. Se a ponte estiver desligada, diga isso e que ela liga em Configurações. Você NUNCA envia mensagens no WhatsApp.
 - Para abrir telas use abrir_pagina. Quando a pessoa se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
@@ -132,6 +136,7 @@ export const TOOLS = [
     limite: { type: "number", description: "Quantas mensagens trazer (padrão 30, máximo 60)." },
   }, required: ["conversa"] }),
   fn("whatsapp_mencoes", "Mostra as mensagens em que alguém marcou a pessoa ou respondeu a uma mensagem dela no WhatsApp.", { type: "object", properties: { desde: { type: "string", description: "hoje, ontem, esta semana ou AAAA-MM-DD. Padrão: últimas 24 horas." } } }),
+  fn("whatsapp_marcar_lidas", "Marca como lidas PELO PRESENCE todas as conversas (ou só uma) do WhatsApp, para que 'mensagens novas' passe a contar só o que chegar daqui para frente. Não muda nada no WhatsApp da pessoa (as mensagens continuam como estão no celular).", { type: "object", properties: { conversa: { type: "string", description: "Nome de uma conversa/grupo. Vazio = todas." } } }),
   fn("encerrar_conversa", "Encerra a conversa por voz quando a pessoa se despedir ou pedir para parar.", { type: "object", properties: {} }),
 ];
 
@@ -370,7 +375,7 @@ export async function runAgent(history: Turn[], emit: Emit, resume?: Resume): Pr
           if (WA_TOOLS.has(k.name)) {
             // Tenta a ponte deste servidor (app local); se ela não está aqui (site publicado), o navegador executa e continua.
             const { bridge } = await import("../whatsapp/bridge");
-            const r = await runWhatsAppTool(k.name, parseArgs(k.args), async (path) => { const b = await bridge(path); return b.ok ? { ok: true, data: b.data } : { ok: false, erro: b.erro, offline: !!b.offline }; }, c.ctx.today);
+            const r = await runWhatsAppTool(k.name, parseArgs(k.args), async (path, method) => { const b = await bridge(path, method ?? "GET"); return b.ok ? { ok: true, data: b.data } : { ok: false, erro: b.erro, offline: !!b.offline }; }, c.ctx.today);
             if (r.offline) { deferred.push({ id: k.id, nome: k.name, args: parseArgs(k.args) }); continue; }
             if (r.panel) emit({ t: "painel", p: r.panel });
             out = r.result;

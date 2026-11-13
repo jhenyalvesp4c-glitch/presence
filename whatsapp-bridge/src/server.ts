@@ -61,6 +61,11 @@ export function createApi(store: Store, state: BridgeState, token: string, contr
 
       if (route === "POST /pause") { const on = q.get("on") === "1"; controls.pause(on); return json(res, 200, { ok: true, paused: on }); }
       if (route === "POST /logout") { await controls.logout(); return json(res, 200, { ok: true }); }
+      if (route === "POST /marcar-lidas") {
+        const chat = q.get("chat");
+        if (chat) { const f = store.findChat(chat); if (!f.ok) return json(res, 200, f); store.markChecked(f.chat.jid); return json(res, 200, { ok: true, conversas: 1, nome: f.chat.name }); }
+        return json(res, 200, { ok: true, conversas: store.markAllChecked() });
+      }
       if (route === "POST /clear") { store.clear(); return json(res, 200, { ok: true }); }
 
       return json(res, 404, { error: "rota desconhecida" });

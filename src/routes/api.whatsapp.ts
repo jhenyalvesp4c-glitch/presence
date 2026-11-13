@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 // Ponte entre a tela (Configurações, avisos) e a ponte local do WhatsApp. Só leitura e controles; nunca envia mensagens.
 const READ = new Set(["status", "chats", "messages", "mentions"]);
-const WRITE = new Set(["pause", "logout", "clear"]);
+const WRITE = new Set(["pause", "logout", "clear", "marcar-lidas"]);
 const json = (status: number, v: unknown) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 export const Route = createFileRoute("/api/whatsapp")({

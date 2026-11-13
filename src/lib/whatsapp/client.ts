@@ -54,8 +54,8 @@ export async function waPost(r: string, params: Record<string, string> = {}): Pr
   try { const sp = new URLSearchParams({ r, ...params }); const res = await fetch(`/api/whatsapp?${sp}`, { method: "POST", headers: await authHeaders() }); return res.ok; } catch { return false; }
 }
 /** Para as ferramentas de voz executadas no navegador. */
-export const clientFetcher = async (path: string) => {
-  const r = await bridgeDirect(path);
+export const clientFetcher = async (path: string, method: "GET" | "POST" = "GET") => {
+  const r = await bridgeDirect(path, method);
   return r.ok ? ({ ok: true, data: r.data } as const) : ({ ok: false, erro: `${r.erro}. Ligue a ponte (whatsapp.cmd) e libere o acesso em Configurações → WhatsApp.`, offline: true } as const);
 };
 

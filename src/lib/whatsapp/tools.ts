@@ -1,10 +1,10 @@
 /** Ações de voz do WhatsApp. Rodam no servidor (app local) ou no navegador (site publicado), conforme onde a ponte é alcançada. */
 import { periodOf } from "../orion";
-import type { Panel } from "../voice/agent";
+import type { ChatView, Panel } from "../voice/agent";
 
 export type WaMessage = { sender_name: string; from_me: boolean; ts: number; text: string; kind: string; mentions_me: boolean; reply_to_me: boolean; is_group: boolean; chat_name: string };
-export type Fetcher = (path: string) => Promise<{ ok: true; data: unknown } | { ok: false; erro: string; offline?: boolean }>;
-export const WA_TOOLS = new Set(["whatsapp_conversas", "whatsapp_ler", "whatsapp_mencoes"]);
+export type Fetcher = (path: string, method?: "GET" | "POST") => Promise<{ ok: true; data: unknown } | { ok: false; erro: string; offline?: boolean }>;
+export const WA_TOOLS = new Set(["whatsapp_conversas", "whatsapp_ler", "whatsapp_mencoes", "whatsapp_marcar_lidas"]);
 export type ToolOut = { result: Record<string, unknown>; panel?: Panel; offline?: boolean };
 
 /** "hoje", "ontem", "esta semana"… ou AAAA-MM-DD → segundos desde 1970 (início do dia, horário de Brasília). */
@@ -38,9 +38,21 @@ export async function runWhatsAppTool(name: string, args: Record<string, unknown
     if (!d.ok) return { result: { ok: false, erro: d.erro, ...(d.opcoes ? { opcoes: d.opcoes } : {}) } };
     const msgs = d.messages ?? [];
     const who = (m: WaMessage) => (m.from_me ? "Você" : m.sender_name || "Alguém");
-    const panel: Panel | undefined = msgs.length ? { titulo: `WhatsApp · ${d.chat?.name ?? ""}`, secoes: [{ titulo: `${msgs.length} mensagem(ns)`, itens: msgs.map((m) => ({ rotulo: `${who(m)}: ${m.text || `(${m.kind})`}`.slice(0, 300), detalhe: when(m.ts) + (m.mentions_me ? " · marcou você" : m.reply_to_me ? " · respondeu a você" : "") })) }] } : undefined;
+    const day = (ts: number) => new Date(ts * 1000).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+    const hour = (ts: number) => new Date(ts * 1000).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+    const chat: ChatView = { nome: d.chat?.name ?? "", grupo: !!d.chat?.is_group, mensagens: msgs.map((m) => ({ quem: m.from_me ? "Você" : m.sender_name || "Alguém", minha: m.from_me, dia: day(m.ts), hora: hour(m.ts), texto: m.text.slice(0, 1500), tipo: m.kind, marcou: m.mentions_me || m.reply_to_me })) };
+    const panel: Panel | undefined = msgs.length ? { titulo: `WhatsApp · ${d.chat?.name ?? ""}`, secoes: [], chat } : undefined;
     return { ...(panel ? { panel } : {}), result: { ok: true, conversa: d.chat?.name, grupo: !!d.chat?.is_group, total: msgs.length, mensagens: msgs.map((m) => ({ quem: who(m), quando: when(m.ts), texto: (m.text || `(${m.kind})`).slice(0, 500), marcou_voce: m.mentions_me || m.reply_to_me })),
       dica: msgs.length ? "Diga quantas mensagens há e leia: cite quem falou e o que disse. Se forem muitas, resuma e ofereça ler tudo." : "Diga que não há mensagens nesse período." } };
+  }
+
+  if (name === "whatsapp_marcar_lidas") {
+    const chat = String(args["conversa"] ?? "").trim();
+    const r = await fetcher(`/marcar-lidas${chat ? `?chat=${encodeURIComponent(chat)}` : ""}`, "POST");
+    if (!r.ok) return fail(r);
+    const d = r.data as { ok?: boolean; erro?: string; opcoes?: string[]; conversas?: number; nome?: string };
+    if (d.ok === false || d.erro) return { result: { ok: false, erro: d.erro, ...(d.opcoes ? { opcoes: d.opcoes } : {}) } };
+    return { result: { ok: true, marcadas: d.conversas ?? 0, conversa: d.nome, aviso: "Só o controle do Presence foi marcado; o WhatsApp do celular não mudou." } };
   }
 
   if (name === "whatsapp_mencoes") {

@@ -2,6 +2,7 @@ import { useRouter, useRouterState } from "@tanstack/react-router";
 import { Mic } from "lucide-react";
 
 import { VoicePanel } from "@/components/voice/VoicePanel";
+import { WhatsChat } from "@/components/voice/WhatsChat";
 import { useVoice, type Phase } from "@/lib/voice/use-voice";
 
 const LABEL: Record<Phase, string> = { idle: "Pronta", listening: "Ouvindo…", thinking: "Pensando…", speaking: "Falando…" };
@@ -64,7 +65,7 @@ export function VoiceDock() {
         <p className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,34rem)] -translate-x-1/2 rounded-xl border border-amber/40 bg-background/90 px-3 py-2 text-center text-[0.75rem] leading-snug text-amber backdrop-blur" role="alert" data-testid="voz-aviso">{v.note}</p>
       )}
 
-      {v.panel && <VoicePanel panel={v.panel} onClose={v.closePanel} onOpen={go} />}
+      {v.panel && (v.panel.chat ? <WhatsChat panel={v.panel} onClose={v.closePanel} /> : <VoicePanel panel={v.panel} onClose={v.closePanel} onOpen={go} />)}
     </>
   );
 }

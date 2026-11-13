@@ -135,3 +135,19 @@ describe("whatsapp: acesso pelo navegador (site do Presence)", () => {
     expect((await req("/status", { origin: "https://spark-mind-friend-htvx.vercel.app", "x-presence-token": "segredo" })).status).toBe(200);
   });
 });
+
+describe("whatsapp: marcar como lido pelo Presence", () => {
+  const store = new Store(":memory:");
+  const g = "120363000000000001@g.us", h = "5531977770000@s.whatsapp.net";
+  const base = 1_800_000_000;
+  const add = (chat: string, id: string, ts: number) => store.addMessage({ id, chat, chat_name: chat === g ? "Juiz de Fora" : "Ana", is_group: chat === g, sender: "x@s.whatsapp.net", sender_name: "X", from_me: false, ts, text: id, kind: "texto", mentions_me: false, reply_to_me: false });
+  add(g, "a", base); add(g, "b", base + 1); add(h, "c", base + 2);
+  it("zera as novas de todas as conversas, só no Presence", () => {
+    expect(store.chats().reduce((n, c) => n + c.novas, 0)).toBe(3);
+    store.markAllChecked(base + 100);
+    expect(store.chats().reduce((n, c) => n + c.novas, 0)).toBe(0);
+    add(g, "d", base + 200);
+    expect(store.chats().find((c) => c.jid === g)!.novas).toBe(1);
+    expect(store.counts().messages).toBe(4); // nada foi apagado
+  });
+});

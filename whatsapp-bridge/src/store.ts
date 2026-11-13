@@ -97,6 +97,13 @@ export class Store {
     this.db.prepare("update chats set checked_ts = max(checked_ts, ?) where jid = ?").run(upTo ?? Math.floor(Date.now() / 1000), jid);
   }
 
+  /** Marca TODAS as conversas como lidas pela Presence (só aqui; o WhatsApp não muda). Depois disso, "novas" conta só o que chegar daqui para frente. */
+  markAllChecked(upTo?: number): number {
+    const ts = upTo ?? Math.floor(Date.now() / 1000);
+    const r = this.db.prepare("update chats set checked_ts = max(checked_ts, ?)").run(ts);
+    return Number(r.changes);
+  }
+
   counts(): { chats: number; messages: number } {
     const c = this.db.prepare("select (select count(*) from chats) as chats, (select count(*) from messages) as messages").get() as { chats: number; messages: number };
     return { chats: Number(c.chats), messages: Number(c.messages) };

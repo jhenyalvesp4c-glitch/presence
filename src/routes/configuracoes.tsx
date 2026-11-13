@@ -105,6 +105,7 @@ function WhatsApp() {
             <Toggle on={voice} onChange={(v) => { setVoice(v); waPrefs.setVoice(v); }} Icon={Volume2} label="Ler o aviso em voz alta" hint="O Presence fala quem marcou e o que foi dito." />
             <div className="flex flex-wrap gap-2 pt-1">
               <button className={btn} disabled={busy} onClick={() => void act("pause", { on: st.phase === "pausado" ? "0" : "1" })}>{st.phase === "pausado" ? <><Play size={14} /> Retomar leitura</> : <><Pause size={14} /> Pausar leitura</>}</button>
+              <button className={btn} disabled={busy} data-testid="wa-marcar-lidas" onClick={() => void act("marcar-lidas", {}, "Marcar todas as conversas como lidas pelo Presence? Daqui para frente ele conta só as mensagens novas. O seu WhatsApp do celular não muda.")}><Check size={14} /> Marcar tudo como lido (no Presence)</button>
               <button className={btn} disabled={busy} onClick={() => void act("clear", {}, "Apagar todas as mensagens guardadas neste computador? O seu WhatsApp não muda.")}><Trash2 size={14} /> Apagar histórico local</button>
               <button className={`${btn} hover:!border-destructive/50 hover:!text-destructive`} disabled={busy} onClick={() => void act("logout", {}, "Desconectar o WhatsApp do Presence?")}><Unplug size={14} /> Desconectar</button>
             </div>

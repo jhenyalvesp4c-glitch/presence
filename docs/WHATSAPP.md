@@ -18,6 +18,9 @@ O aplicativo "Presence" do Windows abre o **site publicado**. Mesmo assim o What
 ## Voz (src/lib/voice/agent.ts, src/lib/whatsapp/tools.ts)
 `whatsapp_conversas`, `whatsapp_ler` (por nome aproximado, período, busca, só novas), `whatsapp_mencoes`. "Novas" = ainda não lidas pelo Presence (ponteiro guardado só na ponte; não muda nada no WhatsApp).
 
+## Conversa na tela e "lido"
+As mensagens lidas pela voz aparecem como no aplicativo (balões um embaixo do outro, nome, horário, separador de dia; `WhatsChat.tsx`). "Marcar tudo como lido" (botão em Configurações ou pela voz: `whatsapp_marcar_lidas`) zera só o ponteiro do Presence; **nada é marcado como lido no WhatsApp** (continua somente leitura).
+
 ## Avisos de marcação
 `WhatsAppWatcher` consulta as marcações a cada ~20 s (quando a ponte está conectada): aviso na tela, notificação e voz (juntando o que chegou junto).
 
