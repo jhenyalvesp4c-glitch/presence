@@ -16,6 +16,7 @@ import { VoiceDock } from "@/components/voice/VoiceDock";
 import { ReminderWatcher } from "@/components/reminders/ReminderWatcher";
 import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { ZoomHint } from "@/components/ZoomHint";
 import { VoiceProvider } from "@/lib/voice/use-voice";
 import { AuthProvider } from "@/lib/auth";
 import { AuthGate } from "@/components/auth/AuthGate";
@@ -136,6 +137,7 @@ function RootComponent() {
       <VoiceProvider>
         <GlobalRail />
         <MobileTabBar />
+        <ZoomHint />
         <div className={railPad}><HealthPreviewProvider><Outlet /></HealthPreviewProvider></div>
         <OrionDock />
         <VoiceDock />
