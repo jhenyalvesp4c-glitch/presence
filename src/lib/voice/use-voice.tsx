@@ -12,7 +12,7 @@ import { takeSentences } from "./sentences";
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
   active: boolean; phase: Phase; userText: string; botText: string; interim: string; panel: Panel | null; canListen: boolean; note: string | null;
-  testVoice: () => void; announce: (text: string) => void; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
+  testVoice: () => void; announce: (text: string) => Promise<void>; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
 };
 const Ctx = createContext<Voice | null>(null);
 export const useVoice = (): Voice => {
@@ -400,9 +400,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, [ask]);
 
   /** Fala um aviso (ex.: lembrete) sem abrir conversa. Se ela já está falando ou ouvindo, não atravessa. */
-  const announce = useCallback((text: string) => {
-    if (!text.trim() || activeRef.current) return;
+  const announce = useCallback((text: string): Promise<void> => {
+    if (!text.trim() || activeRef.current) return Promise.resolve();
     const sp = spk(); sp.reset(); sp.enqueue(text.slice(0, 400));
+    return sp.drained();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Na primeira interação com a página, libera o áudio para os avisos falados.

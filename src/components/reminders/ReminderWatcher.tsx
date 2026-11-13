@@ -2,13 +2,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlarmClock, BellRing, Check, Clock, X } from "lucide-react";
 
-import { supabase } from "@/lib/data/db";
-import { dueReminders, hhmm, localDay, spokenReminder, type Due, type ReminderRow } from "@/lib/reminders";
+import { ownerId, supabase } from "@/lib/data/db";
+import { alertKey, dueReminders, hhmm, localDay, spokenReminder, type Due, type ReminderRow } from "@/lib/reminders";
 import { useVoice } from "@/lib/voice/use-voice";
 
 const SEEN = "presence.lembretes.avisados", SNOOZE = "presence.lembretes.adiados", ASKED = "presence.lembretes.perguntou";
 const read = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : d; } catch { return d; } };
 const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
+
+/** Reserva o aviso no banco. Devolve os lembretes que ESTE aparelho reservou, ou null se a trava não está disponível (aí todos falam, como antes). */
+async function claimAlerts(due: Due[], keys: Map<string, string>): Promise<Set<string> | null> {
+  try {
+    const rows = due.map((d) => ({ user_id: ownerId(), task_id: d.id, due_key: keys.get(d.id) ?? d.key }));
+    const { data, error } = await supabase.from("reminder_alerts").upsert(rows, { onConflict: "user_id,task_id,due_key", ignoreDuplicates: true }).select("task_id");
+    if (error) return null;
+    // Limpeza de avisos antigos (um de vez em quando).
+    if (Math.random() < 0.05) void supabase.from("reminder_alerts").delete().lt("claimed_at", new Date(Date.now() - 3 * 86_400_000).toISOString()).then(() => undefined);
+    return new Set((data ?? []).map((r: { task_id: string }) => r.task_id));
+  } catch { return null; }
+}
 
 /** Avisa os lembretes na hora marcada (com o app aberto): popup, notificação do sistema e voz. */
 export function ReminderWatcher() {
@@ -17,6 +29,30 @@ export function ReminderWatcher() {
   const [cards, setCards] = useState<Due[]>([]);
   const [askPerm, setAskPerm] = useState(false);
   const busy = useRef(false);
+  // Fala: junta o que chegou em poucos segundos numa fala só e nunca começa uma por cima da outra.
+  const pending = useRef<Due[]>([]);
+  const speaking = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstAt = useRef(0);
+  const flush = useCallback(async () => {
+    timer.current = null;
+    if (speaking.current) { timer.current = setTimeout(() => void flush(), 1000); return; }
+    const list = pending.current.splice(0);
+    firstAt.current = 0;
+    if (!list.length) return;
+    speaking.current = true;
+    try { await announceRef.current(spokenReminder(list)); } catch { /* sem voz */ }
+    finally { speaking.current = false; if (pending.current.length) { timer.current = setTimeout(() => void flush(), 500); } }
+  }, []);
+  const speakSoon = useCallback((list: Due[]) => {
+    for (const d of list) if (!pending.current.some((x) => x.id === d.id)) pending.current.push(d);
+    pending.current.sort((a, b) => a.at.getTime() - b.at.getTime());
+    if (!firstAt.current) firstAt.current = Date.now();
+    if (timer.current) clearTimeout(timer.current);
+    const wait = Date.now() - firstAt.current > 8000 ? 0 : 3000; // espera um pouco para juntar os lembretes do mesmo horário
+    timer.current = setTimeout(() => void flush(), wait);
+  }, [flush]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const check = useCallback(async () => {
     if (busy.current) return;
@@ -30,15 +66,20 @@ export function ReminderWatcher() {
       const seen = read<Record<string, string>>(SEEN, {}), snoozed = read<Record<string, number>>(SNOOZE, {});
       const due = dueReminders(data as ReminderRow[], now, seen, snoozed);
       if (!due.length) return;
-      for (const d of due) { seen[d.id] = d.key; delete snoozed[d.id]; }
+      const keys = new Map<string, string>();
+      for (const d of due) { keys.set(d.id, alertKey(d, snoozed[d.id])); seen[d.id] = d.key; delete snoozed[d.id]; }
       write(SEEN, seen); write(SNOOZE, snoozed);
       setCards((c) => [...c.filter((x) => !due.some((d) => d.id === x.id)), ...due]);
+      // Com o Presence aberto em mais de um lugar, só o primeiro a "reservar" o aviso fala e notifica (os outros só mostram o cartão).
+      const claimed = await claimAlerts(due, keys);
+      const mine = claimed ? due.filter((d) => claimed.has(d.id)) : due;
+      if (!mine.length) return;
       if ("Notification" in window && Notification.permission === "granted") {
-        for (const d of due) { try { new Notification("Lembrete", { body: `${d.title}\n${hhmm(d.at)}`, tag: `lembrete-${d.id}`, requireInteraction: true }); } catch { /* sem notificação */ } }
+        for (const d of mine) { try { new Notification("Lembrete", { body: `${d.title}\n${hhmm(d.at)}`, tag: `lembrete-${d.id}`, requireInteraction: true }); } catch { /* sem notificação */ } }
       }
-      announceRef.current(spokenReminder(due));
+      speakSoon(mine);
     } finally { busy.current = false; }
-  }, []);
+  }, [speakSoon]);
 
   useEffect(() => {
     void check();

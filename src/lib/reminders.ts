@@ -31,3 +31,6 @@ export function spokenReminder(list: Due[]): string {
 
 export const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 export const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Chave única de cada aviso (o mesmo lembrete adiado e avisado de novo ganha outra chave). */
+export const alertKey = (d: Due, prevSnooze?: number): string => `${d.key}${prevSnooze ? `@${prevSnooze}` : ""}`;
