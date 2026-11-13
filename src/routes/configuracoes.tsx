@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, 
 
 import { useAuth } from "@/lib/auth";
 import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
-import { waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
+import { directEnabled, enableDirect, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
 
 export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Presence" }] }) });
 
@@ -25,6 +25,8 @@ function WhatsApp() {
   const [st, setSt] = useState<WaStatus | null>(null);
   const [offline, setOffline] = useState(false);
   const [why, setWhy] = useState("");
+  const [direct, setDirect] = useState(true);
+  useEffect(() => { setDirect(directEnabled()); }, []);
   const [busy, setBusy] = useState(false);
   const [alerts, setAlerts] = useState(true), [voice, setVoice] = useState(true);
   useEffect(() => { setAlerts(waPrefs.alerts()); setVoice(waPrefs.voice()); }, []);
@@ -64,7 +66,12 @@ function WhatsApp() {
               <li>Deixe aquela janela preta aberta enquanto usar o WhatsApp aqui.</li>
               <li>Volte a esta tela: o QR Code aparece sozinho.</li>
             </ol>
-            <p className="mt-3 text-xs text-muted-foreground">Funciona só no app do seu computador (o endereço localhost), não no site publicado.</p>
+            {!direct ? (
+              <div className="mt-3 rounded-xl border border-cyan/30 bg-cyan/5 p-3 text-xs">
+                <p className="text-foreground/90">Já ligou a ponte? Este site precisa de permissão para falar com ela, que roda no seu computador. O navegador pode perguntar se deixa este site acessar dispositivos na rede local: clique em <b>Permitir</b>.</p>
+                <button className={`${btn} mt-2`} data-testid="wa-procurar" onClick={() => { enableDirect(); setDirect(true); void load(); }}>Procurar a ponte neste computador</button>
+              </div>
+            ) : <p className="mt-3 text-xs text-muted-foreground">Se o navegador perguntar se este site pode acessar dispositivos na rede local, clique em <b>Permitir</b>.</p>}
             {why && <p className="mt-2 break-words rounded-xl border border-white/10 px-3 py-2 text-xs text-muted-foreground" data-testid="wa-motivo">Detalhe técnico: {why}</p>}
           </div>
         )}

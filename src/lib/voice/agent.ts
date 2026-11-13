@@ -7,6 +7,7 @@ import { z } from "zod/v4";
 
 import { must, supabase, ownerId } from "../data/db";
 import { mentionedDossiers, normalize, periodOf, rank, snippet } from "../orion";
+import { WA_TOOLS, runWhatsAppTool } from "../whatsapp/tools";
 import { commitRecords } from "../mcp/commit";
 import { contextText, DEFAULT_MODEL, type Context } from "../mcp/interpret";
 import { listCategories, listDossiers, listProjects, resolveProject } from "../mcp/lookup";
@@ -24,8 +25,11 @@ export type VoiceEvent =
   | { t: "acao"; a: { tipo: "navegar"; para: string } | { tipo: "encerrar" } }
   | { t: "painel"; p: Panel }
   | { t: "erro"; m: string }
+  | { t: "ferramenta"; estado: Record<string, unknown>[]; chamadas: { id: string; nome: string; args: Record<string, unknown> }[] }
   | { t: "fim" };
 export type Turn = { role: "user" | "assistant"; content: string };
+/** Continuação de uma rodada que parou esperando o navegador executar ferramentas (ex.: WhatsApp pelo site publicado). */
+export type Resume = { estado: Record<string, unknown>[]; resultados: { id: string; content: string }[] };
 
 export const PAGES: Record<string, string> = {
   inicio: "/assistente", demandas: "/demandas", projetos: "/projetos", tarefas: "/tarefas", calendario: "/calendario", planejamento: "/planejamento",
@@ -132,14 +136,7 @@ export const TOOLS = [
 ];
 
 type Emit = (e: VoiceEvent) => void;
-type WaMessage = { sender_name: string; from_me: boolean; ts: number; text: string; kind: string; mentions_me: boolean; reply_to_me: boolean; is_group: boolean; chat_name: string };
-/** "hoje", "ontem", "esta semana"… ou AAAA-MM-DD → segundos desde 1970 (início do dia, horário de Brasília). */
-function sinceOf(v: unknown, today: string): number | undefined {
-  const t = String(v ?? "").trim();
-  if (!t) return undefined;
-  const day = /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : periodOf(t, today)?.from;
-  return day ? Math.floor(new Date(`${day}T00:00:00-03:00`).getTime() / 1000) : undefined;
-}
+
 const parseArgs = (s: string): Record<string, unknown> => { try { const v = JSON.parse(s || "{}"); return v && typeof v === "object" ? (v as Record<string, unknown>) : {}; } catch { return {}; } };
 const resolveDay = (q: unknown, today: string) => {
   const s = String(q ?? "hoje").toLowerCase();
@@ -334,39 +331,6 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       return { ok: true };
     }
 
-    case "whatsapp_conversas": {
-      const { bridge } = await import("../whatsapp/bridge");
-      const r = await bridge<{ chats: { name: string; is_group: boolean; novas: number; last_ts: number }[] }>(`/chats?q=${encodeURIComponent(String(args["busca"] ?? ""))}&limit=15`);
-      if (!r.ok) return { ok: false, erro: r.erro };
-      return { ok: true, conversas: r.data.chats.map((c) => ({ nome: c.name, tipo: c.is_group ? "grupo" : "contato", mensagens_novas: c.novas, ultima: c.last_ts ? new Date(c.last_ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "sem mensagens guardadas" })), total_novas: r.data.chats.reduce((n, c) => n + c.novas, 0) };
-    }
-
-    case "whatsapp_ler": {
-      const { bridge } = await import("../whatsapp/bridge");
-      const since = sinceOf(args["desde"], ctx.today);
-      const params = new URLSearchParams({ chat: String(args["conversa"] ?? ""), limit: String(Math.min(60, Math.max(1, Number(args["limite"]) || 30))) });
-      if (since) params.set("since", String(since));
-      if (args["so_novas"] === true) { params.set("novas", "1"); params.set("marcar", "1"); }
-      if (args["buscar"]) params.set("q", String(args["buscar"]));
-      const r = await bridge<{ ok: boolean; erro?: string; opcoes?: string[]; chat?: { name: string; is_group: boolean }; messages?: WaMessage[]; total?: number }>(`/messages?${params}`);
-      if (!r.ok) return { ok: false, erro: r.erro };
-      if (!r.data.ok) return { ok: false, erro: r.data.erro, ...(r.data.opcoes ? { opcoes: r.data.opcoes } : {}) };
-      const msgs = r.data.messages ?? [];
-      const hhmmBR = (ts: number) => new Date(ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-      if (msgs.length) emit({ t: "painel", p: { titulo: `WhatsApp · ${r.data.chat?.name ?? ""}`, secoes: [{ titulo: `${msgs.length} mensagem(ns)`, itens: msgs.map((m) => ({ rotulo: `${m.from_me ? "Você" : (m.sender_name || "Alguém")}: ${m.text || `(${m.kind})`}`.slice(0, 300), detalhe: hhmmBR(m.ts) + (m.mentions_me ? " · marcou você" : m.reply_to_me ? " · respondeu a você" : "") })) }] } });
-      return { ok: true, conversa: r.data.chat?.name, grupo: !!r.data.chat?.is_group, total: msgs.length, mensagens: msgs.map((m) => ({ quem: m.from_me ? "Você" : (m.sender_name || "Alguém"), quando: hhmmBR(m.ts), texto: (m.text || `(${m.kind})`).slice(0, 500), marcou_voce: m.mentions_me || m.reply_to_me })),
-        dica: msgs.length ? "Diga quantas mensagens há e leia: cite quem falou e o que disse. Se forem muitas, resuma e ofereça ler tudo." : "Diga que não há mensagens nesse período." };
-    }
-
-    case "whatsapp_mencoes": {
-      const { bridge } = await import("../whatsapp/bridge");
-      const since = sinceOf(args["desde"], ctx.today) ?? Math.floor(Date.now() / 1000) - 86400;
-      const r = await bridge<{ mentions: WaMessage[] }>(`/mentions?after=${since}&limit=30`);
-      if (!r.ok) return { ok: false, erro: r.erro };
-      const m = r.data.mentions;
-      return { ok: true, total: m.length, mencoes: m.map((x) => ({ quem: x.sender_name || "Alguém", onde: x.is_group ? `grupo ${x.chat_name}` : "conversa direta", texto: (x.text || `(${x.kind})`).slice(0, 400), tipo: x.mentions_me ? "marcou você" : "respondeu a você" })) };
-    }
-
     case "documentar": {
       const texto = String(args["texto"] ?? "").trim().slice(0, 6000);
       if (!texto) return { ok: false, erro: "Sem texto para guardar." };
@@ -381,7 +345,7 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
 }
 
 /* ───────────── conversa ───────────── */
-export async function runAgent(history: Turn[], emit: Emit): Promise<void> {
+export async function runAgent(history: Turn[], emit: Emit, resume?: Resume): Promise<void> {
   if (!process.env["OPENAI_API_KEY"]) { emit({ t: "erro", m: "A conversa por voz precisa da OPENAI_API_KEY no servidor." }); return; }
   const model = process.env["OPENAI_VOICE_MODEL"]?.trim() || process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
   const c = await voiceContext();
@@ -390,7 +354,7 @@ export async function runAgent(history: Turn[], emit: Emit): Promise<void> {
   const directive = starting ? greetingDirective(st.briefing) : "";
   if (starting && !directive) { emit({ t: "fim" }); return; } // quer esperar: não fala nada
   const known = briefingPrompt(st.briefing, st.memories);
-  const messages: Record<string, unknown>[] = [
+  const messages: Record<string, unknown>[] = resume ? [...resume.estado, ...resume.resultados.map((r) => ({ role: "tool", tool_call_id: r.id, content: r.content.slice(0, 12000) }))] : [
     { role: "system", content: `${PERSONA(st.briefing?.call_name || c.name)}${known ? `\n\n${known}` : ""}${directive ? `\n\nAGORA: ${directive}` : ""}\n\n${contextText(c.ctx)}` },
     ...history.slice(-12).map((m) => ({ role: m.role, content: m.content === GREET_MARK ? "(a conversa por voz acabou de começar)" : m.content.slice(0, 2000) })),
   ];
@@ -399,11 +363,22 @@ export async function runAgent(history: Turn[], emit: Emit): Promise<void> {
       const { text, calls } = await streamChat({ model, messages, tools: TOOLS, tool_choice: "auto", max_completion_tokens: 700, reasoning_effort: "low" }, (d) => emit({ t: "texto", d }));
       if (!calls.length) break;
       messages.push({ role: "assistant", content: text || null, tool_calls: calls.map((k) => ({ id: k.id, type: "function", function: { name: k.name, arguments: k.args || "{}" } })) });
+      const deferred: { id: string; nome: string; args: Record<string, unknown> }[] = [];
       for (const k of calls) {
         let out: unknown;
-        try { out = await runTool(k.name, parseArgs(k.args), emit, c.ctx); } catch (e) { out = { ok: false, erro: e instanceof Error ? e.message : "erro" }; }
+        try {
+          if (WA_TOOLS.has(k.name)) {
+            // Tenta a ponte deste servidor (app local); se ela não está aqui (site publicado), o navegador executa e continua.
+            const { bridge } = await import("../whatsapp/bridge");
+            const r = await runWhatsAppTool(k.name, parseArgs(k.args), async (path) => { const b = await bridge(path); return b.ok ? { ok: true, data: b.data } : { ok: false, erro: b.erro, offline: !!b.offline }; }, c.ctx.today);
+            if (r.offline) { deferred.push({ id: k.id, nome: k.name, args: parseArgs(k.args) }); continue; }
+            if (r.panel) emit({ t: "painel", p: r.panel });
+            out = r.result;
+          } else out = await runTool(k.name, parseArgs(k.args), emit, c.ctx);
+        } catch (e) { out = { ok: false, erro: e instanceof Error ? e.message : "erro" }; }
         messages.push({ role: "tool", tool_call_id: k.id, content: JSON.stringify(out).slice(0, 6000) });
       }
+      if (deferred.length) { emit({ t: "ferramenta", estado: messages, chamadas: deferred }); return; }
     }
     emit({ t: "fim" });
   } catch (e) {

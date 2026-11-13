@@ -2,7 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 // Conversa por voz: recebe o histórico e devolve eventos em linhas JSON (texto, ações, painéis) enquanto a IA responde.
-const body = z.object({ messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(2000) })).min(1).max(24) });
+const body = z.object({
+  messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(2000) })).min(1).max(24),
+  // Continuação depois que o navegador executou ferramentas (WhatsApp): o estado da rodada + os resultados.
+  continuar: z.object({
+    estado: z.array(z.record(z.string(), z.unknown())).min(2).max(60).refine((e) => e[0]?.["role"] === "system" && e.every((m) => ["system", "user", "assistant", "tool"].includes(String(m["role"]))), "estado inválido"),
+    resultados: z.array(z.object({ id: z.string().max(100), content: z.string().max(20000) })).min(1).max(10),
+  }).optional(),
+});
 
 export const Route = createFileRoute("/api/voz")({
   server: {
@@ -42,7 +49,7 @@ export const Route = createFileRoute("/api/voz")({
         const stream = new ReadableStream<Uint8Array>({
           async start(controller) {
             const emit = (e: unknown) => { if (!closed) { try { controller.enqueue(enc.encode(`${JSON.stringify(e)}\n`)); } catch { closed = true; } } };
-            await runAgent(parsed.messages, emit);
+            await runAgent(parsed.messages, emit, parsed.continuar);
             if (!closed) { try { controller.close(); } catch { /* já fechado */ } }
           },
         });

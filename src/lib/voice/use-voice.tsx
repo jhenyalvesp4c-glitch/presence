@@ -3,6 +3,8 @@ import { useRouter } from "@tanstack/react-router";
 
 import { authHeaders } from "@/lib/auth-token";
 import { GREET_MARK } from "@/lib/briefing";
+import { clientFetcher } from "@/lib/whatsapp/client";
+import { runWhatsAppTool } from "@/lib/whatsapp/tools";
 import { useBriefingSafe } from "@/lib/use-briefing";
 import { ownerId, supabase } from "@/lib/supabase";
 import { transcribeAudio } from "@/lib/audio.functions";
@@ -319,27 +321,44 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     endAfter.current = false;
     const say = (chunks: string[]) => chunks.forEach((c) => sp.enqueue(c));
     try {
-      const res = await fetch("/api/voz", { method: "POST", headers: { "content-type": "application/json", ...(await authHeaders()) }, body: JSON.stringify({ messages: history.current }), signal: ctrl.signal });
-      if (!res.ok || !res.body) throw new Error(res.status === 429 ? "Calma, estou recebendo pedidos demais. Tente em instantes." : "Não consegui falar com o servidor.");
-      const reader = res.body.getReader(), dec = new TextDecoder();
-      let carry = "";
-      const handle = (e: VoiceEvent) => {
+      let body: Record<string, unknown> = { messages: history.current };
+      for (let round = 0; round < 4; round++) {
+        const res = await fetch("/api/voz", { method: "POST", headers: { "content-type": "application/json", ...(await authHeaders()) }, body: JSON.stringify(body), signal: ctrl.signal });
+        if (!res.ok || !res.body) throw new Error(res.status === 429 ? "Calma, estou recebendo pedidos demais. Tente em instantes." : "Não consegui falar com o servidor.");
+        const reader = res.body.getReader(), dec = new TextDecoder();
+        let carry = "";
+        const box: { tools: Extract<VoiceEvent, { t: "ferramenta" }> | null } = { tools: null };
+        const handle = (e: VoiceEvent) => {
+          if (turn.current !== my) return;
+          if (e.t === "texto") {
+            said += e.d; buffer += e.d; setBotText(said);
+            const t = takeSentences(buffer, { first });
+            buffer = t.rest; first = t.first; say(t.chunks);
+          } else if (e.t === "acao") {
+            if (e.a.tipo === "navegar") router.history.push(e.a.para); else endAfter.current = true;
+          } else if (e.t === "painel") setPanel(e.p);
+          else if (e.t === "ferramenta") box.tools = e;
+          else if (e.t === "erro") { said = said || e.m; setBotText(said); say([e.m]); }
+        };
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          carry += dec.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = carry.indexOf("\n")) >= 0) { const line = carry.slice(0, nl).trim(); carry = carry.slice(nl + 1); if (line) { try { handle(JSON.parse(line) as VoiceEvent); } catch { /* linha incompleta */ } } }
+        }
         if (turn.current !== my) return;
-        if (e.t === "texto") {
-          said += e.d; buffer += e.d; setBotText(said);
-          const t = takeSentences(buffer, { first });
-          buffer = t.rest; first = t.first; say(t.chunks);
-        } else if (e.t === "acao") {
-          if (e.a.tipo === "navegar") router.history.push(e.a.para); else endAfter.current = true;
-        } else if (e.t === "painel") setPanel(e.p);
-        else if (e.t === "erro") { said = said || e.m; setBotText(said); say([e.m]); }
-      };
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        carry += dec.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = carry.indexOf("\n")) >= 0) { const line = carry.slice(0, nl).trim(); carry = carry.slice(nl + 1); if (line) { try { handle(JSON.parse(line) as VoiceEvent); } catch { /* linha incompleta */ } } }
+        const pend = box.tools;
+        if (!pend) break;
+        // O servidor pediu ferramentas que só este navegador alcança (ponte do WhatsApp neste computador): executa e continua.
+        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+        const resultados: { id: string; content: string }[] = [];
+        for (const c of pend.chamadas) {
+          const out = await runWhatsAppTool(c.nome, c.args, clientFetcher, today).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "erro" } }));
+          if (out.panel) setPanel(out.panel);
+          resultados.push({ id: c.id, content: JSON.stringify(out.result).slice(0, 12000) });
+        }
+        body = { messages: history.current, continuar: { estado: pend.estado, resultados } };
       }
       if (turn.current !== my) return;
       say(takeSentences(buffer, { first, flush: true }).chunks);

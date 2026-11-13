@@ -8,7 +8,14 @@ O Presence lê suas conversas e grupos do WhatsApp, avisa quando alguém **marca
 - **Somente leitura**: não há código para enviar mensagem, marcar como lida ou aparecer online (`markOnlineOnConnect: false`).
 - Para ligar: dois cliques em `whatsapp.cmd`, depois Configurações → WhatsApp → ler o QR Code.
 
-## Voz (src/lib/voice/agent.ts)
+## Site publicado (Vercel) e o aplicativo do Windows
+O aplicativo "Presence" do Windows abre o **site publicado**. Mesmo assim o WhatsApp funciona: o **navegador** (que roda no PC da pessoa) fala direto com a ponte em `http://127.0.0.1:3939`.
+- A ponte aceita só origens exatas (`DEFAULT_ORIGINS` em `whatsapp-bridge/src/server.ts`, mais `localhost`/`127.0.0.1`), confere o `Host`, responde ao pré-pedido do navegador (CORS + `Access-Control-Allow-Private-Network`) e entrega a senha por `GET /parear` só para essas origens.
+- O navegador pode pedir permissão ("acessar dispositivos na rede local"): é preciso clicar em Permitir. A tela de Configurações só tenta no site publicado depois que a pessoa clica em "Procurar a ponte neste computador" (`presence.wa.ativo`).
+- Voz no site publicado: o servidor não alcança a ponte, então `runAgent` para com um evento `ferramenta`; o navegador executa `runWhatsAppTool` na ponte e reenvia a rodada com `continuar` (estado + resultados) para `/api/voz`. No app local (servidor alcança a ponte) tudo roda no servidor, como antes.
+- Se o site publicado ganhar outro endereço, acrescente em `DEFAULT_ORIGINS`.
+
+## Voz (src/lib/voice/agent.ts, src/lib/whatsapp/tools.ts)
 `whatsapp_conversas`, `whatsapp_ler` (por nome aproximado, período, busca, só novas), `whatsapp_mencoes`. "Novas" = ainda não lidas pelo Presence (ponteiro guardado só na ponte; não muda nada no WhatsApp).
 
 ## Avisos de marcação

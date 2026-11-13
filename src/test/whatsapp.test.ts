@@ -105,3 +105,33 @@ describe("whatsapp: API local", () => {
     expect((await call("/sendMessage", { method: "POST" })).status).toBe(404);
   });
 });
+
+describe("whatsapp: acesso pelo navegador (site do Presence)", () => {
+  const store = new Store(":memory:");
+  const state: BridgeState = { phase: "conectado", qr: null, phone: "55", name: "J", since: 1, paused: false };
+  const server = createApi(store, state, "segredo", { logout: async () => undefined, pause: () => undefined });
+  const ready = new Promise<number>((r) => server.listen(0, "127.0.0.1", () => r((server.address() as AddressInfo).port)));
+  afterAll(() => { server.close(); });
+  const req = async (path: string, headers: Record<string, string> = {}, method = "GET") => { const port = await ready; const r = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers }); return { status: r.status, h: r.headers, body: await r.text() }; };
+
+  it("entrega a senha só para o site permitido, com CORS", async () => {
+    const ok = await req("/parear", { origin: "https://spark-mind-friend-htvx.vercel.app" });
+    expect(ok.status).toBe(200); expect(JSON.parse(ok.body).token).toBe("segredo");
+    expect(ok.h.get("access-control-allow-origin")).toBe("https://spark-mind-friend-htvx.vercel.app");
+    const local = await req("/parear", { origin: "http://localhost:8080" }); expect(local.status).toBe(200);
+  });
+  it("não entrega para outros sites, nem parecidos", async () => {
+    for (const o of ["https://evil.example.com", "https://spark-mind-friend-htvx-evil.vercel.app", "http://localhost.evil.com"]) {
+      const r = await req("/parear", { origin: o }); expect(r.status).toBe(403); expect(r.h.get("access-control-allow-origin")).toBeNull(); expect(r.body).not.toContain("segredo");
+    }
+  });
+  it("responde ao pré-pedido do navegador (inclusive acesso à rede local)", async () => {
+    const r = await req("/status", { origin: "https://spark-mind-friend-htvx.vercel.app", "access-control-request-method": "GET", "access-control-request-headers": "x-presence-token" }, "OPTIONS");
+    expect(r.status).toBe(204); expect(r.h.get("access-control-allow-private-network")).toBe("true"); expect(r.h.get("access-control-allow-headers")).toContain("x-presence-token");
+    expect((await req("/status", { origin: "https://evil.example.com" }, "OPTIONS")).status).toBe(403);
+  });
+  it("dados continuam exigindo a senha", async () => {
+    expect((await req("/status", { origin: "https://spark-mind-friend-htvx.vercel.app" })).status).toBe(401);
+    expect((await req("/status", { origin: "https://spark-mind-friend-htvx.vercel.app", "x-presence-token": "segredo" })).status).toBe(200);
+  });
+});
