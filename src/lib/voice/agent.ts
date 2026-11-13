@@ -6,7 +6,7 @@
 import { z } from "zod/v4";
 
 import { must, supabase, SINGLE_USER_ID } from "../data/db";
-import { mentionedDossiers, normalize, rank, snippet } from "../orion";
+import { mentionedDossiers, normalize, periodOf, rank, snippet } from "../orion";
 import { commitRecords } from "../mcp/commit";
 import { contextText, DEFAULT_MODEL, type Context } from "../mcp/interpret";
 import { listCategories, listDossiers, listProjects, resolveProject } from "../mcp/lookup";
@@ -51,7 +51,9 @@ Regras de fala:
 - Faça o pedido na hora usando as ferramentas e depois confirme em uma frase ("Pronto, criei a demanda…"). Não peça permissão para o que foi pedido com clareza.
 - Se faltar um dado essencial, faça UMA pergunta curta. Se algo for ambíguo (projeto, polo), pergunte qual, citando as opções.
 - Para "o que tenho hoje", "me mostra tudo", "minha agenda/pendências" (ou amanhã) use SOMENTE resumo_do_dia, sem abrir nenhuma página (a tela de Saúde "Hoje" é outra coisa: só abra saude se ela pedir saúde). O painel mostra tudo: compromissos, lembretes, tarefas, atrasadas e demandas. Fale só os destaques em até três frases, citando as quantidades.
-- Para perguntas sobre o que aconteceu, documentos, anotações ou arquivos, use buscar_no_orion e responda com o que encontrou. Para guardar algo que a usuária contou, use documentar.
+- Perguntas sobre o que ela FEZ, CRIOU, CONCLUIU ou DOCUMENTOU (ontem, esta semana, mês passado, quantas demandas, quais tarefas, o que anotei) → use consultar_registros: ele traz as listas e contagens reais. Pergunte-se sempre se precisa dele antes de dizer que não sabe.
+- Perguntas sobre o CONTEÚDO de algo (o que disse um documento, detalhes de uma demanda, o que foi combinado, arquivos) → use buscar_no_orion. Se uma ferramenta não bastar, tente a outra antes de responder que não encontrou.
+- Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (Orion), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a usuária contou, use documentar.
 - Para abrir telas use abrir_pagina. Quando a usuária se despedir ou pedir para parar, use encerrar_conversa.
 - Nunca invente dados: se a ferramenta não trouxer, diga que não encontrou.
 ${name ? `Trate a usuária pelo nome de vez em quando, sem exagero.` : ""}`;
@@ -72,6 +74,13 @@ export const TOOLS = [
   fn("resumo_do_dia", "Traz o que a usuária tem para um dia (compromissos, tarefas, atrasadas) e as demandas em andamento. A tela mostra o painel completo.", { type: "object", properties: { quando: { type: "string", description: "hoje, amanha ou AAAA-MM-DD. Padrão: hoje." } } }),
   fn("concluir_tarefa", "Marca uma tarefa pendente como feita, pelo título (aproximado).", { type: "object", properties: { titulo: { type: "string" } }, required: ["titulo"] }),
   fn("buscar_no_orion", "Pesquisa no segundo cérebro (anotações, demandas, tarefas, documentos, arquivos, roteiros, conversas) e devolve os trechos mais relevantes.", { type: "object", properties: { pergunta: { type: "string" } }, required: ["pergunta"] }),
+  fn("consultar_registros", "Lista e conta, com datas, o que a usuária criou, concluiu ou documentou: demandas, tarefas/compromissos/lembretes e anotações do segundo cérebro. Use para 'o que fiz ontem', 'quais demandas concluí esta semana', 'quantas tarefas criei', 'o que documentei'. A tela mostra o painel completo.", { type: "object", properties: {
+    assunto: { type: "string", enum: ["tudo", "demandas", "tarefas", "anotacoes"], description: "Padrão: tudo." },
+    situacao: { type: "string", enum: ["concluidas", "criadas", "abertas", "todas"], description: "concluidas = finalizadas; criadas = registradas no período; abertas = ainda pendentes. Padrão: todas." },
+    periodo: { type: "string", description: "hoje, ontem, anteontem, esta semana, semana passada, este mes, mes passado. Vazio = sem limite de data." },
+    de: { type: "string", description: "AAAA-MM-DD (opcional, no lugar de periodo)." }, ate: { type: "string", description: "AAAA-MM-DD (opcional)." },
+    texto: { type: "string", description: "Filtra por palavra no título/projeto/polo (opcional)." },
+  } }),
   fn("documentar", "Guarda uma anotação no segundo cérebro (Orion) com a data do acontecimento.", { type: "object", properties: { texto: { type: "string" }, data: { type: "string", description: "AAAA-MM-DD; padrão hoje." } }, required: ["texto"] }),
   fn("encerrar_conversa", "Encerra a conversa por voz quando a usuária se despedir ou pedir para parar.", { type: "object", properties: {} }),
 ];
@@ -89,7 +98,7 @@ const resolveDay = (q: unknown, today: string) => {
 const ptDate = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : undefined);
 
-async function runTool(name: string, args: Record<string, unknown>, emit: Emit, ctx: Context): Promise<unknown> {
+export async function runTool(name: string, args: Record<string, unknown>, emit: Emit, ctx: Context): Promise<unknown> {
   switch (name) {
     case "abrir_pagina": {
       const base = PAGES[String(args["pagina"])];
@@ -171,6 +180,67 @@ async function runTool(name: string, args: Record<string, unknown>, emit: Emit, 
       const { docs, kws } = rank(await loadCorpus(), q, ctx.today, 8);
       if (!docs.length) return { ok: true, encontrados: 0, dica: "Diga que não encontrou nada sobre isso." };
       return { ok: true, encontrados: docs.length, trechos: docs.map((d) => ({ tipo: d.kind, data: d.date, onde: d.where, titulo: d.title, texto: snippet(d.text, kws, 360), arquivos: d.files?.map((f) => f.name) })) };
+    }
+
+    case "consultar_registros": {
+      const assunto = String(args["assunto"] ?? "tudo"), sit = String(args["situacao"] ?? "todas");
+      const per = args["de"] || args["ate"]
+        ? { from: String(args["de"] ?? "0000-01-01"), to: String(args["ate"] ?? args["de"] ?? "9999-12-31"), label: `${args["de"] ?? ""} a ${args["ate"] ?? ""}` }
+        : periodOf(String(args["periodo"] ?? ""), ctx.today);
+      const inP = (d?: string | null) => !per || (!!d && d >= per.from && d <= per.to);
+      const dayBR = (ts?: string | null) => (ts ? new Date(ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : undefined);
+      const f = normalize(String(args["texto"] ?? ""));
+      const match = (...parts: (string | null | undefined)[]) => !f || normalize(parts.filter(Boolean).join(" ")).includes(f);
+      const br = (iso?: string) => (iso ? iso.split("-").reverse().join("/") : "");
+      const out: Record<string, unknown> = { periodo: per ? per.label : "todo o histórico" };
+      const secoes: Panel["secoes"] = [];
+
+      if (assunto === "tudo" || assunto === "demandas") {
+        const [dem, projs] = await Promise.all([
+          supabase.from("project_demands").select("code, title, status, priority, dossier_name, project_id, created_at, updated_at").order("updated_at", { ascending: false }).limit(1000),
+          supabase.from("projects").select("id, name"),
+        ]);
+        const pn = new Map((must(projs) as { id: string; name: string }[]).map((x) => [x.id, x.name]));
+        const all = must(dem) as { code: string; title: string; status: string; priority: string; dossier_name: string | null; project_id: string; created_at: string; updated_at: string }[];
+        const pick = (r: (typeof all)[number]) => {
+          const ok = sit === "concluidas" ? r.status === "done" && inP(dayBR(r.updated_at))
+            : sit === "criadas" ? inP(dayBR(r.created_at))
+            : sit === "abertas" ? r.status !== "done" && (!per || inP(dayBR(r.created_at)) || inP(dayBR(r.updated_at)))
+            : inP(dayBR(r.created_at)) || inP(dayBR(r.updated_at));
+          return ok && match(r.title, r.code, r.dossier_name, pn.get(r.project_id));
+        };
+        const hit = all.filter(pick);
+        const ST: Record<string, string> = { todo: "a fazer", doing: "em andamento", done: "concluída" };
+        out["demandas"] = { total: hit.length, concluidas: hit.filter((r) => r.status === "done").length, em_andamento: hit.filter((r) => r.status === "doing").length, a_fazer: hit.filter((r) => r.status === "todo").length,
+          itens: hit.slice(0, 25).map((r) => ({ codigo: r.code, titulo: r.title, projeto: pn.get(r.project_id), polo: r.dossier_name ?? undefined, situacao: ST[r.status], criada_em: dayBR(r.created_at), atualizada_em: dayBR(r.updated_at) })) };
+        if (hit.length) secoes.push({ titulo: `Demandas (${hit.length})`, itens: hit.slice(0, 25).map((r) => ({ rotulo: `${r.code} ${r.title}`, detalhe: [ST[r.status], br(dayBR(r.status === "done" ? r.updated_at : r.created_at)), r.dossier_name].filter(Boolean).join(" · "), feita: r.status === "done", link: `/demandas?projeto=${encodeURIComponent(r.project_id)}` })) });
+      }
+
+      if (assunto === "tudo" || assunto === "tarefas") {
+        const tk = must(await supabase.from("tasks").select("title, due_date, due_time, done, done_at, kind, created_at").order("created_at", { ascending: false }).limit(1500)) as { title: string; due_date: string | null; due_time: string | null; done: boolean; done_at: string | null; kind: string; created_at: string }[];
+        const pick = (r: (typeof tk)[number]) => {
+          const ok = sit === "concluidas" ? r.done && inP(dayBR(r.done_at) ?? r.due_date)
+            : sit === "criadas" ? inP(dayBR(r.created_at))
+            : sit === "abertas" ? !r.done && (!per || inP(r.due_date) || inP(dayBR(r.created_at)))
+            : inP(dayBR(r.created_at)) || inP(r.due_date) || inP(dayBR(r.done_at));
+          return ok && match(r.title);
+        };
+        const hit = tk.filter(pick);
+        const K = (k: string) => (k === "evento" ? "compromisso" : k === "lembrete" ? "lembrete" : "tarefa");
+        out["tarefas"] = { total: hit.length, concluidas: hit.filter((r) => r.done).length, pendentes: hit.filter((r) => !r.done).length,
+          itens: hit.slice(0, 30).map((r) => ({ titulo: r.title, tipo: K(r.kind), feita: r.done, para: r.due_date ?? undefined, concluida_em: dayBR(r.done_at), criada_em: dayBR(r.created_at) })) };
+        if (hit.length) secoes.push({ titulo: `Tarefas, compromissos e lembretes (${hit.length})`, itens: hit.slice(0, 30).map((r) => ({ rotulo: r.title, detalhe: [K(r.kind), r.done ? "feita" : "pendente", br(r.due_date ?? undefined), hhmm(r.due_time)].filter(Boolean).join(" · "), feita: r.done, link: r.kind === "evento" ? "/calendario" : "/tarefas" })) });
+      }
+
+      if (assunto === "tudo" || assunto === "anotacoes") {
+        const en = must(await supabase.from("brain_entries").select("title, text, entry_date, source").order("entry_date", { ascending: false }).limit(800)) as { title: string | null; text: string; entry_date: string; source: string }[];
+        const hit = en.filter((r) => inP(r.entry_date) && match(r.title, r.text));
+        out["anotacoes_no_orion"] = { total: hit.length, itens: hit.slice(0, 20).map((r) => ({ data: r.entry_date, titulo: r.title || undefined, texto: r.text.replace(/\s+/g, " ").slice(0, 220), origem: r.source === "documentacao" ? "documentação" : "anotação" })) };
+        if (hit.length) secoes.push({ titulo: `Anotações no Orion (${hit.length})`, itens: hit.slice(0, 20).map((r) => ({ rotulo: (r.title || r.text).replace(/\s+/g, " ").slice(0, 120), detalhe: br(r.entry_date), link: "/cerebro" })) });
+      }
+
+      emit({ t: "painel", p: { titulo: per ? `Registros · ${per.label}` : "Registros", secoes: secoes.length ? secoes : [{ titulo: "Resultado", itens: [{ rotulo: "Nada encontrado nesse período." }] }] } });
+      return { ok: true, ...out, dica: "Responda com as contagens e os destaques; se houver muitos, cite os principais. Cheque o campo 'periodo'." };
     }
 
     case "documentar": {
