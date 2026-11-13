@@ -13,6 +13,7 @@ import { type ReactNode } from "react";
 import { HealthPreviewProvider } from "@/components/health-preview-provider";
 import { OrionDock } from "@/components/orion/OrionDock";
 import { VoiceDock } from "@/components/voice/VoiceDock";
+import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { VoiceProvider } from "@/lib/voice/use-voice";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -122,12 +123,14 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const railPad = useRailPad();
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <VoiceProvider>
-        <HealthPreviewProvider><Outlet /></HealthPreviewProvider>
+        <GlobalRail />
+        <div className={railPad}><HealthPreviewProvider><Outlet /></HealthPreviewProvider></div>
         <OrionDock />
         <VoiceDock />
       </VoiceProvider>
