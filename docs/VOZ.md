@@ -25,3 +25,7 @@ Cada conversa também fica salva em `assistant_messages` (o Orion encontra depoi
 ## Listas (checklists) por conversa
 
 Ferramenta `lista` (`src/lib/voice/lists.ts`): criar, adicionar, remover, marcar/desmarcar, mostrar, listar, renomear e excluir. As listas ficam salvas no banco (`presence_app.checklists` e `checklist_items`, migração `20261120000100`) e aparecem em Tarefas → aba "Listas" (`/tarefas?aba=listas`; `/listas` redireciona para lá), onde também dá para marcar e adicionar itens com o dedo. No modal da voz, tocar num item marca/desmarca e tocar numa sugestão inclui, sem fechar o modal. A voz sempre oferece sugestões do que mais incluir (aparecem no painel e são faladas). Pedido ambíguo ("toalha" com duas toalhas) vira pergunta; nunca mexe num item por meia-correspondência. Excluir lista ou remover todos os itens pede confirmação.
+
+## Toque de abertura
+
+Ao tocar no orbe, enquanto aparece "Iniciando o Presence…", toca um toque curto de "sistema ligando" (gerado na hora pelo navegador, sem arquivo, em `src/lib/voice/boot-sound.ts`). Ele para (com fade) quando o Presence começa a falar. Para desligar: `localStorage["presence.voz.abertura"] = "0"`.

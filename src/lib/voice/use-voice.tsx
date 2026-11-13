@@ -1,3 +1,4 @@
+import { startBootSound } from "./boot-sound";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@tanstack/react-router";
 
@@ -187,7 +188,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const listenRef = useRef<() => void>(() => undefined);
   const turn = useRef(0);
 
-  const setP = (p: Phase) => { phaseRef.current = p; setPhase(p); if (p !== "thinking") setStatus(null); };
+  const bootStop = useRef<(() => void) | null>(null);
+  const stopBoot = () => { const f = bootStop.current; bootStop.current = null; f?.(); };
+  const setP = (p: Phase) => { phaseRef.current = p; setPhase(p); if (p !== "thinking") { setStatus(null); stopBoot(); } };
   useEffect(() => {
     setCanListen(!!recCtor() || !!navigator.mediaDevices?.getUserMedia);
     try { if (localStorage.getItem("presence.stt") === "gravado") sttMode.current = "gravado"; } catch { /* sem armazenamento */ }
@@ -200,7 +203,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     activeRef.current = false; setActive(false);
     stopListening(); vadStop.current?.(); abort.current?.abort(); speaker.current?.cancel();
     mic.current?.getTracks().forEach((t) => t.stop()); mic.current = null;
-    setP("idle"); setInterim(""); setStatus(null);
+    setP("idle"); setInterim(""); setStatus(null); stopBoot();
     setTimeout(() => { if (!activeRef.current) { setUserText(""); setBotText(""); } }, 6000);
   }, [stopListening]);
 
@@ -389,7 +392,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
     spk().unlock();
     // Se a pessoa pediu no briefing que o Presence comece a conversa, ela fala primeiro.
-    if (greetRef.current !== "esperar") { setStatus("Iniciando o Presence…"); void ask(GREET_MARK); } else listen();
+    if (greetRef.current !== "esperar") { setStatus("Iniciando o Presence…"); bootStop.current = startBootSound(); void ask(GREET_MARK); } else listen();
   }, [listen, ask]);
 
   const stop = useCallback(() => { turn.current++; endSession(); }, [endSession]);
