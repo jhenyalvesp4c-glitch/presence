@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   ArrowRight, AudioLines, BarChart3, Bookmark, Brain, Calendar, CalendarCheck, ClipboardList, Dumbbell, Heart, Home,
   Layers, Lightbulb, ListChecks, Mic, Puzzle, Settings, Sparkles, Sun, Sprout, SquarePlus, Wallet, CreditCard,
-  Workflow, Loader2, Trash2, X,
+  Workflow, X,
 } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
@@ -109,8 +109,6 @@ function Assistente() {
 
   const home = useHome();
   const voice = useVoice();
-  const [text, setText] = useState("");
-  const [chatOpen, setChatOpen] = useState(false);
   // Central de entrada: texto, prints e arquivos interpretados e levados ao módulo certo.
   // Painel aberto abaixo do botão: registrar demanda (Central de entrada) ou Orion (documentar / perguntar).
   const [panel, setPanel] = useState<HomeAction | null>(null);
@@ -122,11 +120,6 @@ function Assistente() {
   const [incoming, setIncoming] = useState<{ id: number; text: string } | null>(null);
   const [active, setActive] = useState(0);
   const voiceTarget = useRef<"chat" | "demand">("chat");
-  const convoEnd = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    convoEnd.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [home.messages.length, home.thinking]);
 
   useEffect(() => {
     if (home.error) toast.error(home.error);
@@ -144,14 +137,11 @@ function Assistente() {
     if (!speech.start()) {
       // Navegador sem reconhecimento de voz: cai para digitação.
       if (target === "demand") setInboxOpen(true);
-      else setChatOpen(true);
     }
   }
 
-  function send(message: string) {
-    setText("");
-    void home.ask(message);
-  }
+  // Atalhos escritos na tela falam com a esfera (responde em voz e legenda, sem caixa de conversa).
+  function send(message: string) { voice.sendText(message); }
 
 
   return (
@@ -252,7 +242,7 @@ function Assistente() {
 
             <div className="flex flex-wrap justify-center gap-3">
               {prompts.map(({ Icon, t }) => (
-                <button key={t} onClick={() => send(t)} disabled={home.thinking}
+                <button key={t} onClick={() => send(t)} disabled={voice.phase === "thinking"}
                   className="glass flex shrink-0 items-center gap-3 rounded-full px-5 py-3 text-sm text-foreground/85 transition hover:text-foreground hover:shadow-[0_0_20px_-8px_var(--cyan)]">
                   <Icon size={18} className="text-violet" /> {t}
                 </button>
@@ -280,35 +270,6 @@ function Assistente() {
               )}
             </div>
             {chooser && <ActionChooser onPick={pick} onClose={() => setChooser(false)} />}
-
-            {(home.messages.length > 0 || home.thinking) && (
-              <div className="glass mx-auto max-h-[420px] w-full max-w-3xl space-y-3 overflow-y-auto rounded-3xl p-5">
-                <div className="flex items-center justify-between">
-                  <span className="mono-caps !text-[0.65rem]">Conversa</span>
-                  <button onClick={() => void home.clearConversation()} className="text-muted-foreground transition hover:text-foreground" aria-label="Limpar conversa"><Trash2 size={15} /></button>
-                </div>
-                {home.messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <p className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      m.role === "user" ? "bg-[color-mix(in_oklab,var(--cyan)_16%,transparent)] text-foreground" : "bg-secondary/70 text-foreground/90"}`}>
-                      {m.content}
-                    </p>
-                  </div>
-                ))}
-                {home.thinking && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin text-cyan" /> Presence está pensando…</div>
-                )}
-                <div ref={convoEnd} />
-              </div>
-            )}
-
-            {(chatOpen || text || home.messages.length > 0) && (
-              <form onSubmit={(e) => { e.preventDefault(); if (text.trim()) send(text); }} className="glass mx-auto flex w-full max-w-3xl items-center gap-3 rounded-full p-2 pl-5">
-                <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Fale com a Presence…" maxLength={4000}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none" autoFocus={chatOpen} disabled={home.thinking} />
-                <button type="submit" disabled={home.thinking || !text.trim()} className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-primary-foreground disabled:opacity-50" aria-label="Enviar"><ArrowRight size={16} /></button>
-              </form>
-            )}
           </div>
 
           {/* Cards */}
