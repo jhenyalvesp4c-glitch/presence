@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, 
 import { useAuth } from "@/lib/auth";
 import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
 import { useVoice } from "@/lib/voice/use-voice";
+import { listImprovements, STATUS_LABEL, type Improvement } from "@/lib/data/improvements";
 import { directEnabled, enableDirect, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
 
 export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Orion" }] }) });
@@ -142,6 +143,28 @@ function WhatsApp() {
   );
 }
 
+/** Pedidos de melhoria que o Orion montou e você confirmou: o que está na fila para o Claude e o que já ficou pronto. */
+function PedidosMelhoria() {
+  const [rows, setRows] = useState<Improvement[] | null>(null);
+  useEffect(() => { void listImprovements(15).then(setRows).catch(() => setRows([])); }, []);
+  if (!rows?.length) return null;
+  const cor: Record<string, string> = { na_fila: "text-amber", em_andamento: "text-cyan", feito: "text-emerald", cancelado: "text-muted-foreground" };
+  return (
+    <section className={card} data-testid="cfg-pedidos">
+      <h2 className="font-display text-lg font-semibold">Pedidos para o Claude</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Quando o Orion não consegue fazer algo, ele monta o pedido, você confirma e ele aparece aqui.</p>
+      <ul className="mt-4 space-y-2">
+        {rows.map((r) => (
+          <li key={r.id} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
+            <div className="flex items-start justify-between gap-3"><span className="font-medium">{r.title}</span><span className={`shrink-0 text-xs ${cor[r.status] ?? ""}`}>{STATUS_LABEL[r.status]}</span></div>
+            {r.claude_note && <p className="mt-1 text-xs text-muted-foreground">{r.claude_note}</p>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Chamar o Orion falando "Orion", como a Alexa. */
 function ChamarPorVoz() {
   const v = useVoice();
@@ -186,6 +209,8 @@ function Configuracoes() {
       </section>
 
       <ChamarPorVoz />
+
+      <PedidosMelhoria />
 
       <WhatsApp />
 

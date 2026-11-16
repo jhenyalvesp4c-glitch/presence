@@ -51,3 +51,9 @@ Limites: só funciona com o Orion aberto (pode estar minimizado) num navegador c
 2. **Gravação** (`wake-listen.ts`): usado automaticamente quando o modo 1 não existe, dá erro ("network"…) ou fica 25 s sem ouvir nada. Fica com o microfone aberto, detecta quando alguém fala, manda só esse trecho curto (WAV 16 kHz) para transcrever na OpenAI e procura a palavra no texto. Silêncio não é enviado; limite de 20 envios por minuto; chave/créditos inválidos desligam o recurso com aviso. Demora ~1–2 s depois de falar.
 
 Configurações → "Chamar por voz" mostra o estado, o modo e a última coisa ouvida (para diagnosticar). Na tela inicial, o status mostra "Diga “Orion”" quando está ligado.
+
+## Pedidos de melhoria para o Claude
+
+Quando o Orion não consegue fazer algo (função que não existe, edição que o sistema não permite), ele usa a ferramenta `pedir_melhoria`: avisa que no momento não consegue e abre um **cartão de confirmação** com o que a pessoa pediu, um título e "como entendi que deve ficar" (editáveis). Só depois do clique em "Confirmar e enviar ao Claude" o pedido é gravado em `presence_app.improvement_requests` (migração `20261121000100`), com status `na_fila`. Configurações mostra a lista "Pedidos para o Claude" e a pessoa pode perguntar "como estão meus pedidos?".
+
+O andamento (`em_andamento`, `feito`, `cancelado`, mais a nota em `claude_note`) é atualizado por quem implementa. **Nada pega os pedidos sozinho ainda**: o Claude lê a fila (ex.: pelo Supabase) numa conversa de desenvolvimento. Ligar uma execução automática (GitHub + Claude Code Action, ou uma rotina agendada) é uma decisão à parte, que exige permissões e revisão antes de ir para produção.

@@ -23,7 +23,9 @@ export type PanelItem = { rotulo: string; detalhe?: string | undefined; feita?: 
 export type ChatMsg = { quem: string; minha: boolean; dia: string; hora: string; texto: string; tipo: string; marcou: boolean; marcados?: string[] };
 /** Conversa do WhatsApp para mostrar como no aplicativo: uma mensagem embaixo da outra. */
 export type ChatView = { nome: string; grupo: boolean; mensagens: ChatMsg[] };
-export type Panel = { titulo: string; secoes: { titulo: string; itens: PanelItem[] }[]; chat?: ChatView; abrir?: { rotulo: string; para: string } };
+/** Pedido de melhoria para o Claude, para a pessoa conferir, corrigir e confirmar na tela antes de enviar. */
+export type Confirmar = { titulo: string; pedido: string; detalhes: string; area: string };
+export type Panel = { titulo: string; secoes: { titulo: string; itens: PanelItem[] }[]; chat?: ChatView; abrir?: { rotulo: string; para: string }; confirmar?: Confirmar };
 export type VoiceEvent =
   | { t: "texto"; d: string }
   | { t: "acao"; a: { tipo: "navegar"; para: string } | { tipo: "encerrar" } }
@@ -35,7 +37,7 @@ export type VoiceEvent =
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -78,6 +80,7 @@ Regras de fala:
 - Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (que também se chama Orion: é a sua própria memória, não confunda com o seu nome), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a pessoa contou, use documentar.
 - Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
 - ROTEIROS de treinamento: pedidos para criar, editar, acrescentar ou tirar coisas de um roteiro (ou bloco, passo, dica, pergunta frequente) → use roteiro. Faça na hora e escreva você mesmo o conteúdo bom e completo em português (passos curtos e objetivos, uma dica, perguntas frequentes com resposta); não peça o texto a ela. Sem projeto citado, a ferramenta acha o roteiro sozinha. Confirme em uma frase o que mudou e nunca diga que não consegue editar roteiros.
+- QUANDO NÃO CONSEGUE: se ela pedir algo que nenhuma ferramenta sua faz (função nova, editar algo que o sistema ainda não deixa, ou uma ferramenta devolveu que não é possível), não pare em "não consigo". Diga em uma frase que no momento não consegue e use pedir_melhoria com um título curto, o pedido dela e os detalhes de como deve ficar. A pessoa confere e confirma na tela; só então vai para o Claude. Nunca prometa que já está sendo feito: diga que o pedido segue para o Claude depois da confirmação. Se ela perguntar do andamento dos pedidos, use pedir_melhoria com acao listar.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
@@ -151,6 +154,13 @@ export const TOOLS = [
     perguntas_incluir: { type: "array", items: { type: "object", properties: { pergunta: { type: "string" }, resposta: { type: "string" } }, required: ["pergunta", "resposta"] } },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar excluir roteiro ou tirar bloco." },
   }, required: ["acao"] }),
+  fn("pedir_melhoria", "Use quando a pessoa pedir algo que você NÃO consegue fazer com as ferramentas que tem (uma função nova, editar algo que não é possível, um recurso que não existe, ou uma ferramenta que falhou por falta de capacidade). Monta um pedido para o Claude implementar: a pessoa confere, corrige e confirma na tela antes de enviar. Só envia depois da confirmação dela. acao=pedir cria o pedido; acao=listar mostra os pedidos e o andamento.", { type: "object", properties: {
+    acao: { type: "string", enum: ["pedir", "listar"], description: "Padrão: pedir." },
+    titulo: { type: "string", description: "Título curto do que precisa ser feito (ex.: Editar blocos de roteiros por voz)." },
+    pedido: { type: "string", description: "O que a pessoa pediu, nas palavras dela." },
+    detalhes: { type: "string", description: "Como entendeu que deve ficar: escopo, passos e o resultado esperado, claros o bastante para o Claude implementar sem perguntar de novo." },
+    area: { type: "string", description: "Tela ou área do sistema envolvida (ex.: Treinamentos, Tarefas, WhatsApp)." },
+  }, required: [] }),
   fn("buscar_no_orion", "Pesquisa no segundo cérebro (anotações, demandas, tarefas, documentos, arquivos, roteiros, conversas) e devolve os trechos mais relevantes.", { type: "object", properties: { pergunta: { type: "string" } }, required: ["pergunta"] }),
   fn("consultar_registros", "Lista e conta, com datas, o que a pessoa criou, concluiu ou documentou: demandas, tarefas/compromissos/lembretes e anotações do segundo cérebro. Use para 'o que fiz ontem', 'quais demandas concluí esta semana', 'quantas tarefas criei', 'o que documentei'. A tela mostra o painel completo.", { type: "object", properties: {
     assunto: { type: "string", enum: ["tudo", "demandas", "tarefas", "anotacoes"], description: "Padrão: tudo." },
@@ -297,6 +307,19 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       const out = await runScriptTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer no roteiro." } }));
       if (out.panel) emit({ t: "painel", p: out.panel });
       return out.result;
+    }
+
+    case "pedir_melhoria": {
+      if (String(args["acao"] ?? "pedir") === "listar") {
+        const { listImprovements, STATUS_LABEL } = await import("../data/improvements");
+        const rows = await listImprovements(12);
+        emit({ t: "painel", p: { titulo: "Pedidos para o Claude", secoes: [{ titulo: "Pedidos", itens: rows.length ? rows.map((r) => ({ rotulo: r.title, detalhe: `${STATUS_LABEL[r.status]}${r.claude_note ? ` · ${r.claude_note}` : ""}`, feita: r.status === "feito" })) : [{ rotulo: "Nenhum pedido ainda." }] }] } });
+        return { ok: true, pedidos: rows.map((r) => ({ titulo: r.title, andamento: STATUS_LABEL[r.status], nota: r.claude_note || undefined })) };
+      }
+      const titulo = String(args["titulo"] ?? "").trim(), pedido = String(args["pedido"] ?? "").trim(), detalhes = String(args["detalhes"] ?? "").trim(), area = String(args["area"] ?? "").trim();
+      if (!titulo) return { ok: false, erro: "Faltou o título do pedido." };
+      emit({ t: "painel", p: { titulo: "Confirmar pedido para o Claude", secoes: [], confirmar: { titulo, pedido: pedido || titulo, detalhes: detalhes || pedido || titulo, area } } });
+      return { ok: true, aguardando_confirmacao: true, instrucao: "Diga em uma ou duas frases que no momento você não consegue fazer isso, que montou o pedido para o Claude e que ela precisa conferir e confirmar na tela. NÃO diga que já está sendo feito nem que foi enviado: só é enviado depois do clique dela, e o Claude implementa em seguida." };
     }
 
     case "buscar_no_orion": {

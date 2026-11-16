@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { AlarmClock, ArrowUpRight, Bell, CalendarDays, Check, ClipboardList, Flame, ListChecks, Rocket, Sparkles, StickyNote, X } from "lucide-react";
 
+import { ConfirmRequest } from "./ConfirmRequest";
 import { addItems, setItemDone } from "@/lib/data/checklists";
 import { normalize } from "@/lib/orion";
 import type { Panel } from "@/lib/voice/agent";
@@ -69,13 +70,13 @@ export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: 
           <div className="min-w-0 flex-1">
             <p className="mono-caps !text-[0.6rem]">Orion · para você</p>
             <h2 className="mt-1 font-serif text-3xl leading-tight tracking-tight first-letter:uppercase sm:text-4xl"><span className="text-gradient">{panel.titulo}</span></h2>
-            <div className="mt-3 flex flex-wrap gap-2">
+            {!panel.confirmar && <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-foreground/90">{total} {total === 1 ? "item" : "itens"}</span>
               {sections.map((s, i) => { const t = toneOf(s.titulo); return (
                 <span key={i} className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs" style={{ borderColor: `color-mix(in oklab, ${t.c} 40%, transparent)`, background: `color-mix(in oklab, ${t.c} 12%, transparent)`, color: t.c }}>
                   <t.Icon size={12} /> {bare(s.titulo)} <b className="font-semibold">{countOf(s.titulo) ?? s.itens.length}</b>
                 </span>); })}
-            </div>
+            </div>}
           </div>
           <button onClick={onClose} aria-label="Fechar painel" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition hover:rotate-90 hover:text-foreground"><X size={16} /></button>
         </header>
@@ -118,7 +119,8 @@ export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: 
               </section>
             );
           })}
-          {!sections.length && <p className="py-10 text-center text-sm text-muted-foreground">Nada por aqui.</p>}
+          {panel.confirmar && <ConfirmRequest data={panel.confirmar} onClose={onClose} />}
+          {!sections.length && !panel.confirmar && <p className="py-10 text-center text-sm text-muted-foreground">Nada por aqui.</p>}
         </div>
 
         <footer className="relative flex items-center justify-between gap-3 border-t border-white/10 px-6 py-3 text-[0.7rem] text-muted-foreground sm:px-8">
