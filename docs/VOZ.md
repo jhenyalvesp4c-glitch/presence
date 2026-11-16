@@ -71,3 +71,8 @@ O intervalo mínimo da agenda é 1 hora, então, ao confirmar o pedido, o Orion 
 Variáveis de ambiente (Vercel, só servidor): `ORION_ROUTINE_FIRE_URL` e `ORION_ROUTINE_FIRE_TOKEN` (ver `.env.example`).
 
 **Estado atual: a rotina está criada, mas DESLIGADA e sem conectores.** Para funcionar, em claude.ai/code/routines: abrir a rotina "Orion: pegar pedidos de melhoria confirmados" → Edit → (1) conferir os conectores Supabase e Vercel e o repositório `jhenyalvesp4c-glitch/presence`; (2) em Trigger clicar em **+ → API**, copiar a Fire URL e **Generate token** (aparece uma vez); (3) manter a agenda de hora em hora como rede de segurança e ativar a rotina; (4) colocar a URL e o token nas variáveis acima na Vercel e fazer um novo deploy.
+
+## Nunca ficar em silêncio ("estou verificando para você")
+
+- **No servidor** (`filler.ts` + `runAgent`): quando o modelo vai usar ferramentas sem ter dito nada, o Orion fala na hora uma frase curta conforme o tipo ("Estou verificando para você.", "Estou abrindo o seu WhatsApp, só um instante.", "Pode deixar, já estou fazendo isso."). Ações imediatas (abrir tela, encerrar) e pedidos de melhoria não ganham aviso; se o modelo já falou, não repete.
+- **No navegador** (`use-voice.tsx`): se passam 2,2 s sem chegar nenhuma resposta, fala "Um instante, estou verificando para você." (uma vez por pedido). Respostas rápidas não ganham aviso.

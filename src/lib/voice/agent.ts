@@ -3,6 +3,7 @@
  * (abrir páginas, criar demandas/tarefas/compromissos, resumo do dia, pesquisar no Orion, documentar).
  * Só roda no servidor. A rota /api/voz repassa os eventos ao navegador em streaming.
  */
+import { fillerFor } from "./filler";
 import { z } from "zod/v4";
 
 import { must, supabase, ownerId } from "../data/db";
@@ -443,10 +444,17 @@ export async function runAgent(history: Turn[], emit: Emit, resume?: Resume): Pr
     ...history.slice(-12).map((m) => ({ role: m.role, content: m.content === GREET_MARK ? "(a conversa por voz acabou de começar)" : m.content.slice(0, 2000) })),
   ];
   try {
+    let spoke = false; // já falou algo neste pedido? (aí não repete o aviso de "estou verificando")
     for (let round = 0; round < 5; round++) {
-      const { text, calls } = await streamChat({ model, messages, tools: TOOLS, tool_choice: "auto", max_completion_tokens: 700, reasoning_effort: "low" }, (d) => emit({ t: "texto", d }));
+      const { text, calls } = await streamChat({ model, messages, tools: TOOLS, tool_choice: "auto", max_completion_tokens: 700, reasoning_effort: "low" }, (d) => { if (d.trim()) spoke = true; emit({ t: "texto", d }); });
       if (!calls.length) break;
-      messages.push({ role: "assistant", content: text || null, tool_calls: calls.map((k) => ({ id: k.id, type: "function", function: { name: k.name, arguments: k.args || "{}" } })) });
+      let said = text;
+      if (!spoke) {
+        // vai executar sem ter dito nada: avisa na hora, para não ficar em silêncio enquanto trabalha
+        const f = fillerFor(calls.map((k) => k.name), calls.map((k) => k.id).join(""));
+        if (f) { spoke = true; said = `${f} `; emit({ t: "texto", d: said }); }
+      }
+      messages.push({ role: "assistant", content: said || null, tool_calls: calls.map((k) => ({ id: k.id, type: "function", function: { name: k.name, arguments: k.args || "{}" } })) });
       for (const k of calls) { const st = TOOL_STATUS[k.name]; if (st) { emit({ t: "status", m: st }); break; } }
       const deferred: { id: string; nome: string; args: Record<string, unknown> }[] = [];
       for (const k of calls) {

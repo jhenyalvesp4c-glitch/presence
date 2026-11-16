@@ -13,6 +13,7 @@ import { ownerId, supabase } from "@/lib/supabase";
 import { transcribeAudio } from "@/lib/audio.functions";
 import type { Panel, Turn, VoiceEvent } from "./agent";
 import { takeSentences } from "./sentences";
+import { SLOW_AFTER_MS, SLOW_FILLER } from "./filler";
 
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
@@ -338,6 +339,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     let said = "", buffer = "", first = true;
     endAfter.current = false;
     const say = (chunks: string[]) => chunks.forEach((c) => sp.enqueue(c));
+    // se a resposta está demorando e ainda não veio nada, avisa em voz alta (nunca fica em silêncio)
+    let gotAny = false;
+    const slow = greeting ? undefined : setTimeout(() => { if (turn.current === my && !gotAny) say([SLOW_FILLER]); }, SLOW_AFTER_MS);
+    const calm = () => { gotAny = true; if (slow) clearTimeout(slow); };
     try {
       let body: Record<string, unknown> = { messages: history.current };
       for (let round = 0; round < 4; round++) {
@@ -348,6 +353,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         const box: { tools: Extract<VoiceEvent, { t: "ferramenta" }> | null } = { tools: null };
         const handle = (e: VoiceEvent) => {
           if (turn.current !== my) return;
+          if (e.t !== "fim") calm();
           if (e.t === "status") setStatus(e.m);
           else if (e.t === "texto") {
             setStatus(null);
@@ -380,6 +386,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         }
         body = { messages: history.current, continuar: { estado: pend.estado, resultados } };
       }
+      calm();
       if (turn.current !== my) return;
       say(takeSentences(buffer, { first, flush: true }).chunks);
       if (said.trim()) {
@@ -387,6 +394,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         void supabase.from("assistant_messages").insert([...(greeting ? [] : [{ user_id: ownerId(), role: "user", content: text }]), { user_id: ownerId(), role: "assistant", content: said.trim() }]).then(() => undefined);
       }
     } catch (e) {
+      calm();
       if (ctrl.signal.aborted || turn.current !== my) return;
       const m = e instanceof Error ? e.message : "Tive um problema agora.";
       sp.enqueue(m);
