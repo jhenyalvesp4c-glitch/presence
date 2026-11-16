@@ -35,7 +35,7 @@ export type VoiceEvent =
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -77,6 +77,7 @@ Regras de fala:
 - Perguntas sobre o CONTEÚDO de algo (o que disse um documento, detalhes de uma demanda, o que foi combinado, arquivos) → use buscar_no_orion. Se uma ferramenta não bastar, tente a outra antes de responder que não encontrou.
 - Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (Orion), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a pessoa contou, use documentar.
 - Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
+- ROTEIROS de treinamento: pedidos para criar, editar, acrescentar ou tirar coisas de um roteiro (ou bloco, passo, dica, pergunta frequente) → use roteiro. Faça na hora e escreva você mesmo o conteúdo bom e completo em português (passos curtos e objetivos, uma dica, perguntas frequentes com resposta); não peça o texto a ela. Sem projeto citado, a ferramenta acha o roteiro sozinha. Confirme em uma frase o que mudou e nunca diga que não consegue editar roteiros.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
@@ -128,6 +129,27 @@ export const TOOLS = [
     todos: { type: "boolean", description: "true para marcar/desmarcar/remover todos os itens." },
     sugestoes: { type: "array", items: { type: "string" }, description: "Ideias do que mais incluir, que ainda não estão na lista." },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar excluir a lista ou remover todos." },
+  }, required: ["acao"] }),
+  fn("roteiro", "Cria e edita ROTEIROS DE TREINAMENTO (Documentação → Treinamentos) do projeto: criar roteiro com blocos, adicionar bloco, editar bloco (título, duração, o que mostrar, dica, o que falar, por quês, perguntas frequentes), tirar bloco ou passo, mudar título/público/objetivo, mostrar ou listar roteiros, excluir. Identifique roteiro e bloco pelo nome aproximado. Quando ela pedir 'coloca mais coisas no roteiro' ou 'cria um bloco sobre X', escreva você mesmo o conteúdo completo e útil (passos objetivos, dica, perguntas frequentes) em português e use adicionar_bloco ou editar_bloco.", { type: "object", properties: {
+    acao: { type: "string", enum: ["listar", "mostrar", "criar", "editar", "adicionar_bloco", "editar_bloco", "remover_bloco", "excluir"] },
+    roteiro: { type: "string", description: "Título (aproximado) do roteiro." },
+    projeto: { type: "string", description: "Nome do projeto (só se ela citar ou houver mais de um)." },
+    titulo: { type: "string", description: "Título do roteiro novo, ou do bloco novo em adicionar_bloco." },
+    publico: { type: "string" }, objetivo: { type: "string" },
+    blocos: { type: "array", description: "Blocos a criar (criar ou adicionar_bloco).", items: { type: "object", properties: {
+      titulo: { type: "string" }, minutos: { type: "number" }, mostrar: { type: "array", items: { type: "string" }, description: "Passos de 'o que mostrar'." },
+      dica: { type: "string" }, falar: { type: "string", description: "Texto para o apresentador falar." }, porque: { type: "array", items: { type: "string" } },
+      perguntas: { type: "array", items: { type: "object", properties: { pergunta: { type: "string" }, resposta: { type: "string" } }, required: ["pergunta", "resposta"] } },
+    }, required: ["titulo"] } },
+    bloco: { type: "string", description: "Título (aproximado) do bloco a editar ou tirar." },
+    depois_de: { type: "string", description: "Em adicionar_bloco: título do bloco depois do qual entra." },
+    novo_titulo: { type: "string", description: "Novo título (do roteiro em editar, do bloco em editar_bloco)." },
+    minutos: { type: "number" }, dica: { type: "string" }, falar: { type: "string" },
+    mostrar_incluir: { type: "array", items: { type: "string" }, description: "Passos a acrescentar em 'o que mostrar'." },
+    mostrar_tirar: { type: "array", items: { type: "string" }, description: "Passos (aproximados) a tirar." },
+    porque_incluir: { type: "array", items: { type: "string" } },
+    perguntas_incluir: { type: "array", items: { type: "object", properties: { pergunta: { type: "string" }, resposta: { type: "string" } }, required: ["pergunta", "resposta"] } },
+    confirmado: { type: "boolean", description: "true só depois de ela confirmar excluir roteiro ou tirar bloco." },
   }, required: ["acao"] }),
   fn("buscar_no_orion", "Pesquisa no segundo cérebro (anotações, demandas, tarefas, documentos, arquivos, roteiros, conversas) e devolve os trechos mais relevantes.", { type: "object", properties: { pergunta: { type: "string" } }, required: ["pergunta"] }),
   fn("consultar_registros", "Lista e conta, com datas, o que a pessoa criou, concluiu ou documentou: demandas, tarefas/compromissos/lembretes e anotações do segundo cérebro. Use para 'o que fiz ontem', 'quais demandas concluí esta semana', 'quantas tarefas criei', 'o que documentei'. A tela mostra o painel completo.", { type: "object", properties: {
@@ -266,6 +288,13 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
     case "lista": {
       const { runListTool } = await import("./lists");
       const out = await runListTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer na lista." } }));
+      if (out.panel) emit({ t: "painel", p: out.panel });
+      return out.result;
+    }
+
+    case "roteiro": {
+      const { runScriptTool } = await import("./scripts");
+      const out = await runScriptTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer no roteiro." } }));
       if (out.panel) emit({ t: "painel", p: out.panel });
       return out.result;
     }

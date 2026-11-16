@@ -34,3 +34,7 @@ Ao tocar no orbe, enquanto aparece "Iniciando o Presence…", toca um toque de "
 
 - O Presence só entende que você terminou depois de **2,5 s de silêncio** (`SILENCE_MS` em `use-voice.tsx`), tanto no reconhecimento do navegador (que agora continua ouvindo nas pausas) quanto na gravação.
 - A caixa de fala tem tamanho fixo e o texto **aparece frase a frase, quando cada frase começa a ser falada**; a caixa rola sozinha para o fim (`SpeechText.tsx`), então toda a mensagem pode ser lida.
+
+## Roteiros de treinamento por voz
+
+Ferramenta `roteiro` (`src/lib/voice/scripts.ts`, regras puras em `src/lib/script-edit.ts`): listar, mostrar, criar roteiro com blocos, adicionar bloco (no fim ou depois de outro), editar bloco (título, duração, "o que mostrar", dica, o que falar, por quês, perguntas frequentes), tirar passos, tirar bloco, mudar título/público/objetivo e excluir. Mexe no mesmo documento da tela (`training_library`), então o que ela pede por voz aparece em Documentação → Treinamentos. O conteúdo novo é escrito pela IA. Tirar bloco e excluir roteiro pedem confirmação; blocos repetidos e nomes ambíguos viram pergunta.
