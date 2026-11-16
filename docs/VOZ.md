@@ -29,3 +29,8 @@ Ferramenta `lista` (`src/lib/voice/lists.ts`): criar, adicionar, remover, marcar
 ## Toque de abertura
 
 Ao tocar no orbe, enquanto aparece "Iniciando o Presence…", toca um toque de "sistema iniciando" estilo painel de IA, sem melodia: zumbido grave que cresce, varredura de energia, batida grave discreta e pulsos digitais com eco (gerado na hora pelo navegador, sem arquivo, em `src/lib/voice/boot-sound.ts`). Ele para (com fade) quando o Presence começa a falar. Para desligar: `localStorage["presence.voz.abertura"] = "0"`.
+
+## Tempo para falar e texto acompanhando a fala
+
+- O Presence só entende que você terminou depois de **2,5 s de silêncio** (`SILENCE_MS` em `use-voice.tsx`), tanto no reconhecimento do navegador (que agora continua ouvindo nas pausas) quanto na gravação.
+- A caixa de fala tem tamanho fixo e o texto **aparece frase a frase, quando cada frase começa a ser falada**; a caixa rola sozinha para o fim (`SpeechText.tsx`), então toda a mensagem pode ser lida.

@@ -50,7 +50,7 @@ class Speaker {
   private node: AudioBufferSourceNode | null = null;
   private waiters: (() => void)[] = [];
   private fallback = false;
-  constructor(private onStart: () => void, private onNote: (n: string | null) => void) {}
+  constructor(private onStart: () => void, private onNote: (n: string | null) => void, private onSay: (t: string) => void = () => {}) {}
 
   /** Chamar dentro de um clique: libera o áudio do navegador (Chrome, Safari e celular) para os toques seguintes. */
   unlock() {
@@ -99,6 +99,7 @@ class Speaker {
       const blob = await it.blob;
       if (this.cancelled) break;
       if (!started) { started = true; this.onStart(); }
+      this.onSay(it.text); // o texto aparece na tela na hora em que a frase começa a ser falada
       let played = false;
       if (blob) played = await this.playBlob(blob);
       if (!played && !this.cancelled) await this.playBrowser(it.text);
@@ -160,6 +161,8 @@ class Speaker {
 }
 
 const MAX_IDLE = 3;
+/** Quanto silêncio (ms) o Presence espera antes de achar que a pessoa terminou de falar. */
+const SILENCE_MS = 2500;
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -195,7 +198,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setCanListen(!!recCtor() || !!navigator.mediaDevices?.getUserMedia);
     try { if (localStorage.getItem("presence.stt") === "gravado") sttMode.current = "gravado"; } catch { /* sem armazenamento */ }
   }, []);
-  const spk = () => (speaker.current ??= new Speaker(() => { if (activeRef.current) setP("speaking"); }, (n) => setNote(n)));
+  const spk = () => (speaker.current ??= new Speaker(() => { if (activeRef.current) setP("speaking"); }, (n) => setNote(n), (t) => setBotText((p) => (p && !/\s$/.test(p) ? `${p} ` : p) + t)));
 
   const stopListening = useCallback(() => { const r = rec.current; rec.current = null; if (r) { r.onend = null; r.onresult = null; try { r.abort(); } catch { /* já parado */ } } setInterim(""); }, []);
 
@@ -213,12 +216,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     if (!C) { setP("idle"); return; }
     stopListening();
     const r = new C();
-    r.lang = "pt-BR"; r.interimResults = true; r.continuous = false;
-    let finalText = "";
+    r.lang = "pt-BR"; r.interimResults = true; r.continuous = true; // continua ouvindo nas pausas; quem decide o fim é o silêncio de SILENCE_MS
+    let finalText = "", endTimer: ReturnType<typeof setTimeout> | null = null;
     r.onresult = (e) => {
       let partial = "";
       for (let i = 0; i < e.results.length; i++) { const x = e.results[i]!; if (x.isFinal) finalText += x[0]!.transcript; else partial += x[0]!.transcript; }
       setInterim(finalText + partial);
+      if (endTimer) clearTimeout(endTimer);
+      if ((finalText + partial).trim()) endTimer = setTimeout(() => { try { r.stop(); } catch { /* já parou */ } }, SILENCE_MS);
     };
     let switched = false;
     r.onerror = (e) => {
@@ -235,6 +240,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       } else if (m[e.error]) { setNote(m[e.error]!); idle.current = MAX_IDLE; }
     };
     r.onend = () => {
+      if (endTimer) clearTimeout(endTimer);
       if (rec.current !== r) return;
       rec.current = null; setInterim("");
       if (switched) { if (activeRef.current) listenRef.current(); return; }
@@ -298,7 +304,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       const rms = Math.sqrt(sum / data.length), now = performance.now();
       if (now - t0 < 400) { noise = Math.max(noise, rms); return; } // mede o ruído do ambiente
       if (rms > Math.max(0.025, noise * 2.5)) { loud += 50; quiet = 0; if (!started && loud >= 150) { started = true; setInterim("…"); } } else if (started) quiet += 50;
-      if (started && quiet >= 950) void finish(loud >= 300 ? "enviar" : "silencio");
+      if (started && quiet >= SILENCE_MS) void finish(loud >= 300 ? "enviar" : "silencio");
       else if (!started && now - t0 > 10_000) void finish("silencio");
       else if (now - t0 > 25_000) void finish(started ? "enviar" : "silencio");
     }, 50);
@@ -337,14 +343,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           if (e.t === "status") setStatus(e.m);
           else if (e.t === "texto") {
             setStatus(null);
-            said += e.d; buffer += e.d; setBotText(said);
+            said += e.d; buffer += e.d;
             const t = takeSentences(buffer, { first });
             buffer = t.rest; first = t.first; say(t.chunks);
           } else if (e.t === "acao") {
             if (e.a.tipo === "navegar") router.history.push(e.a.para); else endAfter.current = true;
           } else if (e.t === "painel") setPanel(e.p);
           else if (e.t === "ferramenta") box.tools = e;
-          else if (e.t === "erro") { said = said || e.m; setBotText(said); say([e.m]); }
+          else if (e.t === "erro") { said = said || e.m; say([e.m]); }
         };
         for (;;) {
           const { done, value } = await reader.read();
@@ -375,7 +381,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (ctrl.signal.aborted || turn.current !== my) return;
       const m = e instanceof Error ? e.message : "Tive um problema agora.";
-      setBotText(m); sp.enqueue(m);
+      sp.enqueue(m);
     }
     if (turn.current !== my) return;
     await sp.drained();
