@@ -1,4 +1,5 @@
-import { startBootSound } from "./boot-sound";
+import { playWakeChime, startBootSound } from "./boot-sound";
+import { afterWake, heardWake, setWakeEnabled, wakeEnabled } from "./wake";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@tanstack/react-router";
 
@@ -15,6 +16,7 @@ import { takeSentences } from "./sentences";
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
   active: boolean; phase: Phase; status: string | null; userText: string; botText: string; interim: string; panel: Panel | null; canListen: boolean; note: string | null;
+  wake: boolean; wakeSupported: boolean; setWake: (on: boolean) => void;
   testVoice: () => void; announce: (text: string) => Promise<void>; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
 };
 const Ctx = createContext<Voice | null>(null);
@@ -175,6 +177,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [canListen, setCanListen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [wake, setWakeState] = useState(false);
+  const [wakeTick, setWakeTick] = useState(0);
+  const wakeRec = useRef<Rec | null>(null);
 
   const activeRef = useRef(false);
   const phaseRef = useRef<Phase>("idle");
@@ -403,6 +408,50 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   const stop = useCallback(() => { turn.current++; endSession(); }, [endSession]);
 
+  /* ───────────── "Presence": chamar falando, como a Alexa ───────────── */
+  const stopWake = useCallback(() => {
+    const r = wakeRec.current; wakeRec.current = null;
+    if (r) { r.onresult = null; r.onerror = null; r.onend = null; try { r.abort(); } catch { /* já parou */ } }
+  }, []);
+  /** Abre a conversa direto ouvindo (sem saudação); se a pessoa já disse o pedido junto ("Presence, que horas são?"), responde a ele. */
+  const activate = useCallback((rest: string) => {
+    if (activeRef.current) return;
+    activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
+    spk().unlock(); playWakeChime();
+    if (rest.length >= 3) void ask(rest); else setTimeout(() => { if (activeRef.current) listen(); }, 500);
+  }, [ask, listen]);
+  const startWake = useCallback(() => {
+    if (wakeRec.current || activeRef.current) return;
+    const C = recCtor(); if (!C) return;
+    const r = new C();
+    r.lang = "pt-BR"; r.interimResults = true; r.continuous = true;
+    r.onresult = (e) => {
+      const last = e.results[e.results.length - 1]; if (!last) return;
+      const text = last[0]?.transcript ?? "";
+      if (!heardWake(text)) return;
+      const rest = last.isFinal ? afterWake(text) : "";
+      stopWake(); activate(rest);
+    };
+    r.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
+        setWakeEnabled(false); setWakeState(false); stopWake();
+        setNote("Para chamar falando \"Presence\", libere o microfone para este site e ligue de novo em Configurações.");
+      } else if (e.error === "network") {
+        setWakeEnabled(false); setWakeState(false); stopWake();
+        setNote("O reconhecimento de voz do navegador não está disponível neste computador, então não consigo ouvir a palavra \"Presence\".");
+      }
+    };
+    r.onend = () => { if (wakeRec.current !== r) return; wakeRec.current = null; if (wakeEnabled() && !activeRef.current) setTimeout(() => setWakeTick((n) => n + 1), 400); };
+    wakeRec.current = r;
+    try { r.start(); } catch { wakeRec.current = null; setTimeout(() => setWakeTick((n) => n + 1), 1500); }
+  }, [activate, stopWake]);
+  const setWake = useCallback((on: boolean) => { setWakeEnabled(on); setWakeState(on); }, []);
+  useEffect(() => { setWakeState(wakeEnabled()); }, []);
+  useEffect(() => {
+    if (wake && !active) startWake(); else stopWake();
+    return () => stopWake();
+  }, [wake, active, wakeTick, startWake, stopWake]);
+
   /** Fala uma frase de teste para o usuário conferir se o som está chegando. */
   const testVoice = useCallback(() => {
     if (!activeRef.current) { activeRef.current = true; setActive(true); }
@@ -433,10 +482,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   /** Fala um aviso (ex.: lembrete) sem abrir conversa. Se ela já está falando ou ouvindo, não atravessa. */
   const announce = useCallback((text: string): Promise<void> => {
     if (!text.trim() || activeRef.current) return Promise.resolve();
+    stopWake();
     const sp = spk(); sp.reset(); sp.enqueue(text.slice(0, 400));
-    return sp.drained();
+    return sp.drained().then(() => setWakeTick((n) => n + 1));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [stopWake]);
   // Na primeira interação com a página, libera o áudio para os avisos falados.
   useEffect(() => {
     const un = () => { try { spk().unlock(); } catch { /* sem áudio */ } window.removeEventListener("pointerdown", un); window.removeEventListener("keydown", un); };
@@ -447,7 +497,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => { activeRef.current = false; speaker.current?.cancel(); stopListening(); }, [stopListening]);
 
-  const value = useMemo<Voice>(() => ({ active, phase, status, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText, closePanel: () => setPanel(null) }),
-    [active, phase, status, userText, botText, interim, panel, canListen, note, testVoice, announce, toggle, stop, sendText]);
+  const value = useMemo<Voice>(() => ({ active, phase, status, userText, botText, interim, panel, canListen, note, wake, wakeSupported: !!recCtor(), setWake, testVoice, announce, toggle, stop, sendText, closePanel: () => setPanel(null) }),
+    [active, phase, status, userText, botText, interim, panel, canListen, note, wake, setWake, testVoice, announce, toggle, stop, sendText]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

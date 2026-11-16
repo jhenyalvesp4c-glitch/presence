@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, Pause, Play, Settings, ShieldCheck, Sparkles, Trash2, Unplug, Volume2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, Mic, Pause, Play, Settings, ShieldCheck, Sparkles, Trash2, Unplug, Volume2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
 import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
+import { useVoice } from "@/lib/voice/use-voice";
 import { directEnabled, enableDirect, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
 
 export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Presence" }] }) });
@@ -141,6 +142,23 @@ function WhatsApp() {
   );
 }
 
+/** Chamar o Presence falando "Presence", como a Alexa. */
+function ChamarPorVoz() {
+  const v = useVoice();
+  return (
+    <section className={card} data-testid="cfg-chamar">
+      <h2 className="font-display text-lg font-semibold">Chamar por voz</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Com isto ligado, é só falar <b className="text-foreground">“Presence”</b> que ele acorda e passa a te ouvir, sem precisar tocar na esfera.</p>
+      <div className="mt-4"><Toggle on={v.wake} onChange={v.setWake} Icon={Mic} label="Ativar quando eu falar “Presence”" hint={v.wakeSupported ? "Funciona enquanto o Presence estiver aberto neste computador, com o microfone liberado." : "Este navegador não tem reconhecimento de voz. Use o Chrome ou o Edge."} /></div>
+      <ul className="mt-4 space-y-1.5 text-xs text-muted-foreground">
+        <li>• Depois de falar “Presence”, ouça o tom curto e fale o que precisa.</li>
+        <li>• Para funcionar sempre, deixe o app aberto (pode ficar minimizado) e libere o microfone.</li>
+        <li>• Enquanto está ligado, o navegador ouve o microfone o tempo todo e envia o áudio ao serviço de reconhecimento de voz dele (no Chrome, o Google) para perceber a palavra. Desligue quando quiser privacidade.</li>
+      </ul>
+    </section>
+  );
+}
+
 function Configuracoes() {
   const { account, signOut } = useAuth();
   const briefing = useBriefingSafe();
@@ -160,6 +178,8 @@ function Configuracoes() {
           <button className={`${btn} hover:!border-destructive/50 hover:!text-destructive`} onClick={() => void signOut()}><LogOut size={14} /> Sair da conta</button>
         </div>
       </section>
+
+      <ChamarPorVoz />
 
       <WhatsApp />
 

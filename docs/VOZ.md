@@ -38,3 +38,9 @@ Ao tocar no orbe, enquanto aparece "Iniciando o Presence…", toca um toque de "
 ## Roteiros de treinamento por voz
 
 Ferramenta `roteiro` (`src/lib/voice/scripts.ts`, regras puras em `src/lib/script-edit.ts`): listar, mostrar, criar roteiro com blocos, adicionar bloco (no fim ou depois de outro), editar bloco (título, duração, "o que mostrar", dica, o que falar, por quês, perguntas frequentes), tirar passos, tirar bloco, mudar título/público/objetivo e excluir. Mexe no mesmo documento da tela (`training_library`), então o que ela pede por voz aparece em Documentação → Treinamentos. O conteúdo novo é escrito pela IA. Tirar bloco e excluir roteiro pedem confirmação; blocos repetidos e nomes ambíguos viram pergunta.
+
+## Chamar falando "Presence" (como a Alexa)
+
+Configurações → "Chamar por voz". Ligado, o navegador escuta continuamente (reconhecimento de voz do próprio navegador, `src/lib/voice/wake.ts`) e, ao ouvir "Presence" (e variações: presens, prisens, presença…), toca um tom curto e passa a ouvir. Se o pedido vier junto ("Presence, que horas são?"), responde direto. Enquanto a conversa está aberta (ou um lembrete é falado) a escuta da palavra fica pausada e volta depois.
+
+Limites: só funciona com o Presence aberto (pode estar minimizado) num navegador com reconhecimento de voz (Chrome/Edge) e microfone liberado; o áudio é enviado ao serviço do navegador (no Chrome, o Google) enquanto estiver ligado; o navegador pode exigir um primeiro toque na página depois de abrir para liberar o som. Preferência local: `localStorage["presence.voz.chamar"]`.

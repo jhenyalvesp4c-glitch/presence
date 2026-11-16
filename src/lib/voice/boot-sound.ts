@@ -97,3 +97,21 @@ export function startBootSound(): () => void {
   setTimeout(stop, BOOT_SECONDS * 1000);
   return stop;
 }
+
+/** Toque curto e discreto de "estou ouvindo", quando o Presence é chamado pela palavra de ativação. */
+export function playWakeChime(): void {
+  if (typeof window === "undefined" || !bootEnabled()) return;
+  try {
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC(); void ctx.resume().catch(() => {});
+    const t = ctx.currentTime + 0.02, out = ctx.createGain(); out.gain.value = 0.5; out.connect(ctx.destination);
+    for (const [f, at, v] of [[784, 0, 0.12], [1175, 0.09, 0.09]] as const) {
+      const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+      const m = ctx.createOscillator(); m.type = "sine"; m.frequency.value = f * 2; const mg = ctx.createGain(); mg.gain.value = f * 0.5; m.connect(mg); mg.connect(o.frequency);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t + at); g.gain.exponentialRampToValueAtTime(v, t + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.5);
+      o.connect(g); g.connect(out); o.start(t + at); m.start(t + at); o.stop(t + at + 0.55); m.stop(t + at + 0.55);
+    }
+    setTimeout(() => { try { void ctx.close(); } catch { /* já fechado */ } }, 900);
+  } catch { /* sem áudio */ }
+}
