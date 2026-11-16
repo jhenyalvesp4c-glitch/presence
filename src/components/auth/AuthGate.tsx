@@ -23,7 +23,7 @@ function Brand() {
         <span aria-hidden className="absolute inset-2 rounded-full bg-[var(--cyan)] opacity-25 blur-md" />
         <span className="relative h-8 w-8 rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, var(--cyan), color-mix(in oklab, var(--violet) 70%, black))", boxShadow: "0 0 24px -2px var(--cyan)" }} />
       </span>
-      <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan">PRESENCE</span>
+      <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan">ORION</span>
     </div>
   );
 }

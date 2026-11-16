@@ -1,5 +1,5 @@
 /**
- * Grava no Presence o que o usuário aprovou, reutilizando os serviços das próprias telas:
+ * Grava no Orion o que o usuário aprovou, reutilizando os serviços das próprias telas:
  * saveDemands (Kanban), saveAppointment (calendário), createTaskRow (tarefas), saveNotesDb (anotações),
  * loadLibrary/saveLibrary (documentação) e putMaterials (anexos). Também desfaz uma operação.
  */

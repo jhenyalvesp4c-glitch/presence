@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-export const Route = createFileRoute("/diagnostico")({ component: Diagnostico, head: () => ({ meta: [{ title: "Diagnóstico · Presence" }] }) });
+export const Route = createFileRoute("/diagnostico")({ component: Diagnostico, head: () => ({ meta: [{ title: "Diagnóstico · Orion" }] }) });
 
 /** Mostra o que o aparelho informa (largura, tela, zoom): ajuda a entender por que o layout do celular não aparece. */
 function Diagnostico() {

@@ -20,9 +20,9 @@ import {
 export const Route = createFileRoute("/organizar_/pronto")({
   head: () => ({
     meta: [
-      { title: "Seu dia está pronto! · Presence" },
-      { name: "description", content: "Seu planejamento diário organizado pelo Presence: timeline, prioridades, progresso e foco." },
-      { property: "og:title", content: "Seu dia está pronto! · Presence" },
+      { title: "Seu dia está pronto! · Orion" },
+      { name: "description", content: "Seu planejamento diário organizado pelo Orion: timeline, prioridades, progresso e foco." },
+      { property: "og:title", content: "Seu dia está pronto! · Orion" },
       { property: "og:description", content: "Plano do dia organizado, com prioridades, progresso e temporizador de foco." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

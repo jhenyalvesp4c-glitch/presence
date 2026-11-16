@@ -4,7 +4,7 @@
  */
 export type OrionKind = "registro" | "documentacao" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento";
 
-/** Arquivo guardado no Presence (print, PDF, anexo de demanda…) que acompanha um documento. */
+/** Arquivo guardado no Orion (print, PDF, anexo de demanda…) que acompanha um documento. */
 export type FileRef = { bucket: string; path: string; name: string; mime: string; size: number };
 
 export type OrionDoc = {
@@ -141,7 +141,7 @@ export function mentionedDossiers(text: string, names: string[]): string[] {
   return [...new Set(names.filter((n) => n.trim() && t.includes(hay(n))))];
 }
 
-export const SYSTEM = `Você é o Orion, o "segundo cérebro" da pessoa: ele responde com base nas FONTES que o Presence reúne (anotações que ela documentou, demandas e seu histórico, tarefas e compromissos, notas de projeto, conversas com o assistente).
+export const SYSTEM = `Você é o Orion, o "segundo cérebro" da pessoa: ele responde com base nas FONTES que o Orion reúne (anotações que ela documentou, demandas e seu histórico, tarefas e compromissos, notas de projeto, conversas com o assistente).
 Regras:
 - Responda SOMENTE com o que está nas fontes. Se não houver informação suficiente, diga isso com clareza e sugira o que ela poderia documentar; nunca invente.
 - Cite as fontes pelo número entre colchetes, ex.: [2]. Datas sempre no formato dia/mês/ano.

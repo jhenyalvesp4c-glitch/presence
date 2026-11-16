@@ -18,7 +18,7 @@ const STEPS = ["Lendo o que você contou…", "Olhando os prints e arquivos…",
 
 type Created = { script: Script; examples: Example[]; duvidas: string[] };
 
-/** Cria um roteiro de treinamento com IA: a usuária conta tudo e anexa prints; o Presence monta os blocos. */
+/** Cria um roteiro de treinamento com IA: a usuária conta tudo e anexa prints; o Orion monta os blocos. */
 export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, onPresent, onClose }: {
   folders: string[]; defaultFolder?: string | undefined; onCreate: (script: Script, examples: Example[]) => void; onOpen: (id: string) => void; onPresent: (id: string) => void; onClose: () => void;
 }) {
@@ -57,7 +57,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
     if (!list.length) return;
     setError("");
     const { added, rejected } = await toPending(list, pending).catch((e) => ({ added: [] as Pending[], rejected: [(e as Error).message] }));
-    const readable = added.filter((p) => p.ai), skipped = added.filter((p) => !p.ai).map((p) => `${p.name}: o Presence não consegue ler este tipo de arquivo (use imagem, PDF ou texto)`);
+    const readable = added.filter((p) => p.ai), skipped = added.filter((p) => !p.ai).map((p) => `${p.name}: o Orion não consegue ler este tipo de arquivo (use imagem, PDF ou texto)`);
     if (readable.length) setPending((p) => [...p, ...readable]);
     const msgs = [...rejected, ...skipped];
     if (msgs.length) setError(msgs.join(" · "));
@@ -102,7 +102,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
   const color = done?.script.color ?? "violet";
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-background/80 p-4 backdrop-blur-md" {...backdropProps(() => { if (!busy && !recording) onClose(); })} data-testid="gerador-roteiro">
-      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Criar roteiro com o Presence" style={tint(color)}
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Criar roteiro com o Orion" style={tint(color)}
         onDragOver={(e) => { if (!done && e.dataTransfer.types.includes("Files")) { e.preventDefault(); setOver(true); } }} onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false); }}
         onDrop={(e) => { if (!done && e.dataTransfer.files.length) { e.preventDefault(); setOver(false); void add([...e.dataTransfer.files]); } }}
         className="glass relative mx-auto my-6 w-full max-w-3xl overflow-hidden rounded-3xl p-5 animate-rise sm:p-6">
@@ -112,7 +112,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
         <div className="relative flex items-start gap-3">
           <span className="icon-tile h-12 w-12 shrink-0 !rounded-2xl shadow-[0_0_30px_-6px_var(--glow)]"><Wand2 size={22} /></span>
           <div className="mr-auto min-w-0">
-            <p className="mono-caps !text-[0.62rem] text-[var(--glow)]">Presence · criador de roteiros</p>
+            <p className="mono-caps !text-[0.62rem] text-[var(--glow)]">Orion · criador de roteiros</p>
             <h2 className="font-display text-xl font-semibold leading-tight">{done ? "Roteiro pronto!" : "Conte o que precisa ensinar"}</h2>
           </div>
           <button onClick={onClose} disabled={busy} aria-label="Fechar" className="text-muted-foreground hover:text-foreground disabled:opacity-40"><X size={18} /></button>
@@ -155,7 +155,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
           </div>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="relative mt-4">
-            <label className="block text-xs text-muted-foreground">Explique do seu jeito (pode ser bagunçado) <span className="opacity-60">— o Presence organiza em blocos, na ordem certa</span>
+            <label className="block text-xs text-muted-foreground">Explique do seu jeito (pode ser bagunçado) <span className="opacity-60">— o Orion organiza em blocos, na ordem certa</span>
               <div className="relative">
                 <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={9} disabled={transcribing} data-testid="roteiro-conteudo" autoFocus
                   placeholder={"Ex.: Preciso de um vídeo ensinando a fazer o disparo em massa. Primeiro tem que importar a base. A planilha precisa ter uma coluna para cada variável do template (se o template tem {curso}, a planilha tem a coluna curso). Não esquecer de avisar que o número tem que estar com +55. Depois de importar, atualizar os contatos e colocar uma tag em todos para segmentar…"}
@@ -190,7 +190,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
                 <input ref={input} type="file" multiple hidden data-testid="roteiro-arquivo" onChange={(e) => { void add([...(e.target.files ?? [])]); e.target.value = ""; }} />
               </div>
               {pending.length === 0 ? (
-                <button type="button" onClick={() => input.current?.click()} className="mt-2 grid w-full place-items-center gap-1 rounded-2xl border border-dashed border-border py-5 text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">Cole (Ctrl+V), arraste ou clique para enviar os prints das telas. O Presence usa nos slides e marca os pontos.</button>
+                <button type="button" onClick={() => input.current?.click()} className="mt-2 grid w-full place-items-center gap-1 rounded-2xl border border-dashed border-border py-5 text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">Cole (Ctrl+V), arraste ou clique para enviar os prints das telas. O Orion usa nos slides e marca os pontos.</button>
               ) : (
                 <ul className="mt-2 flex flex-wrap gap-2" data-testid="roteiro-anexos">
                   {pending.map((p, i) => (
@@ -209,7 +209,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
               <button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">Cancelar</button>
               <button type="submit" disabled={brief.trim().length < 10 || transcribing || recording} data-testid="roteiro-criar" className="group relative flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--glow)] transition enabled:hover:scale-105 disabled:opacity-40">
                 <span aria-hidden className="absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/30 transition duration-700 group-enabled:group-hover:left-[150%]" />
-                <Wand2 size={15} className="relative" /> <span className="relative">Criar roteiro com o Presence</span>
+                <Wand2 size={15} className="relative" /> <span className="relative">Criar roteiro com o Orion</span>
               </button>
             </div>
           </form>

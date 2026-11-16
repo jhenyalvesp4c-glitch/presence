@@ -75,7 +75,7 @@ export function WhatsChat({ panel, onClose }: { panel: Panel; onClose: () => voi
         </div>
 
         <footer className="flex items-center justify-between gap-3 border-t border-white/10 bg-[oklch(0.2_0.03_190)] px-4 py-2.5 text-[0.7rem] text-muted-foreground">
-          <span>O Presence só lê: não envia nem marca como lida no WhatsApp.</span>
+          <span>O Orion só lê: não envia nem marca como lida no WhatsApp.</span>
           <button onClick={onClose} className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-foreground transition hover:border-emerald/50 hover:text-emerald">Fechar</button>
         </footer>
       </div>

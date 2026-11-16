@@ -25,7 +25,7 @@ export type InboxContext = {
   categories: { slug: string; nome: string }[];
 };
 
-const CLIENT = "Presence · Central de entrada";
+const CLIENT = "Orion · Central de entrada";
 
 async function loadContext() {
   const { listProjects, listDossiers, listCategories } = await import("./mcp/lookup");

@@ -28,26 +28,26 @@ Ferramenta `lista` (`src/lib/voice/lists.ts`): criar, adicionar, remover, marcar
 
 ## Toque de abertura
 
-Ao tocar no orbe, enquanto aparece "Iniciando o Presence…", toca um toque de "sistema iniciando" estilo painel de IA, sem melodia: zumbido grave que cresce, varredura de energia, batida grave discreta e pulsos digitais com eco (gerado na hora pelo navegador, sem arquivo, em `src/lib/voice/boot-sound.ts`). Ele para (com fade) quando o Presence começa a falar. Para desligar: `localStorage["presence.voz.abertura"] = "0"`.
+Ao tocar no orbe, enquanto aparece "Iniciando o Orion…", toca um toque de "sistema iniciando" estilo painel de IA, sem melodia: zumbido grave que cresce, varredura de energia, batida grave discreta e pulsos digitais com eco (gerado na hora pelo navegador, sem arquivo, em `src/lib/voice/boot-sound.ts`). Ele para (com fade) quando o Orion começa a falar. Para desligar: `localStorage["presence.voz.abertura"] = "0"`.
 
 ## Tempo para falar e texto acompanhando a fala
 
-- O Presence só entende que você terminou depois de **2,5 s de silêncio** (`SILENCE_MS` em `use-voice.tsx`), tanto no reconhecimento do navegador (que agora continua ouvindo nas pausas) quanto na gravação.
+- O Orion só entende que você terminou depois de **2,5 s de silêncio** (`SILENCE_MS` em `use-voice.tsx`), tanto no reconhecimento do navegador (que agora continua ouvindo nas pausas) quanto na gravação.
 - A caixa de fala tem tamanho fixo e o texto **aparece frase a frase, quando cada frase começa a ser falada**; a caixa rola sozinha para o fim (`SpeechText.tsx`), então toda a mensagem pode ser lida.
 
 ## Roteiros de treinamento por voz
 
 Ferramenta `roteiro` (`src/lib/voice/scripts.ts`, regras puras em `src/lib/script-edit.ts`): listar, mostrar, criar roteiro com blocos, adicionar bloco (no fim ou depois de outro), editar bloco (título, duração, "o que mostrar", dica, o que falar, por quês, perguntas frequentes), tirar passos, tirar bloco, mudar título/público/objetivo e excluir. Mexe no mesmo documento da tela (`training_library`), então o que ela pede por voz aparece em Documentação → Treinamentos. O conteúdo novo é escrito pela IA. Tirar bloco e excluir roteiro pedem confirmação; blocos repetidos e nomes ambíguos viram pergunta.
 
-## Chamar falando "Presence" (como a Alexa)
+## Chamar falando "Orion" (como a Alexa)
 
-Configurações → "Chamar por voz". Ligado, o navegador escuta continuamente (reconhecimento de voz do próprio navegador, `src/lib/voice/wake.ts`) e, ao ouvir "Presence" (e variações: presens, prisens, presença…), toca um tom curto e passa a ouvir. Se o pedido vier junto ("Presence, que horas são?"), responde direto. Enquanto a conversa está aberta (ou um lembrete é falado) a escuta da palavra fica pausada e volta depois.
+Configurações → "Chamar por voz". Ligado, o navegador escuta continuamente (reconhecimento de voz do próprio navegador, `src/lib/voice/wake.ts`) e, ao ouvir "Orion" (e variações: presens, prisens, presença…), toca um tom curto e passa a ouvir. Se o pedido vier junto ("Orion, que horas são?"), responde direto. Enquanto a conversa está aberta (ou um lembrete é falado) a escuta da palavra fica pausada e volta depois.
 
-Limites: só funciona com o Presence aberto (pode estar minimizado) num navegador com reconhecimento de voz (Chrome/Edge) e microfone liberado; o áudio é enviado ao serviço do navegador (no Chrome, o Google) enquanto estiver ligado; o navegador pode exigir um primeiro toque na página depois de abrir para liberar o som. Preferência local: `localStorage["presence.voz.chamar"]`.
+Limites: só funciona com o Orion aberto (pode estar minimizado) num navegador com reconhecimento de voz (Chrome/Edge) e microfone liberado; o áudio é enviado ao serviço do navegador (no Chrome, o Google) enquanto estiver ligado; o navegador pode exigir um primeiro toque na página depois de abrir para liberar o som. Preferência local: `localStorage["presence.voz.chamar"]`.
 
-### Dois modos de escutar "Presence"
+### Dois modos de escutar "Orion"
 
 1. **Navegador** (`webkitSpeechRecognition`): rápido, mas não existe ou não funciona em vários apps instalados.
 2. **Gravação** (`wake-listen.ts`): usado automaticamente quando o modo 1 não existe, dá erro ("network"…) ou fica 25 s sem ouvir nada. Fica com o microfone aberto, detecta quando alguém fala, manda só esse trecho curto (WAV 16 kHz) para transcrever na OpenAI e procura a palavra no texto. Silêncio não é enviado; limite de 20 envios por minuto; chave/créditos inválidos desligam o recurso com aviso. Demora ~1–2 s depois de falar.
 
-Configurações → "Chamar por voz" mostra o estado, o modo e a última coisa ouvida (para diagnosticar). Na tela inicial, o status mostra "Diga “Presence”" quando está ligado.
+Configurações → "Chamar por voz" mostra o estado, o modo e a última coisa ouvida (para diagnosticar). Na tela inicial, o status mostra "Diga “Orion”" quando está ligado.

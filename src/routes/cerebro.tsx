@@ -13,9 +13,9 @@ import { normalize } from "@/lib/orion";
 export const Route = createFileRoute("/cerebro")({
   head: () => ({
     meta: [
-      { title: "Presence · Segundo cérebro" },
-      { name: "description", content: "Tudo o que você documenta, anexa e registra no Presence, ligado e pesquisável." },
-      { property: "og:title", content: "Presence · Segundo cérebro" },
+      { title: "Orion · Segundo cérebro" },
+      { name: "description", content: "Tudo o que você documenta, anexa e registra no Orion, ligado e pesquisável." },
+      { property: "og:title", content: "Orion · Segundo cérebro" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -112,7 +112,7 @@ function CerebroPage() {
             <span className="relative grid h-12 w-12 animate-float place-items-center rounded-2xl bg-gradient-brand text-primary-foreground shadow-[0_0_40px_-4px_var(--violet)]"><Brain size={24} /></span>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="mono-caps">Orion · memória do Presence</p>
+            <p className="mono-caps">Orion · memória do Orion</p>
             <h1 className="font-display text-3xl font-semibold leading-tight sm:text-4xl"><span className="text-gradient">Segundo cérebro</span></h1>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">Tudo o que você documenta, anexa e registra fica aqui, ligado por dossiê e demanda. Pergunte e o Orion procura em tudo.</p>
           </div>
@@ -129,7 +129,7 @@ function CerebroPage() {
         <aside className="glass relative rounded-3xl p-4 animate-rise xl:sticky xl:top-3" style={{ ...tint("violet"), animationDelay: ".05s" }}>
           <p className="mono-caps mb-3 flex items-center gap-2"><Sparkles size={11} className="text-cyan" /> Capturar ou perguntar</p>
           <OrionPanel onDocumented={() => void load()} />
-          <p className="mt-3 text-[0.65rem] leading-snug text-muted-foreground">Cole um print com Ctrl+V, arraste arquivos ou grave um áudio. Demandas, tarefas, notas e conversas do Presence também entram na pergunta, sem você precisar copiar.</p>
+          <p className="mt-3 text-[0.65rem] leading-snug text-muted-foreground">Cole um print com Ctrl+V, arraste arquivos ou grave um áudio. Demandas, tarefas, notas e conversas do Orion também entram na pergunta, sem você precisar copiar.</p>
         </aside>
 
         <section className="glass min-w-0 rounded-3xl p-4 animate-rise sm:p-5" style={{ animationDelay: ".1s" }}>

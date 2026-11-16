@@ -17,9 +17,9 @@ export const Route = createFileRoute("/treino_/exercicios")({
   }),
   head: () => ({
     meta: [
-      { title: "Montar treinos — Presence Saúde" },
+      { title: "Montar treinos — Orion Saúde" },
       { name: "description", content: "Monte os treinos A, B, C da sua ficha: escolha exercícios de peito, costas, pernas e mais." },
-      { property: "og:title", content: "Montar treinos — Presence Saúde" },
+      { property: "og:title", content: "Montar treinos — Orion Saúde" },
       { property: "og:description", content: "Adicione sessões A, B, C e escolha exercícios por grupo muscular." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

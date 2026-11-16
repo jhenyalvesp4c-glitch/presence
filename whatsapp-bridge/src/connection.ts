@@ -24,13 +24,13 @@ export function startConnection(store: Store, state: BridgeState, authDir: strin
     const { state: auth, saveCreds } = await useMultiFileAuthState(authDir);
     let version: number[] | undefined;
     try { ({ version } = await fetchLatestBaileysVersion()); log("Versão do WhatsApp Web:", version?.join(".")); } catch (e) { log("Não consegui buscar a versão mais nova (segue com a padrão):", e instanceof Error ? e.message : e); }
-    sock = makeWASocket({ auth, ...(version ? { version } : {}), logger: quiet, browser: Browsers.macOS("Presence"), markOnlineOnConnect: false, syncFullHistory: false, printQRInTerminal: false, generateHighQualityLinkPreview: false });
+    sock = makeWASocket({ auth, ...(version ? { version } : {}), logger: quiet, browser: Browsers.macOS("Orion"), markOnlineOnConnect: false, syncFullHistory: false, printQRInTerminal: false, generateHighQualityLinkPreview: false });
 
     sock.ev.on("creds.update", saveCreds);
 
     sock.ev.on("connection.update", async (u: any) => {
       if (u.connection) log("Estado da conexão:", u.connection);
-      if (u.qr) { state.qr = await QRCode.toDataURL(u.qr, { margin: 1, width: 280 }); state.phase = "aguardando_qr"; state.erro = ""; log("QR Code pronto: abra Configurações → WhatsApp no Presence e leia com o celular."); }
+      if (u.qr) { state.qr = await QRCode.toDataURL(u.qr, { margin: 1, width: 280 }); state.phase = "aguardando_qr"; state.erro = ""; log("QR Code pronto: abra Configurações → WhatsApp no Orion e leia com o celular."); }
       if (u.connection === "open") {
         state.qr = null; state.erro = ""; log("Conectado ao WhatsApp."); state.phase = state.paused ? "pausado" : "conectado"; state.since = Math.floor(Date.now() / 1000);
         const user = sock.user ?? {};

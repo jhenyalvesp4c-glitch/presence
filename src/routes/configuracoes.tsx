@@ -7,7 +7,7 @@ import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
 import { useVoice } from "@/lib/voice/use-voice";
 import { directEnabled, enableDirect, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
 
-export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Presence" }] }) });
+export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Orion" }] }) });
 
 const card = "glass relative overflow-hidden rounded-3xl p-5 sm:p-6";
 const btn = "flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm transition hover:border-cyan/50 hover:text-cyan disabled:opacity-50";
@@ -52,7 +52,7 @@ function WhatsApp() {
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald/15 text-emerald"><MessageCircle size={20} /></span>
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-lg font-semibold">WhatsApp</h2>
-          <p className="text-xs text-muted-foreground">O Presence lê as suas conversas e grupos (só leitura), avisa quando marcarem você e conta o que foi dito.</p>
+          <p className="text-xs text-muted-foreground">O Orion lê as suas conversas e grupos (só leitura), avisa quando marcarem você e conta o que foi dito.</p>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-medium ${connected ? "bg-emerald/15 text-emerald" : st?.phase === "aguardando_qr" ? "bg-amber/15 text-amber" : "bg-white/10 text-muted-foreground"}`} data-testid="wa-estado">
           {offline ? "Ponte desligada" : st?.phase === "conectado" ? "Conectado" : st?.phase === "pausado" ? "Pausado" : st?.phase === "aguardando_qr" ? "Aguardando leitura do QR" : st?.phase === "conectando" ? "Conectando…" : st ? "Desconectado" : "Verificando…"}
@@ -64,7 +64,7 @@ function WhatsApp() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm" data-testid="wa-offline">
             <p className="font-medium">Para ligar:</p>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
-              <li>Na pasta do Presence no seu computador, dê dois cliques em <b className="text-foreground">whatsapp.cmd</b> (precisa do Node 22.18 ou mais novo).</li>
+              <li>Na pasta do Orion no seu computador, dê dois cliques em <b className="text-foreground">whatsapp.cmd</b> (precisa do Node 22.18 ou mais novo).</li>
               <li>Deixe aquela janela preta aberta enquanto usar o WhatsApp aqui.</li>
               <li>Volte a esta tela: o QR Code aparece sozinho.</li>
             </ol>
@@ -117,12 +117,12 @@ function WhatsApp() {
                 <p>Uma por linha ou separadas por vírgula. Já ignoro por padrão: campanha, anúncio, valor, preço, orçamento, verba, saldo, R$.</p>
               </div>
             </details>
-            <Toggle on={voice} onChange={(v) => { setVoice(v); waPrefs.setVoice(v); }} Icon={Volume2} label="Ler o aviso em voz alta" hint="O Presence fala quem marcou e o que foi dito." />
+            <Toggle on={voice} onChange={(v) => { setVoice(v); waPrefs.setVoice(v); }} Icon={Volume2} label="Ler o aviso em voz alta" hint="O Orion fala quem marcou e o que foi dito." />
             <div className="flex flex-wrap gap-2 pt-1">
               <button className={btn} disabled={busy} onClick={() => void act("pause", { on: st.phase === "pausado" ? "0" : "1" })}>{st.phase === "pausado" ? <><Play size={14} /> Retomar leitura</> : <><Pause size={14} /> Pausar leitura</>}</button>
-              <button className={btn} disabled={busy} data-testid="wa-marcar-lidas" onClick={() => void act("marcar-lidas", {}, "Marcar todas as conversas como lidas pelo Presence? Daqui para frente ele conta só as mensagens novas. O seu WhatsApp do celular não muda.")}><Check size={14} /> Marcar tudo como lido (no Presence)</button>
+              <button className={btn} disabled={busy} data-testid="wa-marcar-lidas" onClick={() => void act("marcar-lidas", {}, "Marcar todas as conversas como lidas pelo Orion? Daqui para frente ele conta só as mensagens novas. O seu WhatsApp do celular não muda.")}><Check size={14} /> Marcar tudo como lido (no Orion)</button>
               <button className={btn} disabled={busy} onClick={() => void act("clear", {}, "Apagar todas as mensagens guardadas neste computador? O seu WhatsApp não muda.")}><Trash2 size={14} /> Apagar histórico local</button>
-              <button className={`${btn} hover:!border-destructive/50 hover:!text-destructive`} disabled={busy} onClick={() => void act("logout", {}, "Desconectar o WhatsApp do Presence?")}><Unplug size={14} /> Desconectar</button>
+              <button className={`${btn} hover:!border-destructive/50 hover:!text-destructive`} disabled={busy} onClick={() => void act("logout", {}, "Desconectar o WhatsApp do Orion?")}><Unplug size={14} /> Desconectar</button>
             </div>
           </div>
         )}
@@ -130,10 +130,10 @@ function WhatsApp() {
         <div className="rounded-2xl border border-amber/30 bg-amber/5 p-4 text-xs leading-relaxed text-foreground/85" data-testid="wa-aviso">
           <p className="flex items-center gap-2 text-sm font-semibold text-amber"><AlertTriangle size={15} /> Leia antes de ligar</p>
           <ul className="mt-2 list-disc space-y-1.5 pl-5">
-            <li><b>Não é uma integração oficial.</b> O WhatsApp só oferece acesso oficial para empresas. Aqui o Presence entra como um “aparelho conectado”, igual ao WhatsApp Web. O WhatsApp pode não gostar de acessos automáticos e, em casos raros, limitar o número. Use por sua conta e risco.</li>
-            <li><b>Só leitura.</b> O Presence não envia mensagens, não marca como lida e não aparece online. O seu celular continua recebendo as notificações normalmente.</li>
-            <li><b>As mensagens ficam no seu computador</b> (pasta .presence do seu usuário), apagadas depois de 30 dias. Elas não vão para a nuvem do Presence.</li>
-            <li><b>Quando você pede para ler ou analisar</b> uma conversa, o trecho pedido é enviado à OpenAI (a IA do Presence) para ser resumido ou lido. Evite pedir sobre conversas que você não quer compartilhar com ela.</li>
+            <li><b>Não é uma integração oficial.</b> O WhatsApp só oferece acesso oficial para empresas. Aqui o Orion entra como um “aparelho conectado”, igual ao WhatsApp Web. O WhatsApp pode não gostar de acessos automáticos e, em casos raros, limitar o número. Use por sua conta e risco.</li>
+            <li><b>Só leitura.</b> O Orion não envia mensagens, não marca como lida e não aparece online. O seu celular continua recebendo as notificações normalmente.</li>
+            <li><b>As mensagens ficam no seu computador</b> (pasta .presence do seu usuário), apagadas depois de 30 dias. Elas não vão para a nuvem do Orion.</li>
+            <li><b>Quando você pede para ler ou analisar</b> uma conversa, o trecho pedido é enviado à OpenAI (a IA do Orion) para ser resumido ou lido. Evite pedir sobre conversas que você não quer compartilhar com ela.</li>
             <li>Quem tiver a pasta .presence do seu computador consegue acessar essas mensagens. Para parar de vez: <i>Desconectar</i> e depois <i>Apagar histórico local</i>.</li>
           </ul>
         </div>
@@ -142,14 +142,14 @@ function WhatsApp() {
   );
 }
 
-/** Chamar o Presence falando "Presence", como a Alexa. */
+/** Chamar o Orion falando "Orion", como a Alexa. */
 function ChamarPorVoz() {
   const v = useVoice();
   return (
     <section className={card} data-testid="cfg-chamar">
       <h2 className="font-display text-lg font-semibold">Chamar por voz</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Com isto ligado, é só falar <b className="text-foreground">“Presence”</b> que ele acorda e passa a te ouvir, sem precisar tocar na esfera.</p>
-      <div className="mt-4"><Toggle on={v.wake} onChange={v.setWake} Icon={Mic} label="Ativar quando eu falar “Presence”" hint="Funciona enquanto o Presence estiver aberto neste computador, com o microfone liberado." /></div>
+      <p className="mt-1 text-sm text-muted-foreground">Com isto ligado, é só falar <b className="text-foreground">“Orion”</b> que ele acorda e passa a te ouvir, sem precisar tocar na esfera.</p>
+      <div className="mt-4"><Toggle on={v.wake} onChange={v.setWake} Icon={Mic} label="Ativar quando eu falar “Orion”" hint="Funciona enquanto o Orion estiver aberto neste computador, com o microfone liberado." /></div>
       {v.wake && (
         <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs" data-testid="cfg-chamar-estado">
           <p><b className="text-foreground">Estado:</b> {v.wakeInfo.estado}{v.wakeInfo.modo ? ` · modo ${v.wakeInfo.modo}` : ""}</p>
@@ -157,7 +157,7 @@ function ChamarPorVoz() {
         </div>
       )}
       <ul className="mt-4 space-y-1.5 text-xs text-muted-foreground">
-        <li>• Depois de falar “Presence”, ouça o tom curto e fale o que precisa.</li>
+        <li>• Depois de falar “Orion”, ouça o tom curto e fale o que precisa.</li>
         <li>• Para funcionar sempre, deixe o app aberto (pode ficar minimizado) e libere o microfone.</li>
         <li>• Enquanto está ligado, o microfone fica aberto o tempo todo. No modo do navegador, o áudio vai ao serviço de reconhecimento dele (no Chrome, o Google). No modo por gravação (usado quando o navegador não reconhece voz), só os trechos em que alguém fala são enviados para transcrição na OpenAI. Desligue quando quiser privacidade.</li>
       </ul>
@@ -173,7 +173,7 @@ function Configuracoes() {
       <header className="flex items-center gap-3">
         <Link to="/assistente" aria-label="Voltar" className="icon-tile h-10 w-10 !rounded-full"><ArrowLeft size={16} /></Link>
         <span className="grid h-11 w-11 place-items-center rounded-2xl bg-cyan/10 text-cyan"><Settings size={20} /></span>
-        <div><h1 className="font-display text-2xl font-semibold">Configurações</h1><p className="text-xs text-muted-foreground">Conta, jeito do Presence e integrações.</p></div>
+        <div><h1 className="font-display text-2xl font-semibold">Configurações</h1><p className="text-xs text-muted-foreground">Conta, jeito do Orion e integrações.</p></div>
       </header>
 
       <section className={card}>

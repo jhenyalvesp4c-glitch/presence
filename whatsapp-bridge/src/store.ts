@@ -82,7 +82,7 @@ export class Store {
     return false;
   }
 
-  /** Conversas, da mais recente para a mais antiga, com quantas mensagens novas (que a Presence ainda não leu). */
+  /** Conversas, da mais recente para a mais antiga, com quantas mensagens novas (que o Orion ainda não leu). */
   chats(q = "", limit = 40): ChatInfo[] {
     const rows = this.db.prepare(`
       select c.jid, c.name, c.is_group, c.last_ts,
@@ -128,12 +128,12 @@ export class Store {
     return rows.map((r) => this.toMsg(r, String(r["chat_name"] ?? ""), !!r["is_group"]));
   }
 
-  /** Marca a conversa como lida PELA PRESENCE (só aqui; não muda nada no seu WhatsApp). */
+  /** Marca a conversa como lida PELA ORION (só aqui; não muda nada no seu WhatsApp). */
   markChecked(jid: string, upTo?: number) {
     this.db.prepare("update chats set checked_ts = max(checked_ts, ?) where jid = ?").run(upTo ?? Math.floor(Date.now() / 1000), jid);
   }
 
-  /** Marca TODAS as conversas como lidas pela Presence (só aqui; o WhatsApp não muda). Depois disso, "novas" conta só o que chegar daqui para frente. */
+  /** Marca TODAS as conversas como lidas pelo Orion (só aqui; o WhatsApp não muda). Depois disso, "novas" conta só o que chegar daqui para frente. */
   markAllChecked(upTo?: number): number {
     const ts = upTo ?? Math.floor(Date.now() / 1000);
     const r = this.db.prepare("update chats set checked_ts = max(checked_ts, ?)").run(ts);

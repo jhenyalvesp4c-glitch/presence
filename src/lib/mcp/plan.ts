@@ -1,5 +1,5 @@
 /**
- * Prepara uma proposta: valida cada registro contra o Presence (projeto, polo/dossiê, demanda, categoria),
+ * Prepara uma proposta: valida cada registro contra o Orion (projeto, polo/dossiê, demanda, categoria),
  * procura registros equivalentes (duplicidade) e monta o resumo que o usuário vai aprovar.
  * Nada é gravado nos módulos aqui.
  */

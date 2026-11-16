@@ -1,5 +1,5 @@
 /**
- * Registros que o assistente pode propor ao Presence: formato de entrada (zod), validações que não
+ * Registros que o assistente pode propor ao Orion: formato de entrada (zod), validações que não
  * dependem do banco e funções puras (normalização de texto, semelhança, datas, resumo).
  */
 import { z } from "zod/v4";
@@ -53,7 +53,7 @@ export const tarefaSchema = z.object({
 export const rotinaSchema = z.object({
   tipo: z.literal("rotina"), ...base,
   titulo: z.string().min(1).max(120), hora: time, descricao: z.string().max(300).optional(),
-  recorrencia: z.literal("diaria").describe("Só existe rotina diária no Presence."),
+  recorrencia: z.literal("diaria").describe("Só existe rotina diária no Orion."),
   natureza: z.enum(["habito", "autocuidado", "treino", "financeiro", "pausa", "tarefa", "compromisso", "extra"]).optional(),
 });
 export const anotacaoSchema = z.object({

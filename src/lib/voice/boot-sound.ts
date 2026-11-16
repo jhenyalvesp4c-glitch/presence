@@ -98,7 +98,7 @@ export function startBootSound(): () => void {
   return stop;
 }
 
-/** Toque curto e discreto de "estou ouvindo", quando o Presence é chamado pela palavra de ativação. */
+/** Toque curto e discreto de "estou ouvindo", quando o Orion é chamado pela palavra de ativação. */
 export function playWakeChime(): void {
   if (typeof window === "undefined" || !bootEnabled()) return;
   try {

@@ -17,7 +17,7 @@ export type AskResult =
   | { ok: false; error: string };
 
 // Prompt estável primeiro (cacheável); dados voláteis (data, nome, demandas) vêm depois.
-const SYSTEM_PROMPT = `Você é o Presence, assistente pessoal da pessoa para rotina, saúde, foco, finanças e projetos.
+const SYSTEM_PROMPT = `Você é o Orion, assistente pessoal da pessoa para rotina, saúde, foco, finanças e projetos.
 Fale sempre em português do Brasil, de forma calorosa, direta e breve (no máximo 3 parágrafos curtos, a menos que ela peça detalhes).
 
 Você tem acesso às demandas e às tarefas dela pelas ferramentas:

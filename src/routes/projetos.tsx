@@ -10,9 +10,9 @@ import { useDbState } from "@/lib/data/use-db-state";
 export const Route = createFileRoute("/projetos")({
   head: () => ({
     meta: [
-      { title: "Presence · Projetos" },
+      { title: "Orion · Projetos" },
       { name: "description", content: "Todos os seus projetos em um painel futurista, com progresso e demandas." },
-      { property: "og:title", content: "Presence · Projetos" },
+      { property: "og:title", content: "Orion · Projetos" },
       { property: "og:description", content: "Veja, crie e acompanhe seus projetos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

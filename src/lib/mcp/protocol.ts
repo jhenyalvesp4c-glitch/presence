@@ -3,7 +3,7 @@
  * resposta em JSON. Implementa o que clientes como o ChatGPT usam: initialize, ping, tools/list e tools/call.
  * Aqui não há acesso ao banco: as ferramentas chegam por `ToolSet`, o que deixa tudo testável.
  */
-export const SERVER_INFO = { name: "presence", title: "Presence", version: "1.0.0" };
+export const SERVER_INFO = { name: "presence", title: "Orion", version: "1.0.0" };
 export const SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
 
 export type ToolAnnotations = { title?: string; readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };

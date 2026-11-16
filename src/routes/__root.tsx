@@ -88,9 +88,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover" },
-      { title: "Presence · Assistente pessoal" },
-      { name: "description", content: "Presence, seu assistente pessoal para rotina, saúde, foco e finanças." },
-      { property: "og:title", content: "Presence · Assistente pessoal" },
+      { title: "Orion · Assistente pessoal" },
+      { name: "description", content: "Orion, seu assistente pessoal para rotina, saúde, foco e finanças." },
+      { property: "og:title", content: "Orion · Assistente pessoal" },
       { property: "og:description", content: "Seu assistente pessoal futurista." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

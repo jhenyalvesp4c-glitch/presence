@@ -1,5 +1,5 @@
 /**
- * Escuta da palavra "Presence" SEM depender do reconhecimento de voz do navegador (que não existe ou não funciona em vários apps instalados).
+ * Escuta da palavra "Orion" SEM depender do reconhecimento de voz do navegador (que não existe ou não funciona em vários apps instalados).
  * Fica com o microfone aberto, percebe quando alguém fala, pega só esse trecho curto e manda transcrever (OpenAI); quem decide se
  * a palavra apareceu é quem chama (`onText`). Silêncio não gera envio. Há limite de envios por minuto.
  */

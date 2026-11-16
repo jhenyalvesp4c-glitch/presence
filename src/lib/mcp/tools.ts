@@ -1,5 +1,5 @@
 /**
- * Ferramentas MCP do Presence. Leitura primeiro (para achar o destino certo), depois propor → confirmar.
+ * Ferramentas MCP do Orion. Leitura primeiro (para achar o destino certo), depois propor → confirmar.
  * Nada é gravado nos módulos sem `confirmar_registros`, com o código que o usuário aprovou.
  */
 import { z } from "zod/v4";
@@ -11,7 +11,7 @@ import { claimProposal, expireProposal, getOperation, getProposal, logOperation,
 import { TIPO_LABEL, hhmmNow, isoDay, normalize, registroSchema, weekdayPt, type Registro } from "./records";
 import type { ToolDef, ToolResult, ToolSet } from "./protocol";
 
-export const INSTRUCTIONS = `Você opera o Presence, o assistente pessoal e de projetos da pessoa. Seu trabalho é ENCAMINHAR cada informação ao módulo certo, sem inventar destino.
+export const INSTRUCTIONS = `Você opera o Orion, o assistente pessoal e de projetos da pessoa. Seu trabalho é ENCAMINHAR cada informação ao módulo certo, sem inventar destino.
 
 FLUXO OBRIGATÓRIO
 1. Interprete o conteúdo (texto, print, documento, transcrição) e identifique o(s) tipo(s) de informação.
@@ -59,12 +59,12 @@ const lim = z.number().int().min(1).max(200).optional().describe("Máximo de ite
 const NONE = z.object({});
 
 const guia = def({
-  name: "presence_guia", title: "Guia do Presence", description: "Mostra a data/hora atual (São Paulo), os módulos do Presence, as regras de encaminhamento e os limites atuais. Chame no início para resolver datas relativas.",
+  name: "presence_guia", title: "Guia do Orion", description: "Mostra a data/hora atual (São Paulo), os módulos do Orion, as regras de encaminhamento e os limites atuais. Chame no início para resolver datas relativas.",
   input: NONE, annotations: READ,
   run: async () => {
     const now = new Date();
     const info = { agora: { data: isoDay(now), hora: hhmmNow(now), dia_da_semana: weekdayPt(now), fuso: "America/Sao_Paulo" } };
-    return text(`Agora: ${weekdayPt(now)}, ${isoDay(now)} ${hhmmNow(now)} (São Paulo).\n\n${INSTRUCTIONS}\n\nLIMITES ATUAIS\n- Lembretes: não há envio de notificação/push no Presence; o lembrete é um registro com data e hora em Minhas Tarefas (e no Planeje meu dia).\n- Documentação: a biblioteca de pastas ainda não é salva no banco; documentação vai para o banco de exemplos de Treinamentos do projeto.\n- Rotina: só existe rotina diária.\n- Prazo de demanda é guardado como dia/mês.`, info);
+    return text(`Agora: ${weekdayPt(now)}, ${isoDay(now)} ${hhmmNow(now)} (São Paulo).\n\n${INSTRUCTIONS}\n\nLIMITES ATUAIS\n- Lembretes: não há envio de notificação/push no Orion; o lembrete é um registro com data e hora em Minhas Tarefas (e no Planeje meu dia).\n- Documentação: a biblioteca de pastas ainda não é salva no banco; documentação vai para o banco de exemplos de Treinamentos do projeto.\n- Rotina: só existe rotina diária.\n- Prazo de demanda é guardado como dia/mês.`, info);
   },
 });
 
@@ -202,7 +202,7 @@ const buscar = def({
 
 const propor = def({
   name: "propor_registros", title: "Propor registros (aguarda confirmação)",
-  description: "Valida e prepara um ou mais registros para o Presence, procura duplicidades e devolve um RESUMO + código de confirmação. NÃO grava nos módulos. Mostre o resumo à pessoa e só chame confirmar_registros depois que ela responder CONFIRMAR <código>. Se houver ambiguidade de projeto/polo/dossiê, a ferramenta devolve as opções reais: pergunte à pessoa.",
+  description: "Valida e prepara um ou mais registros para o Orion, procura duplicidades e devolve um RESUMO + código de confirmação. NÃO grava nos módulos. Mostre o resumo à pessoa e só chame confirmar_registros depois que ela responder CONFIRMAR <código>. Se houver ambiguidade de projeto/polo/dossiê, a ferramenta devolve as opções reais: pergunte à pessoa.",
   input: z.object({ registros: z.array(registroSchema).min(1).max(12).describe("Registros relacionados da mesma mensagem.") }), annotations: WRITE,
   run: async (a, ctx) => {
     const prep = await prepare(a.registros as Registro[]);
@@ -217,7 +217,7 @@ const propor = def({
 
 const confirmar = def({
   name: "confirmar_registros", title: "Confirmar e criar os registros",
-  description: "Cria no Presence os registros de uma proposta aprovada. Exige o código de 4 dígitos que a pessoa digitou ao responder CONFIRMAR e confirmacao_do_usuario=true. Nunca chame sem a resposta dela.",
+  description: "Cria no Orion os registros de uma proposta aprovada. Exige o código de 4 dígitos que a pessoa digitou ao responder CONFIRMAR e confirmacao_do_usuario=true. Nunca chame sem a resposta dela.",
   input: z.object({ proposta_id: z.string().uuid(), codigo_confirmacao: z.string().regex(/^[0-9]{4}$/), confirmacao_do_usuario: z.literal(true).describe("Só true se a pessoa respondeu CONFIRMAR neste turno.") }), annotations: WRITE,
   run: async (a, ctx) => {
     const p = await getProposal(a.proposta_id);
@@ -229,7 +229,7 @@ const confirmar = def({
     const parsed = (p.records as unknown[]).map((r) => registroSchema.safeParse(r));
     if (parsed.some((x) => !x.success)) return fail("A proposta guardada está inválida. Crie uma nova.");
     const prep = await prepare(parsed.map((x) => (x as { data: Registro }).data));
-    if (prep.problems.length) return fail(`O Presence mudou desde a proposta:\n- ${prep.problems.join("\n- ")}\nCrie uma nova proposta.`);
+    if (prep.problems.length) return fail(`O Orion mudou desde a proposta:\n- ${prep.problems.join("\n- ")}\nCrie uma nova proposta.`);
     if (!(await claimProposal(p.id))) return fail("Esta proposta acabou de ser confirmada por outra chamada.");
 
     const { op, created, failed, skipped: nSkipped, status } = await commitRecords(prep.resolved, { client: ctx.client, proposalId: p.id, summary: p.summary });

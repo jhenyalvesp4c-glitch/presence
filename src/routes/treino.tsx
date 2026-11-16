@@ -17,9 +17,9 @@ import {
 export const Route = createFileRoute("/treino")({
   head: () => ({
     meta: [
-      { title: "Presence · Meu treino" },
+      { title: "Orion · Meu treino" },
       { name: "description", content: "Seu treino do dia, divisão semanal, evolução de cargas e timer de descanso." },
-      { property: "og:title", content: "Presence · Meu treino" },
+      { property: "og:title", content: "Orion · Meu treino" },
       { property: "og:description", content: "Treino de hoje, divisão semanal e evolução de cargas." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

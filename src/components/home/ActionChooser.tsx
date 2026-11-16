@@ -9,7 +9,7 @@ export type HomeAction = "demand" | "doc" | "ask";
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
 const OPTIONS: { key: HomeAction; n: string; icon: typeof Search; color: string; title: string; text: string; cta: string }[] = [
-  { key: "demand", n: "1", icon: ClipboardList, color: "cyan", title: "Registrar demanda", text: "Cole o texto, prints, PDFs ou documentos. O Presence separa em demandas, tarefas, compromissos e lembretes para você confirmar.", cta: "Registrar" },
+  { key: "demand", n: "1", icon: ClipboardList, color: "cyan", title: "Registrar demanda", text: "Cole o texto, prints, PDFs ou documentos. O Orion separa em demandas, tarefas, compromissos e lembretes para você confirmar.", cta: "Registrar" },
   { key: "doc", n: "2", icon: BookPlus, color: "violet", title: "Documentar", text: "Guarde no segundo cérebro o que aconteceu hoje: texto, voz, prints e arquivos. Depois é só perguntar.", cta: "Documentar" },
   { key: "ask", n: "3", icon: Search, color: "emerald", title: "Perguntar ao Orion", text: "Pergunte qualquer coisa. Ele pesquisa em demandas, tarefas, notas, documentos e arquivos e traz um relatório.", cta: "Perguntar" },
 ];
@@ -38,7 +38,7 @@ export function ActionChooser({ onPick, onClose }: { onPick: (a: HomeAction) => 
               <Sparkles size={20} className="text-cyan" />
             </span>
             <div className="mr-auto">
-              <p className="mono-caps !text-[0.65rem]">Presence</p>
+              <p className="mono-caps !text-[0.65rem]">Orion</p>
               <h2 className="font-serif text-3xl leading-tight sm:text-4xl">O que você quer <span className="text-gradient">fazer?</span></h2>
             </div>
             <button onClick={onClose} aria-label="Fechar" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/60 text-muted-foreground backdrop-blur transition hover:text-foreground"><X size={16} /></button>

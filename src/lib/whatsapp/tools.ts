@@ -52,7 +52,7 @@ export async function runWhatsAppTool(name: string, args: Record<string, unknown
     if (!r.ok) return fail(r);
     const d = r.data as { ok?: boolean; erro?: string; opcoes?: string[]; conversas?: number; nome?: string };
     if (d.ok === false || d.erro) return { result: { ok: false, erro: d.erro, ...(d.opcoes ? { opcoes: d.opcoes } : {}) } };
-    return { result: { ok: true, marcadas: d.conversas ?? 0, conversa: d.nome, aviso: "Só o controle do Presence foi marcado; o WhatsApp do celular não mudou." } };
+    return { result: { ok: true, marcadas: d.conversas ?? 0, conversa: d.nome, aviso: "Só o controle do Orion foi marcado; o WhatsApp do celular não mudou." } };
   }
 
   if (name === "whatsapp_mencoes") {

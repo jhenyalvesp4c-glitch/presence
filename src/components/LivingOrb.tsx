@@ -97,7 +97,7 @@ export function LivingOrb({ active, mode }: { active?: boolean; mode?: OrbMode }
         style={{ left: `${CX - R * 1.1}%`, top: `${CY - R * 1.45}%`, width: `${R * 2.2}%`, aspectRatio: "1", opacity: "var(--halo)" as unknown as number,
           background: `radial-gradient(circle, color-mix(in oklab, ${m0 === "listening" ? "var(--emerald)" : m0 === "thinking" ? "oklch(0.8 0.15 75)" : "var(--cyan)"} 55%, transparent), color-mix(in oklab, var(--violet) 25%, transparent) 55%, transparent 72%)` }} />
       {/* static: platform + orbits */}
-      <img src={orb} alt="Orbe Presence" width={1024} height={768} className="absolute inset-0 h-full w-full object-contain mix-blend-screen" style={{ maskImage: mask, WebkitMaskImage: mask }} />
+      <img src={orb} alt="Orbe Orion" width={1024} height={768} className="absolute inset-0 h-full w-full object-contain mix-blend-screen" style={{ maskImage: mask, WebkitMaskImage: mask }} />
       {/* living core: sphere rotates, breathes, reacts */}
       <div ref={core} className="absolute inset-0 will-change-transform" style={{ transformOrigin: `${CX}% ${CY}%`, clipPath: circle }}>
         <img src={orb} alt="" width={1024} height={768} className="h-full w-full object-contain" />

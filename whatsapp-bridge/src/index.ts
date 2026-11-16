@@ -1,4 +1,4 @@
-// Ponte do WhatsApp para o Presence (roda só no seu computador). Inicie com: node src/index.ts  (ou dê dois cliques em whatsapp.cmd)
+// Ponte do WhatsApp para o Orion (roda só no seu computador). Inicie com: node src/index.ts  (ou dê dois cliques em whatsapp.cmd)
 import { mkdirSync, writeFileSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -34,7 +34,7 @@ server.listen(port, "127.0.0.1", () => {
   try { chmodSync(file, 0o600); } catch { /* Windows */ }
   console.log(`Ponte do WhatsApp ligada em http://127.0.0.1:${port} (só neste computador).`);
   console.log(`Dados em: ${dir}`);
-  console.log("Abra o Presence → Configurações → WhatsApp para ler o QR Code com o seu celular.");
+  console.log("Abra o Orion → Configurações → WhatsApp para ler o QR Code com o seu celular.");
   void conn.start();
 });
 

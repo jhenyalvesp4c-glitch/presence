@@ -4,9 +4,9 @@ import cover from "@/assets/dieta-atleta.jpg";
 
 export const Route = createFileRoute("/dieta/nova")({
   head: () => ({ meta: [
-    { title: "Nova ficha de dieta — Presence Saúde" },
+    { title: "Nova ficha de dieta — Orion Saúde" },
     { name: "description", content: "Organize sua ficha de dieta com objetivos, metas diárias e refeições personalizadas." },
-    { property: "og:title", content: "Nova ficha de dieta — Presence Saúde" },
+    { property: "og:title", content: "Nova ficha de dieta — Orion Saúde" },
     { property: "og:description", content: "Planeje suas refeições em uma ficha de alimentação personalizada." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },

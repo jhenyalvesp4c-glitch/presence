@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_BRIEFING, GREET_MARK, briefingPrompt, greetingDirective, isDuplicateMemory, sanitize } from "../lib/briefing";
 
-describe("briefing: o que a Presence sabe sobre a pessoa", () => {
+describe("briefing: o que o Orion sabe sobre a pessoa", () => {
   const b = { ...EMPTY_BRIEFING, call_name: "Jhe", tone: "Direta e objetiva.", greeting: "saudacao_hoje" as const, work: "Treinamentos e suporte", biggest_demand: "Disparos em massa", preferences: "Nunca me avise antes das 9h", completed_at: "2026-11-18" };
 
   it("o prompt traz o nome, o jeito, o trabalho, as regras e o que já aprendeu", () => {

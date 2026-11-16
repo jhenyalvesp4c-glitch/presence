@@ -1,5 +1,5 @@
 /**
- * Assistente de voz (estilo Jarvis): conversa curta e rápida + ferramentas que mexem no Presence de verdade
+ * Assistente de voz (estilo Jarvis): conversa curta e rápida + ferramentas que mexem no Orion de verdade
  * (abrir páginas, criar demandas/tarefas/compromissos, resumo do dia, pesquisar no Orion, documentar).
  * Só roda no servidor. A rota /api/voz repassa os eventos ao navegador em streaming.
  */
@@ -67,7 +67,7 @@ async function voiceContext(): Promise<Cached> {
   return fresh;
 }
 
-const PERSONA = (name: string | null) => `Você é o Presence, o assistente pessoal${name ? ` de ${name}` : ""}, no estilo do Jarvis: elegante, calmo, muito eficiente e com um leve toque de humor sofisticado. Está conversando POR VOZ.
+const PERSONA = (name: string | null) => `Você é o Orion, o assistente pessoal${name ? ` de ${name}` : ""}, no estilo do Jarvis: elegante, calmo, muito eficiente e com um leve toque de humor sofisticado. Está conversando POR VOZ.
 Regras de fala:
 - Responda em português do Brasil, em UMA ou DUAS frases curtas. Nada de listas, markdown, emojis, URLs ou códigos; diga datas e horas do jeito que se fala ("amanhã às três da tarde").
 - Faça o pedido na hora usando as ferramentas e depois confirme em uma frase ("Pronto, criei a demanda…"). Não peça permissão para o que foi pedido com clareza.
@@ -75,14 +75,14 @@ Regras de fala:
 - Para "o que tenho hoje", "me mostra tudo", "minha agenda/pendências" (ou amanhã) use SOMENTE resumo_do_dia, sem abrir nenhuma página (a tela de Saúde "Hoje" é outra coisa: só abra saude se ela pedir saúde). O painel mostra tudo: compromissos, lembretes, tarefas, atrasadas e demandas. Fale só os destaques em até três frases, citando as quantidades.
 - Perguntas sobre o que ela FEZ, CRIOU, CONCLUIU ou DOCUMENTOU (ontem, esta semana, mês passado, quantas demandas, quais tarefas, o que anotei) → use consultar_registros: ele traz as listas e contagens reais. Pergunte-se sempre se precisa dele antes de dizer que não sabe.
 - Perguntas sobre o CONTEÚDO de algo (o que disse um documento, detalhes de uma demanda, o que foi combinado, arquivos) → use buscar_no_orion. Se uma ferramenta não bastar, tente a outra antes de responder que não encontrou.
-- Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (Orion), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a pessoa contou, use documentar.
+- Você tem acesso a tudo: demandas (criadas e concluídas), tarefas, compromissos, lembretes, anotações do segundo cérebro (que também se chama Orion: é a sua própria memória, não confunda com o seu nome), documentação e conversas. Nunca diga que não tem acesso. Para guardar algo que a pessoa contou, use documentar.
 - Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
 - ROTEIROS de treinamento: pedidos para criar, editar, acrescentar ou tirar coisas de um roteiro (ou bloco, passo, dica, pergunta frequente) → use roteiro. Faça na hora e escreva você mesmo o conteúdo bom e completo em português (passos curtos e objetivos, uma dica, perguntas frequentes com resposta); não peça o texto a ela. Sem projeto citado, a ferramenta acha o roteiro sozinha. Confirme em uma frase o que mudou e nunca diga que não consegue editar roteiros.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
 - Se ela disser como quer ser chamada, como prefere que você fale ou como começar a conversa, use ajustar_perfil. Quando ela contar algo duradouro sobre si ou pedir "lembra que…", use lembrar; "esquece que…", use esquecer.
-- Para "marcar tudo como lido" / "zerar as novas" no WhatsApp use whatsapp_marcar_lidas e explique que é o controle do Presence (não muda o WhatsApp dela).
+- Para "marcar tudo como lido" / "zerar as novas" no WhatsApp use whatsapp_marcar_lidas e explique que é o controle do Orion (não muda o WhatsApp dela).
 - WhatsApp (somente leitura, só no app do computador): "o que o grupo X mandou", "tem mensagem no grupo?", "analise as conversas" → use whatsapp_ler (com so_novas=true para o que ainda não foi lido); "alguém me marcou?" → whatsapp_mencoes; "quais conversas têm novidade" → whatsapp_conversas. Primeiro diga se há mensagens e quantas; leia citando quem falou e o que disse (e quem foi marcado, quando houver pessoas_marcadas); se forem muitas, resuma e ofereça ler tudo. Se a ponte estiver desligada, diga isso e que ela liga em Configurações. Você NUNCA envia mensagens no WhatsApp.
 - ANTES de usar qualquer ferramenta que leve alguns segundos (WhatsApp, registrar, atualizar, consultar, buscar), diga UMA frase curta e natural avisando o que vai fazer, usando o nome da pessoa. Ex.: "Ok, Jheny, vou abrir o seu WhatsApp para ver as últimas mensagens, só um minutinho." ou "Claro, Jheny, estou criando essa demanda agora." Só depois chame a ferramenta. Nunca fique em silêncio antes de agir, e não repita a mesma frase na resposta final: na resposta final conte o resultado. Para abrir uma tela basta "Claro, abrindo."
 - Para abrir telas use abrir_pagina. Quando a pessoa se despedir ou pedir para parar, use encerrar_conversa.
@@ -94,11 +94,11 @@ const fn = (name: string, description: string, parameters: Record<string, unknow
 const schemaOf = (z_: z.ZodType) => { const { $schema: _s, ...rest } = z.toJSONSchema(z_, { target: "draft-2020-12" }) as Record<string, unknown>; return rest; };
 
 export const TOOLS = [
-  fn("abrir_pagina", "Abre uma tela do Presence para a pessoa.", { type: "object", properties: {
+  fn("abrir_pagina", "Abre uma tela do Orion para a pessoa.", { type: "object", properties: {
     pagina: { type: "string", enum: Object.keys(PAGES), description: "inicio, demandas, projetos, tarefas, calendario, planejamento, saude, treino, dieta, habitos, progresso, cerebro (segundo cérebro/Orion), organizar, analise, resumo" },
     projeto: { type: "string", description: "Só para demandas: nome do projeto, se ela pedir um específico." },
   }, required: ["pagina"] }),
-  fn("registrar", "Cria registros reais no Presence (demanda, tarefa, compromisso, lembrete, rotina, anotação). Use os nomes EXATOS de projetos e polos do contexto. Datas em AAAA-MM-DD, horas em HH:MM.", schemaOf(z.object({
+  fn("registrar", "Cria registros reais no Orion (demanda, tarefa, compromisso, lembrete, rotina, anotação). Use os nomes EXATOS de projetos e polos do contexto. Datas em AAAA-MM-DD, horas em HH:MM.", schemaOf(z.object({
     itens: z.array(rascunhoSchema).min(1).max(8),
     permitir_duplicado: z.boolean().optional().describe("true só se a pessoa pediu para criar mesmo já existindo algo igual."),
   }))),
@@ -178,7 +178,7 @@ export const TOOLS = [
     limite: { type: "number", description: "Quantas mensagens trazer (padrão 30, máximo 60)." },
   }, required: ["conversa"] }),
   fn("whatsapp_mencoes", "Mostra as mensagens em que alguém marcou a pessoa ou respondeu a uma mensagem dela no WhatsApp.", { type: "object", properties: { desde: { type: "string", description: "hoje, ontem, esta semana ou AAAA-MM-DD. Padrão: últimas 24 horas." } } }),
-  fn("whatsapp_marcar_lidas", "Marca como lidas PELO PRESENCE todas as conversas (ou só uma) do WhatsApp, para que 'mensagens novas' passe a contar só o que chegar daqui para frente. Não muda nada no WhatsApp da pessoa (as mensagens continuam como estão no celular).", { type: "object", properties: { conversa: { type: "string", description: "Nome de uma conversa/grupo. Vazio = todas." } } }),
+  fn("whatsapp_marcar_lidas", "Marca como lidas PELO ORION todas as conversas (ou só uma) do WhatsApp, para que 'mensagens novas' passe a contar só o que chegar daqui para frente. Não muda nada no WhatsApp da pessoa (as mensagens continuam como estão no celular).", { type: "object", properties: { conversa: { type: "string", description: "Nome de uma conversa/grupo. Vazio = todas." } } }),
   fn("encerrar_conversa", "Encerra a conversa por voz quando a pessoa se despedir ou pedir para parar.", { type: "object", properties: {} }),
 ];
 
@@ -224,7 +224,7 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       if (prep.problems.length) return { ok: false, faltando: prep.problems.slice(0, 5), dica: "Pergunte à pessoa o que falta ou qual opção, em uma frase." };
       const active = prep.resolved.filter((r) => !r._ignorar);
       if (!active.length) return { ok: false, duplicado: prep.resolved.map((r) => r._duplicado).filter(Boolean), dica: "Já existe algo equivalente. Pergunte se ela quer criar mesmo assim (então chame registrar de novo com permitir_duplicado=true)." };
-      const r = await commitRecords(prep.resolved, { client: "Presence · Voz", summary: prep.summary });
+      const r = await commitRecords(prep.resolved, { client: "Orion · Voz", summary: prep.summary });
       if (r.status === "erro") return { ok: false, erro: r.failed.join(" | ") };
       const link = (tipo: string, pid?: string) => (tipo === "demanda" || tipo === "anotacao" ? `/demandas${pid ? `?projeto=${encodeURIComponent(pid)}` : ""}` : tipo === "compromisso" ? "/calendario" : "/tarefas");
       emit({ t: "painel", p: { titulo: "Registrado", secoes: [{ titulo: `${r.created.length} item(ns) criado(s)`, itens: r.created.map((c) => ({ rotulo: c.rotulo, detalhe: c.modulo, link: link(c.tipo, c.projeto_id) })) }] } });

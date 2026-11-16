@@ -25,9 +25,9 @@ import imgProj from "@/assets/card-projetos.jpg";
 export const Route = createFileRoute("/assistente")({
   head: () => ({
     meta: [
-      { title: "Presence · Assistente pessoal" },
-      { name: "description", content: "Fale com Presence, seu assistente pessoal para rotina, saúde, foco, finanças e projetos." },
-      { property: "og:title", content: "Presence · Assistente pessoal" },
+      { title: "Orion · Assistente pessoal" },
+      { name: "description", content: "Fale com Orion, seu assistente pessoal para rotina, saúde, foco, finanças e projetos." },
+      { property: "og:title", content: "Orion · Assistente pessoal" },
       { property: "og:description", content: "Seu assistente pessoal futurista." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -170,12 +170,12 @@ function Assistente() {
           <header className="glass flex items-center justify-between rounded-3xl px-6 py-4 animate-rise max-sm:rounded-2xl max-sm:px-4 max-sm:py-2.5">
             <div className="flex items-center gap-5">
               <span className="h-2.5 w-2.5 rounded-full bg-cyan shadow-[0_0_12px_var(--cyan)] animate-pulse-ring" />
-              <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan max-sm:text-lg max-sm:tracking-[0.28em]">PRESENCE</span>
+              <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan max-sm:text-lg max-sm:tracking-[0.28em]">ORION</span>
               <span className="tag hidden !px-4 !py-1.5 sm:inline" style={tint("violet")}>Assistente pessoal</span>
             </div>
             <div className="flex items-center gap-4">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: listening ? "var(--emerald)" : "var(--cyan)", boxShadow: "0 0 8px currentColor" }} />
-              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? (voice.status ?? "Pensando…") : voice.wake ? "Diga “Presence”" : "Standby"}</span>
+              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? (voice.status ?? "Pensando…") : voice.wake ? "Diga “Orion”" : "Standby"}</span>
               <span className="h-8 w-px bg-border" />
               <button onClick={voice.toggle} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz" data-testid="voz-cabecalho"><AudioLines size={18} /></button>
               <div className="md:hidden"><AccountMenu below /></div>
@@ -190,7 +190,7 @@ function Assistente() {
                 Como posso<br /><span className="text-gradient">te ajudar hoje?</span>
               </h1>
               <p className="mt-5 max-w-sm text-[0.95rem] leading-relaxed text-muted-foreground max-sm:hidden">
-                Organize sua rotina, acompanhe seus objetivos e conte com o Presence para facilitar seu dia.
+                Organize sua rotina, acompanhe seus objetivos e conte com o Orion para facilitar seu dia.
               </p>
               <Link to="/planejamento" className="glass group mt-7 inline-flex max-sm:hidden items-center gap-4 rounded-full px-6 py-3 text-sm transition hover:shadow-[0_0_30px_-8px_var(--cyan)]">
                 <Sparkles size={18} className="text-cyan" /> "Planeje meu dia de hoje"
@@ -268,7 +268,7 @@ function Assistente() {
                 {!briefing.completed && <span aria-hidden className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{ animation: "vp-sweep 4s ease-in-out infinite" }} />}
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-violet/15 text-violet"><Sparkles size={18} /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{briefing.completed ? "Meu briefing" : "Personalize o Presence"}</span>
+                  <span className="block text-sm font-semibold">{briefing.completed ? "Meu briefing" : "Personalize o Orion"}</span>
                   <span className="block text-xs text-muted-foreground">{briefing.completed ? "Veja ou mude como ele fala com você e o que já aprendeu." : "Responda umas perguntas rápidas e ele aprende o seu jeito, o seu trabalho e como começar a conversa."}</span>
                 </span>
                 <ArrowRight size={16} className="shrink-0 text-muted-foreground transition group-hover:translate-x-1" />

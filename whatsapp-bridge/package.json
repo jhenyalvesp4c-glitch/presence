@@ -2,7 +2,7 @@
   "name": "presence-whatsapp-bridge",
   "private": true,
   "type": "module",
-  "description": "Ponte local (somente leitura) entre o seu WhatsApp e o Presence. Roda só no seu computador.",
+  "description": "Ponte local (somente leitura) entre o seu WhatsApp e o Orion. Roda só no seu computador.",
   "engines": { "node": ">=22.18" },
   "scripts": { "start": "node src/index.ts" },
   "dependencies": {

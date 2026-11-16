@@ -16,9 +16,9 @@ Na tela inicial (`/assistente`), o botão quadrado com o **+** ao lado de "Regis
 4. **Confirmar e distribuir:** só habilita quando não há pendências. Depois mostra o que foi criado, em qual módulo, com link para abrir, e **Desfazer tudo**.
 
 ## Como funciona por baixo
-- `interpretInbox` (função de servidor) manda o conteúdo à **OpenAI** (API Responses, chamada de função `organizar_informacoes`) junto com os **projetos, polos e categorias reais** do Presence. O prompt proíbe inventar ou "aproximar" nomes: o que não está claro vira dúvida. Imagens vão como `input_image`, PDFs como `input_file` e TXT/CSV/MD/JSON como texto.
+- `interpretInbox` (função de servidor) manda o conteúdo à **OpenAI** (API Responses, chamada de função `organizar_informacoes`) junto com os **projetos, polos e categorias reais** do Orion. O prompt proíbe inventar ou "aproximar" nomes: o que não está claro vira dúvida. Imagens vão como `input_image`, PDFs como `input_file` e TXT/CSV/MD/JSON como texto.
 - A IA devolve **rascunhos** (só o `tipo` é obrigatório). `validateInbox` roda a validação completa a cada edição: formato, projeto/polo/demanda reais e duplicidade — **a mesma validação do MCP** (`src/lib/mcp/plan.ts`).
-- `distributeInbox` grava com `commitRecords` (`src/lib/mcp/commit.ts`), **a mesma gravação do `confirmar_registros` do MCP**, que reutiliza os serviços de cada módulo (`saveDemands`, `saveAppointment`, `createTaskRow`, `saveNotesDb`, `loadLibrary/saveLibrary`, `putMaterials`). O histórico fica em `mcp_operations` (cliente "Presence · Central de entrada") e `undoInbox` desfaz.
+- `distributeInbox` grava com `commitRecords` (`src/lib/mcp/commit.ts`), **a mesma gravação do `confirmar_registros` do MCP**, que reutiliza os serviços de cada módulo (`saveDemands`, `saveAppointment`, `createTaskRow`, `saveNotesDb`, `loadLibrary/saveLibrary`, `putMaterials`). O histórico fica em `mcp_operations` (cliente "Orion · Central de entrada") e `undoInbox` desfaz.
 - Nada é gravado antes do seu "Confirmar e distribuir".
 
 ## O que precisa estar configurado
@@ -38,6 +38,6 @@ Variáveis novas só valem depois de **republicar** (Redeploy). A chamada usa `r
 - **Áudio:** arquivos de áudio ainda **não são transcritos**; use **Ditar** (microfone) ou cole a transcrição. **Word/Excel/PowerPoint** ainda não são lidos: salve como PDF.
 - **Tamanho:** até 6 arquivos e ~3 MB no total por envio (limite de 4,5 MB do corpo da função na Vercel). Prints são reduzidos automaticamente (máx. 1600 px, JPEG); PDFs até 3 MB.
 - **Qualidade:** a IA pode errar a classificação; por isso tudo passa pela sua revisão. Quando faltar projeto ou polo, ela pergunta em vez de chutar.
-- **Anotações exigem projeto** (as notas do Presence são por projeto).
-- **Lembretes não notificam** (o Presence não tem notificações): o lembrete é um registro com data e hora.
+- **Anotações exigem projeto** (as notas do Orion são por projeto).
+- **Lembretes não notificam** (o Orion não tem notificações): o lembrete é um registro com data e hora.
 - **Testado:** fluxo completo no navegador com um servidor de IA **simulado** (que também confere o formato da chamada: endereço `/v1/responses`, chave, modelo e imagem como `input_image`) (prints, cartões por destino, pendências, edição, mover, remover, copiar, confirmar, desfazer) e a validação/gravação reais no banco. **A leitura real de prints/PDFs pela OpenAI só foi conferida contra a documentação oficial, não com a chave real; o nome do modelo padrão também não pôde ser verificado na sua conta.**

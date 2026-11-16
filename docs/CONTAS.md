@@ -1,6 +1,6 @@
 # Contas (e-mail e senha)
 
-O Presence tem login simples do Supabase Auth: **e-mail + senha**, sem Google nem serviços externos.
+O Orion tem login simples do Supabase Auth: **e-mail + senha**, sem Google nem serviços externos.
 
 ## Como funciona
 - Tela de entrada (`src/components/auth/AuthGate.tsx`) com "Entrar" e "Criar conta". Sem login, nada do app aparece.

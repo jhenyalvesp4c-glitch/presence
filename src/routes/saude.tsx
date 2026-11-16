@@ -24,9 +24,9 @@ const fichaTitle: Record<Ficha, string> = { treino: "Ficha de treino", dieta: "F
 export const Route = createFileRoute("/saude")({
   head: () => ({
     meta: [
-      { title: "Presence Saúde — Fichas de treino, dieta e medidas" },
+      { title: "Orion Saúde — Fichas de treino, dieta e medidas" },
       { name: "description", content: "Monte fichas de treino, dieta e peso e medidas em um painel futurista." },
-      { property: "og:title", content: "Presence Saúde — Fichas de treino, dieta e medidas" },
+      { property: "og:title", content: "Orion Saúde — Fichas de treino, dieta e medidas" },
       { property: "og:description", content: "Organize sua rotina e acompanhe sua evolução." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

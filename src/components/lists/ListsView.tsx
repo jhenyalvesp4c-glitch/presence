@@ -101,7 +101,7 @@ function Detail({ l, onChange }: { l: CList; onChange: () => void }) {
   );
 }
 
-/** As listas (checklists) do Presence: seletor ao lado, lista aberta em tela cheia. Também mudam por voz. */
+/** As listas (checklists) do Orion: seletor ao lado, lista aberta em tela cheia. Também mudam por voz. */
 export function ListsView() {
   const [lists, setLists] = useState<CList[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);

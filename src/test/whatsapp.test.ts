@@ -112,7 +112,7 @@ describe("whatsapp: API local", () => {
   });
 });
 
-describe("whatsapp: acesso pelo navegador (site do Presence)", () => {
+describe("whatsapp: acesso pelo navegador (site do Orion)", () => {
   const store = new Store(":memory:");
   const state: BridgeState = { phase: "conectado", qr: null, phone: "55", name: "J", since: 1, paused: false };
   const server = createApi(store, state, "segredo", { logout: async () => undefined, pause: () => undefined });
@@ -142,13 +142,13 @@ describe("whatsapp: acesso pelo navegador (site do Presence)", () => {
   });
 });
 
-describe("whatsapp: marcar como lido pelo Presence", () => {
+describe("whatsapp: marcar como lido pelo Orion", () => {
   const store = new Store(":memory:");
   const g = "120363000000000001@g.us", h = "5531977770000@s.whatsapp.net";
   const base = 1_800_000_000;
   const add = (chat: string, id: string, ts: number) => store.addMessage({ id, chat, chat_name: chat === g ? "Juiz de Fora" : "Ana", is_group: chat === g, sender: "x@s.whatsapp.net", sender_name: "X", from_me: false, ts, text: id, kind: "texto", mentions_me: false, reply_to_me: false });
   add(g, "a", base); add(g, "b", base + 1); add(h, "c", base + 2);
-  it("zera as novas de todas as conversas, só no Presence", () => {
+  it("zera as novas de todas as conversas, só no Orion", () => {
     expect(store.chats().reduce((n, c) => n + c.novas, 0)).toBe(3);
     store.markAllChecked(base + 100);
     expect(store.chats().reduce((n, c) => n + c.novas, 0)).toBe(0);

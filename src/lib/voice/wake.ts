@@ -1,10 +1,10 @@
-/** Palavra de ativação ("Presence"), como "Alexa": detecção por texto e a preferência de ligar/desligar. */
+/** Palavra de ativação ("Orion"), como "Alexa": detecção por texto e a preferência de ligar/desligar. */
 const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-/** Como o reconhecimento costuma escrever "Presence" falado em português ou inglês: presence, presens, prisens, presença, prezens… */
-const WAKE = /(?<![a-z])pr[eiy]+[sz]+[eiy]*n[cs][eai]?s?(?![a-z])/;
+/** Como o reconhecimento costuma escrever "Orion" falado: orion, órion, orian, aurion, oriom… (não pega "origem", "oriente", "Marion"). */
+const WAKE = /(?<![a-z])(?:o|au|a)r+[iy][oae][nm]s?(?![a-z])/;
 
 export const heardWake = (text: string): boolean => WAKE.test(strip(text));
-/** O que foi dito depois da palavra de ativação ("Presence, que horas são?" → "que horas são?"), mantendo os acentos do texto original. */
+/** O que foi dito depois da palavra de ativação ("Orion, que horas são?" → "que horas são?"), mantendo os acentos do texto original. */
 export const afterWake = (text: string): string => {
   let flat = ""; const map: number[] = [];
   for (let i = 0; i < text.length; i++) for (const c of strip(text[i]!)) { flat += c; map.push(i); }

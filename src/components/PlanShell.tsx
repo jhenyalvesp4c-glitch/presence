@@ -61,7 +61,7 @@ export function PlanShell({ children, active = 1 }: { children: ReactNode; activ
           <header className="glass flex items-center justify-between gap-4 rounded-3xl px-6 py-3.5 animate-rise">
             <Link to="/assistente" className="flex items-center gap-4">
               <span className="h-2.5 w-2.5 rounded-full bg-cyan shadow-[0_0_12px_var(--cyan)] animate-pulse-ring" />
-              <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan">PRESENCE</span>
+              <span className="font-display text-xl font-semibold tracking-[0.35em] text-cyan">ORION</span>
               <span className="tag hidden !px-4 !py-1.5 sm:inline" style={tint("violet")}>Assistente pessoal</span>
             </Link>
             <nav className="hidden items-center gap-1 rounded-full border border-border px-2 py-1 xl:flex">

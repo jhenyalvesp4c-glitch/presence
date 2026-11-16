@@ -3,7 +3,7 @@
 Caixa disponível em **todas as páginas** (botão roxo no canto inferior direito, ou **Ctrl/⌘ + K**) e na aba Biblioteca da Documentação.
 
 ## Duas ações
-- **Perguntar**: pesquisa em tudo o que o Presence guarda e responde com IA (OpenAI), citando as fontes numeradas. Entende "hoje", "ontem", "semana passada", "este mês", "mês passado".
+- **Perguntar**: pesquisa em tudo o que o Orion guarda e responde com IA (OpenAI), citando as fontes numeradas. Entende "hoje", "ontem", "semana passada", "este mês", "mês passado".
 - **Documentar**: grava uma anotação livre (com data do acontecimento, padrão = hoje). Os dossiês/polos citados no texto viram etiquetas. As últimas aparecem na lista, com apagar ao passar o mouse.
 
 ## Como a resposta é mostrada

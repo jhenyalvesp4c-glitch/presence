@@ -1,5 +1,5 @@
 /**
- * Consultas ao Presence para o MCP (somente leitura) e resolução de nomes em registros reais.
+ * Consultas ao Orion para o MCP (somente leitura) e resolução de nomes em registros reais.
  * Usa o mesmo cliente e as mesmas tabelas das telas; nada de acesso livre ao banco.
  */
 import { loadDemands, ensureProject } from "../data/project-data";

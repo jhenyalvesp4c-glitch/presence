@@ -28,7 +28,7 @@ const bare = (title: string) => title.replace(/\s*\(\d+\)\s*$/, "");
 /** "09:00–10:00 · local" → hora separada do resto. */
 const splitTime = (d?: string) => { const m = d ? /^(\d{2}:\d{2}(?:–\d{2}:\d{2})?)(?:\s*·\s*)?(.*)$/.exec(d) : null; return m ? { time: m[1]!, rest: m[2] || undefined } : { time: undefined, rest: d }; };
 
-/** Modal do que o Presence mostra por voz (o dia, registros, o que foi criado): bonito, organizado e clicável. */
+/** Modal do que o Orion mostra por voz (o dia, registros, o que foi criado): bonito, organizado e clicável. */
 export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: () => void; onOpen: (href: string) => void }) {
   /** Itens de lista tocados aqui: marcar/incluir sem fechar o painel. */
   const [local, setLocal] = useState<Record<string, boolean>>({});
@@ -67,7 +67,7 @@ export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: 
             <span className="relative grid h-10 w-10 place-items-center rounded-full bg-background/70"><Check size={18} className="text-cyan" /></span>
           </span>
           <div className="min-w-0 flex-1">
-            <p className="mono-caps !text-[0.6rem]">Presence · para você</p>
+            <p className="mono-caps !text-[0.6rem]">Orion · para você</p>
             <h2 className="mt-1 font-serif text-3xl leading-tight tracking-tight first-letter:uppercase sm:text-4xl"><span className="text-gradient">{panel.titulo}</span></h2>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-foreground/90">{total} {total === 1 ? "item" : "itens"}</span>

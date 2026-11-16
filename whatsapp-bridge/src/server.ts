@@ -8,7 +8,7 @@ export type Controls = { logout(): Promise<void>; pause(on: boolean): void };
 
 const json = (res: ServerResponse, status: number, body: unknown) => { res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(body)); };
 
-/** Quem pode falar com a ponte pelo navegador: o site do Presence e o app local. Lista exata (nunca por prefixo). */
+/** Quem pode falar com a ponte pelo navegador: o site do Orion e o app local. Lista exata (nunca por prefixo). */
 export const DEFAULT_ORIGINS = ["https://spark-mind-friend-htvx.vercel.app", "https://spark-mind-friend-htvx-jheny1.vercel.app"];
 export const originAllowed = (origin: string | undefined, extra: string[] = []): boolean => {
   if (!origin) return false;

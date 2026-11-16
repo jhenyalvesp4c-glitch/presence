@@ -70,7 +70,7 @@ export function ReminderWatcher() {
       for (const d of due) { keys.set(d.id, alertKey(d, snoozed[d.id])); seen[d.id] = d.key; delete snoozed[d.id]; }
       write(SEEN, seen); write(SNOOZE, snoozed);
       setCards((c) => [...c.filter((x) => !due.some((d) => d.id === x.id)), ...due]);
-      // Com o Presence aberto em mais de um lugar, só o primeiro a "reservar" o aviso fala e notifica (os outros só mostram o cartão).
+      // Com o Orion aberto em mais de um lugar, só o primeiro a "reservar" o aviso fala e notifica (os outros só mostram o cartão).
       const claimed = await claimAlerts(due, keys);
       const mine = claimed ? due.filter((d) => claimed.has(d.id)) : due;
       if (!mine.length) return;
@@ -104,7 +104,7 @@ export function ReminderWatcher() {
       {askPerm && (
         <div className="pointer-events-auto rounded-2xl border border-white/10 bg-[oklch(0.16_0.03_265/0.96)] p-4 shadow-[0_20px_60px_-24px_var(--violet)] backdrop-blur-xl" style={{ animation: "vp-in .45s ease both" }}>
           <p className="text-sm font-medium">Quer receber os lembretes como notificação?</p>
-          <p className="mt-1 text-xs text-muted-foreground">Eles também aparecem aqui e o Presence fala na hora marcada.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Eles também aparecem aqui e o Orion fala na hora marcada.</p>
           <div className="mt-3 flex gap-2">
             <button onClick={() => void enable()} className="rounded-full bg-gradient-brand px-4 py-1.5 text-xs font-semibold text-primary-foreground" data-testid="lembretes-ativar">Ativar</button>
             <button onClick={() => { setAskPerm(false); write(ASKED, 1); }} className="rounded-full border border-white/10 px-4 py-1.5 text-xs text-muted-foreground hover:text-foreground">Agora não</button>

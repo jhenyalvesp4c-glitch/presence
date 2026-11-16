@@ -24,10 +24,10 @@ export const Route = createFileRoute("/tarefas")({
   validateSearch: (s: Record<string, unknown>): { aba?: "listas" } => (s["aba"] === "listas" ? { aba: "listas" } : {}),
   head: () => ({
     meta: [
-      { title: "Presence · Minhas tarefas" },
-      { name: "description", content: "Central de tarefas do Presence: rotina, compromissos e autocuidado em um só lugar." },
-      { property: "og:title", content: "Presence · Minhas tarefas" },
-      { property: "og:description", content: "Organize rotina, compromissos e autocuidado com o Presence." },
+      { title: "Orion · Minhas tarefas" },
+      { name: "description", content: "Central de tarefas do Orion: rotina, compromissos e autocuidado em um só lugar." },
+      { property: "og:title", content: "Orion · Minhas tarefas" },
+      { property: "og:description", content: "Organize rotina, compromissos e autocuidado com o Orion." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

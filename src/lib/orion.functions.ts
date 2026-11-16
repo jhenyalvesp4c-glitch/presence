@@ -1,5 +1,5 @@
 /**
- * Orion (segundo cérebro): pesquisa em tudo o que existe no Presence e responde com IA (OpenAI) citando as fontes.
+ * Orion (segundo cérebro): pesquisa em tudo o que existe no Orion e responde com IA (OpenAI) citando as fontes.
  * Sem OPENAI_API_KEY, devolve só as fontes encontradas (a busca continua funcionando).
  */
 import { createServerFn } from "@tanstack/react-start";
@@ -149,7 +149,7 @@ export const orionAsk = createServerFn({ method: "POST" })
       const sources = toSources(docs, kws);
       const periodLabel = period?.label ?? null;
       if (!docs.length) {
-        return { ok: true, mode: "busca", answer: "Não encontrei nada sobre isso no que o Presence tem guardado. Se foi algo que aconteceu, use “Documentar” para registrar e eu passo a achar.", sources: [], period: periodLabel, keywords: kws };
+        return { ok: true, mode: "busca", answer: "Não encontrei nada sobre isso no que o Orion tem guardado. Se foi algo que aconteceu, use “Documentar” para registrar e eu passo a achar.", sources: [], period: periodLabel, keywords: kws };
       }
       if (!process.env["OPENAI_API_KEY"]) {
         return { ok: true, mode: "busca", answer: `Encontrei ${docs.length} registro${docs.length > 1 ? "s" : ""} relacionados. A resposta escrita pela IA ainda não está ligada (falta OPENAI_API_KEY no servidor), mas as fontes estão abaixo.`, sources, period: periodLabel, keywords: kws };

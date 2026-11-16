@@ -1,6 +1,6 @@
-# Presence × MCP — distribuição inteligente de informações
+# Orion × MCP — distribuição inteligente de informações
 
-O Presence agora tem um servidor **MCP** (Model Context Protocol) remoto. O ChatGPT (ou qualquer cliente MCP) lê o que você manda — texto, print, documento, transcrição de áudio —, **consulta o Presence** para achar o projeto, o polo e o dossiê certos, **mostra um resumo para você aprovar** e, só depois do seu "CONFIRMAR", grava cada informação no módulo correto.
+O Orion agora tem um servidor **MCP** (Model Context Protocol) remoto. O ChatGPT (ou qualquer cliente MCP) lê o que você manda — texto, print, documento, transcrição de áudio —, **consulta o Orion** para achar o projeto, o polo e o dossiê certos, **mostra um resumo para você aprovar** e, só depois do seu "CONFIRMAR", grava cada informação no módulo correto.
 
 > Estado: implementado e testado localmente (versão de desenvolvimento e build de produção). **Para funcionar de fora você precisa de 2 passos manuais** (seção 5 e 7): definir `MCP_TOKEN` e liberar o endpoint da proteção da Vercel.
 
@@ -50,13 +50,13 @@ ChatGPT / Claude / Cursor ──HTTPS──►  /api/mcp   (rota do TanStack Sta
 
 | Ferramenta | O que faz |
 |---|---|
-| `propor_registros` | Recebe 1 a 12 registros relacionados, valida contra o Presence, procura duplicidade e devolve **resumo + código de 4 dígitos**. Não grava. |
+| `propor_registros` | Recebe 1 a 12 registros relacionados, valida contra o Orion, procura duplicidade e devolve **resumo + código de 4 dígitos**. Não grava. |
 | `confirmar_registros` | Cria os registros da proposta. Exige o código e `confirmacao_do_usuario=true`. Uma proposta só pode ser confirmada uma vez e vale 30 min. |
 | `desfazer_operacao` | Remove o que uma operação criou (exige autorização; marcada como *destrutiva* para o cliente pedir aprovação). |
 
 **Tipos de registro aceitos em `propor_registros`** e onde cada um é gravado:
 
-| `tipo` | Módulo do Presence | Campos principais |
+| `tipo` | Módulo do Orion | Campos principais |
 |---|---|---|
 | `demanda` | **Demandas** (Kanban do projeto) | `projeto_id`, `escopo` (geral · polo · multipolo), `dossie` / `dossies`, `titulo`, `descricao`, `prioridade`, `prazo`, `checklist`, `responsavel` |
 | `compromisso` | **Calendário** | `titulo`, `data`, `inicio`, `fim`, `local`, `escopo` (pessoal · profissional), `projeto_id`, `dossie`, `demanda`, `lembrete_minutos_antes` |
@@ -118,15 +118,15 @@ Transporte: HTTP POST com JSON-RPC 2.0 (MCP "Streamable HTTP" sem sessão). Vers
 4. **Escrita só com confirmação:** a proposta guarda o resumo e um código de 4 dígitos; o `confirmar` exige o código (você o digita ao responder) e é de uso único e com validade de 30 min. Antes de gravar, tudo é **revalidado** contra o estado atual (projeto, polo, demanda, duplicidade).
 5. **Histórico e desfazer:** toda criação/desfazer fica em `mcp_operations`.
 
-> Limite honesto: o código de 4 dígitos é uma trava de fluxo (o assistente só o conhece depois do resumo e é instruído a pedi-lo a você), não uma autenticação por pessoa. A autenticação do endpoint é o `MCP_TOKEN`. Quando o login do Presence voltar, dá para trocar por OAuth.
+> Limite honesto: o código de 4 dígitos é uma trava de fluxo (o assistente só o conhece depois do resumo e é instruído a pedi-lo a você), não uma autenticação por pessoa. A autenticação do endpoint é o `MCP_TOKEN`. Quando o login do Orion voltar, dá para trocar por OAuth.
 
 ## 8. Como conectar
 
 **ChatGPT** (nomes de menu mudam; o caminho geral): *Configurações → Aplicativos/Conectores → Avançado → Modo desenvolvedor → Criar* → tipo **MCP**:
-- Nome: `Presence`
+- Nome: `Orion`
 - URL: `https://spark-mind-friend-htvx.vercel.app/api/mcp/<MCP_TOKEN>?x-vercel-protection-bypass=<SEGREDO>`
 - Autenticação: **nenhuma** (o token já está na URL).
-- Ative o conector na conversa. Dica: em um **Projeto** do ChatGPT, cole nas instruções: *"Use o conector Presence para tudo que eu mandar: consulte antes, proponha com propor_registros, mostre o resumo e só confirme depois do meu 'CONFIRMAR <código>'."*
+- Ative o conector na conversa. Dica: em um **Projeto** do ChatGPT, cole nas instruções: *"Use o conector Orion para tudo que eu mandar: consulte antes, proponha com propor_registros, mostre o resumo e só confirme depois do meu 'CONFIRMAR <código>'."*
 
 **Claude (conector personalizado)**: *Configurações → Conectores → Adicionar conector personalizado* → mesma URL.
 
@@ -164,14 +164,14 @@ Executados contra o banco real (dados de teste marcados `TESTE-MCP`, todos remov
 
 ## 10. Limitações e o que ainda depende de implementação
 
-- **Lembretes não notificam:** o Presence não tem envio de notificação/push. Um lembrete é um registro com data e hora (aparece em Minhas Tarefas e no Planeje meu dia). Notificação de verdade depende de um módulo de notificações que não existe ainda.
+- **Lembretes não notificam:** o Orion não tem envio de notificação/push. Um lembrete é um registro com data e hora (aparece em Minhas Tarefas e no Planeje meu dia). Notificação de verdade depende de um módulo de notificações que não existe ainda.
 - **Documentação:** a biblioteca de pastas e documentos da tela ainda não é salva no banco (e guarda senhas de polos; não deve ir para o MCP). Por isso `documentacao` grava no **banco de exemplos de Treinamentos** do projeto, que é o que já tem back-end.
-- **Anotações exigem projeto** (as notas do Presence são por projeto). Não há "anotação pessoal solta".
-- **Recorrência:** só existe rotina **diária**; semanal/mensal não existem no Presence.
+- **Anotações exigem projeto** (as notas do Orion são por projeto). Não há "anotação pessoal solta".
+- **Recorrência:** só existe rotina **diária**; semanal/mensal não existem no Orion.
 - **Prazo da demanda** é guardado como dia/mês (sem ano), como na tela.
 - **Prints, áudios e documentos:** o ChatGPT lê/transcreve e manda **texto**. Arquivos só entram como `conteudo_base64` (até 4 MB) se o cliente conseguir fornecer os bytes — o ChatGPT normalmente **não** consegue repassar um arquivo enviado por você. Evidência em **texto** funciona sempre; arquivo é "o que for possível".
 - **Não há ferramenta para editar/excluir** registros existentes (por segurança); só criar e desfazer o que o MCP criou.
-- **Responsável** (pessoa) vira texto na descrição; o Presence não tem cadastro de responsáveis.
+- **Responsável** (pessoa) vira texto na descrição; o Orion não tem cadastro de responsáveis.
 - **Confirmação:** o código de 4 dígitos é trava de fluxo, não autenticação por pessoa (veja seção 7).
 - **Limite de requisições** é por instância do servidor (best effort).
 - **Os vínculos novos** (`demand_code`, `related_task_id`, `kind`) ainda não aparecem nas telas (não redesenhamos nada); aparecem nas consultas do MCP.

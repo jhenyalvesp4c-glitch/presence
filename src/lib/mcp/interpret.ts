@@ -1,6 +1,6 @@
 /**
  * Interpretação da Central de entrada: manda o texto, os prints, PDFs e documentos para a IA (OpenAI, API Responses)
- * junto com os projetos, polos (dossiês) e categorias REAIS do Presence, e recebe de volta registros estruturados
+ * junto com os projetos, polos (dossiês) e categorias REAIS do Orion, e recebe de volta registros estruturados
  * por uma chamada de função. Nada é gravado aqui. O cliente HTTP entra por parâmetro (`create`), o que deixa o
  * fluxo testável sem rede.
  */
@@ -31,7 +31,7 @@ const toolSchema = () => { const { $schema: _s, ...rest } = z.toJSONSchema(outpu
 export type InputFile = { name: string; mime: string; data: string };
 export type Context = { today: string; weekday: string; projects: (ProjectInfo & { dossiers: DossierInfo[] })[]; categories: CategoryInfo[] };
 
-export const SYSTEM = `Você é o classificador de entrada do Presence, o assistente pessoal e de projetos da pessoa. Ela cola textos e envia prints, imagens, PDFs e documentos. Você transforma isso em REGISTROS estruturados para os módulos do Presence. Você NÃO grava nada: chame a função ${TOOL_NAME}; a pessoa revisa, edita e confirma tudo antes.
+export const SYSTEM = `Você é o classificador de entrada do Orion, o assistente pessoal e de projetos da pessoa. Ela cola textos e envia prints, imagens, PDFs e documentos. Você transforma isso em REGISTROS estruturados para os módulos do Orion. Você NÃO grava nada: chame a função ${TOOL_NAME}; a pessoa revisa, edita e confirma tudo antes.
 
 COMO DECIDIR O DESTINO
 - demanda: pedido de trabalho a executar dentro de um projeto. escopo "geral" (sem polo), "polo" (um polo/dossiê) ou "multipolo" (vários, cada um com andamento próprio). Passos a cumprir vão em "checklist"; quem deve fazer em "responsavel".

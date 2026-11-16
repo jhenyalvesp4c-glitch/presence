@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { name = localStorage.getItem(NAME_KEY) || (session.user.user_metadata?.["name"] as string | undefined) || null; } catch { /* sem armazenamento */ }
     const { data, error } = await authClient.rpc("claim_account", { p_name: name });
     if (error || !data) {
-      setBlocked(/limite/i.test(error?.message ?? "") ? "Este Presence já tem o número máximo de contas. Fale com quem administra." : (error?.message ?? "Não foi possível abrir sua conta."));
+      setBlocked(/limite/i.test(error?.message ?? "") ? "Este Orion já tem o número máximo de contas. Fale com quem administra." : (error?.message ?? "Não foi possível abrir sua conta."));
       setStatus("blocked");
       return;
     }

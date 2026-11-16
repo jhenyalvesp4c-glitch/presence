@@ -164,7 +164,7 @@ class Speaker {
 }
 
 const MAX_IDLE = 3;
-/** Quanto silêncio (ms) o Presence espera antes de achar que a pessoa terminou de falar. */
+/** Quanto silêncio (ms) o Orion espera antes de achar que a pessoa terminou de falar. */
 const SILENCE_MS = 2500;
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
@@ -405,19 +405,19 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const start = useCallback(() => {
     activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
     spk().unlock();
-    // Se a pessoa pediu no briefing que o Presence comece a conversa, ela fala primeiro.
-    if (greetRef.current !== "esperar") { setStatus("Iniciando o Presence…"); bootStop.current = startBootSound(); void ask(GREET_MARK); } else listen();
+    // Se a pessoa pediu no briefing que o Orion comece a conversa, ela fala primeiro.
+    if (greetRef.current !== "esperar") { setStatus("Iniciando o Orion…"); bootStop.current = startBootSound(); void ask(GREET_MARK); } else listen();
   }, [listen, ask]);
 
   const stop = useCallback(() => { turn.current++; endSession(); }, [endSession]);
 
-  /* ───────────── "Presence": chamar falando, como a Alexa ───────────── */
+  /* ───────────── "Orion": chamar falando, como a Alexa ───────────── */
   const stopWake = useCallback(() => {
     const r = wakeRec.current; wakeRec.current = null;
     if (r) { r.onresult = null; r.onerror = null; r.onend = null; try { r.abort(); } catch { /* já parou */ } }
     const f = wakeStop.current; wakeStop.current = null; f?.();
   }, []);
-  /** Abre a conversa direto ouvindo (sem saudação); se a pessoa já disse o pedido junto ("Presence, que horas são?"), responde a ele. */
+  /** Abre a conversa direto ouvindo (sem saudação); se a pessoa já disse o pedido junto ("Orion, que horas são?"), responde a ele. */
   const activate = useCallback((rest: string) => {
     if (activeRef.current) return;
     activeRef.current = true; setActive(true); idle.current = 0; setUserText(""); setBotText(""); setNote(null);
@@ -459,7 +459,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     r.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "audio-capture") {
         setWakeEnabled(false); setWakeState(false); stopWake();
-        const m = "Para chamar falando \"Presence\", libere o microfone para este site e ligue de novo em Configurações.";
+        const m = "Para chamar falando \"Orion\", libere o microfone para este site e ligue de novo em Configurações.";
         setWakeInfo((w) => ({ ...w, estado: m })); setNote(m);
       } else if (e.error === "network" || e.error === "service-not-allowed" || e.error === "language-not-supported") {
         toRecorded("O reconhecimento de voz do navegador não funciona aqui.");

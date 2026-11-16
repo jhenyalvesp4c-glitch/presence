@@ -216,7 +216,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
             <button onClick={() => setGenerating(true)} data-testid="criar-com-ia"
               className="group relative mt-3 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-brand px-3 py-2.5 text-xs font-semibold text-primary-foreground shadow-[0_0_28px_-8px_var(--violet)] transition hover:scale-[1.02] hover:shadow-[0_0_36px_-4px_var(--violet)]">
               <span aria-hidden className="absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/30 transition duration-700 group-hover:left-[150%]" />
-              <Wand2 size={14} className="relative" /> <span className="relative">Criar roteiro com o Presence</span>
+              <Wand2 size={14} className="relative" /> <span className="relative">Criar roteiro com o Orion</span>
             </button>
             <div className="mt-3 flex items-center gap-2">
               <p className="mono-caps mr-auto !text-[0.58rem]">Pastas</p>
@@ -229,7 +229,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
               </form>
             )}
             <div className="mt-2 space-y-2">
-              {scripts.length === 0 && folderNames(lib).length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">Nenhum roteiro. Crie um com o Presence ou em "Novo".</p>}
+              {scripts.length === 0 && folderNames(lib).length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">Nenhum roteiro. Crie um com o Orion ou em "Novo".</p>}
               {[...folderNames(lib), ""].map((fname) => {
                 const list = scripts.filter((sc) => (sc.folder ?? "") === fname);
                 if (fname === "" && (list.length === 0 || folderNames(lib).length === 0)) {

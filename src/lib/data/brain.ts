@@ -134,7 +134,7 @@ export async function syncMirrors(list: Mirror[]) {
   for (const m of changed) mirrorHash.set(m.refId, hash(m));
 }
 
-/** Endereços temporários (1 h) para arquivos de qualquer bucket do Presence (anotações e anexos de demandas). */
+/** Endereços temporários (1 h) para arquivos de qualquer bucket do Orion (anotações e anexos de demandas). */
 export async function signedUrlsFor(files: { bucket: string; path: string }[]): Promise<Record<string, { view: string; download: string }>> {
   const out: Record<string, { view: string; download: string }> = {};
   const byBucket = new Map<string, string[]>();
