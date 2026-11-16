@@ -1,5 +1,6 @@
 import { playWakeChime, startBootSound } from "./boot-sound";
 import { afterWake, heardWake, setWakeEnabled, wakeEnabled } from "./wake";
+import { startRecordedWake } from "./wake-listen";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@tanstack/react-router";
 
@@ -16,7 +17,7 @@ import { takeSentences } from "./sentences";
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
   active: boolean; phase: Phase; status: string | null; userText: string; botText: string; interim: string; panel: Panel | null; canListen: boolean; note: string | null;
-  wake: boolean; wakeSupported: boolean; setWake: (on: boolean) => void;
+  wake: boolean; wakeSupported: boolean; wakeInfo: { modo: string; estado: string; ouvido: string }; setWake: (on: boolean) => void;
   testVoice: () => void; announce: (text: string) => Promise<void>; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
 };
 const Ctx = createContext<Voice | null>(null);
@@ -180,6 +181,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [wake, setWakeState] = useState(false);
   const [wakeTick, setWakeTick] = useState(0);
   const wakeRec = useRef<Rec | null>(null);
+  const wakeStop = useRef<(() => void) | null>(null);
+  const [wakeInfo, setWakeInfo] = useState({ modo: "", estado: "desligado", ouvido: "" });
 
   const activeRef = useRef(false);
   const phaseRef = useRef<Phase>("idle");
@@ -412,6 +415,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const stopWake = useCallback(() => {
     const r = wakeRec.current; wakeRec.current = null;
     if (r) { r.onresult = null; r.onerror = null; r.onend = null; try { r.abort(); } catch { /* já parou */ } }
+    const f = wakeStop.current; wakeStop.current = null; f?.();
   }, []);
   /** Abre a conversa direto ouvindo (sem saudação); se a pessoa já disse o pedido junto ("Presence, que horas são?"), responde a ele. */
   const activate = useCallback((rest: string) => {
@@ -420,32 +424,55 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     spk().unlock(); playWakeChime();
     if (rest.length >= 3) void ask(rest); else setTimeout(() => { if (activeRef.current) listen(); }, 500);
   }, [ask, listen]);
+  /** Escuta por gravação (não depende do reconhecimento do navegador): usada quando o navegador não tem ou não consegue reconhecer voz. */
+  const startRecWake = useCallback(() => {
+    if (wakeStop.current || activeRef.current) return;
+    setWakeInfo((w) => ({ ...w, modo: "gravação", estado: "iniciando o microfone…" }));
+    wakeStop.current = startRecordedWake({
+      onStatus: (estado) => setWakeInfo((w) => ({ ...w, modo: "gravação", estado })),
+      onText: (text) => { setWakeInfo((w) => ({ ...w, ouvido: text })); if (heardWake(text)) { stopWake(); activate(afterWake(text)); } },
+      onFail: (msg) => { stopWake(); setWakeEnabled(false); setWakeState(false); setWakeInfo((w) => ({ ...w, estado: msg })); setNote(msg); },
+    });
+  }, [activate, stopWake]);
   const startWake = useCallback(() => {
-    if (wakeRec.current || activeRef.current) return;
-    const C = recCtor(); if (!C) return;
+    if (wakeRec.current || wakeStop.current || activeRef.current) return;
+    let preferRec = false; try { preferRec = localStorage.getItem("presence.voz.chamar.modo") === "gravacao"; } catch { /* sem armazenamento */ }
+    const C = recCtor();
+    if (!C || preferRec) { startRecWake(); return; }
+    const toRecorded = (why: string) => {
+      stopWake();
+      try { localStorage.setItem("presence.voz.chamar.modo", "gravacao"); } catch { /* sem armazenamento */ }
+      setWakeInfo((w) => ({ ...w, estado: `${why} Usando o modo por gravação.` }));
+      setTimeout(() => setWakeTick((n) => n + 1), 100);
+    };
     const r = new C();
     r.lang = "pt-BR"; r.interimResults = true; r.continuous = true;
+    let heardAny = false;
     r.onresult = (e) => {
       const last = e.results[e.results.length - 1]; if (!last) return;
       const text = last[0]?.transcript ?? "";
+      heardAny = true; setWakeInfo((w) => ({ ...w, ouvido: text }));
       if (!heardWake(text)) return;
       const rest = last.isFinal ? afterWake(text) : "";
       stopWake(); activate(rest);
     };
     r.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
+      if (e.error === "not-allowed" || e.error === "audio-capture") {
         setWakeEnabled(false); setWakeState(false); stopWake();
-        setNote("Para chamar falando \"Presence\", libere o microfone para este site e ligue de novo em Configurações.");
-      } else if (e.error === "network") {
-        setWakeEnabled(false); setWakeState(false); stopWake();
-        setNote("O reconhecimento de voz do navegador não está disponível neste computador, então não consigo ouvir a palavra \"Presence\".");
+        const m = "Para chamar falando \"Presence\", libere o microfone para este site e ligue de novo em Configurações.";
+        setWakeInfo((w) => ({ ...w, estado: m })); setNote(m);
+      } else if (e.error === "network" || e.error === "service-not-allowed" || e.error === "language-not-supported") {
+        toRecorded("O reconhecimento de voz do navegador não funciona aqui.");
       }
     };
     r.onend = () => { if (wakeRec.current !== r) return; wakeRec.current = null; if (wakeEnabled() && !activeRef.current) setTimeout(() => setWakeTick((n) => n + 1), 400); };
     wakeRec.current = r;
-    try { r.start(); } catch { wakeRec.current = null; setTimeout(() => setWakeTick((n) => n + 1), 1500); }
-  }, [activate, stopWake]);
-  const setWake = useCallback((on: boolean) => { setWakeEnabled(on); setWakeState(on); }, []);
+    setWakeInfo((w) => ({ ...w, modo: "navegador", estado: "ouvindo" }));
+    try { r.start(); } catch { wakeRec.current = null; toRecorded("Não consegui iniciar o reconhecimento do navegador."); return; }
+    // se em 25 s o navegador não ouviu nada (algumas janelas de aplicativo aceitam o comando mas ficam mudas), troca para o modo por gravação
+    setTimeout(() => { if (wakeRec.current === r && !heardAny) toRecorded("O navegador não está reconhecendo voz."); }, 25000);
+  }, [activate, startRecWake, stopWake]);
+  const setWake = useCallback((on: boolean) => { setWakeEnabled(on); setWakeState(on); if (!on) setWakeInfo({ modo: "", estado: "desligado", ouvido: "" }); }, []);
   useEffect(() => { setWakeState(wakeEnabled()); }, []);
   useEffect(() => {
     if (wake && !active) startWake(); else stopWake();
@@ -497,7 +524,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => { activeRef.current = false; speaker.current?.cancel(); stopListening(); }, [stopListening]);
 
-  const value = useMemo<Voice>(() => ({ active, phase, status, userText, botText, interim, panel, canListen, note, wake, wakeSupported: !!recCtor(), setWake, testVoice, announce, toggle, stop, sendText, closePanel: () => setPanel(null) }),
-    [active, phase, status, userText, botText, interim, panel, canListen, note, wake, setWake, testVoice, announce, toggle, stop, sendText]);
+  const value = useMemo<Voice>(() => ({ active, phase, status, userText, botText, interim, panel, canListen, note, wake, wakeSupported: true, wakeInfo, setWake, testVoice, announce, toggle, stop, sendText, closePanel: () => setPanel(null) }),
+    [active, phase, status, userText, botText, interim, panel, canListen, note, wake, wakeInfo, setWake, testVoice, announce, toggle, stop, sendText]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

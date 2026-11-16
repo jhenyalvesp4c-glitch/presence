@@ -149,11 +149,17 @@ function ChamarPorVoz() {
     <section className={card} data-testid="cfg-chamar">
       <h2 className="font-display text-lg font-semibold">Chamar por voz</h2>
       <p className="mt-1 text-sm text-muted-foreground">Com isto ligado, é só falar <b className="text-foreground">“Presence”</b> que ele acorda e passa a te ouvir, sem precisar tocar na esfera.</p>
-      <div className="mt-4"><Toggle on={v.wake} onChange={v.setWake} Icon={Mic} label="Ativar quando eu falar “Presence”" hint={v.wakeSupported ? "Funciona enquanto o Presence estiver aberto neste computador, com o microfone liberado." : "Este navegador não tem reconhecimento de voz. Use o Chrome ou o Edge."} /></div>
+      <div className="mt-4"><Toggle on={v.wake} onChange={v.setWake} Icon={Mic} label="Ativar quando eu falar “Presence”" hint="Funciona enquanto o Presence estiver aberto neste computador, com o microfone liberado." /></div>
+      {v.wake && (
+        <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs" data-testid="cfg-chamar-estado">
+          <p><b className="text-foreground">Estado:</b> {v.wakeInfo.estado}{v.wakeInfo.modo ? ` · modo ${v.wakeInfo.modo}` : ""}</p>
+          {v.wakeInfo.ouvido && <p className="mt-1 text-muted-foreground">Última coisa que ouvi: “{v.wakeInfo.ouvido}”</p>}
+        </div>
+      )}
       <ul className="mt-4 space-y-1.5 text-xs text-muted-foreground">
         <li>• Depois de falar “Presence”, ouça o tom curto e fale o que precisa.</li>
         <li>• Para funcionar sempre, deixe o app aberto (pode ficar minimizado) e libere o microfone.</li>
-        <li>• Enquanto está ligado, o navegador ouve o microfone o tempo todo e envia o áudio ao serviço de reconhecimento de voz dele (no Chrome, o Google) para perceber a palavra. Desligue quando quiser privacidade.</li>
+        <li>• Enquanto está ligado, o microfone fica aberto o tempo todo. No modo do navegador, o áudio vai ao serviço de reconhecimento dele (no Chrome, o Google). No modo por gravação (usado quando o navegador não reconhece voz), só os trechos em que alguém fala são enviados para transcrição na OpenAI. Desligue quando quiser privacidade.</li>
       </ul>
     </section>
   );

@@ -44,3 +44,10 @@ Ferramenta `roteiro` (`src/lib/voice/scripts.ts`, regras puras em `src/lib/scrip
 Configurações → "Chamar por voz". Ligado, o navegador escuta continuamente (reconhecimento de voz do próprio navegador, `src/lib/voice/wake.ts`) e, ao ouvir "Presence" (e variações: presens, prisens, presença…), toca um tom curto e passa a ouvir. Se o pedido vier junto ("Presence, que horas são?"), responde direto. Enquanto a conversa está aberta (ou um lembrete é falado) a escuta da palavra fica pausada e volta depois.
 
 Limites: só funciona com o Presence aberto (pode estar minimizado) num navegador com reconhecimento de voz (Chrome/Edge) e microfone liberado; o áudio é enviado ao serviço do navegador (no Chrome, o Google) enquanto estiver ligado; o navegador pode exigir um primeiro toque na página depois de abrir para liberar o som. Preferência local: `localStorage["presence.voz.chamar"]`.
+
+### Dois modos de escutar "Presence"
+
+1. **Navegador** (`webkitSpeechRecognition`): rápido, mas não existe ou não funciona em vários apps instalados.
+2. **Gravação** (`wake-listen.ts`): usado automaticamente quando o modo 1 não existe, dá erro ("network"…) ou fica 25 s sem ouvir nada. Fica com o microfone aberto, detecta quando alguém fala, manda só esse trecho curto (WAV 16 kHz) para transcrever na OpenAI e procura a palavra no texto. Silêncio não é enviado; limite de 20 envios por minuto; chave/créditos inválidos desligam o recurso com aviso. Demora ~1–2 s depois de falar.
+
+Configurações → "Chamar por voz" mostra o estado, o modo e a última coisa ouvida (para diagnosticar). Na tela inicial, o status mostra "Diga “Presence”" quando está ligado.
