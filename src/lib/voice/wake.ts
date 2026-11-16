@@ -1,7 +1,7 @@
 /** Palavra de ativação ("Orion"), como "Alexa": detecção por texto e a preferência de ligar/desligar. */
 const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 /** Como o reconhecimento costuma escrever "Orion" falado: orion, órion, orian, aurion, oriom… (não pega "origem", "oriente", "Marion"). */
-const WAKE = /(?<![a-z])(?:o|au|a)r+[iy][oae][nm]s?(?![a-z])/;
+const WAKE = /(?<![a-z])(?:h?o|au|a|ou)r+[iy]+(?:[oae]+[nm]*|[nm])?s?(?![a-z])/;
 
 export const heardWake = (text: string): boolean => WAKE.test(strip(text));
 /** O que foi dito depois da palavra de ativação ("Orion, que horas são?" → "que horas são?"), mantendo os acentos do texto original. */

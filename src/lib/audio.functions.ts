@@ -4,7 +4,7 @@ import { z } from "zod";
 
 /** ~3 MB de áudio (≈ 4 MB em base64): cabe no limite de corpo da Vercel (4,5 MB). */
 export const MAX_AUDIO_B64 = 4_200_000;
-const input = z.object({ data: z.string().min(100, "Áudio vazio.").max(MAX_AUDIO_B64, "Áudio longo demais. Grave um trecho menor."), mime: z.string().min(3).max(80) });
+const input = z.object({ data: z.string().min(100, "Áudio vazio.").max(MAX_AUDIO_B64, "Áudio longo demais. Grave um trecho menor."), mime: z.string().min(3).max(80), prompt: z.string().max(300).optional() });
 
 export type TranscribeResult = { ok: true; text: string } | { ok: false; error: string };
 
@@ -15,7 +15,7 @@ export const transcribeAudio = createServerFn({ method: "POST" })
     try {
       const { transcribe, OpenAIError } = await import("./mcp/openai");
       const bytes = new Uint8Array(Buffer.from(data.data, "base64"));
-      const text = await transcribe(bytes, data.mime).catch((e) => {
+      const text = await transcribe(bytes, data.mime, process.env, data.prompt).catch((e) => {
         if (e instanceof OpenAIError) {
           if (e.status === 401) throw new Error("A chave da OpenAI (OPENAI_API_KEY) é inválida.");
           if (e.status === 429) throw new Error(e.code === "insufficient_quota" ? "A conta da OpenAI está sem créditos." : "Muitas solicitações seguidas. Tente de novo em instantes.");

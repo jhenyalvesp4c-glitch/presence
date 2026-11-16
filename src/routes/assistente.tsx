@@ -175,7 +175,7 @@ function Assistente() {
             </div>
             <div className="flex items-center gap-4">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: listening ? "var(--emerald)" : "var(--cyan)", boxShadow: "0 0 8px currentColor" }} />
-              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? (voice.status ?? "Pensando…") : voice.wake ? "Diga “Orion”" : "Standby"}</span>
+              <span className="mono-caps hidden !text-[0.65rem] sm:inline">{listening || voice.phase === "listening" ? "Ouvindo…" : voice.phase === "speaking" ? "Falando…" : home.thinking || voice.phase === "thinking" ? (voice.status ?? "Pensando…") : voice.wake ? (/entend|ouvindo voc/i.test(voice.wakeInfo.estado) ? voice.wakeInfo.estado : "Diga “Orion”") : "Standby"}</span>
               <span className="h-8 w-px bg-border" />
               <button onClick={voice.toggle} className="icon-tile h-11 w-11 !rounded-full" style={tint("cyan")} aria-label="Voz" data-testid="voz-cabecalho"><AudioLines size={18} /></button>
               <div className="md:hidden"><AccountMenu below /></div>

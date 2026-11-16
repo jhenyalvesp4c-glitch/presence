@@ -6,7 +6,9 @@
 import { transcribeAudio } from "@/lib/audio.functions";
 
 const TARGET_SR = 16000;
-const MAX_SEG_S = 8, MIN_LOUD_S = 0.25, PREROLL_S = 0.45, END_QUIET_S = 0.7, MAX_PER_MIN = 20;
+const MAX_SEG_S = 8, MIN_LOUD_S = 0.2, PREROLL_S = 0.5, END_QUIET_S = 0.55, MAX_PER_MIN = 24;
+/** Ajuda a transcrição a acertar o nome do assistente. */
+const NAME_HINT = "Orion. Assistente Orion. Ei Orion, bom dia, Orion. Órion.";
 const GHOST = /^(obrigad[oa]\.?|legendas? .*|tchau\.?|\.+|\s*)$|amara\.org|inscreva-se/i;
 
 export function pcmToWavBase64(pcm: Float32Array, sr = TARGET_SR): string {
@@ -34,7 +36,7 @@ export function startRecordedWake(o: WakeListen): () => void {
     busy = true; sent.push(now);
     try {
       o.onStatus("Entendendo…");
-      const r = await transcribeAudio({ data: { data: pcmToWavBase64(pcm), mime: "audio/wav" } });
+      const r = await transcribeAudio({ data: { data: pcmToWavBase64(pcm), mime: "audio/wav", prompt: NAME_HINT } });
       if (stopped) return;
       if (!r.ok) {
         if (/OPENAI_API_KEY|cr[eé]ditos|inv[aá]lida/i.test(r.error)) { o.onFail(r.error); return; }
