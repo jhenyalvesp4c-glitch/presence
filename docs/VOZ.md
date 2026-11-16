@@ -28,4 +28,4 @@ Ferramenta `lista` (`src/lib/voice/lists.ts`): criar, adicionar, remover, marcar
 
 ## Toque de abertura
 
-Ao tocar no orbe, enquanto aparece "Iniciando o Presence…", toca um toque curto de "sistema ligando" (gerado na hora pelo navegador, sem arquivo, em `src/lib/voice/boot-sound.ts`). Ele para (com fade) quando o Presence começa a falar. Para desligar: `localStorage["presence.voz.abertura"] = "0"`.
+Ao tocar no orbe, enquanto aparece "Iniciando o Presence…", toca um toque de "sistema iniciando" estilo painel de IA, sem melodia: zumbido grave que cresce, varredura de energia, batida grave discreta e pulsos digitais com eco (gerado na hora pelo navegador, sem arquivo, em `src/lib/voice/boot-sound.ts`). Ele para (com fade) quando o Presence começa a falar. Para desligar: `localStorage["presence.voz.abertura"] = "0"`.
