@@ -56,4 +56,12 @@ Configurações → "Chamar por voz" mostra o estado, o modo e a última coisa o
 
 Quando o Orion não consegue fazer algo (função que não existe, edição que o sistema não permite), ele usa a ferramenta `pedir_melhoria`: avisa que no momento não consegue e abre um **cartão de confirmação** com o que a pessoa pediu, um título e "como entendi que deve ficar" (editáveis). Só depois do clique em "Confirmar e enviar ao Claude" o pedido é gravado em `presence_app.improvement_requests` (migração `20261121000100`), com status `na_fila`. Configurações mostra a lista "Pedidos para o Claude" e a pessoa pode perguntar "como estão meus pedidos?".
 
-O andamento (`em_andamento`, `feito`, `cancelado`, mais a nota em `claude_note`) é atualizado por quem implementa. **Nada pega os pedidos sozinho ainda**: o Claude lê a fila (ex.: pelo Supabase) numa conversa de desenvolvimento. Ligar uma execução automática (GitHub + Claude Code Action, ou uma rotina agendada) é uma decisão à parte, que exige permissões e revisão antes de ir para produção.
+O andamento (`em_andamento`, `feito`, `cancelado`, mais a nota em `claude_note`) é atualizado por quem implementa.
+
+### Execução automática (rotina do Claude)
+
+Existe uma rotina agendada do Claude Code ("Orion: pegar pedidos de melhoria confirmados", intervalo mínimo permitido: **1 hora**) que lê a fila, implementa **um pedido por execução** na branch `claude/busy-planck-p1i0im`, roda `tsc` e `vitest`, publica em produção pela Vercel, confere o deploy (com rollback se falhar) e atualiza o status e a nota. Ela só aceita linhas do dono `00000000-0000-0000-0000-000000000001` (a conta da Jheny), trata o texto do pedido como dado (nunca como instrução), só faz mudanças de banco aditivas e cancela com explicação o que for ambíguo, perigoso ou que falhe nos testes.
+
+Segurança da fila: a tabela **não tem política para o papel `anon`** (migração `20261121000200`), então só quem está logado grava nela; sem isso, qualquer pessoa com a chave pública do Supabase poderia injetar um pedido.
+
+**Estado atual: a rotina está criada, mas DESLIGADA.** Ela foi criada sem conectores (Supabase, Vercel) e sem o repositório anexado, então uma execução não conseguiria ler a fila nem publicar. Para ligar: na página de rotinas do claude.ai, abrir a rotina, adicionar os conectores Supabase e Vercel e o repositório `jhenyalvesp4c-glitch/presence`, e ativar.
