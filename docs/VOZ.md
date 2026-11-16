@@ -64,4 +64,10 @@ Existe uma rotina agendada do Claude Code ("Orion: pegar pedidos de melhoria con
 
 Segurança da fila: a tabela **não tem política para o papel `anon`** (migração `20261121000200`), então só quem está logado grava nela; sem isso, qualquer pessoa com a chave pública do Supabase poderia injetar um pedido.
 
-**Estado atual: a rotina está criada, mas DESLIGADA.** Ela foi criada sem conectores (Supabase, Vercel) e sem o repositório anexado, então uma execução não conseguiria ler a fila nem publicar. Para ligar: na página de rotinas do claude.ai, abrir a rotina, adicionar os conectores Supabase e Vercel e o repositório `jhenyalvesp4c-glitch/presence`, e ativar.
+### Acordar o Claude na hora (gatilho por API)
+
+O intervalo mínimo da agenda é 1 hora, então, ao confirmar o pedido, o Orion também **acorda a rotina na hora** (`src/lib/improvements.functions.ts`, `fireImprovement`): chamada `POST https://api.anthropic.com/v1/claude_code/routines/<id>/fire` com o token da rotina (cabeçalhos `anthropic-beta: experimental-cc-routine-2026-04-01` e `anthropic-version: 2023-06-01`). O servidor confere que o pedido existe, está na fila e é de quem está logado; só aceita o endereço oficial da API; o token nunca vai para o navegador. Limites da plataforma: 30 disparos por hora por rotina. Se não estiver configurado ou falhar, o pedido continua na fila e a verificação agendada o pega.
+
+Variáveis de ambiente (Vercel, só servidor): `ORION_ROUTINE_FIRE_URL` e `ORION_ROUTINE_FIRE_TOKEN` (ver `.env.example`).
+
+**Estado atual: a rotina está criada, mas DESLIGADA e sem conectores.** Para funcionar, em claude.ai/code/routines: abrir a rotina "Orion: pegar pedidos de melhoria confirmados" → Edit → (1) conferir os conectores Supabase e Vercel e o repositório `jhenyalvesp4c-glitch/presence`; (2) em Trigger clicar em **+ → API**, copiar a Fire URL e **Generate token** (aparece uma vez); (3) manter a agenda de hora em hora como rede de segurança e ativar a rotina; (4) colocar a URL e o token nas variáveis acima na Vercel e fazer um novo deploy.

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Loader2, Send, X } from "lucide-react";
 import { sendImprovement } from "@/lib/data/improvements";
+import { fireImprovement } from "@/lib/improvements.functions";
 import type { Confirmar } from "@/lib/voice/agent";
 
 /** Cartão para conferir, corrigir e confirmar o pedido que o Orion vai enviar ao Claude. */
@@ -8,11 +9,17 @@ export function ConfirmRequest({ data, onClose }: { data: Confirmar; onClose: ()
   const [titulo, setTitulo] = useState(data.titulo);
   const [detalhes, setDetalhes] = useState(data.detalhes);
   const [estado, setEstado] = useState<"conferindo" | "enviando" | "enviado" | "erro">("conferindo");
+  const [acionado, setAcionado] = useState(false);
   const [erro, setErro] = useState("");
 
   async function enviar() {
     setEstado("enviando"); setErro("");
-    try { await sendImprovement({ title: titulo, request: data.pedido, details: detalhes, area: data.area }); setEstado("enviado"); }
+    try {
+      const id = await sendImprovement({ title: titulo, request: data.pedido, details: detalhes, area: data.area });
+      // acorda o Claude na hora (se estiver configurado); se não der, o pedido continua na fila
+      const r = await fireImprovement({ data: { id } }).catch(() => null);
+      setAcionado(!!r?.ok); setEstado("enviado");
+    }
     catch (e) { setErro(e instanceof Error ? e.message : "Não consegui enviar."); setEstado("erro"); }
   }
 
@@ -20,8 +27,8 @@ export function ConfirmRequest({ data, onClose }: { data: Confirmar; onClose: ()
     return (
       <div className="rounded-2xl border border-emerald/40 bg-emerald/10 p-5 text-center" data-testid="pedido-enviado">
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-emerald/20 text-emerald"><Check size={20} /></span>
-        <p className="mt-3 font-medium">Pedido enviado ao Claude</p>
-        <p className="mt-1 text-sm text-muted-foreground">Ficou na fila: “{titulo}”. Você acompanha o andamento perguntando ao Orion “como estão os meus pedidos?”.</p>
+        <p className="mt-3 font-medium">{acionado ? "Claude acionado agora" : "Pedido enviado ao Claude"}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{acionado ? `O Claude já começou a trabalhar em “${titulo}”.` : `Ficou na fila: “${titulo}”. O Claude pega na próxima verificação.`} Você acompanha o andamento em Configurações → Pedidos para o Claude, ou perguntando ao Orion “como estão os meus pedidos?”.</p>
         <button onClick={onClose} className="mt-4 rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm transition hover:border-cyan/50 hover:text-cyan">Fechar</button>
       </div>
     );
