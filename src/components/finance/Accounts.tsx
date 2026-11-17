@@ -7,7 +7,7 @@ import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
 import { AccountTile, CardVisual, KIND_LABEL } from "./CardVisual";
 import { Donut, Meter, Money, RadialRings } from "./charts";
 import { HeroPanel, SectionTitle, Tilt } from "./fx";
-import { AccountForm, CardForm, TxForm } from "./forms";
+import { AccountForm, CardForm, InvoiceItemForm, TxForm } from "./forms";
 import { PlanCard } from "./Installments";
 import { EntryRow } from "./rows";
 import { CatBadge, ConfirmDelete, Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TONES, btn } from "./ui";
@@ -182,7 +182,7 @@ function CardStats({ card }: { card: Card }) {
 
 /** Faturas mês a mês: navegue pelos meses, veja o que entra em cada uma e informe o total que o banco mostra. */
 function InvoiceView({ card }: { card: Card }) {
-  const f = useFinance(), { state, today } = f, open = invoiceMonthOf(card, isoOf(today)), [ym, setYm] = useState(open);
+  const f = useFinance(), { state, today } = f, open = invoiceMonthOf(card, isoOf(today)), [ym, setYm] = useState(open), [detail, setDetail] = useState(false);
   const inv = invoiceFor(state, card, ym), months = Array.from({ length: 9 }, (_, i) => addMonths(open, i - 2));
   const typed = card.declared?.[ym], isOpen = ym === open;
   const itemized = inv.lines.filter((l) => l.source !== "ajuste");
@@ -203,17 +203,21 @@ function InvoiceView({ card }: { card: Card }) {
           <Field label="Total desta fatura (como aparece no app do banco)" hint={typed !== undefined ? (inv.over > 0 ? `Atenção: os itens cadastrados passam ${brl(inv.over)} do total informado. Confira o total ou os itens.` : inv.adjustment > 0 ? `Já detalhado: ${brl(inv.total - inv.adjustment)}. Faltam ${brl(inv.adjustment)} para detalhar; conforme você cadastra as compras e parcelas, esse valor diminui e o total não muda.` : "Tudo detalhado: os itens fecham com o total.") : "Opcional. Informe o total do banco e vá cadastrando as compras e parcelas: elas abatem desse valor, sem duplicar."}>
             <MoneyInput value={typed} onChange={(v) => f.upsertCard(withDeclaredTotal(card, ym, v))} data-testid="fin-fatura-total-informado" />
           </Field>
-          <p className="pb-2 text-xs text-muted-foreground">{itemized.length} {itemized.length === 1 ? "item" : "itens"}{inv.adjustment > 0 ? ` · ${brl(inv.adjustment)} sem detalhar` : ""}</p>
+          <div className="flex flex-col items-end gap-1.5 pb-1"><button className={btn.primary} onClick={() => setDetail(true)} data-testid="fin-detalhar-abrir"><Plus size={15} /> Detalhar uma compra</button><p className="text-xs text-muted-foreground">{itemized.length} {itemized.length === 1 ? "item" : "itens"}{inv.adjustment > 0 ? ` · ${brl(inv.adjustment)} sem detalhar` : ""}</p></div>
         </div>
         {inv.lines.length === 0 ? <Empty icon={Receipt} title="Fatura vazia" hint="As compras no crédito deste cartão aparecem aqui." /> : (
           <ul className="space-y-0.5">{inv.lines.map((l, i) => (
             <li key={l.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/[0.04]" style={{ animation: `fin-pop .4s ${Math.min(i, 12) * 0.03}s both` }}>
               <CatBadge id={l.category} size={34} />
               <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}{l.source === "ajuste" && <Pill color="var(--cyan)">a detalhar</Pill>}</p><p className="text-xs text-muted-foreground">{l.source === "ajuste" ? "total do banco menos o que já foi cadastrado" : dateBR(l.date)}</p></div>
+              {l.source === "ajuste" && <button className={`${btn.ghost} !px-3 !py-1.5 text-xs`} onClick={() => setDetail(true)} data-testid="fin-detalhar-linha">Detalhar</button>}
               <b className="text-sm tabular-nums">{brl(l.amount)}</b>
             </li>))}</ul>
         )}
       </Panel>
+      <Modal open={detail} onClose={() => setDetail(false)} title="Detalhar uma compra desta fatura">
+        <InvoiceItemForm card={card} ym={ym} onCancel={() => setDetail(false)} onSave={(r) => { if (r.plan) f.upsertPlan(r.plan); if (r.tx) f.upsertTx(r.tx); setDetail(false); }} />
+      </Modal>
     </div>
   );
 }

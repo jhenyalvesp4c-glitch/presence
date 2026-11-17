@@ -275,6 +275,15 @@ export const closingYmOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: st
 /** Mês de vencimento da fatura que fecha em `closeYm`. */
 export const dueYmOfClosing = (card: Pick<Card, "closingDay" | "dueDay">, closeYm: string): string => (card.dueDay > card.closingDay ? closeYm : addMonths(closeYm, 1));
 
+/**
+ * Compra parcelada cadastrada de dentro de uma fatura: a parcela `x` (de `n`) cai exatamente na fatura que vence em `ym`;
+ * as anteriores contam como pagas e as seguintes entram nas faturas dos meses seguintes.
+ */
+export function planForInvoice(card: Card, ym: string, o: { id: string; desc: string; per: number; n: number; x: number; category: string; todayIso: string }): Plan {
+  const x = Math.max(1, Math.min(o.n, o.x));
+  return { id: o.id, desc: o.desc, cardId: card.id, total: round2(o.per * o.n), count: o.n, per: o.per, purchaseYm: addMonths(closingYmOf(card, ym), -(x - 1)), first: addMonths(ym, -(x - 1)), category: o.category, createdAt: o.todayIso };
+}
+
 export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);
 /** "fecha 28/11 · vence 05/12": sempre as duas datas, para não confundir mês de fechamento com mês de vencimento. */
 export const invoiceLabel = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => `fecha ${dateBR(closingDateOf(card, dueYm)).slice(0, 5)} · vence ${dateBR(dueDateOf(card, dueYm)).slice(0, 5)}`;

@@ -411,3 +411,29 @@ describe("detalhamento da sobra de caixa (a conta que aparece na bola da visão 
     expect(b.catItems!.some((e) => e.desc === "Netflix")).toBe(true);
   });
 });
+
+describe("detalhar uma compra dentro da fatura (total do banco fica igual)", () => {
+  const nu = { id: "m", name: "Mercado Pago", brand: "mastercard" as const, last4: "1", tone: "azul" as const, limit: 3500, availableBase: 3000, baseDate: "2026-11-17", closingDay: 9, dueDay: 15, adjustments: {}, declared: { "2026-12": 435.8 } };
+  const base = (): FinanceState => ({ ...EMPTY_STATE, onboarded: true, cards: [nu] });
+  it("a parcela 3 de 10 cai nesta fatura, o total continua 435,80 e as 7 seguintes entram nos próximos meses", async () => {
+    const { planForInvoice, invoiceFor } = await import("@/lib/finance/calc");
+    const p = planForInvoice(nu, "2026-12", { id: "p1", desc: "Tênis", per: 120, n: 10, x: 3, category: "compras", todayIso: "2026-11-17" });
+    const s = { ...base(), plans: [p] };
+    const dez = invoiceFor(s, nu, "2026-12");
+    expect(dez.total).toBe(435.8); expect(dez.adjustment).toBeCloseTo(315.8, 2);
+    expect(dez.lines.find((l) => l.source === "parcela")?.parcel).toBe("3/10");
+    expect(invoiceFor(s, nu, "2026-11").lines.some((l) => l.source === "parcela")).toBe(true); // a 2ª já passou (fatura de nov)
+    expect(invoiceFor(s, nu, "2027-01").lines.find((l) => l.source === "parcela")?.parcel).toBe("4/10");
+    expect(invoiceFor(s, nu, "2027-07").lines.find((l) => l.source === "parcela")?.parcel).toBe("10/10");
+    expect(invoiceFor(s, nu, "2027-08").lines.some((l) => l.source === "parcela")).toBe(false);
+  });
+  it("vários itens abatem o mesmo total; passando do total, avisa", async () => {
+    const { planForInvoice, invoiceFor } = await import("@/lib/finance/calc");
+    const a = planForInvoice(nu, "2026-12", { id: "a", desc: "A", per: 200, n: 4, x: 1, category: "compras", todayIso: "2026-11-17" });
+    const b = planForInvoice(nu, "2026-12", { id: "b", desc: "B", per: 100, n: 2, x: 2, category: "compras", todayIso: "2026-11-17" });
+    expect(invoiceFor({ ...base(), plans: [a, b] }, nu, "2026-12")).toMatchObject({ total: 435.8, over: 0 });
+    const c = planForInvoice(nu, "2026-12", { id: "c", desc: "C", per: 300, n: 2, x: 1, category: "compras", todayIso: "2026-11-17" });
+    const r = invoiceFor({ ...base(), plans: [a, b, c] }, nu, "2026-12");
+    expect(r.total).toBe(600); expect(r.over).toBeCloseTo(164.2, 2);
+  });
+});
