@@ -223,11 +223,14 @@ export function accountBalance(s: FinanceState, a: Account, today: Date = new Da
 }
 export const totalBalance = (s: FinanceState, today: Date = new Date()) => sum(s.accounts.map((a) => accountBalance(s, a, today)));
 
-/** Quanto do limite está livre: o informado no briefing menos o que foi gasto no crédito depois dele. */
+/**
+ * Quanto do limite está livre: o informado (o que o banco mostra) menos o que foi gasto no crédito depois dele.
+ * Não consome limite o que já estava dentro do valor informado (`inLimit`, como o detalhamento de uma fatura).
+ */
 export function cardAvailable(s: FinanceState, c: Card): number {
   let used = 0;
-  for (const t of s.transactions) if (t.cardId === c.id && t.method === "credito" && t.kind === "despesa" && t.date >= c.baseDate) used += t.amount;
-  for (const p of s.plans) if (p.cardId === c.id && p.createdAt >= c.baseDate) used += p.total;
+  for (const t of s.transactions) if (t.cardId === c.id && t.method === "credito" && t.kind === "despesa" && t.date >= c.baseDate && !t.inLimit) used += t.amount;
+  for (const p of s.plans) if (p.cardId === c.id && p.createdAt >= c.baseDate && !p.inLimit) used += p.total;
   return Math.max(0, round2(c.availableBase - used));
 }
 
@@ -281,7 +284,7 @@ export const dueYmOfClosing = (card: Pick<Card, "closingDay" | "dueDay">, closeY
  */
 export function planForInvoice(card: Card, ym: string, o: { id: string; desc: string; per: number; n: number; x: number; category: string; todayIso: string }): Plan {
   const x = Math.max(1, Math.min(o.n, o.x));
-  return { id: o.id, desc: o.desc, cardId: card.id, total: round2(o.per * o.n), count: o.n, per: o.per, purchaseYm: addMonths(closingYmOf(card, ym), -(x - 1)), first: addMonths(ym, -(x - 1)), category: o.category, createdAt: o.todayIso };
+  return { id: o.id, desc: o.desc, cardId: card.id, total: round2(o.per * o.n), count: o.n, per: o.per, purchaseYm: addMonths(closingYmOf(card, ym), -(x - 1)), first: addMonths(ym, -(x - 1)), category: o.category, createdAt: o.todayIso, inLimit: true };
 }
 
 export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);

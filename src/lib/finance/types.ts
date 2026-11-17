@@ -21,6 +21,8 @@ export type Card = {
 export type Transaction = {
   id: string; kind: TxKind; desc: string; amount: number; date: string; method: Method;
   accountId?: string | undefined; cardId?: string | undefined; category: string;
+  /** Já estava dentro do limite informado do cartão (ex.: detalhamento de uma fatura): não consome o limite de novo. */
+  inLimit?: boolean | undefined;
 };
 /** Compra parcelada. A fatura de cada parcela é calculada a partir de `first` (mês de vencimento da 1ª parcela). */
 export type Plan = {
@@ -28,6 +30,8 @@ export type Plan = {
   purchaseYm: string; first: string; category: string;
   /** Se informado, vale no lugar do cálculo por datas ("já paguei N parcelas"). */
   paidManual?: number | undefined; createdAt: string;
+  /** Já estava dentro do limite informado do cartão (ex.: detalhamento de uma fatura): não consome o limite de novo. */
+  inLimit?: boolean | undefined;
 };
 /** Pausa de uma recorrente: não conta nos meses de `from` até `to` (inclusive). Sem `to` = continua pausada. */
 export type RecurringPause = { from: string; to?: string | undefined };

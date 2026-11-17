@@ -151,7 +151,7 @@ export function InvoiceItemForm({ card, ym, onSave, onCancel }: { card: Card; ym
   const restantes = kind === "parcelada" ? n - x : 0;
   const save = () => {
     if (!per || !desc.trim()) return;
-    if (kind === "avista") return onSave({ tx: { id: uid("tx-"), kind: "despesa", desc: desc.trim(), amount: per, date, method: "credito", cardId: card.id, category: cat } });
+    if (kind === "avista") return onSave({ tx: { id: uid("tx-"), kind: "despesa", desc: desc.trim(), amount: per, date, method: "credito", cardId: card.id, category: cat, inLimit: true } });
     onSave({ plan: planForInvoice(card, ym, { id: uid("plan-"), desc: desc.trim(), per, n, x, category: cat, todayIso }) });
   };
   return (

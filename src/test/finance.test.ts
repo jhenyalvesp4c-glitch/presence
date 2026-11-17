@@ -437,3 +437,25 @@ describe("detalhar uma compra dentro da fatura (total do banco fica igual)", () 
     expect(r.total).toBe(600); expect(r.over).toBeCloseTo(164.2, 2);
   });
 });
+
+describe("limite do cartão: detalhar a fatura não consome o limite de novo", () => {
+  const card = { id: "m", name: "Mercado Pago", brand: "mastercard" as const, last4: "1", tone: "azul" as const, limit: 5500, availableBase: 1427.04, baseDate: "2026-11-17", closingDay: 9, dueDay: 15, adjustments: {}, declared: { "2026-12": 435.8 } };
+  const st = (over: Partial<FinanceState>): FinanceState => ({ ...EMPTY_STATE, onboarded: true, cards: [card], ...over });
+  it("compras detalhadas na fatura (inLimit) deixam o disponível igual ao informado pelo banco", async () => {
+    const { cardAvailable, planForInvoice } = await import("@/lib/finance/calc");
+    const planos = [2287.8, 2524.2, 1689.84].map((total, i) => planForInvoice(card, "2026-12", { id: `p${i}`, desc: `C${i}`, per: total / 12, n: 12, x: 1, category: "compras", todayIso: "2026-11-17" }));
+    expect(cardAvailable(st({ plans: planos }), card)).toBe(1427.04);
+  });
+  it("uma compra nova de verdade continua consumindo o limite", async () => {
+    const { cardAvailable } = await import("@/lib/finance/calc");
+    const nova: Plan = { id: "n", desc: "TV", cardId: "m", total: 1000, count: 10, per: 100, purchaseYm: "2026-11", first: "2026-12", category: "compras", createdAt: "2026-11-17" };
+    const tx = { id: "t", kind: "despesa" as const, desc: "Mercado", amount: 27.04, date: "2026-11-18", method: "credito" as const, cardId: "m", category: "mercado" };
+    expect(cardAvailable(st({ plans: [nova], transactions: [tx] }), card)).toBeCloseTo(400, 2);
+  });
+  it("a marca inLimit vai e volta pelo banco", async () => {
+    const { toRows, fromRows } = await import("@/lib/finance/db-map");
+    const p: Plan = { id: "x", desc: "A", cardId: "m", total: 100, count: 2, per: 50, purchaseYm: "2026-11", first: "2026-12", category: "compras", createdAt: "2026-11-17", inLimit: true };
+    const back = fromRows(JSON.parse(JSON.stringify(toRows(st({ plans: [p] })))));
+    expect(back.plans[0]!.inLimit).toBe(true);
+  });
+});
