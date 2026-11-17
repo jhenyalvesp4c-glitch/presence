@@ -1,10 +1,10 @@
 import { useEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { ArrowRight, BookPlus, ClipboardList, Search, Sparkles, X } from "lucide-react";
+import { ArrowRight, BookPlus, ClipboardList, MessagesSquare, Search, Sparkles, X } from "lucide-react";
 
 import { backdropProps } from "@/lib/backdrop";
 
-export type HomeAction = "demand" | "doc" | "ask";
+export type HomeAction = "demand" | "doc" | "ask" | "chat";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
@@ -12,9 +12,10 @@ const OPTIONS: { key: HomeAction; n: string; icon: typeof Search; color: string;
   { key: "demand", n: "1", icon: ClipboardList, color: "cyan", title: "Registrar demanda", text: "Cole o texto, prints, PDFs ou documentos. O Orion separa em demandas, tarefas, compromissos e lembretes para você confirmar.", cta: "Registrar" },
   { key: "doc", n: "2", icon: BookPlus, color: "violet", title: "Documentar", text: "Guarde no segundo cérebro o que aconteceu hoje: texto, voz, prints e arquivos. Depois é só perguntar.", cta: "Documentar" },
   { key: "ask", n: "3", icon: Search, color: "emerald", title: "Perguntar ao Orion", text: "Pergunte qualquer coisa. Ele pesquisa em demandas, tarefas, notas, documentos e arquivos e traz um relatório.", cta: "Perguntar" },
+  { key: "chat", n: "4", icon: MessagesSquare, color: "amber", title: "Conversar", text: "Bata um papo por texto ou áudio e mande imagens, prints e arquivos. Ele analisa, responde e, se não conseguir fazer algo, monta o pedido para o Claude.", cta: "Conversar" },
 ];
 
-/** "O que você quer fazer?": escolhe entre registrar demanda, documentar ou perguntar (atalhos 1, 2 e 3). */
+/** "O que você quer fazer?": escolhe entre registrar demanda, documentar ou perguntar (atalhos 1, 2, 3 e 4). */
 export function ActionChooser({ onPick, onClose }: { onPick: (a: HomeAction) => void; onClose: () => void }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -44,7 +45,7 @@ export function ActionChooser({ onPick, onClose }: { onPick: (a: HomeAction) => 
             <button onClick={onClose} aria-label="Fechar" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/60 text-muted-foreground backdrop-blur transition hover:text-foreground"><X size={16} /></button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {OPTIONS.map((o, i) => {
               const I = o.icon;
               return (
@@ -63,7 +64,7 @@ export function ActionChooser({ onPick, onClose }: { onPick: (a: HomeAction) => 
               );
             })}
           </div>
-          <p className="mt-5 text-center text-xs text-muted-foreground">Para falar, toque na <span className="text-cyan">esfera</span> · use as teclas <span className="font-mono">1</span> <span className="font-mono">2</span> <span className="font-mono">3</span> · <span className="font-mono">Esc</span> fecha</p>
+          <p className="mt-5 text-center text-xs text-muted-foreground">Para falar, toque na <span className="text-cyan">esfera</span> · use as teclas <span className="font-mono">1</span> <span className="font-mono">2</span> <span className="font-mono">3</span> <span className="font-mono">4</span> · <span className="font-mono">Esc</span> fecha</p>
         </div>
       </div>
     </div>,

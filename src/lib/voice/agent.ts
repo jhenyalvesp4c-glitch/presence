@@ -3,6 +3,7 @@
  * (abrir páginas, criar demandas/tarefas/compromissos, resumo do dia, pesquisar no Orion, documentar).
  * Só roda no servidor. A rota /api/voz repassa os eventos ao navegador em streaming.
  */
+import { buildUserContent, stripBinary, type Anexo } from "./attachments";
 import { fillerFor } from "./filler";
 import { z } from "zod/v4";
 
@@ -445,7 +446,10 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
 }
 
 /* ───────────── conversa ───────────── */
-export async function runAgent(history: Turn[], emit: Emit, resume?: Resume): Promise<void> {
+const CHAT_MODE = `MODO CONVERSA ESCRITA: ela está digitando na tela (texto, imagens, arquivos) e LÊ a resposta; não está ouvindo. Aqui vale responder de forma completa e organizada (listas curtas, passos), sem a regra de frases curtas faladas. Se ela mandar imagem, PDF ou arquivo, analise o conteúdo de verdade e responda sobre ele. Se o pedido for algo que nenhuma ferramenta sua faz (ex.: um print de um erro, uma tela para mudar, uma função nova), use pedir_melhoria: o Claude NÃO vê a imagem, então descreva no pedido, com detalhes, o que aparece nela (tela, textos, valores, o que está errado ou o que ela quer) e o que precisa mudar.`;
+
+export type AgentOpts = { modo?: "voz" | "chat"; anexos?: Anexo[] };
+export async function runAgent(history: Turn[], emit: Emit, resume?: Resume, opts: AgentOpts = {}): Promise<void> {
   if (!process.env["OPENAI_API_KEY"]) { emit({ t: "erro", m: "A conversa por voz precisa da OPENAI_API_KEY no servidor." }); return; }
   const model = process.env["OPENAI_VOICE_MODEL"]?.trim() || process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
   const c = await voiceContext();
@@ -454,14 +458,15 @@ export async function runAgent(history: Turn[], emit: Emit, resume?: Resume): Pr
   const directive = starting ? greetingDirective(st.briefing) : "";
   if (starting && !directive) { emit({ t: "fim" }); return; } // quer esperar: não fala nada
   const known = briefingPrompt(st.briefing, st.memories);
+  const chat = opts.modo === "chat", anexos = opts.anexos ?? [];
   const messages: Record<string, unknown>[] = resume ? [...resume.estado, ...resume.resultados.map((r) => ({ role: "tool", tool_call_id: r.id, content: r.content.slice(0, 12000) }))] : [
-    { role: "system", content: `${PERSONA(st.briefing?.call_name || c.name)}${known ? `\n\n${known}` : ""}${directive ? `\n\nAGORA: ${directive}` : ""}\n\n${contextText(c.ctx)}` },
-    ...history.slice(-12).map((m) => ({ role: m.role, content: m.content === GREET_MARK ? "(a conversa por voz acabou de começar)" : m.content.slice(0, 2000) })),
+    { role: "system", content: `${PERSONA(st.briefing?.call_name || c.name)}${known ? `\n\n${known}` : ""}${directive ? `\n\nAGORA: ${directive}` : ""}${chat ? `\n\n${CHAT_MODE}` : ""}\n\n${contextText(c.ctx)}` },
+    ...history.slice(-12).map((m, i, arr) => ({ role: m.role, content: m.content === GREET_MARK ? "(a conversa por voz acabou de começar)" : i === arr.length - 1 && m.role === "user" && chat && anexos.length ? buildUserContent(m.content.slice(0, 6000), anexos) : m.content.slice(0, chat ? 6000 : 2000) })),
   ];
   try {
     let spoke = false; // já falou algo neste pedido? (aí não repete o aviso de "estou verificando")
     for (let round = 0; round < 5; round++) {
-      const { text, calls } = await streamChat({ model, messages, tools: TOOLS, tool_choice: "auto", max_completion_tokens: 700, reasoning_effort: "low" }, (d) => { if (d.trim()) spoke = true; emit({ t: "texto", d }); });
+      const { text, calls } = await streamChat({ model, messages, tools: TOOLS, tool_choice: "auto", max_completion_tokens: chat ? 2000 : 700, reasoning_effort: "low" }, (d) => { if (d.trim()) spoke = true; emit({ t: "texto", d }); });
       if (!calls.length) break;
       let said = text;
       if (!spoke) {
@@ -486,7 +491,7 @@ export async function runAgent(history: Turn[], emit: Emit, resume?: Resume): Pr
         } catch (e) { out = { ok: false, erro: e instanceof Error ? e.message : "erro" }; }
         messages.push({ role: "tool", tool_call_id: k.id, content: JSON.stringify(out).slice(0, 6000) });
       }
-      if (deferred.length) { emit({ t: "ferramenta", estado: messages, chamadas: deferred }); return; }
+      if (deferred.length) { emit({ t: "ferramenta", estado: stripBinary(messages), chamadas: deferred }); return; }
     }
     emit({ t: "fim" });
   } catch (e) {

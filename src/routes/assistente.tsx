@@ -10,6 +10,7 @@ import {
 import { LivingOrb } from "@/components/LivingOrb";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { ActionChooser, type HomeAction } from "@/components/home/ActionChooser";
+import { OrionChat } from "@/components/orion/OrionChat";
 import { OrionPanel } from "@/components/orion/OrionPanel";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { useBriefingSafe } from "@/lib/use-briefing";
@@ -277,15 +278,15 @@ function Assistente() {
 
             <div ref={panelRef}>
               {inboxOpen && <InboxPanel incoming={incoming} onClose={() => setPanel(null)} onListen={() => toggleVoice("demand")} listening={listening} interim={speech.interim} />}
-              {(panel === "doc" || panel === "ask") && (
-                <section className="glass relative mx-auto w-full max-w-3xl rounded-3xl p-4 animate-rise sm:p-5" data-testid="painel-orion-inicio" style={tint(panel === "doc" ? "violet" : "emerald")}>
+              {(panel === "doc" || panel === "ask" || panel === "chat") && (
+                <section className="glass relative mx-auto w-full max-w-3xl rounded-3xl p-4 animate-rise sm:p-5" data-testid="painel-orion-inicio" style={tint(panel === "doc" ? "violet" : panel === "chat" ? "amber" : "emerald")}>
                   <div className="mb-3 flex items-center gap-3">
                     <span className="icon-tile h-10 w-10 !rounded-2xl"><Sparkles size={17} /></span>
-                    <div className="mr-auto"><p className="mono-caps !text-[0.62rem]">Orion · segundo cérebro</p><h3 className="font-display text-lg font-semibold leading-tight">{panel === "doc" ? "Documentar" : "Perguntar"}</h3></div>
+                    <div className="mr-auto"><p className="mono-caps !text-[0.62rem]">{panel === "chat" ? "Orion · conversa" : "Orion · segundo cérebro"}</p><h3 className="font-display text-lg font-semibold leading-tight">{panel === "doc" ? "Documentar" : panel === "chat" ? "Conversar" : "Perguntar"}</h3></div>
                     <button onClick={() => setChooser(true)} className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">Trocar</button>
                     <button onClick={() => setPanel(null)} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
                   </div>
-                  <OrionPanel key={panel} initialMode={panel} autoFocus />
+                  {panel === "chat" ? <OrionChat key="chat" autoFocus /> : <OrionPanel key={panel} initialMode={panel} autoFocus />}
                 </section>
               )}
             </div>

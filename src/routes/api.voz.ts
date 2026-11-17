@@ -3,7 +3,11 @@ import { z } from "zod";
 
 // Conversa por voz: recebe o histórico e devolve eventos em linhas JSON (texto, ações, painéis) enquanto a IA responde.
 const body = z.object({
-  messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(2000) })).min(1).max(24),
+  messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(6000) })).min(1).max(24),
+  // Conversa escrita (tela): texto, imagens, PDFs e arquivos de texto anexados à última mensagem.
+  modo: z.enum(["voz", "chat"]).optional(),
+  anexos: z.array(z.object({ name: z.string().min(1).max(200), mime: z.string().min(1).max(100), data: z.string().max(4_200_000) })).max(6).optional()
+    .refine((l) => !l || l.reduce((n, f) => n + f.data.length, 0) <= 4_000_000, "Arquivos grandes demais (máx. ~3 MB no total)."),
   // Continuação depois que o navegador executou ferramentas (WhatsApp): o estado da rodada + os resultados.
   continuar: z.object({
     estado: z.array(z.record(z.string(), z.unknown())).min(2).max(60).refine((e) => e[0]?.["role"] === "system" && e.every((m) => ["system", "user", "assistant", "tool"].includes(String(m["role"]))), "estado inválido"),
@@ -49,7 +53,7 @@ export const Route = createFileRoute("/api/voz")({
         const stream = new ReadableStream<Uint8Array>({
           async start(controller) {
             const emit = (e: unknown) => { if (!closed) { try { controller.enqueue(enc.encode(`${JSON.stringify(e)}\n`)); } catch { closed = true; } } };
-            await runAgent(parsed.messages, emit, parsed.continuar);
+            await runAgent(parsed.messages, emit, parsed.continuar, { modo: parsed.modo ?? "voz", anexos: parsed.anexos ?? [] });
             if (!closed) { try { controller.close(); } catch { /* já fechado */ } }
           },
         });
