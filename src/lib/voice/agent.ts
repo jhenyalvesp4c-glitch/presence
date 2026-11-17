@@ -38,7 +38,7 @@ export type VoiceEvent =
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", financeiro: "Olhando o seu financeiro…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -82,6 +82,7 @@ Regras de fala:
 - Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
 - ROTEIROS de treinamento: pedidos para criar, editar, acrescentar ou tirar coisas de um roteiro (ou bloco, passo, dica, pergunta frequente) → use roteiro. Faça na hora e escreva você mesmo o conteúdo bom e completo em português (passos curtos e objetivos, uma dica, perguntas frequentes com resposta); não peça o texto a ela. Sem projeto citado, a ferramenta acha o roteiro sozinha. Confirme em uma frase o que mudou e nunca diga que não consegue editar roteiros.
 - QUANDO NÃO CONSEGUE: se ela pedir algo que nenhuma ferramenta sua faz (função nova, editar algo que o sistema ainda não deixa, ou uma ferramenta devolveu que não é possível), não pare em "não consigo". Diga em uma frase que no momento não consegue e use pedir_melhoria com um título curto, o pedido dela e os detalhes de como deve ficar. A pessoa confere e confirma na tela; só então vai para o Claude. Nunca prometa que já está sendo feito: diga que o pedido segue para o Claude depois da confirmação. Se ela perguntar do andamento dos pedidos, use pedir_melhoria com acao listar.
+- FINANCEIRO: para dinheiro ("quanto gastei", "quanto tenho", "como está minha fatura", "o que falta pagar", "minhas assinaturas", "gastei 50 no mercado") use a ferramenta financeiro. Ela traz os números reais; nunca invente valores. Responda em uma ou duas frases, com poucos números (valor falado como "mil duzentos e cinquenta reais"). Para registrar um gasto ou ganho, use acao lancar com a frase dela exatamente como foi dita; se faltar conta ou cartão, pergunte só isso. Compra parcelada não se lança por voz.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
@@ -124,6 +125,13 @@ export const TOOLS = [
     prioridade: { type: "string", enum: ["alta", "media", "baixa"] }, local: { type: "string" },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
   }, required: ["item", "acao"] }),
+  fn("financeiro", "Consulta o FINANCEIRO real da pessoa (contas, cartões, parcelas, assinaturas) e lança gastos/ganhos. Ações: resumo (saldo, o que entrou e saiu, o que falta pagar, alertas), categorias (onde gastou), saldo (por conta), fatura (cartão), parcelas, assinaturas, ultimos (movimentações, com busca opcional), lancar (grava uma despesa/receita a partir de uma frase).", { type: "object", properties: {
+    acao: { type: "string", enum: ["resumo", "categorias", "saldo", "fatura", "parcelas", "assinaturas", "ultimos", "lancar"] },
+    mes: { type: "string", description: "Mês: 'dezembro', 'mês passado' ou AAAA-MM. Vazio = mês atual." },
+    conta: { type: "string", description: "Nome da conta (acao saldo)." }, cartao: { type: "string", description: "Nome do cartão (acao fatura)." },
+    busca: { type: "string", description: "Texto ou categoria para filtrar (acao ultimos)." }, quantidade: { type: "number" },
+    frase: { type: "string", description: "A frase dela, como falou (acao lancar). Ex.: 'gastei 50 no mercado no débito pelo Nubank'." },
+  }, required: ["acao"] }),
   fn("lista", "Cria e ajusta LISTAS/CHECKLISTS salvas (o que levar para a praia, compras, preparar uma viagem, passos de algo). Ações: criar (com titulo e itens agrupados), adicionar, remover, marcar (feito), desmarcar, mostrar, listar, renomear, excluir. Em criar/adicionar/mostrar passe sempre `sugestoes` com 4 a 6 ideias úteis que ainda NÃO estão na lista. Quando ela pedir uma lista sem dizer os itens, monte você mesmo uma lista completa e bem pensada, agrupada por tema.", { type: "object", properties: {
     acao: { type: "string", enum: ["criar", "adicionar", "remover", "marcar", "desmarcar", "mostrar", "listar", "renomear", "excluir"] },
     lista: { type: "string", description: "Nome (aproximado) da lista. Vazio = a lista mais recente." },
@@ -294,6 +302,13 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
         prioridade: args["prioridade"] as "alta" | "media" | "baixa" | undefined, local: args["local"] as string | undefined, confirmado: args["confirmado"] === true,
       }).catch((e): Record<string, unknown> => ({ ok: false, erro: e instanceof Error ? e.message : "Não consegui alterar o item." }));
       return r;
+    }
+
+    case "financeiro": {
+      const { runFinanceTool } = await import("./finance-tool");
+      const out = await runFinanceTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui olhar o financeiro." } }));
+      if (out.panel) emit({ t: "painel", p: out.panel });
+      return out.result;
     }
 
     case "lista": {

@@ -1,6 +1,6 @@
 # Módulo financeiro (frontend)
 
-Rota `/financeiro` (`src/routes/financeiro.tsx`). Etapa 1: **só frontend**, com dados fictícios e gravação local. O backend (Supabase) entra na etapa 2 sem mexer nas telas.
+Rota `/financeiro` (`src/routes/financeiro.tsx`). Etapa 1: frontend. Etapa 2 (feita): **backend no Supabase**, com as mesmas telas. Sem login, continua funcionando só neste aparelho.
 
 ## Telas
 - **Briefing inicial** (`components/finance/Briefing.tsx`): 10 etapas (início, contas e saldos, cartões, faturas atuais, fixas, compras no débito, compras no crédito, parcelas em andamento, metas, resumo). Aparece no primeiro acesso; dá para pular etapas, voltar, refazer (menu ⋯) ou "Explorar com dados de exemplo".
@@ -27,5 +27,16 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 - Despesas do mês: compras na data da compra, parcelas no mês de vencimento, fixas todo mês.
 - Saldo da conta = saldo informado no briefing ± movimentações feitas depois dele (crédito não mexe no saldo). Limite livre = limite livre informado − gastos no crédito depois dele.
 
-## Ligar ao Supabase (etapa 2)
-Criar tabelas no schema `presence_app`, todas com `user_id uuid default presence_app.owner_id()` e RLS por dono (sem política para `anon`): `fin_accounts`, `fin_cards`, `fin_transactions`, `fin_plans`, `fin_recurring`, `fin_goals` e `fin_settings` (onboarded). Implementar `SupabaseFinanceRepo implements FinanceRepo` e trocar o `financeRepo` exportado em `repo.ts`. A ferramenta de voz poderá reutilizar `parse.ts`/`calc.ts` no servidor.
+## Backend (Supabase)
+**Tabelas** (schema `presence_app`, migração `20261122000100_presence_app_financeiro.sql`): `fin_settings`, `fin_accounts`, `fin_cards`, `fin_plans`, `fin_recurring`, `fin_transactions`, `fin_goals`. Chave `(user_id, id)`, com `id` em texto (o mesmo do app, ex.: `card-nubank`). Valores em `numeric(14,2)`, datas em `date`, meses em `aaaa-mm`. `adjustments` (cartão) e `pauses` (fixas) são `jsonb`. **RLS só para logados, sem política nem permissão para `anon`** (dado sensível); cada pessoa vê só o que é seu (`owner_id()`). Não há chaves estrangeiras entre elas: o app já cuida da consistência (apagar um cartão tira as parcelas dele).
+
+**Camadas**
+- `db-map.ts` (puro, testado): `toRows`/`fromRows` e `diffRows` (só o que mudou vai para a rede).
+- `cloud-repo.ts`: `CloudFinanceRepo` (`load/save/reset` + `status`/`subscribe`). Ao abrir lê tudo (paginado); grava em ordem, uma gravação por vez; se falhar guarda cópia no navegador e mostra "Não consegui salvar".
+- **Migração automática**: se a nuvem está vazia e o navegador tem dados, sobem uma vez; a cópia local vira `presence.financeiro.v1.migrado` (reserva, nunca apagada sozinha).
+- `store.tsx` expõe `sync` (`saving | saved | local | error`) e recarrega ao voltar para o app (traz o que foi lançado em outro aparelho).
+- Indicador no topo do Financeiro (`SyncDot`): "Salvo na nuvem", "Salvando…", "Só neste aparelho · entre na conta" ou erro.
+
+**Voz** (`src/lib/voice/finance-tool.ts`, ferramenta `financeiro`): `resumo`, `categorias`, `saldo`, `fatura`, `parcelas`, `assinaturas`, `ultimos` e `lancar` (frase → `parseNatural` → grava em `fin_transactions`; só grava se entendeu valor, forma de pagamento e conta/cartão; parcelado não). Usa `calc.ts` no servidor, então os números são os mesmos da tela.
+
+**Próximo**: Open Finance (agregador) alimentando `fin_transactions`, com o mesmo `id` estável por lançamento do banco para não duplicar.

@@ -22,6 +22,13 @@ const TAB_META: Record<Tab, { label: string; icon: typeof Gauge }> = {
   movimentacoes: { label: "Movimentações", icon: Receipt }, assinaturas: { label: "Assinaturas", icon: Repeat }, metas: { label: "Metas", icon: Target },
 };
 
+/** Indicador de onde os dados estão sendo guardados. */
+function SyncDot() {
+  const { sync } = useFinance();
+  const m = { idle: ["var(--cyan)", "Carregando…"], saving: ["var(--cyan)", "Salvando…"], saved: ["var(--emerald)", "Salvo na nuvem"], local: ["var(--amber)", "Só neste aparelho · entre na conta para guardar"], error: ["oklch(0.7 0.2 25)", "Não consegui salvar · tento de novo no próximo lançamento"] }[sync];
+  return <span data-testid="fin-sync" data-sync={sync}><LiveDot color={m[0]!} label={m[1]!} /></span>;
+}
+
 export const Route = createFileRoute("/financeiro")({
   validateSearch: (s: Record<string, unknown>): { aba?: Tab; item?: string; refazer?: "1" } => ({
     ...(TABS.includes(s["aba"] as Tab) && s["aba"] !== "visao" ? { aba: s["aba"] as Tab } : {}),
@@ -48,7 +55,7 @@ function FinancePage() {
 
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex flex-wrap items-center gap-3"><p className="mono-caps">Finanças pessoais · {monthName(ymOf(f.today))}</p>{!onboarding && <LiveDot label="Atualizado agora" />}</div>
+          <div className="flex flex-wrap items-center gap-3"><p className="mono-caps">Finanças pessoais · {monthName(ymOf(f.today))}</p>{!onboarding && <SyncDot />}</div>
           <h1 className="relative mt-2 font-serif text-6xl leading-[0.9] md:text-7xl" style={{ animation: "fin-rise .7s both" }}>Meu <span className="text-gradient italic drop-shadow-[0_0_30px_color-mix(in_oklab,var(--cyan)_45%,transparent)]">financeiro</span></h1>
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">{onboarding ? "Responda ao briefing e o Orion monta o seu painel." : "Para onde o dinheiro vai, o que já está comprometido e como estão as suas metas."}</p>
         </div>
