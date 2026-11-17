@@ -287,6 +287,14 @@ export function planForInvoice(card: Card, ym: string, o: { id: string; desc: st
   return { id: o.id, desc: o.desc, cardId: card.id, total: round2(o.per * o.n), count: o.n, per: o.per, purchaseYm: addMonths(closingYmOf(card, ym), -(x - 1)), first: addMonths(ym, -(x - 1)), category: o.category, createdAt: o.todayIso, inLimit: true };
 }
 
+/**
+ * Assinatura cadastrada de dentro de uma fatura: cobrança fixa mensal no cartão, a partir desta fatura (vence em `ym`),
+ * que se repete todo mês até ser pausada (aba Assinaturas).
+ */
+export function subscriptionForInvoice(card: Card, ym: string, o: { id: string; desc: string; amount: number; day: number }): Recurring {
+  return { id: o.id, kind: "despesa", desc: o.desc, amount: o.amount, day: Math.max(1, Math.min(31, Math.round(o.day) || 1)), category: "assinaturas", method: "credito", cardId: card.id, startYm: ym, subscription: true };
+}
+
 export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);
 /** "fecha 28/11 · vence 05/12": sempre as duas datas, para não confundir mês de fechamento com mês de vencimento. */
 export const invoiceLabel = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => `fecha ${dateBR(closingDateOf(card, dueYm)).slice(0, 5)} · vence ${dateBR(dueDateOf(card, dueYm)).slice(0, 5)}`;

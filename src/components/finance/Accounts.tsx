@@ -216,7 +216,7 @@ function InvoiceView({ card }: { card: Card }) {
         )}
       </Panel>
       <Modal open={detail} onClose={() => setDetail(false)} title="Detalhar uma compra desta fatura">
-        <InvoiceItemForm card={card} ym={ym} onCancel={() => setDetail(false)} onSave={(r) => { if (r.plan) f.upsertPlan(r.plan); if (r.tx) f.upsertTx(r.tx); setDetail(false); }} />
+        <InvoiceItemForm card={card} ym={ym} onCancel={() => setDetail(false)} onSave={(r) => { if (r.plan) f.upsertPlan(r.plan); if (r.tx) f.upsertTx(r.tx); if (r.recurring) f.upsertRecurring(r.recurring); setDetail(false); }} />
       </Modal>
     </div>
   );

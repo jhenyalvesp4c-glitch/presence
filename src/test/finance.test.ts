@@ -459,3 +459,20 @@ describe("limite do cartão: detalhar a fatura não consome o limite de novo", (
     expect(back.plans[0]!.inLimit).toBe(true);
   });
 });
+
+describe("detalhar uma assinatura dentro da fatura", () => {
+  const card = { id: "m", name: "Mercado Pago", brand: "mastercard" as const, last4: "1", tone: "azul" as const, limit: 5500, availableBase: 1427.04, baseDate: "2026-11-17", closingDay: 9, dueDay: 15, adjustments: {}, declared: { "2026-12": 435.8 } };
+  it("vira assinatura mensal: entra nesta fatura (sem mudar o total) e em todas as seguintes, até pausar", async () => {
+    const { subscriptionForInvoice, invoiceFor, isSubscription, pauseRecurring } = await import("@/lib/finance/calc");
+    const sub = subscriptionForInvoice(card, "2026-12", { id: "r1", desc: "ChatGPT", amount: 100, day: 12 });
+    expect(isSubscription(sub)).toBe(true); expect(sub.cardId).toBe("m"); expect(sub.method).toBe("credito");
+    const s: FinanceState = { ...EMPTY_STATE, onboarded: true, cards: [card], recurring: [sub] };
+    const dez = invoiceFor(s, card, "2026-12");
+    expect(dez.total).toBe(435.8); expect(dez.adjustment).toBeCloseTo(335.8, 2);
+    expect(dez.lines.find((l) => l.source === "recorrente")?.desc).toBe("ChatGPT");
+    for (const ym of ["2027-01", "2027-06"]) expect(invoiceFor(s, card, ym).lines.some((l) => l.desc === "ChatGPT")).toBe(true);
+    expect(invoiceFor(s, card, "2026-11").lines.some((l) => l.desc === "ChatGPT")).toBe(false); // antes desta fatura, não
+    const pausada = { ...s, recurring: [pauseRecurring(sub, new Date(2026, 10, 20))] };
+    expect(invoiceFor(pausada, card, "2027-02").lines.some((l) => l.desc === "ChatGPT")).toBe(false);
+  });
+});

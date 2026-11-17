@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
-import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, planForInvoice, planInfo, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
 import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
 import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Tone, Transaction, TxKind } from "@/lib/finance/types";
@@ -137,10 +137,12 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
  * Cadastra uma compra que já está dentro do total de uma fatura: o total do banco não muda (a parte "a detalhar" diminui)
  * e, se for parcelada, as parcelas seguintes passam a contar nas próximas faturas.
  */
-export function InvoiceItemForm({ card, ym, onSave, onCancel }: { card: Card; ym: string; onSave: (r: { plan?: Plan; tx?: Transaction }) => void; onCancel?: (() => void) | undefined }) {
+export function InvoiceItemForm({ card, ym, onSave, onCancel }: { card: Card; ym: string; onSave: (r: { plan?: Plan; tx?: Transaction; recurring?: Recurring }) => void; onCancel?: (() => void) | undefined }) {
   const { state, today } = useFinance(), todayIso = isoOf(today);
   const [desc, setDesc] = useState(""), [kind, setKind] = useState<"parcelada" | "avista">("parcelada"), [per, setPer] = useState<number | undefined>();
-  const [cur, setCur] = useState("1"), [count, setCount] = useState("10"), [cat, setCat] = useState("compras");
+  const [cur, setCur] = useState("1"), [count, setCount] = useState("10"), [cat, setCat] = useState("compras"), [day, setDay] = useState(String(today.getDate()));
+  // assinatura é cobrança fixa mensal: troca o formulário (sem parcelas) e cadastra como assinatura, que vale todo mês até pausar
+  const subs = cat === "assinaturas";
   const n = Math.max(1, Math.min(60, Math.round(Number(count) || 1))), x = Math.max(1, Math.min(n, Math.round(Number(cur) || 1)));
   const close = closingDateOf(card, ym), prevClose = closingDateOf(card, addMonths(ym, -1));
   // à vista: hoje, se hoje está dentro deste ciclo; senão o dia do fechamento (que pertence a esta fatura)
@@ -148,28 +150,31 @@ export function InvoiceItemForm({ card, ym, onSave, onCancel }: { card: Card; ym
   const inv = invoiceFor(state, card, ym), declared = card.declared?.[ym];
   const amount = per ?? 0, added = amount;
   const detailedAfter = Math.round((inv.total - inv.adjustment + added) * 100) / 100, totalAfter = declared !== undefined ? Math.max(declared, detailedAfter) : detailedAfter;
-  const restantes = kind === "parcelada" ? n - x : 0;
+  const restantes = !subs && kind === "parcelada" ? n - x : 0;
   const save = () => {
     if (!per || !desc.trim()) return;
+    if (subs) return onSave({ recurring: subscriptionForInvoice(card, ym, { id: uid("rec-"), desc: desc.trim(), amount: per, day: Number(day) }) });
     if (kind === "avista") return onSave({ tx: { id: uid("tx-"), kind: "despesa", desc: desc.trim(), amount: per, date, method: "credito", cardId: card.id, category: cat, inLimit: true } });
     onSave({ plan: planForInvoice(card, ym, { id: uid("plan-"), desc: desc.trim(), per, n, x, category: cat, todayIso }) });
   };
   return (
     <div className="space-y-4" data-testid="fin-detalhar-form">
       <Field label="O que é essa compra?"><TextInput value={desc} onChange={(e) => { setDesc(e.target.value); setCat(guessCategory(e.target.value)); }} placeholder="Ex.: Tênis, curso, celular" autoFocus data-testid="fin-detalhar-desc" /></Field>
-      <Field group label="Tipo"><Segmented value={kind} onChange={setKind} options={[{ value: "parcelada", label: "Parcelada" }, { value: "avista", label: "À vista no crédito" }]} /></Field>
+      {!subs && <Field group label="Tipo"><Segmented value={kind} onChange={setKind} options={[{ value: "parcelada", label: "Parcelada" }, { value: "avista", label: "À vista no crédito" }]} /></Field>}
       <Grid>
-        <Field label={kind === "parcelada" ? "Valor de cada parcela" : "Valor"}><MoneyInput value={per} onChange={setPer} data-testid="fin-detalhar-valor" /></Field>
-        {kind === "parcelada" && <Field label="Total de parcelas"><TextInput type="number" min={1} max={60} value={count} onChange={(e) => setCount(e.target.value)} /></Field>}
-        {kind === "parcelada" && <Field label="Qual parcela está nesta fatura?" hint={`Se esta fatura traz a ${x}ª, as anteriores já foram pagas.`}><TextInput type="number" min={1} max={n} value={cur} onChange={(e) => setCur(e.target.value)} data-testid="fin-detalhar-atual" /></Field>}
+        <Field label={subs ? "Valor mensal" : kind === "parcelada" ? "Valor de cada parcela" : "Valor"}><MoneyInput value={per} onChange={setPer} data-testid="fin-detalhar-valor" /></Field>
+        {subs && <Field label="Dia da cobrança" hint="Dia do mês em que o cartão cobra."><TextInput type="number" min={1} max={31} value={day} onChange={(e) => setDay(e.target.value)} data-testid="fin-detalhar-dia" /></Field>}
+        {!subs && kind === "parcelada" && <Field label="Total de parcelas"><TextInput type="number" min={1} max={60} value={count} onChange={(e) => setCount(e.target.value)} /></Field>}
+        {!subs && kind === "parcelada" && <Field label="Qual parcela está nesta fatura?" hint={`Se esta fatura traz a ${x}ª, as anteriores já foram pagas.`}><TextInput type="number" min={1} max={n} value={cur} onChange={(e) => setCur(e.target.value)} data-testid="fin-detalhar-atual" /></Field>}
       </Grid>
       <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} /></Field>
       <div className="rounded-2xl border border-cyan/25 bg-cyan/[0.06] p-4 text-sm" data-testid="fin-detalhar-previa">
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-cyan">Como vai ficar</p>
         <p className="mt-2 text-muted-foreground">Esta fatura {declared !== undefined ? <>continua em <b className="text-foreground">{brl(totalAfter)}</b>{declared >= detailedAfter ? <>, com <b className="text-foreground">{brl(Math.round((declared - detailedAfter) * 100) / 100)}</b> ainda a detalhar</> : <> (os itens passam do total informado em <b className="text-foreground">{brl(Math.round((detailedAfter - declared) * 100) / 100)}</b>)</>}.</> : <>passa a ter <b className="text-foreground">{brl(totalAfter)}</b> (você ainda não informou o total do banco).</>}</p>
-        {kind === "parcelada" && <p className="mt-1.5 text-muted-foreground">{restantes > 0 ? <>As próximas <b className="text-foreground">{restantes}</b> {restantes === 1 ? "parcela entra" : "parcelas entram"} nas faturas seguintes, a partir de <b className="text-foreground">{monthLabel(closingYmOf(card, addMonths(ym, 1)))}</b>.</> : "Esta é a última parcela: nada vai para as faturas seguintes."}</p>}
+        {subs && <p className="mt-1.5 text-muted-foreground">É uma <b className="text-foreground">assinatura mensal</b>: entra todo mês nesta fatura e nas próximas, a partir de <b className="text-foreground">{monthLabel(closingYmOf(card, ym))}</b>, até você pausar na aba Assinaturas.</p>}
+        {!subs && kind === "parcelada" && <p className="mt-1.5 text-muted-foreground">{restantes > 0 ? <>As próximas <b className="text-foreground">{restantes}</b> {restantes === 1 ? "parcela entra" : "parcelas entram"} nas faturas seguintes, a partir de <b className="text-foreground">{monthLabel(closingYmOf(card, addMonths(ym, 1)))}</b>.</> : "Esta é a última parcela: nada vai para as faturas seguintes."}</p>}
       </div>
-      <Actions onCancel={onCancel} onSave={save} saveLabel="Detalhar na fatura" disabled={!desc.trim() || !per} />
+      <Actions onCancel={onCancel} onSave={save} saveLabel={subs ? "Cadastrar assinatura" : "Detalhar na fatura"} disabled={!desc.trim() || !per} />
     </div>
   );
 }
