@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowUpRight, BookOpen, CalendarDays, Download, ExternalLink, File as FileIcon, FileText, Image as ImageIcon, KeyRound, Paperclip, Pencil, Save, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowUpRight, BookOpen, ChevronLeft, ChevronRight, CalendarDays, Download, ExternalLink, File as FileIcon, FileText, Image as ImageIcon, KeyRound, Paperclip, Pencil, Save, Sparkles, Trash2, X } from "lucide-react";
 
 import { backdropProps } from "@/lib/backdrop";
 import { sizeLabel } from "@/lib/brain-files";
@@ -98,9 +99,14 @@ export function EntryDrawer({ e, all, urls, onClose, onChanged, onDelete, onOpen
   const [big, setBig] = useState<Attachment | null>(null);
   useEffect(() => { setEdit(false); setTitle(e.title); setText(e.text); setDate(e.date); }, [e.id, e.title, e.text, e.date]);
   useEffect(() => {
-    const h = (k: KeyboardEvent) => { if (k.key === "Escape") { if (big) setBig(null); else onClose(); } };
+    const imgs = e.attachments.filter(isImage);
+    const step = (d: number) => setBig((cur) => { const i = cur ? imgs.findIndex((a) => a.path === cur.path) : -1; return i < 0 ? cur : imgs[Math.max(0, Math.min(imgs.length - 1, i + d))] ?? cur; });
+    const h = (k: KeyboardEvent) => {
+      if (k.key === "Escape") { if (big) setBig(null); else onClose(); }
+      else if (big && (k.key === "ArrowRight" || k.key === "ArrowLeft")) { k.preventDefault(); step(k.key === "ArrowRight" ? 1 : -1); }
+    };
     window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
-  }, [big, onClose]);
+  }, [big, onClose, e.attachments]);
 
   const related = all.filter((o) => o.id !== e.id && (o.dossiers.some((d) => e.dossiers.includes(d)) || codesIn(`${o.title} ${o.text}`).some((c) => codesIn(`${e.title} ${e.text}`).includes(c)))).slice(0, 6);
   const codes = codesIn(`${e.title} ${e.text}`);
@@ -189,11 +195,25 @@ export function EntryDrawer({ e, all, urls, onClose, onChanged, onDelete, onOpen
           )}
         </aside>
       </div>
-      {big && urls[big.path] && (
-        <div className="fixed inset-0 z-[60] grid place-items-center bg-background/90 p-4 backdrop-blur-md" {...backdropProps(() => setBig(null))}>
-          <img src={urls[big.path]!.view} alt={big.name} className="max-h-full max-w-full rounded-2xl border border-border object-contain shadow-[0_0_60px_-10px_var(--violet)]" />
-        </div>
-      )}
+      {big && urls[big.path] && typeof document !== "undefined" && (() => {
+        // Em um portal no <body>: dentro do painel do Orion (que tem filtros/transformações) o `fixed` não prende na tela e a imagem grande ficava lá no meio da rolagem.
+        const imgs = e.attachments.filter(isImage), i = imgs.findIndex((a) => a.path === big.path), go = (d: number) => { const n = imgs[i + d]; if (n) setBig(n); };
+        return createPortal(
+          <div className="fixed inset-0 z-[95] flex flex-col bg-background/92 p-3 backdrop-blur-xl sm:p-5" {...backdropProps(() => setBig(null))} role="dialog" aria-label={`Imagem ${big.name}`} data-testid="imagem-grande">
+            <div className="flex items-center gap-3" onClick={(ev) => ev.stopPropagation()}>
+              <p className="min-w-0 flex-1 truncate text-sm font-semibold">{big.name}<span className="ml-2 text-[0.7rem] font-normal text-muted-foreground">{imgs.length > 1 && i >= 0 ? `${i + 1} de ${imgs.length}` : ""}</span></p>
+              <a href={urls[big.path]!.download} download={big.name} aria-label="Baixar" title="Baixar" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:text-foreground"><Download size={15} /></a>
+              <button onClick={() => setBig(null)} aria-label="Fechar" data-testid="fechar-imagem" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:text-foreground"><X size={16} /></button>
+            </div>
+            <div className="relative mt-3 grid min-h-0 flex-1 place-items-center" onClick={(ev) => ev.stopPropagation()}>
+              {imgs.length > 1 && <button onClick={() => go(-1)} disabled={i <= 0} aria-label="Anterior" className="absolute left-0 z-10 grid h-11 w-11 place-items-center rounded-full border border-border bg-background/70 backdrop-blur disabled:opacity-30"><ChevronLeft size={20} /></button>}
+              {imgs.length > 1 && <button onClick={() => go(1)} disabled={i < 0 || i >= imgs.length - 1} aria-label="Próxima" className="absolute right-0 z-10 grid h-11 w-11 place-items-center rounded-full border border-border bg-background/70 backdrop-blur disabled:opacity-30"><ChevronRight size={20} /></button>}
+              <img src={urls[big.path]!.view} alt={big.name} className="max-h-full max-w-[min(92vw,1400px)] rounded-2xl border border-border object-contain shadow-[0_0_60px_-10px_var(--violet)]" />
+            </div>
+          </div>,
+          document.body,
+        );
+      })()}
     </div>
   );
 }

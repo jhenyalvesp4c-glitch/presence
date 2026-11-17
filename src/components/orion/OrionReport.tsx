@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, BookOpen, Brain, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, Download, ExternalLink, FileIcon, FileText, Folder, GraduationCap, ImageIcon, MessageSquare, Paperclip, ShieldCheck, Sparkles, StickyNote, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ArrowUpRight, BookOpen, Brain, ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, ChevronDown, ClipboardList, Download, ExternalLink, FileIcon, FileText, Folder, GraduationCap, ImageIcon, MessageSquare, Paperclip, ShieldCheck, Sparkles, StickyNote, X } from "lucide-react";
 
 import { backdropProps } from "@/lib/backdrop";
 import { signedUrlsFor } from "@/lib/data/brain";
@@ -84,7 +85,7 @@ function SourceCard({ s, i, cited, kws, urls, onZoom }: { s: OrionSource; i: num
 export function OrionReport({ r }: { r: Report }) {
   const [urls, setUrls] = useState<Urls>({});
   const [zoom, setZoom] = useState<FileRef | null>(null);
-  const [more, setMore] = useState(false);
+  const [more, setMore] = useState(false), [allImgs, setAllImgs] = useState(false);
 
   const cites = useMemo(() => new Set([...r.answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))), [r.answer]);
   const featured = useMemo(() => {
@@ -95,9 +96,10 @@ export function OrionReport({ r }: { r: Report }) {
   const files = useMemo(() => {
     const seen = new Set<string>(); const out: FileRef[] = [];
     for (const s of featured) for (const f of s.files) if (!seen.has(fkey(f))) { seen.add(fkey(f)); out.push(f); }
-    return out.slice(0, 12);
+    return out.slice(0, 200);
   }, [featured]);
   const images = files.filter(isImg), docs = files.filter((f) => !isImg(f));
+  const SHOWN = 12, shownImages = allImgs ? images : images.slice(0, SHOWN), zoomAt = zoom ? images.findIndex((f) => fkey(f) === fkey(zoom)) : -1;
 
   useEffect(() => {
     const need = r.sources.flatMap((s) => s.files);
@@ -105,9 +107,15 @@ export function OrionReport({ r }: { r: Report }) {
   }, [r.sources]);
   useEffect(() => {
     if (!zoom) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setZoom(null); } };
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.stopPropagation(); setZoom(null); }
+      else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault(); e.stopPropagation();
+        setZoom((cur) => { const i = cur ? images.findIndex((f) => fkey(f) === fkey(cur)) : -1; return i < 0 ? cur : images[Math.max(0, Math.min(images.length - 1, i + (e.key === "ArrowRight" ? 1 : -1)))] ?? cur; });
+      }
+    };
     window.addEventListener("keydown", h, true); return () => window.removeEventListener("keydown", h, true);
-  }, [zoom]);
+  }, [zoom, images]);
 
   const cite = (n: number) => {
     if (!featured.some((s) => s.n === n)) setMore(true);
@@ -147,7 +155,7 @@ export function OrionReport({ r }: { r: Report }) {
           <h4 className="mono-caps mb-2 flex items-center gap-2 !text-[0.62rem]"><Paperclip size={11} className="text-emerald" /> Arquivos encontrados <span className="text-muted-foreground">({files.length})</span></h4>
           {images.length > 0 && (
             <div className={`grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
-              {images.map((f, i) => {
+              {shownImages.map((f, i) => {
                 const u = urls[fkey(f)];
                 return (
                   <button key={fkey(f)} onClick={() => setZoom(f)} style={{ animationDelay: `${i * 80}ms` }} aria-label={`Ampliar ${f.name}`} data-testid="imagem-encontrada"
@@ -162,6 +170,7 @@ export function OrionReport({ r }: { r: Report }) {
               })}
             </div>
           )}
+          {images.length > SHOWN && <button onClick={() => setAllImgs((v) => !v)} className="mt-2 w-full rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-emerald/60 hover:text-emerald" data-testid="ver-todas-imagens">{allImgs ? "Mostrar menos" : `Ver todas as ${images.length} imagens`}</button>}
           {docs.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{docs.map((f) => <FileChip key={fkey(f)} f={f} urls={urls} onZoom={setZoom} />)}</div>}
         </div>
       )}
@@ -184,12 +193,22 @@ export function OrionReport({ r }: { r: Report }) {
         </div>
       )}
 
-      {zoom && urls[fkey(zoom)] && (
-        <div className="fixed inset-0 z-[70] grid place-items-center bg-background/90 p-4 backdrop-blur-md" {...backdropProps(() => setZoom(null))} data-testid="lightbox">
-          <button onClick={() => setZoom(null)} aria-label="Fechar" className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-border bg-background/80 text-muted-foreground hover:text-foreground"><X size={16} /></button>
-          {isImg(zoom) ? <img src={urls[fkey(zoom)]!.view} alt={zoom.name} className="max-h-full max-w-full rounded-2xl border border-border object-contain shadow-[0_0_60px_-10px_var(--violet)]" />
-            : <a href={urls[fkey(zoom)]!.view} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-border bg-background/80 px-4 py-3 text-sm"><ExternalLink size={14} /> Abrir {zoom.name}</a>}
-        </div>
+      {zoom && urls[fkey(zoom)] && typeof document !== "undefined" && createPortal(
+        // no <body>: dentro do painel (que tem desfoque) o `fixed` não prende na tela e a imagem abria no meio da rolagem
+        <div className="fixed inset-0 z-[95] flex flex-col bg-background/92 p-3 backdrop-blur-xl sm:p-5" {...backdropProps(() => setZoom(null))} role="dialog" aria-label={`Arquivo ${zoom.name}`} data-testid="lightbox">
+          <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold">{zoom.name}<span className="ml-2 text-[0.7rem] font-normal text-muted-foreground">{images.length > 1 && zoomAt >= 0 ? `${zoomAt + 1} de ${images.length}` : ""}</span></p>
+            <a href={urls[fkey(zoom)]!.download} download={zoom.name} aria-label="Baixar" title="Baixar" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:text-foreground"><Download size={15} /></a>
+            <button onClick={() => setZoom(null)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:text-foreground"><X size={16} /></button>
+          </div>
+          <div className="relative mt-3 grid min-h-0 flex-1 place-items-center" onClick={(e) => e.stopPropagation()}>
+            {isImg(zoom) && images.length > 1 && <button onClick={() => { const n = images[zoomAt - 1]; if (n) setZoom(n); }} disabled={zoomAt <= 0} aria-label="Anterior" className="absolute left-0 z-10 grid h-11 w-11 place-items-center rounded-full border border-border bg-background/70 backdrop-blur disabled:opacity-30"><ChevronLeft size={20} /></button>}
+            {isImg(zoom) && images.length > 1 && <button onClick={() => { const n = images[zoomAt + 1]; if (n) setZoom(n); }} disabled={zoomAt < 0 || zoomAt >= images.length - 1} aria-label="Próxima" className="absolute right-0 z-10 grid h-11 w-11 place-items-center rounded-full border border-border bg-background/70 backdrop-blur disabled:opacity-30"><ChevronRight size={20} /></button>}
+            {isImg(zoom) ? <img src={urls[fkey(zoom)]!.view} alt={zoom.name} className="max-h-full max-w-[min(92vw,1400px)] rounded-2xl border border-border object-contain shadow-[0_0_60px_-10px_var(--violet)]" />
+              : <a href={urls[fkey(zoom)]!.view} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-border bg-background/80 px-4 py-3 text-sm"><ExternalLink size={14} /> Abrir {zoom.name}</a>}
+          </div>
+        </div>,
+        document.body,
       )}
     </section>
   );
