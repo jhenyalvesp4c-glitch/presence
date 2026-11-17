@@ -1,10 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Brain, ClipboardList, Heart, Home, ListChecks } from "lucide-react";
+import { Brain, ClipboardList, Heart, Home, ListChecks, Wallet } from "lucide-react";
 
 const items = [
   { Icon: Home, label: "Início", to: "/assistente", match: ["/assistente"], c: "cyan" },
   { Icon: ListChecks, label: "Tarefas", to: "/tarefas", match: ["/tarefas", "/calendario", "/planejamento"], c: "cyan" },
   { Icon: ClipboardList, label: "Demandas", to: "/projetos", match: ["/projetos", "/demandas"], c: "violet" },
+  { Icon: Wallet, label: "Finanças", to: "/financeiro", match: ["/financeiro"], c: "emerald" },
   { Icon: Heart, label: "Saúde", to: "/saude", match: ["/saude", "/hoje", "/habitos", "/dieta", "/medidas", "/treino"], c: "emerald" },
   { Icon: Brain, label: "Orion", to: "/cerebro", match: ["/cerebro"], c: "violet" },
 ] as const;
@@ -15,7 +16,7 @@ export function MobileTabBar() {
   return (
     <nav aria-label="Navegação principal" data-testid="barra-inferior"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[oklch(0.13_0.03_265/0.92)] pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden">
-      <ul className="mx-auto grid max-w-md grid-cols-5">
+      <ul className="mx-auto grid max-w-md grid-cols-6">
         {items.map(({ Icon, label, to, match, c }) => {
           const on = match.some((m) => path === m || path.startsWith(`${m}/`));
           return (

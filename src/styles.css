@@ -454,3 +454,19 @@
 
 /* Nada deve alargar a página no celular (o Safari encolhe tudo se algo passar da tela). */
 html, body { max-width: 100%; overflow-x: clip; }
+
+
+/* ---------- Financeiro ---------- */
+@keyframes fin-ring { from { stroke-dasharray: 0 var(--c); } to { stroke-dasharray: var(--len) var(--c); } }
+@keyframes fin-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes fin-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fin-bar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes fin-pop { 0% { transform: scale(.85); opacity: 0; } 60% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes fin-float { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(.6deg); } }
+@keyframes fin-aurora { 0%,100% { transform: translate3d(-6%, -4%, 0) scale(1); } 50% { transform: translate3d(6%, 5%, 0) scale(1.18); } }
+@keyframes fin-sheen { from { transform: translateX(-130%) skewX(-18deg); } to { transform: translateX(230%) skewX(-18deg); } }
+@keyframes fin-slide { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes fin-slide-back { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@keyframes fin-modal { from { opacity: 0; transform: translateY(18px) scale(.97); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes fin-glow { 0%,100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--cyan) 45%, transparent); } 50% { box-shadow: 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) { [style*="fin-"] { animation: none !important; } }

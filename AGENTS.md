@@ -18,3 +18,6 @@
 - **Contas / login** (`docs/CONTAS.md`, `src/lib/auth.tsx`, `src/components/auth/`, `src/lib/server-auth.ts`, migrações `20261117*`): e-mail+senha pelo Supabase Auth, máximo 2 contas; a 1ª assume os dados legados. Use `ownerId()` (nunca `SINGLE_USER_ID`) para `user_id` e pastas do Storage; o projeto padrão é `defaultProjectId()` (não `P4C_ID`). Rotas `/api/*` novas devem usar `withUser`. Testes locais: `VITE_AUTH_DISABLED=1`.
 - **Briefing e memória** (`docs/BRIEFING.md`, `src/lib/briefing.ts`, `src/lib/data/briefing.ts`, `src/lib/use-briefing.tsx`, `src/components/briefing/`): o que o Orion sabe sobre cada pessoa + aprendizados. Novos recursos que usem IA em nome da pessoa devem incluir `briefingPrompt(...)` no prompt. Migração `20261118000100` precisa estar aplicada.
 - **WhatsApp** (`docs/WHATSAPP.md`, `whatsapp-bridge/`, `src/lib/whatsapp/`, `/configuracoes`): ponte local somente leitura (Baileys + SQLite em `~/.presence/whatsapp`). Nunca adicione envio de mensagens nem marque como lida. A conexão real só é testada no PC da pessoa.
+
+## Módulo financeiro
+Frontend em `/financeiro` com dados locais (etapa 1; Supabase na etapa 2). Regras em `src/lib/finance/calc.ts` (testadas em `src/test/finance.test.ts`), telas em `src/components/finance/`. Detalhes em `docs/FINANCEIRO.md`.

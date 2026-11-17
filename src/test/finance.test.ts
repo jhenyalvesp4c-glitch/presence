@@ -1,0 +1,147 @@
+import { describe, expect, it } from "vitest";
+import { accountBalance, addMonths, alertsFor, cardAvailable, categoryTotals, commitments, invoiceFor, invoiceMonthOf, monthEntries, monthlySeries, openInvoice, planInfo, totalFutureParcels, whyChanged, ymOf, expensesOf, total } from "@/lib/finance/calc";
+import { makeMock } from "@/lib/finance/mock";
+import { parseNatural } from "@/lib/finance/parse";
+import { normalizeState } from "@/lib/finance/repo";
+import type { Plan } from "@/lib/finance/types";
+
+const TODAY = new Date(2026, 10, 17); // 17/11/2026
+const mock = () => makeMock(TODAY);
+const plan = (o: Partial<Plan> = {}): Plan => ({ id: "p", desc: "Compra", cardId: "c", total: 1200, count: 12, per: 100, purchaseYm: "2026-07", first: "2026-08", category: "compras", createdAt: "2026-07-10", ...o });
+
+describe("fatura do cartão", () => {
+  const nubank = { closingDay: 25, dueDay: 5 }, picpay = { closingDay: 20, dueDay: 28 }, mp = { closingDay: 10, dueDay: 17 };
+  it("compra até o fechamento cai na fatura que vence no mês seguinte (vencimento antes do fechamento)", () => {
+    expect(invoiceMonthOf(nubank, "2026-11-12")).toBe("2026-12");
+    expect(invoiceMonthOf(nubank, "2026-11-25")).toBe("2026-12");
+    expect(invoiceMonthOf(nubank, "2026-11-26")).toBe("2027-01");
+  });
+  it("vencimento depois do fechamento: a fatura vence no mesmo mês", () => {
+    expect(invoiceMonthOf(picpay, "2026-11-12")).toBe("2026-11");
+    expect(invoiceMonthOf(picpay, "2026-11-21")).toBe("2026-12");
+    expect(invoiceMonthOf(mp, "2026-11-10")).toBe("2026-11");
+    expect(invoiceMonthOf(mp, "2026-11-11")).toBe("2026-12");
+  });
+  it("vira o ano", () => { expect(invoiceMonthOf(nubank, "2026-12-30")).toBe("2027-02"); });
+});
+
+describe("compras parceladas", () => {
+  it("calcula pagas, restantes e o mês em que terminam", () => {
+    const i = planInfo(plan(), { dueDay: 5 }, TODAY); // ago, set, out e nov (dia 5 já passou)
+    expect(i.paid).toBe(4); expect(i.remaining).toBe(8); expect(i.currentIndex).toBe(5);
+    expect(i.lastYm).toBe("2027-07"); expect(i.remainingAmount).toBe(800); expect(i.paidAmount).toBe(400); expect(i.pct).toBe(33);
+  });
+  it("o exemplo do pedido: 3 pagas de 12, 9 restantes", () => {
+    const i = planInfo(plan({ paidManual: 3 }), { dueDay: 5 }, TODAY);
+    expect(`${i.paid}/12`).toBe("3/12"); expect(i.remaining).toBe(9); expect(i.remainingAmount).toBe(900);
+  });
+  it("parcela do mês só conta como paga depois do vencimento", () => {
+    expect(planInfo(plan({ first: "2026-11" }), { dueDay: 28 }, TODAY).paid).toBe(0);
+    expect(planInfo(plan({ first: "2026-11" }), { dueDay: 10 }, TODAY).paid).toBe(1);
+  });
+  it("a última parcela absorve os centavos", () => {
+    const i = planInfo(plan({ total: 1000, per: 83.33, count: 12 }), { dueDay: 5 }, TODAY);
+    expect(i.schedule.at(-1)!.amount).toBe(83.37);
+    expect(Math.round(i.schedule.reduce((a, p) => a + p.amount, 0) * 100) / 100).toBe(1000);
+  });
+  it("quitada quando todas passaram", () => { expect(planInfo(plan({ first: "2025-01", count: 6, total: 600 }), { dueDay: 5 }, TODAY)).toMatchObject({ done: true, remaining: 0, nextDue: null }); });
+});
+
+describe("projeção e lançamentos do mês", () => {
+  it("projeta o comprometimento mês a mês e zera depois da última parcela", () => {
+    const s = mock(), c = commitments(s, ymOf(TODAY), 12);
+    expect(c).toHaveLength(12); expect(c[0]!.parcelas).toBeGreaterThan(0);
+    const lisboaMonths = c.filter((m) => m.porCartao["card-nubank"]).length; expect(lisboaMonths).toBeGreaterThan(0);
+    expect(c[11]!.parcelas).toBeLessThan(c[0]!.parcelas); // as compras vão terminando
+  });
+  it("total futuro bate com a soma das parcelas restantes", () => {
+    const s = mock(), futuro = totalFutureParcels(s, TODAY);
+    const proj = commitments(s, ymOf(TODAY), 40).reduce((a, m) => a + m.parcelas, 0);
+    // a projeção começa no mês atual, que pode ter parcela já paga: diferença no máximo as parcelas do mês atual
+    expect(proj + 0.01).toBeGreaterThanOrEqual(futuro);
+  });
+  it("parcela aparece só no mês certo e recorrente a partir do início", () => {
+    const s = mock(), es = (ym: string) => monthEntries(s, ym);
+    expect(es(addMonths(ymOf(TODAY), 1)).some((e) => e.desc === "Passagens Lisboa" && e.parcel === "1/6")).toBe(true);
+    expect(es(ymOf(TODAY)).some((e) => e.desc === "Passagens Lisboa")).toBe(false);
+    expect(es(addMonths(ymOf(TODAY), -20)).some((e) => e.source === "recorrente")).toBe(false);
+    expect(es(ymOf(TODAY)).some((e) => e.source === "recorrente" && e.desc === "Aluguel")).toBe(true);
+  });
+  it("série mensal tem 6 pontos e o acumulado soma os saldos", () => {
+    const sr = monthlySeries(mock(), ymOf(TODAY), 6);
+    expect(sr).toHaveLength(6);
+    expect(Math.round(sr.reduce((a, p) => a + p.saldo, 0) * 100) / 100).toBe(sr.at(-1)!.acumulado);
+  });
+});
+
+describe("contas, limites e faturas", () => {
+  it("débito reduz o saldo da conta, crédito não", () => {
+    const s = mock(), acc = s.accounts[0]!;
+    const base = accountBalance(s, acc);
+    s.transactions.push({ id: "n1", kind: "despesa", desc: "Teste", amount: 100, date: "2026-11-16", method: "debito", accountId: acc.id, category: "outros" });
+    expect(accountBalance(s, acc)).toBe(Math.round((base - 100) * 100) / 100);
+    s.transactions.push({ id: "n2", kind: "despesa", desc: "Crédito", amount: 100, date: "2026-11-16", method: "credito", accountId: acc.id, cardId: "card-nubank", category: "outros" });
+    expect(accountBalance(s, acc)).toBe(Math.round((base - 100) * 100) / 100);
+  });
+  it("limite disponível cai com compra no crédito e com parcelamento novo", () => {
+    const s = mock(), c = s.cards[0]!, a0 = cardAvailable(s, c);
+    s.transactions.push({ id: "n3", kind: "despesa", desc: "Compra", amount: 250, date: "2026-11-16", method: "credito", cardId: c.id, category: "outros" });
+    expect(cardAvailable(s, c)).toBeCloseTo(a0 - 250, 2);
+    s.plans.push(plan({ id: "novo", cardId: c.id, total: 600, count: 6, per: 100, createdAt: "2026-11-17" }));
+    expect(cardAvailable(s, c)).toBeCloseTo(a0 - 250 - 600, 2);
+  });
+  it("fatura junta compras do ciclo, parcelas, recorrentes e o ajuste informado", () => {
+    const s = mock(), c = s.cards[0]!, ym = invoiceMonthOf(c, "2026-11-17");
+    const base = invoiceFor(s, c, ym).total;
+    c.adjustments[ym] = 300;
+    const inv = invoiceFor(s, c, ym);
+    expect(inv.total).toBe(Math.round((base + 300) * 100) / 100);
+    expect(inv.lines.some((l) => l.source === "parcela")).toBe(true);
+    expect(inv.lines.some((l) => l.source === "ajuste")).toBe(true);
+    expect(openInvoice(s, c, TODAY).ym).toBe(ym);
+  });
+});
+
+describe("categorias, alertas e por que aumentou", () => {
+  it("o mês atual do exemplo tem restaurantes em alta e o painel avisa", () => {
+    const s = mock(), cats = categoryTotals(s, ymOf(TODAY)), rest = cats.find((c) => c.id === "restaurantes")!;
+    expect(rest.delta).toBeGreaterThan(0);
+    expect(alertsFor(s, TODAY).some((a) => a.id === "cat:restaurantes" || a.id === "meta:goal-rest")).toBe(true);
+  });
+  it("explica o aumento com as categorias e as compras que mais pesaram", () => {
+    const w = whyChanged(mock(), ymOf(TODAY));
+    expect(w.top.length).toBeGreaterThan(0); expect(w.top[0]!.items.length).toBeGreaterThan(0);
+    expect(w.top[0]!.cat.delta).toBeGreaterThanOrEqual(w.top.at(-1)!.cat.delta);
+  });
+  it("percentuais das categorias somam 100", () => {
+    const cats = categoryTotals(mock(), addMonths(ymOf(TODAY), -1));
+    expect(Math.round(cats.reduce((a, c) => a + c.pct, 0))).toBe(100);
+    expect(cats.reduce((a, c) => a + c.value, 0)).toBeCloseTo(total(expensesOf(monthEntries(mock(), addMonths(ymOf(TODAY), -1)))), 1);
+  });
+});
+
+describe("lançamento por frase", () => {
+  const s = mock(), p = (t: string) => parseNatural(t, s, TODAY);
+  it("compra no débito pelo banco", () => {
+    expect(p("Hoje comprei um livro de R$ 30 no débito pelo Nubank")).toMatchObject({ amount: 30, method: "debito", accountId: "acc-nubank", category: "educacao", desc: "Livro", date: "2026-11-17", installments: 1, kind: "despesa" });
+  });
+  it("compra parcelada no cartão", () => {
+    expect(p("Parcelei uma compra de R$ 600 em 6 vezes no PicPay")).toMatchObject({ amount: 600, installments: 6, method: "credito", cardId: "card-picpay" });
+  });
+  it("data relativa e pix", () => {
+    expect(p("Ontem almocei por R$ 42,90 no pix")).toMatchObject({ amount: 42.9, method: "pix", date: "2026-11-16", category: "restaurantes" });
+    expect(p("dia 3 paguei R$ 1.250,50 de aluguel no débito pelo Nubank")).toMatchObject({ amount: 1250.5, date: "2026-11-03" });
+  });
+  it("receita", () => { expect(p("Recebi R$ 800 de um freela no PicPay")).toMatchObject({ kind: "receita", amount: 800, accountId: "acc-picpay", category: "extra" }); });
+  it("diz o que falta quando a frase é vaga", () => {
+    const d = p("comprei um fone"); expect(d.missing).toEqual(expect.arrayContaining(["valor", "forma de pagamento"])); expect(d.confidence).toBeLessThan(0.7);
+  });
+  it("frase completa tem confiança alta", () => { expect(p("Hoje comprei um livro de R$ 30 no débito pelo Nubank").confidence).toBe(1); });
+});
+
+describe("armazenamento", () => {
+  it("normaliza dados incompletos ou de outra versão", () => {
+    expect(normalizeState(null).accounts).toEqual([]); expect(normalizeState({ version: 99, accounts: [{}] }).accounts).toEqual([]);
+    const s = normalizeState({ version: 1, cards: [{ id: "c" }] }); expect(s.cards[0]!.adjustments).toEqual({}); expect(s.plans).toEqual([]);
+  });
+});

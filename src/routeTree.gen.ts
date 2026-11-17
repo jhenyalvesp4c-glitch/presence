@@ -17,6 +17,7 @@ import { Route as CerebroRouteImport } from './routes/cerebro'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as DemandasRouteImport } from './routes/demandas'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
+import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as HabitosRouteImport } from './routes/habitos'
 import { Route as HojeRouteImport } from './routes/hoje'
 import { Route as ListasRouteImport } from './routes/listas'
@@ -80,6 +81,11 @@ const DemandasRoute = DemandasRouteImport.update({
 const DiagnosticoRoute = DiagnosticoRouteImport.update({
   id: '/diagnostico',
   path: '/diagnostico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceiroRoute = FinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HabitosRoute = HabitosRouteImport.update({
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
   '/listas': typeof ListasRoute
@@ -246,6 +253,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
   '/listas': typeof ListasRoute
@@ -281,6 +289,7 @@ export interface FileRoutesById {
   '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
   '/listas': typeof ListasRoute
@@ -317,6 +326,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
+    | '/financeiro'
     | '/habitos'
     | '/hoje'
     | '/listas'
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
+    | '/financeiro'
     | '/habitos'
     | '/hoje'
     | '/listas'
@@ -385,6 +396,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
+    | '/financeiro'
     | '/habitos'
     | '/hoje'
     | '/listas'
@@ -420,6 +432,7 @@ export interface RootRouteChildren {
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   DemandasRoute: typeof DemandasRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
+  FinanceiroRoute: typeof FinanceiroRoute
   HabitosRoute: typeof HabitosRoute
   HojeRoute: typeof HojeRoute
   ListasRoute: typeof ListasRoute
@@ -501,6 +514,13 @@ declare module '@tanstack/react-router' {
       path: '/diagnostico'
       fullPath: '/diagnostico'
       preLoaderRoute: typeof DiagnosticoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/financeiro': {
+      id: '/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof FinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/habitos': {
@@ -694,6 +714,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfiguracoesRoute: ConfiguracoesRoute,
   DemandasRoute: DemandasRoute,
   DiagnosticoRoute: DiagnosticoRoute,
+  FinanceiroRoute: FinanceiroRoute,
   HabitosRoute: HabitosRoute,
   HojeRoute: HojeRoute,
   ListasRoute: ListasRoute,

@@ -1,0 +1,248 @@
+import { useMemo, useState, type ReactNode } from "react";
+import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
+import { addMonths, brl, invoiceMonthOf, isoOf, monthLabel, planInfo, ymOf } from "@/lib/finance/calc";
+import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
+import { uid, useFinance } from "@/lib/finance/store";
+import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Tone, Transaction, TxKind } from "@/lib/finance/types";
+import { CatIcon, Field, MoneyInput, Pill, Segmented, Select, TextInput, TONE_KEYS, TONES, btn } from "./ui";
+
+const Grid = ({ children }: { children: ReactNode }) => <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
+export function Actions({ onCancel, onSave, saveLabel = "Salvar", disabled, extra }: { onCancel?: (() => void) | undefined; onSave: () => void; saveLabel?: string | undefined; disabled?: boolean | undefined; extra?: ReactNode }) {
+  return <div className="mt-5 flex flex-wrap items-center justify-end gap-2">{extra}{onCancel && <button type="button" className={btn.ghost} onClick={onCancel}>Cancelar</button>}<button type="button" className={btn.primary} onClick={onSave} disabled={disabled} data-testid="fin-salvar">{saveLabel}</button></div>;
+}
+
+/** Seletor de cor (as paletas de cartão/conta). */
+export function TonePicker({ value, onChange }: { value: Tone; onChange: (t: Tone) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Cor">
+      {TONE_KEYS.map((k) => <button key={k} type="button" role="radio" aria-checked={value === k} aria-label={TONES[k].label} onClick={() => onChange(k)}
+        className={`h-8 w-8 rounded-full transition ${value === k ? "scale-110 ring-2 ring-white/80 ring-offset-2 ring-offset-[oklch(0.15_0.03_265)]" : "opacity-80 hover:opacity-100"}`} style={{ background: TONES[k].bg, boxShadow: value === k ? `0 0 16px ${TONES[k].glow}` : undefined }} />)}
+    </div>
+  );
+}
+
+/** Seletor de categoria com ícones. */
+export function CategoryPicker({ value, onChange, income = false }: { value: string; onChange: (id: string) => void; income?: boolean }) {
+  const list = income ? INCOME_CATS : EXPENSE_CATS;
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Categoria">
+      {list.map((c) => { const on = c.id === value; return (
+        <button key={c.id} type="button" role="radio" aria-checked={on} onClick={() => onChange(c.id)}
+          className="flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-2.5 text-[0.72rem] transition"
+          style={{ borderColor: `color-mix(in oklab, ${c.color} ${on ? 70 : 14}%, transparent)`, background: on ? `color-mix(in oklab, ${c.color} 18%, transparent)` : "transparent", color: on ? c.color : undefined, boxShadow: on ? `0 8px 24px -14px ${c.color}` : undefined }}>
+          <span style={{ color: c.color }}><CatIcon id={c.id} size={18} /></span>{c.name}
+        </button>); })}
+    </div>
+  );
+}
+
+/* ───────────── conta ───────────── */
+export function AccountForm({ initial, onSave, onCancel }: { initial?: Account | undefined; onSave: (a: Account) => void; onCancel?: (() => void) | undefined }) {
+  const { today } = useFinance();
+  const [name, setName] = useState(initial?.name ?? ""), [kind, setKind] = useState<AccountKind>(initial?.kind ?? "banco"), [tone, setTone] = useState<Tone>(initial?.tone ?? "roxo"), [bal, setBal] = useState<number | undefined>(initial?.balanceBase);
+  const save = () => onSave({ id: initial?.id ?? uid("acc-"), name: name.trim(), kind, tone, balanceBase: bal ?? 0, baseDate: initial && bal === initial.balanceBase ? initial.baseDate : isoOf(today) });
+  return (
+    <div className="space-y-4">
+      <Field label="Nome do banco ou carteira"><TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Nubank, PicPay, Mercado Pago" autoFocus data-testid="fin-conta-nome" /></Field>
+      <Field group label="Tipo"><Segmented value={kind} onChange={setKind} options={[{ value: "banco", label: "Banco", icon: Landmark }, { value: "carteira", label: "Carteira", icon: Wallet }, { value: "dinheiro", label: "Dinheiro", icon: Banknote }, { value: "investimento", label: "Invest.", icon: PiggyBank }]} /></Field>
+      <Field label="Saldo disponível hoje"><MoneyInput value={bal} onChange={setBal} data-testid="fin-conta-saldo" /></Field>
+      <Field group label="Cor"><TonePicker value={tone} onChange={setTone} /></Field>
+      <Actions onCancel={onCancel} onSave={save} disabled={!name.trim()} />
+    </div>
+  );
+}
+
+/* ───────────── cartão ───────────── */
+export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undefined; onSave: (c: Card) => void; onCancel?: (() => void) | undefined }) {
+  const { today } = useFinance();
+  const [name, setName] = useState(initial?.name ?? ""), [brand, setBrand] = useState<CardBrand>(initial?.brand ?? "mastercard"), [last4, setLast4] = useState(initial?.last4 ?? ""), [tone, setTone] = useState<Tone>(initial?.tone ?? "roxo");
+  const [limit, setLimit] = useState<number | undefined>(initial?.limit), [avail, setAvail] = useState<number | undefined>(initial?.availableBase);
+  const [closing, setClosing] = useState(String(initial?.closingDay ?? 25)), [due, setDue] = useState(String(initial?.dueDay ?? 5));
+  const openYm = invoiceMonthOf({ closingDay: Number(closing) || 25, dueDay: Number(due) || 5 }, isoOf(today));
+  const [extra, setExtra] = useState<number | undefined>(initial?.adjustments[openYm]);
+  const day = (v: string) => Math.max(1, Math.min(31, Math.round(Number(v) || 1)));
+  const ok = name.trim() && limit && limit > 0 && avail !== undefined && avail <= (limit ?? 0);
+  const save = () => {
+    const adjustments = { ...(initial?.adjustments ?? {}) }; if (extra) adjustments[openYm] = extra; else delete adjustments[openYm];
+    onSave({ id: initial?.id ?? uid("card-"), name: name.trim(), brand, last4: last4.replace(/\D/g, "").padStart(4, "0").slice(-4), tone, limit: limit ?? 0, availableBase: avail ?? 0, baseDate: initial && avail === initial.availableBase ? initial.baseDate : isoOf(today), closingDay: day(closing), dueDay: day(due), adjustments });
+  };
+  return (
+    <div className="space-y-4">
+      <Grid>
+        <Field label="Nome do cartão"><TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Nubank" autoFocus data-testid="fin-cartao-nome" /></Field>
+        <Field label="Final do cartão (4 dígitos)"><TextInput value={last4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="0000" inputMode="numeric" /></Field>
+      </Grid>
+      <Field group label="Bandeira"><Segmented value={brand} onChange={setBrand} options={[{ value: "mastercard", label: "Master" }, { value: "visa", label: "Visa" }, { value: "elo", label: "Elo" }, { value: "amex", label: "Amex" }, { value: "outro", label: "Outra" }]} /></Field>
+      <Grid>
+        <Field label="Limite total"><MoneyInput value={limit} onChange={setLimit} data-testid="fin-cartao-limite" /></Field>
+        <Field label="Limite disponível hoje" hint={avail !== undefined && limit && avail > limit ? "Não pode ser maior que o limite total." : undefined}><MoneyInput value={avail} onChange={setAvail} data-testid="fin-cartao-disponivel" /></Field>
+        <Field label="Dia de fechamento da fatura"><TextInput type="number" min={1} max={31} value={closing} onChange={(e) => setClosing(e.target.value)} /></Field>
+        <Field label="Dia de vencimento da fatura"><TextInput type="number" min={1} max={31} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+      </Grid>
+      <Field label={`Outros valores pendentes na fatura de ${monthLabel(openYm)}`} hint="Opcional: fatura anterior em aberto, juros, anuidade…"><MoneyInput value={extra} onChange={setExtra} /></Field>
+      <Field group label="Cor"><TonePicker value={tone} onChange={setTone} /></Field>
+      <Actions onCancel={onCancel} onSave={save} disabled={!ok} />
+    </div>
+  );
+}
+
+/* ───────────── compra parcelada ───────────── */
+export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial?: Plan | undefined; onSave: (p: Plan) => void; onCancel?: (() => void) | undefined; defaultCardId?: string | undefined }) {
+  const { state, today } = useFinance();
+  const todayYm = ymOf(today);
+  const [desc, setDesc] = useState(initial?.desc ?? ""), [cardId, setCardId] = useState(initial?.cardId ?? defaultCardId ?? state.cards[0]?.id ?? "");
+  const [total, setTotal] = useState<number | undefined>(initial?.total), [count, setCount] = useState(String(initial?.count ?? 12));
+  const [per, setPer] = useState<number | undefined>(initial?.per), [perTouched, setPerTouched] = useState(!!initial);
+  const [purchaseYm, setPurchaseYm] = useState(initial?.purchaseYm ?? addMonths(todayYm, -2));
+  const [first, setFirst] = useState(initial?.first ?? addMonths(todayYm, -1)), [firstTouched, setFirstTouched] = useState(!!initial);
+  const [mode, setMode] = useState<"datas" | "manual">(initial?.paidManual !== undefined ? "manual" : "datas"), [paid, setPaid] = useState(String(initial?.paidManual ?? 3));
+  const [cat, setCat] = useState(initial?.category ?? "compras");
+  const card = state.cards.find((c) => c.id === cardId);
+  const n = Math.max(1, Math.min(60, Math.round(Number(count) || 1)));
+  const perV = perTouched && per !== undefined ? per : total ? Math.round((total / n) * 100) / 100 : undefined;
+  // primeira parcela sugerida: a fatura em que a compra caiu (se o mês da compra mudar e a pessoa não mexeu)
+  const firstV = firstTouched ? first : card ? invoiceMonthOf(card, `${purchaseYm}-15`) : first;
+  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, paidManual: mode === "manual" ? Math.max(0, Math.min(n, Math.round(Number(paid) || 0))) : undefined, createdAt: initial?.createdAt ?? isoOf(today) } : null;
+  const info = useMemo(() => (draft ? planInfo(draft, card, today) : null), [draft, card, today]);
+  return (
+    <div className="space-y-4">
+      <Field label="Descrição da compra"><TextInput value={desc} onChange={(e) => { setDesc(e.target.value); if (!initial) setCat(guessCategory(e.target.value)); }} placeholder="Ex.: Notebook, sofá, curso de inglês" autoFocus data-testid="fin-plano-desc" /></Field>
+      <Grid>
+        <Field label="Cartão utilizado"><Select value={cardId} onChange={(e) => setCardId(e.target.value)} data-testid="fin-plano-cartao">{state.cards.length === 0 && <option value="">Cadastre um cartão primeiro</option>}{state.cards.map((c) => <option key={c.id} value={c.id}>{c.name} •••• {c.last4}</option>)}</Select></Field>
+        <Field label="Valor total"><MoneyInput value={total} onChange={setTotal} data-testid="fin-plano-total" /></Field>
+        <Field label="Quantidade de parcelas"><TextInput type="number" min={1} max={60} value={count} onChange={(e) => setCount(e.target.value)} data-testid="fin-plano-parcelas" /></Field>
+        <Field label="Valor de cada parcela" hint="Calculado pelo total; pode ajustar."><MoneyInput value={perV} onChange={(v) => { setPer(v); setPerTouched(true); }} /></Field>
+        <Field label="Mês e ano da compra"><TextInput type="month" value={purchaseYm} onChange={(e) => setPurchaseYm(e.target.value)} /></Field>
+        <Field label="Primeira parcela (mês do vencimento)"><TextInput type="month" value={firstV} onChange={(e) => { setFirst(e.target.value); setFirstTouched(true); }} /></Field>
+      </Grid>
+      <Field group label="Situação atual"><Segmented value={mode} onChange={setMode} options={[{ value: "datas", label: "Calcular pelas datas" }, { value: "manual", label: "Informar parcelas pagas" }]} /></Field>
+      {mode === "manual" && <Field label="Quantas parcelas já foram pagas?"><TextInput type="number" min={0} max={n} value={paid} onChange={(e) => setPaid(e.target.value)} /></Field>}
+      <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} /></Field>
+      {info && draft && (
+        <div className="rounded-2xl border border-cyan/25 bg-cyan/[0.06] p-4" data-testid="fin-plano-previa" style={{ animation: "fin-fade .4s both" }}>
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-cyan">Como vai ficar</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2"><Pill color="var(--emerald)">{info.paid}/{draft.count} pagas</Pill><Pill color="var(--amber)">{info.remaining} restantes</Pill><Pill color="var(--violet)">termina em {monthLabel(info.lastYm)}</Pill></div>
+          <p className="mt-2 text-sm text-muted-foreground">Ainda faltam <b className="text-foreground">{brl(info.remainingAmount)}</b>{draft.per * draft.count !== draft.total ? " (a última parcela ajusta os centavos)" : ""}.</p>
+        </div>
+      )}
+      <Actions onCancel={onCancel} onSave={() => draft && onSave(draft)} disabled={!draft || !desc.trim()} />
+    </div>
+  );
+}
+
+/* ───────────── despesa ou receita recorrente ───────────── */
+export function RecurringForm({ initial, onSave, onCancel }: { initial?: Recurring | undefined; onSave: (r: Recurring) => void; onCancel?: (() => void) | undefined }) {
+  const { state, today } = useFinance();
+  const [kind, setKind] = useState<TxKind>(initial?.kind ?? "despesa"), [desc, setDesc] = useState(initial?.desc ?? ""), [amount, setAmount] = useState<number | undefined>(initial?.amount), [day, setDay] = useState(String(initial?.day ?? 5));
+  const [cat, setCat] = useState(initial?.category ?? "moradia"), [method, setMethod] = useState<Method>(initial?.method ?? "debito");
+  const [payId, setPayId] = useState(initial?.cardId ?? initial?.accountId ?? (state.accounts[0]?.id ?? ""));
+  const isCard = state.cards.some((c) => c.id === payId);
+  const save = () => onSave({ id: initial?.id ?? uid("rec-"), kind, desc: desc.trim(), amount: amount ?? 0, day: Math.max(1, Math.min(31, Math.round(Number(day) || 1))), category: cat, method: isCard ? "credito" : method === "credito" ? "debito" : method, accountId: isCard ? undefined : payId || undefined, cardId: isCard ? payId : undefined, startYm: initial?.startYm ?? ymOf(today) });
+  return (
+    <div className="space-y-4">
+      <Segmented value={kind} onChange={(k) => { setKind(k); setCat(k === "receita" ? "salario" : "moradia"); }} options={[{ value: "despesa", label: "Despesa fixa" }, { value: "receita", label: "Receita fixa" }]} />
+      <Grid>
+        <Field label="Descrição"><TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={kind === "despesa" ? "Ex.: Aluguel, Netflix, academia" : "Ex.: Salário"} autoFocus data-testid="fin-rec-desc" /></Field>
+        <Field label="Valor"><MoneyInput value={amount} onChange={setAmount} data-testid="fin-rec-valor" /></Field>
+        <Field label="Dia do mês"><TextInput type="number" min={1} max={31} value={day} onChange={(e) => setDay(e.target.value)} /></Field>
+        <Field label={kind === "despesa" ? "Paga com" : "Cai em"}>
+          <Select value={payId} onChange={(e) => setPayId(e.target.value)}>
+            <optgroup label="Contas">{state.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup>
+            {kind === "despesa" && state.cards.length > 0 && <optgroup label="Cartões">{state.cards.map((c) => <option key={c.id} value={c.id}>{c.name} •••• {c.last4}</option>)}</optgroup>}
+          </Select>
+        </Field>
+      </Grid>
+      <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} income={kind === "receita"} /></Field>
+      <Actions onCancel={onCancel} onSave={save} disabled={!desc.trim() || !amount} />
+    </div>
+  );
+}
+
+/* ───────────── meta ───────────── */
+const GOAL_KINDS: { value: GoalKind; label: string; hint: string }[] = [
+  { value: "guardar", label: "Guardar um valor", hint: "Viagem, compra grande, qualquer objetivo." },
+  { value: "reserva", label: "Reserva de emergência", hint: "Meses de segurança guardados." },
+  { value: "quitar_cartao", label: "Quitar um cartão", hint: "Acompanhe o quanto já pagou." },
+  { value: "economizar_mensal", label: "Economizar por mês", hint: "Uma meta de poupança mensal." },
+  { value: "limite_categoria", label: "Limitar gastos de uma categoria", hint: "O Orion avisa quando passar." },
+];
+export const goalKindLabel = (k: GoalKind) => GOAL_KINDS.find((g) => g.value === k)?.label ?? k;
+export function GoalForm({ initial, onSave, onCancel }: { initial?: Goal | undefined; onSave: (g: Goal) => void; onCancel?: (() => void) | undefined }) {
+  const { state } = useFinance();
+  const [kind, setKind] = useState<GoalKind>(initial?.kind ?? "guardar"), [title, setTitle] = useState(initial?.title ?? ""), [target, setTarget] = useState<number | undefined>(initial?.target), [current, setCurrent] = useState<number | undefined>(initial?.current ?? 0);
+  const [deadline, setDeadline] = useState(initial?.deadline ?? ""), [cardId, setCardId] = useState(initial?.cardId ?? state.cards[0]?.id ?? ""), [category, setCategory] = useState(initial?.category ?? "restaurantes");
+  const info = GOAL_KINDS.find((g) => g.value === kind)!;
+  const auto = kind === "limite_categoria" ? `Limite de ${catOf(category).name}` : kind === "reserva" ? "Reserva de emergência" : kind === "economizar_mensal" ? "Economizar todo mês" : kind === "quitar_cartao" ? `Quitar o cartão ${state.cards.find((c) => c.id === cardId)?.name ?? ""}`.trim() : "";
+  const save = () => onSave({ id: initial?.id ?? uid("goal-"), kind, title: title.trim() || auto || "Nova meta", target: target ?? 0, current: kind === "limite_categoria" ? 0 : current ?? 0, deadline: deadline || undefined, category: kind === "limite_categoria" ? category : undefined, cardId: kind === "quitar_cartao" ? cardId : undefined, monthly: kind === "economizar_mensal" ? target : undefined });
+  return (
+    <div className="space-y-4">
+      <Field label="Tipo de meta" hint={info.hint}><Select value={kind} onChange={(e) => setKind(e.target.value as GoalKind)} data-testid="fin-meta-tipo">{GOAL_KINDS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</Select></Field>
+      <Field label="Nome da meta"><TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={auto || "Ex.: Viagem para Lisboa"} data-testid="fin-meta-nome" /></Field>
+      <Grid>
+        {kind === "quitar_cartao" && <Field label="Cartão"><Select value={cardId} onChange={(e) => setCardId(e.target.value)}>{state.cards.map((c) => <option key={c.id} value={c.id}>{c.name} •••• {c.last4}</option>)}</Select></Field>}
+        {kind === "limite_categoria" && <Field label="Categoria"><Select value={category} onChange={(e) => setCategory(e.target.value)}>{CATS.filter((c) => !c.income).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>}
+        <Field label={kind === "limite_categoria" ? "Limite por mês" : kind === "economizar_mensal" ? "Quanto guardar por mês" : kind === "quitar_cartao" ? "Valor a quitar" : "Valor da meta"}><MoneyInput value={target} onChange={setTarget} data-testid="fin-meta-valor" /></Field>
+        {kind !== "limite_categoria" && <Field label={kind === "economizar_mensal" ? "Já guardado neste mês" : kind === "quitar_cartao" ? "Já pago" : "Já guardado"}><MoneyInput value={current} onChange={setCurrent} /></Field>}
+        {(kind === "guardar" || kind === "reserva" || kind === "quitar_cartao") && <Field label="Prazo (opcional)"><TextInput type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>}
+      </Grid>
+      <Actions onCancel={onCancel} onSave={save} disabled={!target} />
+    </div>
+  );
+}
+
+/* ───────────── movimentação (despesa ou receita) ───────────── */
+export type TxResult = { tx?: Transaction; plan?: Plan };
+export function TxForm({ initial, onSave, onCancel, lockMethod, initialMethod, saveLabel = "Adicionar", extraActions }: { initial?: Partial<Transaction> & { installments?: number } | undefined; onSave: (r: TxResult) => void; onCancel?: (() => void) | undefined; lockMethod?: Method | undefined; initialMethod?: Method | undefined; saveLabel?: string | undefined; extraActions?: ReactNode }) {
+  const { state, today } = useFinance();
+  const [kind, setKind] = useState<TxKind>(initial?.kind ?? "despesa"), [desc, setDesc] = useState(initial?.desc ?? ""), [amount, setAmount] = useState<number | undefined>(initial?.amount);
+  const [method, setMethod] = useState<Method>(lockMethod ?? initial?.method ?? initialMethod ?? "debito"), [date, setDate] = useState(initial?.date ?? isoOf(today));
+  const [cat, setCat] = useState(initial?.category ?? "outros"), [catTouched, setCatTouched] = useState(!!initial?.category);
+  const [accountId, setAccountId] = useState(initial?.accountId ?? state.accounts[0]?.id ?? ""), [cardId, setCardId] = useState(initial?.cardId ?? state.cards[0]?.id ?? "");
+  const [parcelado, setParcelado] = useState((initial?.installments ?? 1) > 1), [count, setCount] = useState(String(initial?.installments && initial.installments > 1 ? initial.installments : 3));
+  const credit = kind === "despesa" && method === "credito";
+  const catV = catTouched ? cat : guessCategory(desc, kind === "receita");
+  const n = Math.max(2, Math.min(60, Math.round(Number(count) || 2)));
+  const card = state.cards.find((c) => c.id === cardId);
+  const needsPay = credit ? !!cardId : method === "dinheiro" ? true : !!accountId;
+  const methods: { value: Method; label: string }[] = kind === "receita" ? [{ value: "pix", label: "Pix" }, { value: "debito", label: "Conta" }, { value: "dinheiro", label: "Dinheiro" }] : [{ value: "debito", label: "Débito" }, { value: "credito", label: "Crédito" }, { value: "dinheiro", label: "Dinheiro" }, { value: "pix", label: "Pix" }];
+  const save = () => {
+    const base = { desc: desc.trim(), category: catV };
+    if (credit && parcelado && amount && card) {
+      const first = invoiceMonthOf(card, date), per = Math.round((amount / n) * 100) / 100;
+      return onSave({ plan: { id: uid("plan-"), ...base, cardId, total: amount, count: n, per, purchaseYm: ymOf(date), first, createdAt: date } });
+    }
+    onSave({ tx: { id: initial?.id ?? uid("tx-"), kind, ...base, amount: amount ?? 0, date, method: kind === "receita" && method === "credito" ? "pix" : method, accountId: credit ? undefined : method === "dinheiro" ? (state.accounts.find((a) => a.kind === "dinheiro")?.id ?? (accountId || undefined)) : accountId || undefined, cardId: credit ? cardId : undefined } });
+  };
+  return (
+    <div className="space-y-4" data-testid="fin-form-mov">
+      {!lockMethod && <Segmented value={kind} onChange={(k) => { setKind(k); setMethod(k === "receita" ? "pix" : "debito"); setCatTouched(false); }} options={[{ value: "despesa", label: "Despesa" }, { value: "receita", label: "Receita" }]} />}
+      <Field label={kind === "despesa" ? "O que foi comprado?" : "O que você recebeu?"}><TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={kind === "despesa" ? "Ex.: Livro, almoço, farmácia" : "Ex.: Freela, venda"} autoFocus data-testid="fin-mov-desc" /></Field>
+      <Grid>
+        <Field label="Qual o valor?"><MoneyInput value={amount} onChange={setAmount} data-testid="fin-mov-valor" /></Field>
+        <Field label="Data"><TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} max={isoOf(addDays(today, 0))} data-testid="fin-mov-data" /></Field>
+      </Grid>
+      {!lockMethod && <Field group label={kind === "despesa" ? "Foi débito, crédito ou dinheiro?" : "Como recebeu?"}><Segmented value={method} onChange={setMethod} options={methods} /></Field>}
+      {credit ? (
+        <Field label="Qual cartão?"><Select value={cardId} onChange={(e) => setCardId(e.target.value)} data-testid="fin-mov-cartao">{state.cards.length === 0 && <option value="">Cadastre um cartão primeiro</option>}{state.cards.map((c) => <option key={c.id} value={c.id}>{c.name} •••• {c.last4}</option>)}</Select></Field>
+      ) : method !== "dinheiro" ? (
+        <Field label="Qual conta?"><Select value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="fin-mov-conta">{state.accounts.length === 0 && <option value="">Cadastre uma conta primeiro</option>}{state.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select></Field>
+      ) : null}
+      {credit && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+          <label className="flex cursor-pointer items-center justify-between gap-3"><span className="text-sm font-medium">Foi parcelado?</span>
+            <button type="button" role="switch" aria-checked={parcelado} onClick={() => setParcelado(!parcelado)} data-testid="fin-mov-parcelado" className={`relative h-6 w-11 rounded-full transition ${parcelado ? "bg-emerald/70" : "bg-white/15"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${parcelado ? "left-[1.35rem]" : "left-0.5"}`} /></button></label>
+          {parcelado && (
+            <div className="mt-3 grid grid-cols-[7rem_1fr] items-end gap-3">
+              <Field label="Parcelas"><TextInput type="number" min={2} max={60} value={count} onChange={(e) => setCount(e.target.value)} data-testid="fin-mov-nparcelas" /></Field>
+              <p className="pb-2 text-sm text-muted-foreground">{amount ? <>{n}x de <b className="text-foreground">{brl(amount / n)}</b></> : "Informe o valor"}{card && amount ? <> · 1ª em <b className="text-foreground">{monthLabel(invoiceMonthOf(card, date))}</b></> : null}</p>
+            </div>
+          )}
+        </div>
+      )}
+      <Field group label="Categoria da despesa"><CategoryPicker value={catV} onChange={(c) => { setCat(c); setCatTouched(true); }} income={kind === "receita"} /></Field>
+      <Actions onCancel={onCancel} onSave={save} saveLabel={credit && parcelado ? "Adicionar compra parcelada" : saveLabel} disabled={!desc.trim() || !amount || !needsPay} extra={extraActions} />
+    </div>
+  );
+}
+function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+
