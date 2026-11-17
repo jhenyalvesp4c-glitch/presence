@@ -173,17 +173,44 @@ export function cardAvailable(s: FinanceState, c: Card): number {
 }
 
 export type InvoiceLine = { id: string; desc: string; amount: number; date: string; category: string; parcel?: string | undefined; source: Entry["source"] | "ajuste" };
-export type Invoice = { cardId: string; ym: string; due: string; lines: InvoiceLine[]; total: number; adjustment: number };
+/** `declared` = total informado (se houver); `adjustment` = parte ainda não detalhada; `over` = quanto os itens passam do total informado. */
+export type Invoice = { cardId: string; ym: string; due: string; lines: InvoiceLine[]; total: number; adjustment: number; declared?: number | undefined; over: number };
 export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice {
   const lines: InvoiceLine[] = [];
   for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx" });
   for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela" });
   for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa" && recurringActiveIn(r, dueYm)) lines.push({ id: `${r.id}:${dueYm}`, desc: r.desc, amount: r.amount, date: dayIn(dueYm, r.day), category: r.category, source: "recorrente" });
-  const adjustment = card.adjustments[dueYm] ?? 0;
-  if (adjustment) lines.push({ id: `adj:${dueYm}`, desc: "Outros valores pendentes", amount: adjustment, date: dueDateOf(card, dueYm), category: "outros", source: "ajuste" });
-  return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total: sum(lines.map((l) => l.amount)), adjustment };
+  const items = sum(lines.map((l) => l.amount)), declared = card.declared?.[dueYm];
+  // com total informado, o que ainda não foi detalhado é "total − itens" (nunca negativo): detalhar não muda o total
+  const adjustment = declared !== undefined ? round2(Math.max(0, declared - items)) : (card.adjustments[dueYm] ?? 0);
+  const over = declared !== undefined ? round2(Math.max(0, items - declared)) : 0;
+  if (adjustment) lines.push({ id: `adj:${dueYm}`, desc: declared !== undefined ? "Outros valores (ainda não detalhados)" : "Outros valores pendentes", amount: adjustment, date: dueDateOf(card, dueYm), category: "outros", source: "ajuste" });
+  return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total: sum(lines.map((l) => l.amount)), adjustment, declared, over };
 }
 /** Data de fechamento da fatura que vence em `dueYm`. */
+/**
+ * Versões antigas guardavam o total digitado como um valor fixo somado aos itens ("adjustments"), o que duplicava ao cadastrar
+ * as compras. Converte para o total informado (`declared`) mantendo o total que já aparecia.
+ */
+export function migrateInvoiceTotals(st: FinanceState): FinanceState {
+  if (!st.cards.some((c) => Object.values(c.adjustments ?? {}).some((v) => v))) return st;
+  return { ...st, cards: st.cards.map((c) => {
+    const adj = Object.entries(c.adjustments ?? {}).filter(([, v]) => v);
+    if (!adj.length) return c;
+    const declared = { ...(c.declared ?? {}) }, bare = { ...c, adjustments: {}, declared: {} };
+    for (const [ym, v] of adj) if (declared[ym] === undefined) declared[ym] = round2(invoiceFor(st, bare, ym).total + v);
+    return { ...c, adjustments: {}, declared };
+  }) };
+}
+
+/** Informa (ou limpa, com valor vazio ou 0) o total da fatura de um mês, como o banco mostra. */
+export function withDeclaredTotal(card: Card, ym: string, value: number | undefined): Card {
+  const declared = { ...(card.declared ?? {}) }, adjustments = { ...card.adjustments };
+  if (value && value > 0) declared[ym] = round2(value); else delete declared[ym];
+  delete adjustments[ym];
+  return { ...card, declared, adjustments };
+}
+
 export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);
 /** "fecha 28/11 · vence 05/12": sempre as duas datas, para não confundir mês de fechamento com mês de vencimento. */
 export const invoiceLabel = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => `fecha ${dateBR(closingDateOf(card, dueYm)).slice(0, 5)} · vence ${dateBR(dueDateOf(card, dueYm)).slice(0, 5)}`;

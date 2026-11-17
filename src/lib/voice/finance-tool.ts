@@ -1,5 +1,5 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
-import { addMonths, alertsFor, brl, cashflow, categoryTotals, dateBR, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
+import { addMonths, alertsFor, brl, cashflow, categoryTotals, dateBR, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
 import { cloudFinanceRepo } from "../finance/cloud-repo";
 import { catOf } from "../finance/categories";
 import { parseNatural } from "../finance/parse";
@@ -55,7 +55,8 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
   if (acao === "fatura") {
     const q = String(args["cartao"] ?? "").trim(), cards = q ? find(s.cards, q) : s.cards;
     if (q && !cards.length) return { result: { ok: false, erro: `Não achei o cartão "${q}".`, cartoes: s.cards.map((c) => c.name) } };
-    const inv = cards.map((c) => { const i = openInvoice(s, c, today); return { cartao: c.name, total: i.total, periodo: invoiceLabel(c, i.ym), vence: dateBR(i.due), maiores: [...i.lines].sort((a, b) => b.amount - a.amount).slice(0, 3).map((l) => `${l.desc} ${brl(l.amount)}`) }; });
+    const byMonth = !!String(args["mes"] ?? "").trim();
+    const inv = cards.map((c) => { const i = byMonth ? invoiceFor(s, c, ym) : openInvoice(s, c, today); return { cartao: c.name, total: i.total, periodo: invoiceLabel(c, i.ym), vence: dateBR(i.due), maiores: [...i.lines].sort((a, b) => b.amount - a.amount).slice(0, 3).map((l) => `${l.desc} ${brl(l.amount)}`) }; });
     return { result: { ok: true, faturas: inv }, panel: panel("Faturas abertas", inv.map((i) => ({ titulo: i.cartao, itens: [item(brl(i.total), `${i.periodo}`), ...i.maiores.map((m) => item(m))] })), "/financeiro?aba=contas") };
   }
 

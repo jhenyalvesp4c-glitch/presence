@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, CalendarClock, CreditCard, Landmark, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
-import { accountBalance, addMonths, brl, cardAvailable, closingDateOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
+import { ArrowLeft, CalendarClock, ChevronLeft, ChevronRight, CreditCard, Landmark, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
+import { accountBalance, addMonths, brl, cardAvailable, closingDateOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
@@ -10,7 +10,7 @@ import { HeroPanel, SectionTitle, Tilt } from "./fx";
 import { AccountForm, CardForm, TxForm } from "./forms";
 import { PlanCard } from "./Installments";
 import { EntryRow } from "./rows";
-import { CatBadge, ConfirmDelete, Empty, Head, Modal, Panel, Pill, Segmented, TONES, btn } from "./ui";
+import { CatBadge, ConfirmDelete, Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TONES, btn } from "./ui";
 
 const ROSE = "oklch(0.72 0.18 10)";
 const AddTile = ({ label, onClick, testId }: { label: string; onClick: () => void; testId?: string }) => (
@@ -135,8 +135,8 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
         )}
       </div>
       <Segmented value={tab} onChange={setTab} className="max-w-2xl"
-        options={card ? [{ value: "fatura", label: "Fatura atual" }, { value: "proximas", label: "Próximas" }, { value: "parceladas", label: "Parceladas" }, { value: "historico", label: "Histórico" }] : [{ value: "historico", label: "Histórico" }, { value: "debito", label: "Compras no débito" }, { value: "mes", label: "Despesas do mês" }]} />
-      {card && tab === "fatura" && <InvoiceView card={card} ym={invoiceMonthOf(card, isoOf(today))} />}
+        options={card ? [{ value: "fatura", label: "Faturas" }, { value: "proximas", label: "Próximas" }, { value: "parceladas", label: "Parceladas" }, { value: "historico", label: "Histórico" }] : [{ value: "historico", label: "Histórico" }, { value: "debito", label: "Compras no débito" }, { value: "mes", label: "Despesas do mês" }]} />
+      {card && tab === "fatura" && <InvoiceView card={card} />}
       {card && tab === "proximas" && (
         <div className="grid gap-4 sm:grid-cols-2" data-testid="fin-proximas">{upcomingInvoices(state, card, today, 6).slice(1).map((inv, i) => (
           <Panel key={inv.ym} glow={tone.glow} className="!p-4" style={{ animation: `fin-pop .5s ${i * 0.06}s both` }}>
@@ -180,20 +180,41 @@ function CardStats({ card }: { card: Card }) {
   );
 }
 
-function InvoiceView({ card, ym }: { card: Card; ym: string }) {
-  const { state } = useFinance(), inv = invoiceFor(state, card, ym);
+/** Faturas mês a mês: navegue pelos meses, veja o que entra em cada uma e informe o total que o banco mostra. */
+function InvoiceView({ card }: { card: Card }) {
+  const f = useFinance(), { state, today } = f, open = invoiceMonthOf(card, isoOf(today)), [ym, setYm] = useState(open);
+  const inv = invoiceFor(state, card, ym), months = Array.from({ length: 9 }, (_, i) => addMonths(open, i - 2));
+  const typed = card.declared?.[ym], isOpen = ym === open;
+  const itemized = inv.lines.filter((l) => l.source !== "ajuste");
   return (
-    <Panel glow={TONES[card.tone].glow} data-testid="fin-fatura">
-      <Head icon={Receipt} title={`Fatura que vence em ${dateBR(inv.due)}`} sub={`Fecha em ${dateBR(closingDateOf(card, inv.ym))}`} right={<b className="font-display text-2xl tabular-nums">{brl(inv.total)}</b>} />
-      {inv.lines.length === 0 ? <Empty icon={Receipt} title="Fatura vazia" hint="As compras no crédito deste cartão aparecem aqui." /> : (
-        <ul className="space-y-0.5">{inv.lines.map((l, i) => (
-          <li key={l.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/[0.04]" style={{ animation: `fin-pop .4s ${Math.min(i, 12) * 0.03}s both` }}>
-            <CatBadge id={l.category} size={34} />
-            <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}</p><p className="text-xs text-muted-foreground">{dateBR(l.date)}</p></div>
-            <b className="text-sm tabular-nums">{brl(l.amount)}</b>
-          </li>))}</ul>
-      )}
-    </Panel>
+    <div className="space-y-4" data-testid="fin-fatura">
+      <div className="flex gap-2 overflow-x-auto pb-1 scroll-neon" data-testid="fin-fatura-meses">
+        {months.map((m) => { const i = invoiceFor(state, card, m), on = m === ym; return (
+          <button key={m} onClick={() => setYm(m)} aria-pressed={on} data-testid={`fin-fatura-mes-${m}`}
+            className={`shrink-0 rounded-2xl border px-3.5 py-2 text-left transition ${on ? "border-cyan/50 bg-cyan/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}>
+            <p className="text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">vence {monthLabel(m)}{m === open ? " · atual" : ""}</p>
+            <p className="font-display text-base font-semibold tabular-nums">{i.total > 0 ? brl(i.total) : "—"}</p>
+          </button>); })}
+      </div>
+      <Panel glow={TONES[card.tone].glow}>
+        <Head icon={Receipt} title={`Fatura que vence em ${dateBR(inv.due)}`} sub={`Fecha em ${dateBR(closingDateOf(card, inv.ym))}${isOpen ? " · fatura aberta" : ""}`}
+          right={<div className="flex items-center gap-1"><button className={btn.icon} aria-label="Mês anterior" onClick={() => setYm(addMonths(ym, -1))}><ChevronLeft size={16} /></button><b className="min-w-[7.5rem] text-center font-display text-2xl tabular-nums" data-testid="fin-fatura-total">{brl(inv.total)}</b><button className={btn.icon} aria-label="Próximo mês" onClick={() => setYm(addMonths(ym, 1))}><ChevronRight size={16} /></button></div>} />
+        <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <Field label="Total desta fatura (como aparece no app do banco)" hint={typed !== undefined ? (inv.over > 0 ? `Atenção: os itens cadastrados passam ${brl(inv.over)} do total informado. Confira o total ou os itens.` : inv.adjustment > 0 ? `Já detalhado: ${brl(inv.total - inv.adjustment)}. Faltam ${brl(inv.adjustment)} para detalhar; conforme você cadastra as compras e parcelas, esse valor diminui e o total não muda.` : "Tudo detalhado: os itens fecham com o total.") : "Opcional. Informe o total do banco e vá cadastrando as compras e parcelas: elas abatem desse valor, sem duplicar."}>
+            <MoneyInput value={typed} onChange={(v) => f.upsertCard(withDeclaredTotal(card, ym, v))} data-testid="fin-fatura-total-informado" />
+          </Field>
+          <p className="pb-2 text-xs text-muted-foreground">{itemized.length} {itemized.length === 1 ? "item" : "itens"}{inv.adjustment > 0 ? ` · ${brl(inv.adjustment)} sem detalhar` : ""}</p>
+        </div>
+        {inv.lines.length === 0 ? <Empty icon={Receipt} title="Fatura vazia" hint="As compras no crédito deste cartão aparecem aqui." /> : (
+          <ul className="space-y-0.5">{inv.lines.map((l, i) => (
+            <li key={l.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/[0.04]" style={{ animation: `fin-pop .4s ${Math.min(i, 12) * 0.03}s both` }}>
+              <CatBadge id={l.category} size={34} />
+              <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}{l.source === "ajuste" && <Pill color="var(--cyan)">a detalhar</Pill>}</p><p className="text-xs text-muted-foreground">{l.source === "ajuste" ? "total do banco menos o que já foi cadastrado" : dateBR(l.date)}</p></div>
+              <b className="text-sm tabular-nums">{brl(l.amount)}</b>
+            </li>))}</ul>
+        )}
+      </Panel>
+    </div>
   );
 }
 

@@ -127,7 +127,7 @@ export const TOOLS = [
   }, required: ["item", "acao"] }),
   fn("financeiro", "Consulta o FINANCEIRO real da pessoa (contas, cartões, parcelas, assinaturas) e lança gastos/ganhos. Ações: resumo (saldo, o que entrou e saiu, o que falta pagar, alertas), categorias (onde gastou), saldo (por conta), fatura (cartão), parcelas, assinaturas, ultimos (movimentações, com busca opcional), lancar (grava uma despesa/receita a partir de uma frase).", { type: "object", properties: {
     acao: { type: "string", enum: ["resumo", "categorias", "saldo", "fatura", "parcelas", "assinaturas", "ultimos", "lancar"] },
-    mes: { type: "string", description: "Mês: 'dezembro', 'mês passado' ou AAAA-MM. Vazio = mês atual." },
+    mes: { type: "string", description: "Mês (na acao fatura é o mês do VENCIMENTO; sem mês = fatura aberta): 'dezembro', 'mês passado' ou AAAA-MM. Vazio = mês atual." },
     conta: { type: "string", description: "Nome da conta (acao saldo)." }, cartao: { type: "string", description: "Nome do cartão (acao fatura)." },
     busca: { type: "string", description: "Texto ou categoria para filtrar (acao ultimos)." }, quantidade: { type: "number" },
     frase: { type: "string", description: "A frase dela, como falou (acao lancar). Ex.: 'gastei 50 no mercado no débito pelo Nubank'." },

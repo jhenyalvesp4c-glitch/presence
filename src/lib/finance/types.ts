@@ -15,6 +15,8 @@ export type Card = {
   closingDay: number; dueDay: number;
   /** Valores pendentes extras por fatura (mês de vencimento "aaaa-mm" → valor): fatura anterior em aberto, juros etc. */
   adjustments: Record<string, number>;
+  /** Total da fatura como o banco mostra (mês de vencimento "aaaa-mm" → valor). Os itens cadastrados abatem desse total; o que falta aparece como "ainda não detalhado". */
+  declared?: Record<string, number> | undefined;
 };
 export type Transaction = {
   id: string; kind: TxKind; desc: string; amount: number; date: string; method: Method;

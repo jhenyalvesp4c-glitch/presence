@@ -37,6 +37,8 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 - `store.tsx` expõe `sync` (`saving | saved | local | error`) e recarrega ao voltar para o app (traz o que foi lançado em outro aparelho).
 - Indicador no topo do Financeiro (`SyncDot`): "Salvo na nuvem", "Salvando…", "Só neste aparelho · entre na conta" ou erro.
 
+**Fatura com total do banco** (`Card.declared`, coluna `fin_cards.declared`): por mês de vencimento, a pessoa informa o total que o banco mostra. As compras e parcelas cadastradas abatem desse total e o que falta aparece como "Outros valores (ainda não detalhados)" (`Invoice.adjustment`); o total não muda ao detalhar, então não duplica. Se os itens passarem do total informado, `Invoice.over` avisa. `adjustments` (soma fixa) é o formato antigo: `migrateInvoiceTotals` converte para `declared` ao abrir, mantendo o total que já aparecia. Na tela do cartão, a aba "Faturas" navega mês a mês.
+
 **Voz** (`src/lib/voice/finance-tool.ts`, ferramenta `financeiro`): `resumo`, `categorias`, `saldo`, `fatura`, `parcelas`, `assinaturas`, `ultimos` e `lancar` (frase → `parseNatural` → grava em `fin_transactions`; só grava se entendeu valor, forma de pagamento e conta/cartão; parcelado não). Usa `calc.ts` no servidor, então os números são os mesmos da tela.
 
 **Próximo**: Open Finance (agregador) alimentando `fin_transactions`, com o mesmo `id` estável por lançamento do banco para não duplicar.

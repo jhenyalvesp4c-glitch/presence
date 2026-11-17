@@ -59,3 +59,11 @@ describe("financeiro: gravação só do que mudou", () => {
     expect(d.settings).toBe(true); expect(d.empty).toBe(false); expect(d.upserts.fin_transactions).toHaveLength(0);
   });
 });
+
+describe("financeiro: total informado da fatura no banco", () => {
+  it("ida e volta mantém os totais por mês", () => {
+    const a = makeMock(today); a.cards[0]!.declared = { "2026-12": 1113.56, "2027-01": 80 };
+    expect(viaBanco(a).cards[0]!.declared).toEqual({ "2026-12": 1113.56, "2027-01": 80 });
+    expect(viaBanco(makeMock(today)).cards[0]!.declared).toBeUndefined();
+  });
+});

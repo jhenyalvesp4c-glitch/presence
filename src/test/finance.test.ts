@@ -261,3 +261,44 @@ describe("sobra de caixa (o caso real: salário 1.500, casa 500, faturas 1.113,5
     expect(c.sobra).toBeLessThan(0);
   });
 });
+
+describe("fatura com total informado: cadastrar as compras não duplica", () => {
+  const mk = (declared?: number, adjustments: Record<string, number> = {}): FinanceState => ({ ...EMPTY_STATE, onboarded: true,
+    cards: [{ id: "n", name: "Nubank", brand: "mastercard", last4: "1", tone: "roxo", limit: 5000, availableBase: 4000, baseDate: "2026-11-17", closingDay: 28, dueDay: 5, adjustments, declared: declared === undefined ? undefined : { "2026-12": declared } }] });
+  const plan = (n: string, per: number): Plan => ({ id: n, desc: n, cardId: "n", total: per * 3, count: 3, per, purchaseYm: "2026-11", first: "2026-12", category: "compras", createdAt: "2026-11-10" });
+  it("o total do banco é o total; os itens abatem e o resto fica 'a detalhar'", async () => {
+    const { invoiceFor } = await import("@/lib/finance/calc");
+    const c = mk(1113.56).cards[0]!;
+    expect(invoiceFor(mk(1113.56), c, "2026-12").total).toBe(1113.56);
+    const st = { ...mk(1113.56), plans: [plan("Tênis", 189.9), plan("Sofá", 300)] };
+    const inv = invoiceFor(st, st.cards[0]!, "2026-12");
+    expect(inv.total).toBe(1113.56); expect(inv.adjustment).toBeCloseTo(1113.56 - 489.9, 2); expect(inv.over).toBe(0);
+    expect(inv.lines.filter((l) => l.source === "parcela")).toHaveLength(2);
+  });
+  it("itens que passam do total informado avisam e o total é o dos itens", async () => {
+    const { invoiceFor } = await import("@/lib/finance/calc");
+    const st = { ...mk(300), plans: [plan("A", 200), plan("B", 200)] };
+    const inv = invoiceFor(st, st.cards[0]!, "2026-12");
+    expect(inv.total).toBe(400); expect(inv.over).toBe(100); expect(inv.adjustment).toBe(0);
+  });
+  it("sem total informado, tudo continua como antes", async () => {
+    const { invoiceFor } = await import("@/lib/finance/calc");
+    const st = { ...mk(undefined, { "2026-12": 300 }), plans: [plan("A", 100)] };
+    expect(invoiceFor(st, st.cards[0]!, "2026-12").total).toBe(400);
+  });
+  it("migra o ajuste antigo para total informado sem mudar o total que já aparecia, e depois não duplica", async () => {
+    const { invoiceFor, migrateInvoiceTotals } = await import("@/lib/finance/calc");
+    const antigo = { ...mk(undefined, { "2026-12": 1113.56 }), plans: [plan("Tênis", 189.9)] };
+    const antes = invoiceFor(antigo, antigo.cards[0]!, "2026-12").total; // 189,90 + 1.113,56
+    const novo = migrateInvoiceTotals(antigo);
+    expect(novo.cards[0]!.adjustments).toEqual({}); expect(invoiceFor(novo, novo.cards[0]!, "2026-12").total).toBeCloseTo(antes, 2);
+    const depois = { ...novo, plans: [...novo.plans, plan("Sofá", 300)] };
+    expect(invoiceFor(depois, depois.cards[0]!, "2026-12").total).toBeCloseTo(antes, 2); // cadastrar o sofá não aumentou
+  });
+  it("informar e limpar o total", async () => {
+    const { withDeclaredTotal } = await import("@/lib/finance/calc");
+    const c = mk(undefined, { "2026-12": 50 }).cards[0]!;
+    const a = withDeclaredTotal(c, "2026-12", 900); expect(a.declared).toEqual({ "2026-12": 900 }); expect(a.adjustments).toEqual({});
+    expect(withDeclaredTotal(a, "2026-12", undefined).declared).toEqual({});
+  });
+});

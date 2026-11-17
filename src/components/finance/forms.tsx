@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
-import { addMonths, brl, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, planInfo, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, planInfo, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
 import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
 import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Tone, Transaction, TxKind } from "@/lib/finance/types";
@@ -59,12 +59,12 @@ export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undef
   const [limit, setLimit] = useState<number | undefined>(initial?.limit), [avail, setAvail] = useState<number | undefined>(initial?.availableBase);
   const [closing, setClosing] = useState(String(initial?.closingDay ?? 25)), [due, setDue] = useState(String(initial?.dueDay ?? 5));
   const openYm = invoiceMonthOf({ closingDay: Number(closing) || 25, dueDay: Number(due) || 5 }, isoOf(today));
-  const [extra, setExtra] = useState<number | undefined>(initial?.adjustments[openYm]);
+  const [extra, setExtra] = useState<number | undefined>(initial?.declared?.[openYm]);
   const day = (v: string) => Math.max(1, Math.min(31, Math.round(Number(v) || 1)));
   const ok = name.trim() && limit && limit > 0 && avail !== undefined && avail <= (limit ?? 0);
   const save = () => {
-    const adjustments = { ...(initial?.adjustments ?? {}) }; if (extra) adjustments[openYm] = extra; else delete adjustments[openYm];
-    onSave({ id: initial?.id ?? uid("card-"), name: name.trim(), brand, last4: last4.replace(/\D/g, "").padStart(4, "0").slice(-4), tone, limit: limit ?? 0, availableBase: avail ?? 0, baseDate: initial && avail === initial.availableBase ? initial.baseDate : isoOf(today), closingDay: day(closing), dueDay: day(due), adjustments });
+    const base: Card = { id: initial?.id ?? uid("card-"), name: name.trim(), brand, last4: last4.replace(/\D/g, "").padStart(4, "0").slice(-4), tone, limit: limit ?? 0, availableBase: avail ?? 0, baseDate: initial && avail === initial.availableBase ? initial.baseDate : isoOf(today), closingDay: day(closing), dueDay: day(due), adjustments: initial?.adjustments ?? {}, declared: initial?.declared };
+    onSave(withDeclaredTotal(base, openYm, extra));
   };
   return (
     <div className="space-y-4">
@@ -79,7 +79,7 @@ export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undef
         <Field label="Dia de fechamento da fatura"><TextInput type="number" min={1} max={31} value={closing} onChange={(e) => setClosing(e.target.value)} /></Field>
         <Field label="Dia de vencimento da fatura"><TextInput type="number" min={1} max={31} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
       </Grid>
-      <Field label={`Valor atual da fatura (${invoiceLabel({ closingDay: day(closing), dueDay: day(due) }, openYm)})`} hint="Opcional. Se já sabe o total da fatura aberta, informe aqui; compras que você lançar depois somam a este valor."><MoneyInput value={extra} onChange={setExtra} /></Field>
+      <Field label={`Valor atual da fatura (${invoiceLabel({ closingDay: day(closing), dueDay: day(due) }, openYm)})`} hint="Opcional. O total como aparece no app do banco. As compras e parcelas que você cadastrar abatem desse valor, sem duplicar."><MoneyInput value={extra} onChange={setExtra} /></Field>
       <Field group label="Cor"><TonePicker value={tone} onChange={setTone} /></Field>
       <Actions onCancel={onCancel} onSave={save} disabled={!ok} />
     </div>
