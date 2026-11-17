@@ -14,6 +14,10 @@ import { transcribeAudio } from "@/lib/audio.functions";
 import type { Panel, Turn, VoiceEvent } from "./agent";
 import { takeSentences } from "./sentences";
 import { SLOW_AFTER_MS, SLOW_FILLER } from "./filler";
+import { markStt, recordPerf, takeStt } from "./perf";
+
+/** Marcas de tempo do pedido em andamento (para o medidor de velocidade). */
+const cur: { t0: number; text?: number; audio?: number; tools?: boolean } = { t0: 0 };
 
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
@@ -207,7 +211,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setCanListen(!!recCtor() || !!navigator.mediaDevices?.getUserMedia);
     try { if (localStorage.getItem("presence.stt") === "gravado") sttMode.current = "gravado"; } catch { /* sem armazenamento */ }
   }, []);
-  const spk = () => (speaker.current ??= new Speaker(() => { if (activeRef.current) setP("speaking"); }, (n) => setNote(n), (t) => setBotText((p) => (p && !/\s$/.test(p) ? `${p} ` : p) + t)));
+  const spk = () => (speaker.current ??= new Speaker(() => { if (cur.t0 && cur.audio === undefined) cur.audio = Math.round(performance.now() - cur.t0); if (activeRef.current) setP("speaking"); }, (n) => setNote(n), (t) => setBotText((p) => (p && !/\s$/.test(p) ? `${p} ` : p) + t)));
 
   const stopListening = useCallback(() => { const r = rec.current; rec.current = null; if (r) { r.onend = null; r.onresult = null; try { r.abort(); } catch { /* já parado */ } } setInterim(""); }, []);
 
@@ -297,13 +301,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       if (kind === "cancelar" || !activeRef.current) return;
       if (kind === "silencio") { if (++idle.current >= MAX_IDLE) endSession(); else listenRef.current(); return; }
       setP("thinking"); setInterim("");
+      const tStt = performance.now();
       try {
         const blob = new Blob(chunks, { type: mr.mimeType || mime || "audio/webm" });
         const r = await transcribeAudio({ data: { data: await blobToBase64(blob), mime: blob.type } });
         if (!activeRef.current) return;
         const text = r.ok ? r.text.trim() : "";
         if (!r.ok) setNote(r.error);
-        if (text.length >= 2 && !GHOST.test(text)) { idle.current = 0; void askRef.current(text); return; }
+        if (text.length >= 2 && !GHOST.test(text)) { idle.current = 0; markStt(performance.now() - tStt); void askRef.current(text); return; }
       } catch (e) { setNote(`Não consegui transcrever a gravação (${e instanceof Error ? e.message : "erro"}).`); }
       if (++idle.current >= MAX_IDLE) endSession(); else listenRef.current();
     };
@@ -330,6 +335,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   /** Uma rodada: manda a fala, recebe a resposta em streaming e fala cada frase assim que fica pronta. */
   const ask = useCallback(async (text: string) => {
     const my = ++turn.current;
+    const stt = takeStt(); cur.t0 = performance.now(); delete cur.text; delete cur.audio; cur.tools = false;
     stopListening();
     const sp = spk(); sp.reset();
     const greeting = text === GREET_MARK;
@@ -356,6 +362,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           if (e.t !== "fim") calm();
           if (e.t === "status") setStatus(e.m);
           else if (e.t === "texto") {
+            if (cur.text === undefined) cur.text = Math.round(performance.now() - cur.t0);
             setStatus(null);
             said += e.d; buffer += e.d;
             const t = takeSentences(buffer, { first });
@@ -363,7 +370,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           } else if (e.t === "acao") {
             if (e.a.tipo === "navegar") router.history.push(e.a.para); else endAfter.current = true;
           } else if (e.t === "painel") setPanel(e.p);
-          else if (e.t === "ferramenta") box.tools = e;
+          else if (e.t === "ferramenta") { box.tools = e; cur.tools = true; }
           else if (e.t === "erro") { said = said || e.m; say([e.m]); }
         };
         for (;;) {
@@ -401,6 +408,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     }
     if (turn.current !== my) return;
     await sp.drained();
+    if (!greeting) recordPerf({ em: Date.now(), transcricao: stt, primeiroTexto: cur.text ?? 0, comecouFalar: cur.audio ?? 0, total: Math.round(performance.now() - cur.t0), ferramentas: !!cur.tools });
     if (turn.current !== my || !activeRef.current) return;
     if (endAfter.current) { endSession(); return; }
     listen();

@@ -76,3 +76,7 @@ Variáveis de ambiente (Vercel, só servidor): `ORION_ROUTINE_FIRE_URL` e `ORION
 
 - **No servidor** (`filler.ts` + `runAgent`): quando o modelo vai usar ferramentas sem ter dito nada, o Orion fala na hora uma frase curta conforme o tipo ("Estou verificando para você.", "Estou abrindo o seu WhatsApp, só um instante.", "Pode deixar, já estou fazendo isso."). Ações imediatas (abrir tela, encerrar) e pedidos de melhoria não ganham aviso; se o modelo já falou, não repete.
 - **No navegador** (`use-voice.tsx`): se passam 2,2 s sem chegar nenhuma resposta, fala "Um instante, estou verificando para você." (uma vez por pedido). Respostas rápidas não ganham aviso.
+
+## Medidor de velocidade
+
+Configurações → "Velocidade da conversa" mostra, para as últimas 8 respostas, quanto demorou a transcrição (só no modo gravação), a primeira palavra do texto e o início da fala, desde que a pessoa terminou de falar (`src/lib/voice/perf.ts`, guardado só no navegador). Além desses tempos, o Orion espera `SILENCE_MS` (2,5 s) de silêncio para entender que a pessoa terminou.

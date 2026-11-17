@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
 import { useVoice } from "@/lib/voice/use-voice";
 import { listImprovements, STATUS_LABEL, type Improvement } from "@/lib/data/improvements";
+import { avg, onPerf, perfSamples, type PerfSample } from "@/lib/voice/perf";
 import { directEnabled, enableDirect, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
 
 export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Orion" }] }) });
@@ -143,6 +144,29 @@ function WhatsApp() {
   );
 }
 
+/** Quanto cada etapa da conversa demorou nas últimas respostas, para achar onde está a lentidão. */
+function VelocidadeConversa() {
+  const [rows, setRows] = useState<PerfSample[]>([]);
+  useEffect(() => { setRows(perfSamples()); return onPerf(() => setRows(perfSamples())); }, []);
+  const s = (ms: number) => (ms ? `${(ms / 1000).toFixed(1)} s` : "—");
+  return (
+    <section className={card} data-testid="cfg-velocidade">
+      <h2 className="font-display text-lg font-semibold">Velocidade da conversa</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Mostra quanto cada etapa demorou nas últimas respostas, desde que você terminou de falar. Converse um pouco com o Orion e volte aqui.</p>
+      {!rows.length ? <p className="mt-3 text-xs text-muted-foreground">Ainda não há medições neste navegador.</p> : (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="text-muted-foreground"><tr><th className="py-1 pr-3 font-medium">Transcrição</th><th className="py-1 pr-3 font-medium">Primeira palavra</th><th className="py-1 pr-3 font-medium">Começou a falar</th><th className="py-1 font-medium">Usou ferramenta</th></tr></thead>
+            <tbody>{rows.map((r) => <tr key={r.em} className="border-t border-white/10"><td className="py-1.5 pr-3">{s(r.transcricao)}</td><td className="pr-3">{s(r.primeiroTexto)}</td><td className="pr-3">{s(r.comecouFalar)}</td><td>{r.ferramentas ? "sim" : "não"}</td></tr>)}</tbody>
+            <tfoot><tr className="border-t border-white/20 font-medium"><td className="py-1.5 pr-3">{s(avg(rows.map((r) => r.transcricao).filter(Boolean)))}</td><td className="pr-3">{s(avg(rows.map((r) => r.primeiroTexto).filter(Boolean)))}</td><td className="pr-3">{s(avg(rows.map((r) => r.comecouFalar).filter(Boolean)))}</td><td>média</td></tr></tfoot>
+          </table>
+          <p className="mt-2 text-[0.7rem] text-muted-foreground">“Transcrição” só aparece no modo de gravação. Além disso, o Orion espera 2,5 s de silêncio antes de entender que você terminou.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Pedidos de melhoria que o Orion montou e você confirmou: o que está na fila para o Claude e o que já ficou pronto. */
 function PedidosMelhoria() {
   const [rows, setRows] = useState<Improvement[] | null>(null);
@@ -211,6 +235,8 @@ function Configuracoes() {
       <ChamarPorVoz />
 
       <PedidosMelhoria />
+
+      <VelocidadeConversa />
 
       <WhatsApp />
 
