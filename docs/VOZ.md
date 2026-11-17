@@ -80,3 +80,10 @@ Variáveis de ambiente (Vercel, só servidor): `ORION_ROUTINE_FIRE_URL` e `ORION
 ## Medidor de velocidade
 
 Configurações → "Velocidade da conversa" mostra, para as últimas 8 respostas, quanto demorou a transcrição (só no modo gravação), a primeira palavra do texto e o início da fala, desde que a pessoa terminou de falar (`src/lib/voice/perf.ts`, guardado só no navegador). Além desses tempos, o Orion espera `SILENCE_MS` (2,5 s) de silêncio para entender que a pessoa terminou.
+
+
+## Chamar falando "Orion": como evita falsos chamados
+- **Modo por gravação** (`wake-listen.ts`): `createSegmenter` só manda para transcrever um trecho **curto (até 6 s)**, com voz de verdade (som por pelo menos 0,3 s) e que termina em silêncio. Silêncio e batidas rápidas (palma, porta, tecla) não geram trecho. Som que não para (ventilador, TV) é descartado e o nível de ruído de fundo sobe. Se o modelo está ocupado, o trecho mais recente espera a vez (não se perde a palavra dita agora).
+- **A dica da transcrição NÃO leva o nome.** O modelo repete a dica quando só ouve ruído; com "Orion" na dica, qualquer barulho virava "Orion" e ativava. Hoje a dica é neutra e a transcrição usa `temperature = 0`.
+- **Texto** (`wake.ts`): aceita as variações de escrita (Orion, Órion, Orian, Aurion, "o Ryan", "ori on"…), mas só **no começo da fala** (até 3 palavras antes: "ei", "bom dia"), e descarta falas com 3 ou mais "Orion" (é a IA repetindo a dica). Citar o nome no meio de uma conversa não ativa. Frases fantasma do modelo ("Obrigado.", "Legendas pela comunidade Amara.org") são ignoradas.
+- Testes: `wake.test.ts` (texto) e `wake-segmenter.test.ts` (sons sintéticos: silêncio, palma, palavra, ruído constante, fala longa).

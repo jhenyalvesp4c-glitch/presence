@@ -64,6 +64,7 @@ export async function transcribe(bytes: Uint8Array, mime: string, env: Record<st
   form.append("model", model);
   form.append("language", "pt");
   form.append("response_format", "json");
+  form.append("temperature", "0"); // sem "criatividade": menos texto inventado quando o áudio é só ruído
   form.append("prompt", prompt || "Anotações em português do Brasil sobre disparos em massa, polos, dossiês, demandas, CRM, templates e treinamentos.");
   const res = await fetch(`${baseUrl(env)}/audio/transcriptions`, {
     method: "POST", headers: { authorization: `Bearer ${env["OPENAI_API_KEY"] ?? ""}` }, body: form, signal: AbortSignal.timeout(TIMEOUT_MS),
