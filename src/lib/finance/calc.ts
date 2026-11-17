@@ -66,7 +66,7 @@ function recurringEntry(r: Recurring, ym: string): Entry | null {
 const txEntry = (t: Transaction): Entry => ({ id: t.id, kind: t.kind, desc: t.desc, amount: t.amount, date: t.date, category: t.category, method: t.method, accountId: t.accountId, cardId: t.cardId, source: "tx" });
 
 /** Tudo que entra e sai no mês do calendário `ym` (compras na data da compra, parcelas no mês de vencimento, recorrentes). */
-export function monthEntries(s: FinanceState, ym: string): Entry[] {
+export function monthEntries(s: FinanceState, ym: string, upTo?: string): Entry[] {
   const out: Entry[] = [];
   for (const t of s.transactions) if (ymOf(t.date) === ym) out.push(txEntry(t));
   for (const p of s.plans) {
@@ -74,15 +74,25 @@ export function monthEntries(s: FinanceState, ym: string): Entry[] {
     for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === ym) out.push({ id: `${p.id}:${n}`, kind: "despesa", desc: p.desc, amount: parcelAmount(p, n), date: dayIn(ym, dueDay), category: p.category, method: "credito", cardId: p.cardId, source: "parcela", planId: p.id, parcel: `${n}/${p.count}` });
   }
   for (const r of s.recurring) { const e = recurringEntry(r, ym); if (e) out.push(e); }
-  return out.sort((a, b) => b.date.localeCompare(a.date));
+  return out.filter((e) => !upTo || e.date <= upTo).sort((a, b) => b.date.localeCompare(a.date));
+}
+/** Mesmo dia do mês anterior (para comparar "até hoje" com o mês passado até o mesmo dia). */
+export const sameDayPrev = (ym: string, upTo: string): string => dayIn(addMonths(ym, -1), Number(upTo.slice(8, 10)));
+
+export type MonthSummary = { receitas: number; despesas: number; aReceber: number; aPagar: number; resultado: number; previsto: number };
+/** Realizado até hoje × ainda por acontecer neste mês (salário do dia 30 só conta quando chegar o dia 30). */
+export function monthSummary(s: FinanceState, ym: string, todayIso: string): MonthSummary {
+  const es = monthEntries(s, ym), done = es.filter((e) => e.date <= todayIso), later = es.filter((e) => e.date > todayIso);
+  const receitas = total(incomeOf(done)), despesas = total(expensesOf(done)), aReceber = total(incomeOf(later)), aPagar = total(expensesOf(later));
+  return { receitas, despesas, aReceber, aPagar, resultado: round2(receitas - despesas), previsto: round2(receitas + aReceber - despesas - aPagar) };
 }
 export const expensesOf = (es: Entry[]) => es.filter((e) => e.kind === "despesa");
 export const incomeOf = (es: Entry[]) => es.filter((e) => e.kind === "receita");
 export const total = (es: Entry[]) => sum(es.map((e) => e.amount));
 
 export type CatTotal = { id: string; name: string; color: string; value: number; pct: number; prev: number; delta: number; deltaPct: number | null };
-export function categoryTotals(s: FinanceState, ym: string): CatTotal[] {
-  const cur = expensesOf(monthEntries(s, ym)), prev = expensesOf(monthEntries(s, addMonths(ym, -1)));
+export function categoryTotals(s: FinanceState, ym: string, upTo?: string): CatTotal[] {
+  const cur = expensesOf(monthEntries(s, ym, upTo)), prev = expensesOf(monthEntries(s, addMonths(ym, -1), upTo ? sameDayPrev(ym, upTo) : undefined));
   const all = total(cur), by = new Map<string, number>(), pv = new Map<string, number>();
   for (const e of cur) by.set(e.category, (by.get(e.category) ?? 0) + e.amount);
   for (const e of prev) pv.set(e.category, (pv.get(e.category) ?? 0) + e.amount);
@@ -94,25 +104,34 @@ export function categoryTotals(s: FinanceState, ym: string): CatTotal[] {
 
 export type MonthPoint = { ym: string; label: string; receitas: number; despesas: number; saldo: number; acumulado: number };
 /** Série dos últimos `n` meses (inclui o atual) com receitas, despesas e saldo acumulado. */
-export function monthlySeries(s: FinanceState, currentYm: string, n = 6): MonthPoint[] {
+export function monthlySeries(s: FinanceState, currentYm: string, n = 6, upTo?: string): MonthPoint[] {
   let acc = 0;
   return Array.from({ length: n }, (_, i) => addMonths(currentYm, i - (n - 1))).map((ym) => {
-    const es = monthEntries(s, ym), receitas = total(incomeOf(es)), despesas = total(expensesOf(es)), saldo = round2(receitas - despesas);
+    const es = monthEntries(s, ym, ym === currentYm ? upTo : undefined), receitas = total(incomeOf(es)), despesas = total(expensesOf(es)), saldo = round2(receitas - despesas);
     acc = round2(acc + saldo);
     return { ym, label: monthShort(ym), receitas, despesas, saldo, acumulado: acc };
   });
 }
 
 /* ───────────── saldos, limites e faturas ───────────── */
-export function accountBalance(s: FinanceState, a: Account): number {
+export function accountBalance(s: FinanceState, a: Account, today: Date = new Date()): number {
   let v = a.balanceBase;
   for (const t of s.transactions) {
     if (t.accountId !== a.id || t.date < a.baseDate || t.method === "credito") continue;
     v += t.kind === "receita" ? t.amount : -t.amount;
   }
+  // salário e despesas fixas pagos na conta mexem no saldo quando o dia deles chega (depois do saldo informado)
+  const todayIso = isoOf(today);
+  for (let ym = ymOf(a.baseDate); ym <= ymOf(todayIso); ym = addMonths(ym, 1)) {
+    for (const r of s.recurring) {
+      if (r.accountId !== a.id || r.method === "credito" || ym < r.startYm) continue;
+      const d = dayIn(ym, r.day);
+      if (d >= a.baseDate && d <= todayIso) v += r.kind === "receita" ? r.amount : -r.amount;
+    }
+  }
   return round2(v);
 }
-export const totalBalance = (s: FinanceState) => sum(s.accounts.map((a) => accountBalance(s, a)));
+export const totalBalance = (s: FinanceState, today: Date = new Date()) => sum(s.accounts.map((a) => accountBalance(s, a, today)));
 
 /** Quanto do limite está livre: o informado no briefing menos o que foi gasto no crédito depois dele. */
 export function cardAvailable(s: FinanceState, c: Card): number {
@@ -142,6 +161,32 @@ export const openInvoice = (s: FinanceState, card: Card, today: Date): Invoice =
 export const upcomingInvoices = (s: FinanceState, card: Card, today: Date, n = 4): Invoice[] => { const m = invoiceMonthOf(card, isoOf(today)); return Array.from({ length: n }, (_, i) => invoiceFor(s, card, addMonths(m, i))); };
 export const totalOpenInvoices = (s: FinanceState, today: Date) => sum(s.cards.map((c) => openInvoice(s, c, today).total));
 
+/* ───────────── fluxo de caixa previsto ───────────── */
+export type FlowEvent = { id: string; date: string; label: string; amount: number; kind: "receita" | "despesa" | "fatura"; cardId?: string | undefined; balance: number };
+export type Cashflow = { start: number; events: FlowEvent[]; end: number; min: number; firstNegative: FlowEvent | null; until: string };
+/**
+ * O que ainda vai entrar e sair nos próximos dias, na ordem, com o saldo depois de cada item.
+ * Entram: salário e fixas pagas em conta (ainda por vir) e as faturas dos cartões que vencem na janela.
+ * Compras no crédito, parcelas e fixas no cartão NÃO entram à parte: já estão dentro da fatura.
+ */
+export function cashflow(s: FinanceState, today: Date, days = 60): Cashflow {
+  const todayIso = isoOf(today), end = isoOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() + days));
+  const raw: Omit<FlowEvent, "balance">[] = [];
+  for (let ym = ymOf(todayIso); ym <= ymOf(end); ym = addMonths(ym, 1)) {
+    for (const r of s.recurring) {
+      if (r.cardId || r.method === "credito" || ym < r.startYm) continue;
+      const d = dayIn(ym, r.day);
+      if (d > todayIso && d <= end) raw.push({ id: `${r.id}:${ym}`, date: d, label: r.desc, amount: r.kind === "receita" ? r.amount : -r.amount, kind: r.kind });
+    }
+  }
+  for (const c of s.cards) for (const inv of upcomingInvoices(s, c, today, 4)) if (inv.total > 0 && inv.due > todayIso && inv.due <= end) raw.push({ id: `fat:${c.id}:${inv.ym}`, date: inv.due, label: `Fatura ${c.name}`, amount: -inv.total, kind: "fatura", cardId: c.id });
+  raw.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount); // no mesmo dia, o que entra vem antes do que sai
+  const start = totalBalance(s, today);
+  let bal = start, min = start;
+  const events = raw.map((e) => { bal = round2(bal + e.amount); min = Math.min(min, bal); return { ...e, balance: bal }; });
+  return { start, events, end: bal, min, firstNegative: events.find((e) => e.balance < 0) ?? null, until: end };
+}
+
 /* ───────────── comprometimento futuro ───────────── */
 export type Commitment = { ym: string; label: string; parcelas: number; recorrentes: number; total: number; porCartao: Record<string, number> };
 export function commitments(s: FinanceState, currentYm: string, n = 12): Commitment[] {
@@ -159,12 +204,14 @@ export const totalFutureParcels = (s: FinanceState, today: Date) => sum(s.plans.
 export type Alert = { id: string; level: "danger" | "warning" | "info"; title: string; detail: string };
 export function alertsFor(s: FinanceState, today: Date): Alert[] {
   const ym = ymOf(today), out: Alert[] = [];
-  const cats = categoryTotals(s, ym);
+  const todayIso = isoOf(today), cats = categoryTotals(s, ym, todayIso);
   for (const c of cats) {
     const base = [1, 2, 3].map((i) => total(expensesOf(monthEntries(s, addMonths(ym, -i))).filter((e) => e.category === c.id))), avg = sum(base) / 3;
     if (avg > 0 && c.value > avg * 1.3 && c.value - avg >= 80) out.push({ id: `cat:${c.id}`, level: c.value > avg * 1.6 ? "danger" : "warning", title: `${c.name} acima do normal`, detail: `R$ ${c.value.toFixed(0)} neste mês, ${Math.round(((c.value - avg) / avg) * 100)}% acima da sua média dos últimos 3 meses.` });
   }
-  const es = monthEntries(s, ym), rec = total(incomeOf(es)), exp = total(expensesOf(es));
+  const es = monthEntries(s, ym, todayIso), rec = total(incomeOf(es)), exp = total(expensesOf(es));
+  const flow = cashflow(s, today, 60);
+  if (flow.firstNegative) out.push({ id: "fluxo", level: "danger", title: `Seu saldo previsto fica negativo em ${dateBR(flow.firstNegative.date).slice(0, 5)}`, detail: `Depois de ${flow.firstNegative.label}, faltam R$ ${Math.abs(flow.firstNegative.balance).toFixed(2).replace(".", ",")}. No pior ponto dos próximos 60 dias faltam R$ ${Math.abs(flow.min).toFixed(2).replace(".", ",")}.` });
   if (rec > 0 && exp > rec) out.push({ id: "saldo", level: "danger", title: "Despesas acima das receitas", detail: `Você já gastou R$ ${(exp - rec).toFixed(0)} a mais do que entrou neste mês.` });
   for (const c of s.cards) {
     const used = c.limit ? 1 - cardAvailable(s, c) / c.limit : 0;
@@ -174,17 +221,17 @@ export function alertsFor(s: FinanceState, today: Date): Alert[] {
   }
   const next = commitments(s, addMonths(ym, 1), 1)[0];
   if (next && rec > 0 && next.parcelas > rec * 0.4) out.push({ id: "parc", level: "warning", title: "Parcelas pesam no próximo mês", detail: `R$ ${next.parcelas.toFixed(0)} em parcelas, ${Math.round((next.parcelas / rec) * 100)}% da sua receita mensal.` });
-  for (const g of s.goals) if (g.kind === "limite_categoria" && g.category) { const v = total(expensesOf(es).filter((e) => e.category === g.category)); if (v > g.target) out.push({ id: `meta:${g.id}`, level: "warning", title: `Limite de ${catOf(g.category).name} estourado`, detail: `R$ ${v.toFixed(0)} de um limite de R$ ${g.target.toFixed(0)}.` }); }
+  for (const g of s.goals) if (g.kind === "limite_categoria" && g.category) { const v = total(expensesOf(monthEntries(s, ym)).filter((e) => e.category === g.category)); if (v > g.target) out.push({ id: `meta:${g.id}`, level: "warning", title: `Limite de ${catOf(g.category).name} estourado`, detail: `R$ ${v.toFixed(0)} de um limite de R$ ${g.target.toFixed(0)}.` }); }
   const rank = { danger: 0, warning: 1, info: 2 } as const;
   return out.sort((a, b) => rank[a.level] - rank[b.level]);
 }
 
 export type WhyUp = { totalDelta: number; totalPct: number | null; top: { cat: CatTotal; items: Entry[] }[] };
 /** Explica o aumento (ou queda) dos gastos em relação ao mês anterior: categorias que mais subiram e as compras que mais pesaram. */
-export function whyChanged(s: FinanceState, ym: string): WhyUp {
-  const cur = total(expensesOf(monthEntries(s, ym))), prev = total(expensesOf(monthEntries(s, addMonths(ym, -1))));
-  const ups = categoryTotals(s, ym).filter((c) => c.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
-  const es = expensesOf(monthEntries(s, ym));
+export function whyChanged(s: FinanceState, ym: string, upTo?: string): WhyUp {
+  const cur = total(expensesOf(monthEntries(s, ym, upTo))), prev = total(expensesOf(monthEntries(s, addMonths(ym, -1), upTo ? sameDayPrev(ym, upTo) : undefined)));
+  const ups = prev > 0 ? categoryTotals(s, ym, upTo).filter((c) => c.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3) : [];
+  const es = expensesOf(monthEntries(s, ym, upTo));
   return { totalDelta: round2(cur - prev), totalPct: prev > 0 ? ((cur - prev) / prev) * 100 : null, top: ups.map((cat) => ({ cat, items: es.filter((e) => e.category === cat.id).sort((a, b) => b.amount - a.amount).slice(0, 3) })) };
 }
 

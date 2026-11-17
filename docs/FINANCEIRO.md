@@ -18,6 +18,9 @@ Rota `/financeiro` (`src/routes/financeiro.tsx`). Etapa 1: **só frontend**, com
 - `mock.ts`: dados de exemplo sempre relativos a "hoje".
 - `repo.ts`: interface `FinanceRepo` (`load/save/reset`) e a implementação local (`localStorage`, chave `presence.financeiro.v1`). `store.tsx` usa só essa interface.
 
+## Realizado × previsto
+O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no mês (salário do dia 30 só conta no dia 30). Os indicadores mostram o realizado e, embaixo, "a receber" e "a pagar"; "Resultado até hoje" mostra também o previsto do fim do mês. O bloco **"Para onde vai o seu saldo"** (`cashflow` em `calc.ts`) projeta os próximos 60 dias: entradas e fixas pagas em conta que ainda vão acontecer e o vencimento de cada fatura, com o saldo depois de cada item, e avisa quando fica negativo. Compras no crédito, parcelas e fixas no cartão não entram à parte: já estão dentro da fatura. O saldo da conta também acompanha salário e fixas quando o dia passa (depois da data do saldo informado).
+
 ## Regras que valem saber
 - Fatura de uma compra no crédito: compras até o dia de fechamento entram na fatura que vence no próximo vencimento depois do fechamento (`invoiceMonthOf`).
 - Parcela conta como paga depois do dia de vencimento, ou pelo número informado ("já paguei N"). A última parcela absorve os centavos.

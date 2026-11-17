@@ -88,7 +88,7 @@ export function Briefing({ onDone }: { onDone: () => void }) {
           <p className="text-xs text-muted-foreground">Os dados de exemplo são fictícios e ficam só neste navegador. Você pode limpar tudo depois, em “Opções”.</p>
         </div>);
       case "contas": return <ListStep testId="fin-step-contas" items={state.accounts} addLabel="Adicionar banco ou carteira" hint="Cadastre pelo menos uma conta para os saldos aparecerem."
-        grid="grid gap-3 sm:grid-cols-2" render={(a: Account, act) => <div className="relative"><AccountTile account={a} balance={accountBalance(state, a)} /><span className="absolute right-3 top-3 flex gap-1.5">{act}<Remove label={a.name} onClick={() => f.removeAccount(a.id)} /></span></div>}
+        grid="grid gap-3 sm:grid-cols-2" render={(a: Account, act) => <div className="relative"><AccountTile account={a} balance={accountBalance(state, a, today)} /><span className="absolute right-3 top-3 flex gap-1.5">{act}<Remove label={a.name} onClick={() => f.removeAccount(a.id)} /></span></div>}
         form={(init, d) => <AccountForm initial={init} onCancel={state.accounts.length ? d : undefined} onSave={(a) => { f.upsertAccount(a); d(); }} />} />;
       case "cartoes": return <ListStep testId="fin-step-cartoes" items={state.cards} addLabel="Adicionar cartão de crédito" hint="Sem cartões? Pode pular esta etapa."
         grid="grid gap-4 sm:grid-cols-2" render={(c: Card, act) => <div><CardVisual card={c} compact usedPct={c.limit ? (1 - cardAvailable(state, c) / c.limit) * 100 : 0} /><span className="mt-2 flex justify-end gap-1.5">{act}<Remove label={c.name} onClick={() => f.removeCard(c.id)} /></span></div>}

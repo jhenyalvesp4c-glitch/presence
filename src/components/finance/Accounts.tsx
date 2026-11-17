@@ -46,7 +46,7 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
       <section>
         <div className="mb-3"><h2 className="font-serif text-3xl">Contas e <span className="text-gradient italic">carteiras</span></h2><p className="text-sm text-muted-foreground">Bancos, carteiras digitais e dinheiro.</p></div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {state.accounts.map((a, i) => <div key={a.id} style={{ animation: `fin-pop .55s ${i * 0.07}s both` }}><AccountTile account={a} balance={accountBalance(state, a)} onClick={() => onSel({ type: "acc", id: a.id })} /></div>)}
+          {state.accounts.map((a, i) => <div key={a.id} style={{ animation: `fin-pop .55s ${i * 0.07}s both` }}><AccountTile account={a} balance={accountBalance(state, a, today)} onClick={() => onSel({ type: "acc", id: a.id })} /></div>)}
           <AddTile label="Adicionar conta" onClick={() => setEdit({ type: "acc" })} testId="fin-add-conta" />
         </div>
       </section>
@@ -80,12 +80,12 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
       <button className="flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground" onClick={onBack} data-testid="fin-voltar"><ArrowLeft size={16} /> Contas e cartões</button>
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,26rem)_1fr]">
         <div className="space-y-4">
-          {card ? <CardVisual card={card} usedPct={card.limit ? (1 - cardAvailable(state, card) / card.limit) * 100 : 0} /> : <AccountTile account={acc!} balance={accountBalance(state, acc!)} selected />}
+          {card ? <CardVisual card={card} usedPct={card.limit ? (1 - cardAvailable(state, card) / card.limit) * 100 : 0} /> : <AccountTile account={acc!} balance={accountBalance(state, acc!, today)} selected />}
           <div className="flex gap-2"><button className={`${btn.ghost} flex-1`} onClick={() => setEdit(true)}><Pencil size={14} /> Editar</button><button className={`${btn.danger} flex-1`} onClick={() => setDel(true)}><Trash2 size={14} /> Excluir</button></div>
         </div>
         {card ? <CardStats card={card} /> : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Stat label="Saldo atual" color={accountBalance(state, acc!) < 0 ? ROSE : undefined}><Money value={accountBalance(state, acc!)} /></Stat>
+            <Stat label="Saldo atual" color={accountBalance(state, acc!, today) < 0 ? ROSE : undefined}><Money value={accountBalance(state, acc!, today)} /></Stat>
             <Stat label="Despesas do mês" color={ROSE}><Money value={monthExp} /></Stat>
             <Stat label="Entradas do mês" color="var(--emerald)"><Money value={monthInc} /></Stat>
             <Stat label="Tipo"><span className="font-sans text-base">{KIND_LABEL[acc!.kind]}</span></Stat>

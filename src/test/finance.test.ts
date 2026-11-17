@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { accountBalance, addMonths, closingDateOf, invoiceLabel, alertsFor, cardAvailable, categoryTotals, commitments, invoiceFor, invoiceMonthOf, monthEntries, monthlySeries, openInvoice, planInfo, totalFutureParcels, whyChanged, ymOf, expensesOf, total } from "@/lib/finance/calc";
+import { accountBalance, addMonths, cashflow, closingDateOf, invoiceLabel, monthSummary, totalBalance, alertsFor, cardAvailable, categoryTotals, commitments, invoiceFor, invoiceMonthOf, monthEntries, monthlySeries, openInvoice, planInfo, totalFutureParcels, whyChanged, ymOf, expensesOf, total } from "@/lib/finance/calc";
 import { makeMock } from "@/lib/finance/mock";
 import { parseNatural } from "@/lib/finance/parse";
 import { normalizeState } from "@/lib/finance/repo";
-import type { Plan } from "@/lib/finance/types";
+import { EMPTY_STATE, type FinanceState, type Plan } from "@/lib/finance/types";
 
 const TODAY = new Date(2026, 10, 17); // 17/11/2026
 const mock = () => makeMock(TODAY);
@@ -87,15 +87,15 @@ describe("projeção e lançamentos do mês", () => {
 describe("contas, limites e faturas", () => {
   it("débito reduz o saldo da conta, crédito não", () => {
     const s = mock(), acc = s.accounts[0]!;
-    const base = accountBalance(s, acc);
-    s.transactions.push({ id: "n1", kind: "despesa", desc: "Teste", amount: 100, date: "2026-11-16", method: "debito", accountId: acc.id, category: "outros" });
-    expect(accountBalance(s, acc)).toBe(Math.round((base - 100) * 100) / 100);
-    s.transactions.push({ id: "n2", kind: "despesa", desc: "Crédito", amount: 100, date: "2026-11-16", method: "credito", accountId: acc.id, cardId: "card-nubank", category: "outros" });
-    expect(accountBalance(s, acc)).toBe(Math.round((base - 100) * 100) / 100);
+    const base = accountBalance(s, acc, TODAY);
+    s.transactions.push({ id: "n1", kind: "despesa", desc: "Teste", amount: 100, date: "2026-11-17", method: "debito", accountId: acc.id, category: "outros" });
+    expect(accountBalance(s, acc, TODAY)).toBe(Math.round((base - 100) * 100) / 100);
+    s.transactions.push({ id: "n2", kind: "despesa", desc: "Crédito", amount: 100, date: "2026-11-17", method: "credito", accountId: acc.id, cardId: "card-nubank", category: "outros" });
+    expect(accountBalance(s, acc, TODAY)).toBe(Math.round((base - 100) * 100) / 100);
   });
   it("limite disponível cai com compra no crédito e com parcelamento novo", () => {
     const s = mock(), c = s.cards[0]!, a0 = cardAvailable(s, c);
-    s.transactions.push({ id: "n3", kind: "despesa", desc: "Compra", amount: 250, date: "2026-11-16", method: "credito", cardId: c.id, category: "outros" });
+    s.transactions.push({ id: "n3", kind: "despesa", desc: "Compra", amount: 250, date: "2026-11-17", method: "credito", cardId: c.id, category: "outros" });
     expect(cardAvailable(s, c)).toBeCloseTo(a0 - 250, 2);
     s.plans.push(plan({ id: "novo", cardId: c.id, total: 600, count: 6, per: 100, createdAt: "2026-11-17" }));
     expect(cardAvailable(s, c)).toBeCloseTo(a0 - 250 - 600, 2);
@@ -153,5 +153,52 @@ describe("armazenamento", () => {
   it("normaliza dados incompletos ou de outra versão", () => {
     expect(normalizeState(null).accounts).toEqual([]); expect(normalizeState({ version: 99, accounts: [{}] }).accounts).toEqual([]);
     const s = normalizeState({ version: 1, cards: [{ id: "c" }] }); expect(s.cards[0]!.adjustments).toEqual({}); expect(s.plans).toEqual([]);
+  });
+});
+
+
+/** O caso real que apareceu: saldo zero, salário e aluguel no dia 30, duas faturas que vencem em dezembro. */
+describe("fluxo de caixa: salário no dia 30 e faturas em dezembro", () => {
+  const mk = (): FinanceState => ({
+    ...structuredClone(EMPTY_STATE), onboarded: true,
+    accounts: [{ id: "a", name: "Conta", kind: "banco", tone: "roxo", balanceBase: 0, baseDate: "2026-11-17" }],
+    cards: [
+      { id: "nu", name: "Nubank", brand: "mastercard", last4: "4617", tone: "roxo", limit: 7800, availableBase: 5272.79, baseDate: "2026-11-17", closingDay: 28, dueDay: 5, adjustments: { "2026-12": 1113.56 } },
+      { id: "mp", name: "Mercado Pago", brand: "mastercard", last4: "1209", tone: "azul", limit: 3500, availableBase: 3000, baseDate: "2026-11-17", closingDay: 9, dueDay: 15, adjustments: { "2026-12": 435 } },
+    ],
+    recurring: [
+      { id: "sal", kind: "receita", desc: "Salário", amount: 1500, day: 30, category: "salario", method: "pix", accountId: "a", startYm: "2026-11" },
+      { id: "alu", kind: "despesa", desc: "Moradia", amount: 500, day: 30, category: "moradia", method: "debito", accountId: "a", startYm: "2026-11" },
+    ],
+  });
+  it("antes do dia 30 o mês mostra R$ 0 realizado e o que ainda vem separado", () => {
+    expect(monthSummary(mk(), "2026-11", "2026-11-17")).toEqual({ receitas: 0, despesas: 0, aReceber: 1500, aPagar: 500, resultado: 0, previsto: 1000 });
+    expect(totalBalance(mk(), TODAY)).toBe(0);
+  });
+  it("as faturas aparecem com fechamento e vencimento corretos", () => {
+    const s = mk();
+    expect(openInvoice(s, s.cards[0]!, TODAY)).toMatchObject({ ym: "2026-12", due: "2026-12-05", total: 1113.56 });
+    expect(openInvoice(s, s.cards[1]!, TODAY)).toMatchObject({ ym: "2026-12", due: "2026-12-15", total: 435 });
+  });
+  it("a projeção mostra o saldo ficando negativo no vencimento do Nubank", () => {
+    const f = cashflow(mk(), TODAY, 30);
+    expect(f.events.map((e) => [e.date, e.label, e.amount, e.balance])).toEqual([
+      ["2026-11-30", "Salário", 1500, 1500], ["2026-11-30", "Moradia", -500, 1000], ["2026-12-05", "Fatura Nubank", -1113.56, -113.56], ["2026-12-15", "Fatura Mercado Pago", -435, -548.56],
+    ]);
+    expect(f.firstNegative?.date).toBe("2026-12-05"); expect(f.min).toBe(-548.56); expect(f.end).toBe(-548.56);
+    // em 60 dias entram também o salário e o aluguel de dezembro (30/12) e o saldo volta a subir
+    const f60 = cashflow(mk(), TODAY, 60);
+    expect(f60.min).toBe(-548.56); expect(f60.end).toBe(451.44);
+  });
+  it("o alerta avisa que vai faltar dinheiro", () => { expect(alertsFor(mk(), TODAY).find((a) => a.id === "fluxo")?.level).toBe("danger"); });
+  it("quando o dia 30 chega, salário e aluguel entram no saldo da conta", () => {
+    const s = mk(), dia30 = new Date(2026, 10, 30);
+    expect(accountBalance(s, s.accounts[0]!, dia30)).toBe(1000);
+    expect(monthSummary(s, "2026-11", "2026-11-30")).toMatchObject({ receitas: 1500, despesas: 500, resultado: 1000, aReceber: 0, aPagar: 0 });
+  });
+  it("fixas pagas no cartão não são contadas duas vezes (já estão na fatura)", () => {
+    const s = mk(); s.recurring.push({ id: "net", kind: "despesa", desc: "Netflix", amount: 55.9, day: 20, category: "assinaturas", method: "credito", cardId: "nu", startYm: "2026-11" });
+    expect(cashflow(s, TODAY, 60).events.some((e) => e.label === "Netflix")).toBe(false);
+    expect(openInvoice(s, s.cards[0]!, TODAY).total).toBe(1169.46);
   });
 });

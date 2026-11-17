@@ -6,7 +6,7 @@ import type { Account, Card, FinanceState, Goal, Method, Plan, Recurring, Transa
 function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 export function makeMock(today: Date = new Date()): FinanceState {
-  const ym0 = ymOf(today), base = `${ym0}-01`, todayDay = today.getDate();
+  const ym0 = ymOf(today), base = isoOf(today), todayDay = today.getDate();
   const accounts: Account[] = [
     { id: "acc-nubank", name: "Nubank", kind: "banco", tone: "roxo", balanceBase: 4280.5, baseDate: base },
     { id: "acc-picpay", name: "PicPay", kind: "carteira", tone: "verde", balanceBase: 612.3, baseDate: base },

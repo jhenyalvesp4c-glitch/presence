@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CreditCard, Info, Layers, PiggyBank, Scale, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { addMonths, alertsFor, brl, categoryTotals, commitments, dateBR, isoOf, monthName, monthlySeries, openInvoice, parseIso, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
+import { addMonths, alertsFor, brl, cashflow, categoryTotals, commitments, dateBR, isoOf, monthName, monthSummary, monthlySeries, openInvoice, parseIso, sameDayPrev, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
 import { AreaChart, BarsChart, Donut, Money, Sparkline, StackedBars } from "./charts";
 import { NaturalComposer } from "./QuickAdd";
@@ -29,30 +29,66 @@ const Delta = ({ now, prev, goodWhenUp = true }: { now: number; prev: number; go
   return <span className="inline-flex items-center gap-1" style={{ color: good ? "var(--emerald)" : ROSE }}>{up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{Math.abs(d).toFixed(0)}% <span className="text-muted-foreground">vs mês anterior</span></span>;
 };
 
+/** O que ainda vai entrar e sair, na ordem, com o saldo depois de cada item. Mostra com clareza quando o saldo fica negativo. */
+function FlowPanel({ flow, today, onAddMov }: { flow: ReturnType<typeof cashflow>; today: Date; onAddMov: () => void }) {
+  const neg = flow.min < 0, color = neg ? ROSE : "var(--cyan)";
+  // um ponto por dia (o saldo no fim do dia), para o gráfico não repetir datas
+  const byDay = new Map<string, number>(); for (const e of flow.events) byDay.set(e.date, e.balance);
+  const points = [{ label: "hoje", value: flow.start }, ...[...byDay.entries()].map(([d, v]) => ({ label: dateBR(d).slice(0, 5), value: v }))];
+  return (
+    <Panel glow={color} data-testid="fin-fluxo">
+      <Head icon={CalendarClock} title="Para onde vai o seu saldo" sub={`Próximos 60 dias: o que entra, o que sai e como o saldo fica (até ${dateBR(flow.until).slice(0, 5)})`}
+        right={<span className="text-right"><span className="block text-[0.66rem] uppercase tracking-wider text-muted-foreground">Saldo hoje</span><b className="font-display text-xl tabular-nums">{brl(flow.start)}</b></span>} />
+      {flow.events.length === 0 ? <Empty icon={CalendarClock} title="Nada previsto nos próximos 60 dias" hint="Cadastre salário, despesas fixas e cartões para ver a projeção do saldo." action={<button className={btn.ghost} onClick={onAddMov}>Adicionar movimentação</button>} /> : (
+        <div className="grid items-start gap-5 lg:grid-cols-[1.1fr_1fr]">
+          <div>
+            {flow.firstNegative ? (
+              <p className="mb-3 rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: `color-mix(in oklab, ${ROSE} 40%, transparent)`, background: `color-mix(in oklab, ${ROSE} 9%, transparent)` }} data-testid="fin-fluxo-negativo">
+                <b style={{ color: ROSE }}>O saldo fica negativo em {dateBR(flow.firstNegative.date).slice(0, 5)}</b> ({brl(flow.firstNegative.balance)}), depois de {flow.firstNegative.label}. No pior momento faltam <b>{brl(Math.abs(flow.min))}</b>.
+              </p>
+            ) : <p className="mb-3 rounded-2xl border border-emerald/30 bg-emerald/[0.07] px-4 py-3 text-sm">O saldo se mantém positivo nos próximos 60 dias e termina em <b>{brl(flow.end)}</b>.</p>}
+            <AreaChart points={points} color={color} height={190} />
+          </div>
+          <ol className="space-y-1.5" data-testid="fin-fluxo-lista">
+            {flow.events.slice(0, 9).map((e, i) => (
+              <li key={e.id} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2" style={{ animation: `fin-pop .4s ${i * 0.04}s both` }}>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[0.7rem] font-semibold tabular-nums" style={{ color: e.amount >= 0 ? "var(--emerald)" : e.kind === "fatura" ? "var(--violet)" : ROSE, background: "color-mix(in oklab, currentColor 13%, transparent)" }}>{dateBR(e.date).slice(0, 5)}</span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{e.label}</span><span className="block text-[0.7rem] text-muted-foreground">{e.kind === "fatura" ? "vencimento da fatura" : e.amount >= 0 ? "entrada prevista" : "saída prevista"}</span></span>
+                <span className="text-right"><span className={`block text-sm font-semibold tabular-nums ${e.amount >= 0 ? "text-emerald" : ""}`}>{e.amount >= 0 ? "+" : "−"}{brl(Math.abs(e.amount))}</span><span className="block text-[0.7rem] tabular-nums" style={{ color: e.balance < 0 ? ROSE : undefined }}>saldo {brl(e.balance)}</span></span>
+              </li>
+            ))}
+            {flow.events.length > 9 && <li className="px-2 text-xs text-muted-foreground">+ {flow.events.length - 9} lançamentos depois</li>}
+          </ol>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: { onOpenCard: (id: string) => void; onOpenAccount: (id: string) => void; onAdd: () => void; onTab: (t: string) => void; onDraft: (d: Draft) => void }) {
   const { state, today } = useFinance();
   const ym = ymOf(today), [active, setActive] = useState<string | null>(null);
   const model = useMemo(() => {
-    const es = monthEntries(state, ym), prevEs = monthEntries(state, addMonths(ym, -1));
-    const series = monthlySeries(state, ym, 6), cats = categoryTotals(state, ym), future = commitments(state, ym, 12);
+    const todayIso = isoOf(today), sum = monthSummary(state, ym, todayIso), prevEs = monthEntries(state, addMonths(ym, -1), sameDayPrev(ym, todayIso));
+    const series = monthlySeries(state, ym, 6, todayIso), cats = categoryTotals(state, ym, todayIso), future = commitments(state, ym, 12);
     return {
-      receitas: total(incomeOf(es)), despesas: total(expensesOf(es)), prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
-      series, cats, future, saldo: totalBalance(state), faturas: totalOpenInvoices(state, today), parcelas: totalFutureParcels(state, today),
-      alerts: alertsFor(state, today), why: whyChanged(state, ym),
+      sum, prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
+      series, cats, future, saldo: totalBalance(state, today), faturas: totalOpenInvoices(state, today), parcelas: totalFutureParcels(state, today),
+      alerts: alertsFor(state, today), why: whyChanged(state, ym, todayIso), flow: cashflow(state, today, 60),
     };
   }, [state, ym, today]);
   const nowCard = model.cats.find((c) => c.id === active);
   const upcoming = useMemo(() => state.cards.map((c) => ({ card: c, inv: openInvoice(state, c, today) })).filter((x) => x.inv.total > 0).sort((a, b) => a.inv.due.localeCompare(b.inv.due)), [state, today]);
-  const net = model.receitas - model.despesas;
+  const net = model.sum.resultado;
   const levelColor = { danger: ROSE, warning: "var(--amber)", info: "var(--cyan)" } as const;
 
   return (
     <div className="space-y-5" data-testid="fin-dashboard">
       <Panel glow="var(--violet)" className="!p-4 sm:!p-5"><NaturalComposer onOpenForm={onDraft} /></Panel>
 
-      {model.alerts.length > 0 && (
+      {model.alerts.some((a) => a.id !== "fluxo") && (
         <div className="grid gap-3 md:grid-cols-2" data-testid="fin-alertas">
-          {model.alerts.slice(0, 4).map((a, i) => (
+          {model.alerts.filter((a) => a.id !== "fluxo").slice(0, 4).map((a, i) => (
             <div key={a.id} className="flex items-start gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: `color-mix(in oklab, ${levelColor[a.level]} 35%, transparent)`, background: `color-mix(in oklab, ${levelColor[a.level]} 8%, transparent)`, animation: `fin-pop .5s ${i * 0.07}s both` }}>
               <span style={{ color: levelColor[a.level] }} className="mt-0.5">{a.level === "info" ? <Info size={18} /> : <AlertTriangle size={18} />}</span>
               <div><p className="text-sm font-medium">{a.title}</p><p className="text-xs text-muted-foreground">{a.detail}</p></div>
@@ -61,23 +97,25 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
         </div>
       )}
 
+      <FlowPanel flow={model.flow} today={today} onAddMov={onAdd} />
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Kpi testId="kpi-saldo" icon={Wallet} label="Saldo disponível" value={model.saldo} color="var(--cyan)" spark={model.series.map((p) => p.acumulado)} foot={<span>{state.accounts.length} contas e carteiras</span>} delay={0} />
-        <Kpi testId="kpi-receitas" icon={TrendingUp} label="Receitas do mês" value={model.receitas} color="var(--emerald)" foot={<Delta now={model.receitas} prev={model.prevR} />} delay={0.05} />
-        <Kpi testId="kpi-despesas" icon={TrendingDown} label="Despesas do mês" value={model.despesas} color={ROSE} foot={<Delta now={model.despesas} prev={model.prevD} goodWhenUp={false} />} delay={0.1} />
+        <Kpi testId="kpi-receitas" icon={TrendingUp} label="Receitas até hoje" value={model.sum.receitas} color="var(--emerald)" foot={model.sum.aReceber > 0 ? <span>+ {brl(model.sum.aReceber)} a receber no mês</span> : <Delta now={model.sum.receitas} prev={model.prevR} />} delay={0.05} />
+        <Kpi testId="kpi-despesas" icon={TrendingDown} label="Despesas até hoje" value={model.sum.despesas} color={ROSE} foot={model.sum.aPagar > 0 ? <span>+ {brl(model.sum.aPagar)} a pagar no mês</span> : <Delta now={model.sum.despesas} prev={model.prevD} goodWhenUp={false} />} delay={0.1} />
         <Kpi testId="kpi-faturas" icon={CreditCard} label="Faturas abertas" value={model.faturas} color="var(--violet)" foot={<span>{state.cards.length} cartões</span>} delay={0.15} />
         <Kpi testId="kpi-parcelas" icon={Layers} label="Parcelas futuras" value={model.parcelas} color="var(--amber)" foot={<span>{state.plans.length} compras parceladas</span>} delay={0.2} />
-        <Kpi testId="kpi-saldo-mes" icon={Scale} label="Resultado do mês" value={net} color={net >= 0 ? "var(--emerald)" : ROSE} foot={<span>{net >= 0 ? "sobrando até agora" : "gastando mais do que entrou"}</span>} delay={0.25} />
+        <Kpi testId="kpi-saldo-mes" icon={Scale} label="Resultado até hoje" value={net} color={net >= 0 ? "var(--emerald)" : ROSE} foot={<span>previsto no fim do mês: <b className={model.sum.previsto >= 0 ? "text-emerald" : ""} style={model.sum.previsto < 0 ? { color: ROSE } : undefined}>{brl(model.sum.previsto)}</b></span>} delay={0.25} />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-5">
         <Panel glow="var(--violet)" className="lg:col-span-3" data-testid="fin-categorias">
-          <Head icon={PiggyBank} title="Onde você mais gasta" sub={`Despesas de ${monthName(ym)} por categoria`} />
-          {model.cats.length === 0 ? <Empty title="Sem despesas neste mês" hint="Adicione uma movimentação para ver o gráfico." /> : (
+          <Head icon={PiggyBank} title="Onde você mais gasta" sub={`Despesas feitas até hoje em ${monthName(ym)}`} />
+          {model.cats.length === 0 ? <Empty title="Nenhuma despesa até hoje" hint="Adicione uma movimentação para ver o gráfico." /> : (
             <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
               <Donut data={model.cats} active={active} onActive={setActive} center={nowCard
                 ? <div><p className="text-xs text-muted-foreground">{nowCard.name}</p><p className="font-display text-xl font-semibold tabular-nums">{brl(nowCard.value)}</p><p className="text-xs" style={{ color: nowCard.color }}>{nowCard.pct.toFixed(0)}% das despesas</p></div>
-                : <div><p className="text-xs text-muted-foreground">Total no mês</p><p className="font-display text-2xl font-semibold tabular-nums">{brl(model.despesas)}</p><p className="text-xs text-muted-foreground">{model.cats.length} categorias</p></div>} />
+                : <div><p className="text-xs text-muted-foreground">Gasto até hoje</p><p className="font-display text-2xl font-semibold tabular-nums">{brl(model.sum.despesas)}</p><p className="text-xs text-muted-foreground">{model.cats.length} categorias</p></div>} />
               <ul className="space-y-1.5">
                 {model.cats.slice(0, 7).map((c) => (
                   <li key={c.id}>
@@ -96,18 +134,29 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
         </Panel>
 
         <Panel glow={ROSE} className="lg:col-span-2" data-testid="fin-porque">
-          <Head icon={model.why.totalDelta > 0 ? TrendingUp : TrendingDown} title={model.why.totalDelta > 0 ? "Por que seus gastos subiram?" : "Como seus gastos mudaram"} sub="Comparado ao mês passado" />
-          <p className="font-display text-3xl font-semibold tabular-nums" style={{ color: model.why.totalDelta > 0 ? ROSE : "var(--emerald)" }}>{model.why.totalDelta > 0 ? "+" : ""}{brl(model.why.totalDelta)}</p>
-          <p className="mb-4 text-xs text-muted-foreground">{model.why.totalPct === null ? "sem mês anterior para comparar" : `${model.why.totalDelta >= 0 ? "a mais" : "a menos"} (${Math.abs(model.why.totalPct).toFixed(0)}%) que em ${monthName(addMonths(ym, -1))}`}. O mês ainda não terminou.</p>
-          {model.why.top.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma categoria subiu em relação ao mês passado.</p> : (
-            <ol className="space-y-3">
-              {model.why.top.map(({ cat, items }, i) => (
-                <li key={cat.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3" style={{ animation: `fin-pop .5s ${0.1 + i * 0.08}s both` }}>
-                  <div className="flex items-center gap-2.5"><CatBadge id={cat.id} size={28} /><span className="text-sm font-medium">{cat.name}</span><span className="ml-auto text-sm font-semibold tabular-nums" style={{ color: ROSE }}>+{brl(cat.delta)}</span></div>
-                  <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">{items.map((e) => <li key={e.id} className="flex justify-between gap-2"><span className="truncate">{e.desc}{e.parcel ? ` (${e.parcel})` : ""}</span><span className="tabular-nums">{brl(e.amount)}</span></li>)}</ul>
-                </li>
-              ))}
-            </ol>
+          {model.why.totalPct === null ? (
+            <>
+              <Head icon={TrendingUp} title="Seus gastos neste mês" sub="Ainda não há mês anterior para comparar" />
+              <p className="font-display text-3xl font-semibold tabular-nums">{brl(model.sum.despesas)}</p>
+              <p className="mb-4 text-xs text-muted-foreground">gastos até hoje. Quando houver um mês anterior, o Orion mostra aqui por que os gastos subiram ou caíram.</p>
+              <ol className="space-y-2">{model.cats.slice(0, 3).map((c) => <li key={c.id} className="flex items-center gap-2.5 rounded-2xl border border-white/8 bg-white/[0.03] p-3"><CatBadge id={c.id} size={28} /><span className="text-sm font-medium">{c.name}</span><span className="ml-auto text-sm font-semibold tabular-nums">{brl(c.value)}</span></li>)}</ol>
+            </>
+          ) : (
+            <>
+              <Head icon={model.why.totalDelta > 0 ? TrendingUp : TrendingDown} title={model.why.totalDelta > 0 ? "Por que seus gastos subiram?" : "Como seus gastos mudaram"} sub="Até hoje, comparado ao mesmo ponto do mês passado" />
+              <p className="font-display text-3xl font-semibold tabular-nums" style={{ color: model.why.totalDelta > 0 ? ROSE : "var(--emerald)" }}>{model.why.totalDelta > 0 ? "+" : ""}{brl(model.why.totalDelta)}</p>
+              <p className="mb-4 text-xs text-muted-foreground">{model.why.totalDelta >= 0 ? "a mais" : "a menos"} ({Math.abs(model.why.totalPct).toFixed(0)}%) que em {monthName(addMonths(ym, -1))} até o dia {today.getDate()}.</p>
+              {model.why.top.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma categoria subiu em relação ao mês passado.</p> : (
+                <ol className="space-y-3">
+                  {model.why.top.map(({ cat, items }, i) => (
+                    <li key={cat.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3" style={{ animation: `fin-pop .5s ${0.1 + i * 0.08}s both` }}>
+                      <div className="flex items-center gap-2.5"><CatBadge id={cat.id} size={28} /><span className="text-sm font-medium">{cat.name}</span><span className="ml-auto text-sm font-semibold tabular-nums" style={{ color: ROSE }}>+{brl(cat.delta)}</span></div>
+                      <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">{items.map((e) => <li key={e.id} className="flex justify-between gap-2"><span className="truncate">{e.desc}{e.parcel ? ` (${e.parcel})` : ""}</span><span className="tabular-nums">{brl(e.amount)}</span></li>)}</ul>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
           )}
         </Panel>
       </div>
