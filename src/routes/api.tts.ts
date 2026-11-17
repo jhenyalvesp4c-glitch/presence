@@ -13,6 +13,10 @@ export const Route = createFileRoute("/api/tts")({
         const { guard } = await import("@/lib/voice/http");
         const blocked = guard(request, "tts");
         if (blocked) return blocked;
+        // diagnóstico só para quem está logado: ele faz uma chamada real ao provedor de IA/voz (custo) e mostra a configuração
+        const { withUser } = await import("@/lib/server-auth");
+        const denied = await withUser(request, async () => new Response(null, { status: 204 }));
+        if (denied.status !== 204) return denied;
         const info = { chave: !!process.env["ELEVENLABS_API_KEY"], voz: !!process.env["ELEVENLABS_VOICE_ID"], modelo: process.env["ELEVENLABS_MODEL"] ?? "eleven_flash_v2_5", openai: !!process.env["OPENAI_API_KEY"] };
         if (!info.chave) return json(200, { ...info, ok: false, erro: "Sem ELEVENLABS_API_KEY no servidor." });
         try {

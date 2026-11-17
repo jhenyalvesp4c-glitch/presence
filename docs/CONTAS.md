@@ -1,22 +1,22 @@
-# Contas (e-mail e senha)
+# Contas, login e acesso
 
-O Orion tem login simples do Supabase Auth: **e-mail + senha**, sem Google nem serviços externos.
+**Cada pessoa cria a própria conta (e-mail e senha) direto no Orion.** Ninguém precisa de conta na Vercel nem na Supabase para entrar.
 
 ## Como funciona
-- Tela de entrada (`src/components/auth/AuthGate.tsx`) com "Entrar" e "Criar conta". Sem login, nada do app aparece.
-- **A primeira conta a entrar é a principal**: assume os dados que já existiam (o antigo "dono fixo" `00000000-0000-0000-0000-000000000001`). A segunda conta começa vazia (só com as categorias de tarefa padrão). **Máximo de 2 contas** (função `presence_app.claim_account`; para mudar o limite, altere `n >= 2` numa nova migração).
-- `presence_app.account_owner` liga o usuário do Auth ao "dono" dos dados. `presence_app.owner_id()` é o dono de quem está logado (e o padrão de `user_id` em todas as tabelas).
-- RLS: toda tabela com `user_id` (e os 3 buckets, pasta = dono) só deixa ler/gravar linhas do próprio dono. Conta que não passou por `claim_account` não enxerga nada.
-- Arquivos: o caminho no Storage começa com o dono (`ownerId()`).
+- Tela de entrada do Orion (`AuthGate`): "Entrar" e "Criar conta" (Supabase Auth, e-mail e senha). Ao entrar, a função `presence_app.claim_account` vincula o login a um espaço de dados próprio (`account_owner`).
+- A conta principal (a primeira) usa o dono legado `00000000-0000-0000-0000-000000000001`; as demais usam o próprio id. Cada pessoa só enxerga o que é dela (RLS por `owner_id()`).
+- **Limite de contas:** `presence_app.app_settings` (`max_accounts`, hoje 10). Existe para proteger o custo da IA enquanto o cadastro está aberto. Para mudar: `update presence_app.app_settings set value = 20 where key = 'max_accounts';`.
 
-## No servidor
-- Funções do servidor (`createServerFn`) recebem o token por um middleware global (`src/start.ts`); rotas `/api/voz` e `/api/tts` usam `withUser` (`src/lib/server-auth.ts`). Sem login válido → 401.
-- Dentro do pedido, `supabase` (Proxy em `src/lib/supabase.ts`) e `ownerId()` usam o login de quem pediu (AsyncLocalStorage). Código novo só precisa importar `supabase` e usar `ownerId()` em vez de IDs fixos.
-- **MCP (`/api/mcp`) continua sem login de usuário**: usa `MCP_TOKEN` e age como a conta principal (dono legado) pelo papel `anon`.
+## Vercel
+- A proteção "Vercel Authentication" (SSO) fica **só nas prévias** (`ssoProtection.deploymentType = "preview"`). A produção é pública, para qualquer pessoa abrir o site e criar a conta. Se ela voltar para "all", só quem tem login na Vercel entra.
+- As rotas de servidor (`/api/voz`, `/api/tts`, `/api/whatsapp`, funções do servidor) exigem a sessão do Orion; o MCP exige o token. Os diagnósticos `GET /api/voz` e `GET /api/tts` também exigem login (fazem chamadas pagas).
 
-## Ainda pendente (endurecimento)
-- As policies do papel `anon` para o dono legado continuam existindo por causa do MCP: quem tiver a chave pública do Supabase ainda consegue ler os dados da conta principal pela API REST. Para fechar, dê ao MCP um login próprio e remova as policies "sem login: …" (tabelas e Storage).
-- Recuperar senha por e-mail ainda não tem tela.
+## Banco: nada para quem não está logado
+A migração `20261124000200_presence_app_close_anon_access.sql` removeu as políticas do "modo sem login" (papel `anon`) de todas as tabelas e dos buckets `presence-app-*`, e tirou os privilégios do `anon`. A chave pública do banco vai no código do site, então **ela não pode dar acesso a dados**.
+- Consequência: o modo de teste local sem login (`VITE_AUTH_DISABLED=1`) e o MCP (que usava a chave pública como a conta principal) não leem mais os dados. Para ligar o MCP de novo é preciso um login de serviço no servidor (ainda não feito).
 
-## Testes locais sem login
-`VITE_AUTH_DISABLED=1 bun run dev` roda tudo como a conta principal, sem a tela de entrada. **Nunca defina isso na Vercel.**
+## Para conferir no painel da Supabase (Authentication)
+- **URL Configuration:** "Site URL" = endereço de produção do Orion; sem isso o link do e-mail de confirmação leva para o lugar errado.
+- **Providers → Email:** cadastro por e-mail ativo.
+- **Leaked password protection:** ligar (impede senhas vazadas).
+- E-mails de confirmação: o envio padrão da Supabase tem limite baixo por hora; para muitas contas, configurar um SMTP próprio.

@@ -23,6 +23,10 @@ export const Route = createFileRoute("/api/voz")({
         const { guard } = await import("@/lib/voice/http");
         const blocked = guard(request, "voz");
         if (blocked) return blocked;
+        // diagnóstico só para quem está logado: ele faz uma chamada real ao provedor de IA/voz (custo) e mostra a configuração
+        const { withUser } = await import("@/lib/server-auth");
+        const denied = await withUser(request, async () => new Response(null, { status: 204 }));
+        if (denied.status !== 204) return denied;
         const out = (v: unknown) => new Response(JSON.stringify(v), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
         const { DEFAULT_MODEL } = await import("@/lib/mcp/interpret");
         const model = process.env["OPENAI_VOICE_MODEL"]?.trim() || process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
