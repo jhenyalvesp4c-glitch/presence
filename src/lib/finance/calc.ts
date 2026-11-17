@@ -134,6 +134,48 @@ export function monthSummary(s: FinanceState, ym: string, todayIso: string): Mon
   const receitas = total(incomeOf(done)), despesas = total(expensesOf(done)), aReceber = total(incomeOf(later)), aPagar = total(expensesOf(later));
   return { receitas, despesas, aReceber, aPagar, resultado: round2(receitas - despesas), previsto: round2(receitas + aReceber - despesas - aPagar) };
 }
+/* ───────────── detalhamento da sobra/falta do mês ───────────── */
+export type BreakdownGroupId = "fixas" | "assinaturas" | "parcelas" | "cartao" | "avulsas" | "faturas";
+export type BreakdownGroup = { id: BreakdownGroupId; label: string; hint: string; total: number; done: number; later: number; pct: number; items: Entry[] };
+export type MonthBreakdown = {
+  ym: string; income: { total: number; done: number; later: number; items: Entry[] };
+  groups: BreakdownGroup[]; expenses: number; previsto: number;
+  /** Quanto da renda do mês vai embora (pode passar de 100%). */
+  spentPct: number; biggest: Entry[];
+  /** Quanto as assinaturas ativas custam neste mês (o que pausar todas economizaria). */
+  subscriptions: number;
+  /** Gastos para ranking de categorias (na visão de caixa inclui o que há dentro das faturas). */
+  catItems?: Entry[];
+};
+const GROUPS: { id: BreakdownGroupId; label: string; hint: string }[] = [
+  { id: "fixas", label: "Contas fixas", hint: "aluguel, luz, internet e outras que se repetem todo mês" },
+  { id: "assinaturas", label: "Assinaturas", hint: "streaming, clubes e serviços ativos" },
+  { id: "parcelas", label: "Parcelas do cartão", hint: "parcelas de compras parceladas que vencem neste mês" },
+  { id: "cartao", label: "Compras no cartão", hint: "compras à vista no crédito feitas neste mês" },
+  { id: "avulsas", label: "Gastos do dia a dia", hint: "pix, débito e dinheiro" },
+];
+/** Em que grupo um gasto do mês entra (para explicar a sobra ou a falta). */
+export function groupOf(s: FinanceState, e: Entry): BreakdownGroupId {
+  if (e.source === "parcela") return "parcelas";
+  if (e.source === "recorrente") { const r = s.recurring.find((x) => x.id === e.id.slice(0, e.id.lastIndexOf(":"))); return r && isSubscription(r) ? "assinaturas" : "fixas"; }
+  return e.method === "credito" ? "cartao" : "avulsas";
+}
+/** Tudo que entra e sai no mês, separado em grupos, somando exatamente a "sobra prevista" (`monthSummary().previsto`). */
+export function monthBreakdown(s: FinanceState, ym: string, todayIso: string): MonthBreakdown {
+  const es = monthEntries(s, ym).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+  const inc = incomeOf(es), exp = expensesOf(es), income = total(inc), expenses = total(exp);
+  const split = (xs: Entry[]) => ({ done: total(xs.filter((e) => e.date <= todayIso)), later: total(xs.filter((e) => e.date > todayIso)) });
+  const groups = GROUPS.map((g) => {
+    const items = exp.filter((e) => groupOf(s, e) === g.id), t = total(items);
+    return { ...g, items, total: t, ...split(items), pct: income > 0 ? (t / income) * 100 : 0 };
+  }).filter((g) => g.items.length > 0).sort((a, b) => b.total - a.total);
+  return {
+    ym, income: { total: income, items: inc, ...split(inc) }, groups, expenses, previsto: round2(income - expenses),
+    spentPct: income > 0 ? (expenses / income) * 100 : expenses > 0 ? 100 : 0,
+    biggest: [...exp].sort((a, b) => b.amount - a.amount).slice(0, 3),
+    subscriptions: groups.find((g) => g.id === "assinaturas")?.total ?? 0,
+  };
+}
 export const expensesOf = (es: Entry[]) => es.filter((e) => e.kind === "despesa");
 export const incomeOf = (es: Entry[]) => es.filter((e) => e.kind === "receita");
 export const total = (es: Entry[]) => sum(es.map((e) => e.amount));
@@ -228,6 +270,11 @@ export function withDeclaredTotal(card: Card, ym: string, value: number | undefi
   return { ...card, declared, adjustments };
 }
 
+/** Mês de fechamento da fatura que vence em `dueYm` (a fatura "de novembro" é a que fecha em novembro). */
+export const closingYmOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => (card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1));
+/** Mês de vencimento da fatura que fecha em `closeYm`. */
+export const dueYmOfClosing = (card: Pick<Card, "closingDay" | "dueDay">, closeYm: string): string => (card.dueDay > card.closingDay ? closeYm : addMonths(closeYm, 1));
+
 export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);
 /** "fecha 28/11 · vence 05/12": sempre as duas datas, para não confundir mês de fechamento com mês de vencimento. */
 export const invoiceLabel = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => `fecha ${dateBR(closingDateOf(card, dueYm)).slice(0, 5)} · vence ${dateBR(dueDateOf(card, dueYm)).slice(0, 5)}`;
@@ -249,6 +296,39 @@ export function monthClose(s: FinanceState, today: Date): MonthClose {
   const aPagarConta = total(expensesOf(later).filter((e) => !e.cardId && e.method !== "credito")), faturas = totalOpenInvoices(s, today);
   return { saldo, aReceber, aPagarConta, faturas, sobra: round2(saldo + aReceber - aPagarConta - faturas) };
 }
+
+/**
+ * Detalhamento da SOBRA DE CAIXA (a mesma conta de `monthClose`): o que já está nas contas + o que ainda entra no mês,
+ * menos o que ainda sai das contas e as faturas dos cartões. Compras e parcelas no crédito aparecem dentro das faturas.
+ */
+export function cashBreakdown(s: FinanceState, today: Date): MonthBreakdown {
+  const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today);
+  const later = monthEntries(s, ym).filter((e) => e.date > todayIso).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+  const incLater = incomeOf(later), outAcct = expensesOf(later).filter((e) => !e.cardId && e.method !== "credito");
+  const mk = (id: string, desc: string, amount: number, kind: "receita" | "despesa", over: Partial<Entry> = {}): Entry => ({ id, kind, desc, amount, date: todayIso, category: "outros", method: "debito", source: "tx", ...over });
+  const items: Entry[] = [...(c.saldo > 0 ? [mk("saldo", "Saldo nas contas hoje", c.saldo, "receita")] : []), ...incLater];
+  const faturas: Entry[] = [], catItems: Entry[] = [...outAcct];
+  for (const card of s.cards) {
+    const inv = openInvoice(s, card, today);
+    if (inv.total <= 0) continue;
+    faturas.push(mk(`fat:${card.id}`, `Fatura ${card.name} · ${invoiceLabel(card, inv.ym)}`, inv.total, "despesa", { date: inv.due, method: "credito", cardId: card.id }));
+    for (const l of inv.lines) catItems.push(mk(l.id, l.desc, l.amount, "despesa", { date: l.date, category: l.category, method: "credito", cardId: card.id, source: l.source === "parcela" ? "parcela" : "tx", parcel: l.parcel }));
+  }
+  const buckets: Record<string, Entry[]> = { fixas: [], assinaturas: [], avulsas: [], faturas };
+  for (const e of outAcct) buckets[groupOf(s, e)]!.push(e);
+  if (c.saldo < 0) buckets["avulsas"]!.push(mk("saldo-neg", "Saldo negativo nas contas", -c.saldo, "despesa"));
+  const incomeTotal = round2(Math.max(c.saldo, 0) + c.aReceber);
+  const labels: Record<string, { label: string; hint: string }> = { ...Object.fromEntries(GROUPS.map((g) => [g.id, { label: g.label, hint: g.hint }])), avulsas: { label: "Outros gastos das contas", hint: "pix, débito e dinheiro que ainda vão sair" }, faturas: { label: "Faturas dos cartões", hint: "o que você paga pelos cartões; compras e parcelas já estão dentro delas" } };
+  const groups = (Object.keys(buckets) as BreakdownGroupId[]).map((id) => { const xs = buckets[id]!, t = total(xs); return { id, label: labels[id]!.label, hint: labels[id]!.hint, items: xs, total: t, done: 0, later: t, pct: incomeTotal > 0 ? (t / incomeTotal) * 100 : 0 }; }).filter((g) => g.items.length > 0).sort((a, b) => b.total - a.total);
+  const expenses = round2(sum(groups.map((g) => g.total)));
+  const subscriptions = sum(s.recurring.filter((r) => isSubscription(r) && recurringActiveIn(r, ym)).map((r) => r.amount));
+  return {
+    ym, income: { total: incomeTotal, done: Math.max(c.saldo, 0), later: c.aReceber, items }, groups, expenses, previsto: round2(incomeTotal - expenses),
+    spentPct: incomeTotal > 0 ? (expenses / incomeTotal) * 100 : expenses > 0 ? 100 : 0,
+    biggest: groups.flatMap((g) => g.items).sort((a, b) => b.amount - a.amount).slice(0, 3), subscriptions, catItems,
+  };
+}
+
 
 export type FlowEvent = { id: string; date: string; label: string; amount: number; kind: "receita" | "despesa" | "fatura"; cardId?: string | undefined; balance: number };
 export type Cashflow = { start: number; events: FlowEvent[]; end: number; min: number; firstNegative: FlowEvent | null; until: string };

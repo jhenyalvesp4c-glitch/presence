@@ -43,9 +43,9 @@ export function OrbitArt({ size = 260, children }: { size?: number; children?: R
   const c = size / 2;
   const rings = [{ r: c * 0.93, dur: 38, col: "var(--violet)", dot: 0 }, { r: c * 0.74, dur: 26, col: "var(--cyan)", dot: 1 }, { r: c * 0.58, dur: 18, col: "var(--emerald)", dot: 2 }];
   return (
-    <div className="relative" style={{ width: size, height: size }} aria-hidden>
-      <span className="absolute inset-[22%] rounded-full bg-gradient-brand opacity-30 blur-2xl" style={{ animation: "fin-breathe 5s ease-in-out infinite" }} />
-      <svg viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 h-full w-full overflow-visible">
+    <div className="relative" style={{ width: size, height: size }}>
+      <span aria-hidden className="absolute inset-[22%] rounded-full bg-gradient-brand opacity-30 blur-2xl" style={{ animation: "fin-breathe 5s ease-in-out infinite" }} />
+      <svg aria-hidden viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 h-full w-full overflow-visible">
         <defs>
           <radialGradient id="orb-core" cx="50%" cy="50%" r="60%"><stop offset="0%" stopColor="var(--background)" /><stop offset="70%" stopColor="var(--background)" stopOpacity=".85" /><stop offset="100%" stopColor="var(--cyan)" stopOpacity=".5" /></radialGradient>
         </defs>

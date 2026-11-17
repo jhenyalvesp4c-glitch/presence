@@ -343,3 +343,71 @@ describe("em qual fatura cada compra cai", () => {
     expect(nextUnpaidYm(nu, new Date(2026, 10, 30))).toBe("2026-12");
   });
 });
+
+import * as calcMod from "@/lib/finance/calc";
+
+describe("detalhamento da sobra prevista", () => {
+  const st = (): FinanceState => ({ ...EMPTY_STATE, onboarded: true,
+    cards: [{ id: "c", name: "Nubank", brand: "visa", last4: "1234", tone: "roxo", limit: 5000, availableBase: 5000, baseDate: "2026-11-01", closingDay: 25, dueDay: 5, adjustments: {} }],
+    recurring: [
+      { id: "sal", kind: "receita", desc: "Salário", amount: 5000, day: 5, category: "salario", method: "pix", startYm: "2026-01" },
+      { id: "alu", kind: "despesa", desc: "Aluguel", amount: 1500, day: 10, category: "moradia", method: "pix", startYm: "2026-01" },
+      { id: "net", kind: "despesa", desc: "Netflix", amount: 55.9, day: 20, category: "assinaturas", method: "credito", cardId: "c", startYm: "2026-01" },
+      { id: "dis", kind: "despesa", desc: "Disney+", amount: 40, day: 20, category: "lazer", method: "credito", cardId: "c", startYm: "2026-01", subscription: true, pauses: [{ from: "2026-11" }] },
+    ],
+    plans: [plan({ id: "tv", desc: "TV", cardId: "c", total: 1200, count: 12, per: 100, first: "2026-08" })],
+    transactions: [
+      { id: "t1", kind: "despesa", desc: "Mercado", amount: 300, date: "2026-11-12", method: "pix", category: "mercado" },
+      { id: "t2", kind: "despesa", desc: "Tênis", amount: 250, date: "2026-11-20", method: "credito", cardId: "c", category: "compras" },
+    ],
+  });
+  const b = calcMod.monthBreakdown(st(), "2026-11", "2026-11-17");
+  const g = (id: string) => b.groups.find((x) => x.id === id)?.total ?? 0;
+  it("os grupos somam exatamente a sobra prevista do mês", () => {
+    expect(b.previsto).toBe(monthSummary(st(), "2026-11", "2026-11-17").previsto);
+    expect(b.previsto).toBe(5000 - 1500 - 55.9 - 100 - 300 - 250);
+  });
+  it("separa contas fixas, assinaturas, parcelas, compras no cartão e gastos do dia a dia", () => {
+    expect(g("fixas")).toBe(1500); expect(g("assinaturas")).toBe(55.9); expect(g("parcelas")).toBe(100); expect(g("cartao")).toBe(250); expect(g("avulsas")).toBe(300);
+  });
+  it("assinatura pausada não entra no detalhamento", () => {
+    expect(b.groups.flatMap((x) => x.items).some((e) => e.desc === "Disney+")).toBe(false);
+  });
+  it("separa o que já saiu do que ainda vai sair", () => {
+    const card = b.groups.find((x) => x.id === "cartao")!;
+    expect(card.done).toBe(0); expect(card.later).toBe(250);
+    expect(b.income.done).toBe(5000);
+  });
+});
+
+
+describe("detalhamento da sobra de caixa (a conta que aparece na bola da visão geral)", () => {
+  const today = new Date(2026, 10, 17);
+  const st = (): FinanceState => ({ ...EMPTY_STATE, onboarded: true,
+    accounts: [{ id: "a", name: "Nubank", kind: "banco", tone: "roxo", balanceBase: 0.4, baseDate: "2026-11-17" }],
+    cards: [
+      { id: "n", name: "Nubank", brand: "mastercard", last4: "1", tone: "roxo", limit: 5000, availableBase: 3886.44, baseDate: "2026-11-17", closingDay: 28, dueDay: 5, adjustments: {}, declared: { "2026-12": 1113.56 } },
+      { id: "m", name: "Mercado Pago", brand: "mastercard", last4: "2", tone: "azul", limit: 3000, availableBase: 2565, baseDate: "2026-11-17", closingDay: 9, dueDay: 15, adjustments: {}, declared: { "2026-12": 435 } },
+    ],
+    recurring: [
+      { id: "s", kind: "receita", desc: "Salário", amount: 1500, day: 30, category: "salario", method: "pix", accountId: "a", startYm: "2026-01" },
+      { id: "c", kind: "despesa", desc: "Moradia", amount: 500, day: 30, category: "moradia", method: "pix", accountId: "a", startYm: "2026-01" },
+      { id: "net", kind: "despesa", desc: "Netflix", amount: 55.9, day: 20, category: "assinaturas", method: "credito", cardId: "n", startYm: "2026-01" },
+    ] });
+  it("o resultado é exatamente a sobra de caixa (a mesma de monthClose)", () => {
+    const b = calcMod.cashBreakdown(st(), today), c = calcMod.monthClose(st(), today);
+    expect(b.previsto).toBeCloseTo(c.sobra, 2); expect(b.previsto).toBeLessThan(0);
+    expect(b.income.total).toBeCloseTo(0.4 + 1500, 2);
+  });
+  it("faturas aparecem por cartão e compras no crédito não contam duas vezes", () => {
+    const b = calcMod.cashBreakdown(st(), today), f = b.groups.find((g) => g.id === "faturas")!;
+    expect(f.items.map((i) => i.cardId).sort()).toEqual(["m", "n"]); expect(f.total).toBeCloseTo(1548.56, 2);
+    expect(b.groups.find((g) => g.id === "assinaturas")).toBeUndefined(); // Netflix está dentro da fatura do Nubank
+    expect(b.groups.find((g) => g.id === "fixas")!.total).toBe(500);
+    expect(b.expenses).toBeCloseTo(2048.56, 2);
+  });
+  it("categorias consideram o que há dentro das faturas", () => {
+    const b = calcMod.cashBreakdown(st(), today);
+    expect(b.catItems!.some((e) => e.desc === "Netflix")).toBe(true);
+  });
+});

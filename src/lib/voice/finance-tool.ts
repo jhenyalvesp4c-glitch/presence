@@ -1,5 +1,5 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
-import { addMonths, alertsFor, brl, cashflow, categoryTotals, dateBR, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
+import { addMonths, alertsFor, brl, cashBreakdown, cashflow, categoryTotals, dateBR, dueYmOfClosing, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
 import { cloudFinanceRepo } from "../finance/cloud-repo";
 import { catOf } from "../finance/categories";
 import { parseNatural } from "../finance/parse";
@@ -39,6 +39,12 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
       panel: panel(`Resumo · ${monthName(ym)}`, [{ titulo: "Agora", itens: [item("Saldo nas contas", brl(saldo)), item("Entrou no mês", brl(m.receitas)), item("Saiu no mês", brl(m.despesas)), item("Ainda a pagar no mês", brl(m.aPagar)), item("Faturas abertas", brl(faturas))] }, ...(alertas.length ? [{ titulo: "Atenção", itens: alertas.map((a) => item(a.title, a.detail)) }] : [])]) };
   }
 
+  if (acao === "detalhe") {
+    const b = cashBreakdown(s, today), c = monthClose(s, today);
+    return { result: { ok: true, resultado: c.sobra, situacao: c.sobra >= 0 ? "sobra" : "falta", tem_na_conta: c.saldo, ainda_entra: c.aReceber, ainda_sai: b.expenses, onde_vai: b.groups.map((g) => ({ grupo: g.label, valor: g.total })), maiores: b.biggest.map((e) => ({ item: e.desc, valor: e.amount })), dica: "Explique em 2 ou 3 frases: o que tem, o que entra, o que mais pesa (normalmente as faturas) e quanto falta ou sobra." },
+      panel: panel(c.sobra >= 0 ? "Por que sobra" : "Por que falta", [{ titulo: "A conta", itens: [item("Tem hoje", brl(c.saldo)), item("Ainda entra", brl(c.aReceber)), ...b.groups.map((g) => item(g.label, `− ${brl(g.total)}`)), item(c.sobra >= 0 ? "Sobra" : "Falta", brl(Math.abs(c.sobra)))] }]) };
+  }
+
   if (acao === "categorias") {
     const cats = categoryTotals(s, ym, ym === ymOf(today) ? todayIso : undefined).filter((c) => c.value > 0).slice(0, 8);
     return { result: { ok: true, mes: monthName(ym), categorias: cats.map((c) => ({ categoria: c.name, valor: c.value, percentual: Math.round(c.pct), mes_anterior: c.prev })) },
@@ -56,7 +62,7 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
     const q = String(args["cartao"] ?? "").trim(), cards = q ? find(s.cards, q) : s.cards;
     if (q && !cards.length) return { result: { ok: false, erro: `Não achei o cartão "${q}".`, cartoes: s.cards.map((c) => c.name) } };
     const byMonth = !!String(args["mes"] ?? "").trim();
-    const inv = cards.map((c) => { const i = byMonth ? invoiceFor(s, c, ym) : openInvoice(s, c, today); return { cartao: c.name, total: i.total, periodo: invoiceLabel(c, i.ym), vence: dateBR(i.due), maiores: [...i.lines].sort((a, b) => b.amount - a.amount).slice(0, 3).map((l) => `${l.desc} ${brl(l.amount)}`) }; });
+    const inv = cards.map((c) => { const i = byMonth ? invoiceFor(s, c, dueYmOfClosing(c, ym)) : openInvoice(s, c, today); return { cartao: c.name, total: i.total, periodo: invoiceLabel(c, i.ym), vence: dateBR(i.due), maiores: [...i.lines].sort((a, b) => b.amount - a.amount).slice(0, 3).map((l) => `${l.desc} ${brl(l.amount)}`) }; });
     return { result: { ok: true, faturas: inv }, panel: panel("Faturas abertas", inv.map((i) => ({ titulo: i.cartao, itens: [item(brl(i.total), `${i.periodo}`), ...i.maiores.map((m) => item(m))] })), "/financeiro?aba=contas") };
   }
 

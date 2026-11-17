@@ -5,6 +5,7 @@ import { useFinance } from "@/lib/finance/store";
 import { AreaChart, BarsChart, Donut, Gauge, Heatmap, Money, RadialRings, Sparkline, StackedBars } from "./charts";
 import { HeroPanel, OrbitArt, Tilt } from "./fx";
 import { NaturalComposer } from "./QuickAdd";
+import { MonthBreakdownModal } from "./MonthBreakdown";
 import { CatBadge, Empty, Head, Panel, Pill, TONES, btn } from "./ui";
 import type { Draft } from "@/lib/finance/parse";
 
@@ -72,7 +73,7 @@ function FlowPanel({ flow, today, onAddMov }: { flow: ReturnType<typeof cashflow
 
 type Model = { close: ReturnType<typeof monthClose>; sum: ReturnType<typeof monthSummary>; series: ReturnType<typeof monthlySeries>; saldo: number; faturas: number; parcelas: number; flow: ReturnType<typeof cashflow> };
 /** Topo da visão geral: saldo gigante, ritmo do mês e a órbita com o que sobra no fim do mês. */
-function Hero({ model, cards, accounts, today }: { model: Model; cards: number; accounts: number; today: Date }) {
+function Hero({ model, cards, accounts, today, onDetail }: { model: Model; cards: number; accounts: number; today: Date; onDetail: () => void }) {
   const c = model.close, good = c.sobra >= 0;
   const stats = [
     { l: "A receber no mês", v: model.sum.aReceber, c: "var(--emerald)", i: ArrowUpRight },
@@ -101,11 +102,17 @@ function Hero({ model, cards, accounts, today }: { model: Model; cards: number; 
         </div>
         <div className="relative grid place-items-center">
           <OrbitArt size={290}>
-            <div>
-              <p className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{good ? "Sobra de caixa" : "Falta no caixa"}</p>
-              <p className="font-display text-2xl font-semibold tabular-nums" style={{ color: good ? "var(--emerald)" : ROSE, textShadow: `0 0 24px ${good ? "var(--emerald)" : ROSE}` }}><Money value={Math.abs(c.sobra)} cents={false} /></p>
-              <p className="text-[0.68rem] text-muted-foreground">depois de pagar as faturas</p>
-            </div>
+            <button type="button" onClick={onDetail} data-testid="fin-sobra-detalhe" aria-label={`Ver o detalhamento da ${good ? "sobra" : "falta"} de caixa`}
+              className="group/sobra relative grid h-[128px] w-[128px] cursor-pointer place-items-center rounded-full transition duration-300 hover:scale-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/60">
+              <span aria-hidden className="absolute inset-0 rounded-full border opacity-0 transition duration-300 group-hover/sobra:opacity-100" style={{ borderColor: good ? "var(--emerald)" : ROSE, boxShadow: `0 0 30px -6px ${good ? "var(--emerald)" : ROSE}, inset 0 0 24px -10px ${good ? "var(--emerald)" : ROSE}` }} />
+              <span aria-hidden className="absolute inset-0 rounded-full" style={{ border: `1px solid ${good ? "var(--emerald)" : ROSE}`, animation: "fin-pulse 2.6s ease-out infinite", opacity: 0.35 }} />
+              <span>
+                <span className="block text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{good ? "Sobra de caixa" : "Falta no caixa"}</span>
+                <span className="block font-display text-2xl font-semibold tabular-nums" style={{ color: good ? "var(--emerald)" : ROSE, textShadow: `0 0 24px ${good ? "var(--emerald)" : ROSE}` }}><Money value={Math.abs(c.sobra)} cents={false} /></span>
+                <span className="block text-[0.68rem] text-muted-foreground">depois de pagar as faturas</span>
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[0.6rem] font-medium text-cyan transition group-hover/sobra:bg-cyan/15">ver detalhes<ArrowUpRight size={10} /></span>
+              </span>
+            </button>
           </OrbitArt>
           <dl className="mt-3 w-full max-w-[19rem] space-y-1 text-xs tabular-nums" data-testid="fin-sobra-conta" aria-label="Como chegamos nesse número">
             {[["Saldo hoje", c.saldo, ""], ["+ Ainda entra no mês", c.aReceber, "var(--emerald)"], ["− Contas a pagar no mês", -c.aPagarConta, ROSE], ["− Faturas dos cartões", -c.faturas, ROSE]].map(([l, v, col]) => (
@@ -122,7 +129,7 @@ function Hero({ model, cards, accounts, today }: { model: Model; cards: number; 
 
 export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: { onOpenCard: (id: string) => void; onOpenAccount: (id: string) => void; onAdd: () => void; onTab: (t: string) => void; onDraft: (d: Draft) => void }) {
   const { state, today } = useFinance();
-  const ym = ymOf(today), [active, setActive] = useState<string | null>(null);
+  const ym = ymOf(today), [active, setActive] = useState<string | null>(null), [detail, setDetail] = useState(false);
   const model = useMemo(() => {
     const todayIso = isoOf(today), sum = monthSummary(state, ym, todayIso), prevEs = monthEntries(state, addMonths(ym, -1), sameDayPrev(ym, todayIso));
     const series = monthlySeries(state, ym, 6, todayIso), cats = categoryTotals(state, ym, todayIso), future = commitments(state, ym, 12);
@@ -144,7 +151,8 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
 
   return (
     <div className="space-y-5" data-testid="fin-dashboard">
-      <Hero model={model} cards={state.cards.length} accounts={state.accounts.length} today={today} />
+      <Hero model={model} cards={state.cards.length} accounts={state.accounts.length} today={today} onDetail={() => setDetail(true)} />
+      <MonthBreakdownModal open={detail} onClose={() => setDetail(false)} onTab={onTab} />
 
       <Panel glow="var(--violet)" className="!p-4 sm:!p-5"><NaturalComposer onOpenForm={onDraft} /></Panel>
 

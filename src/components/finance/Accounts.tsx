@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, ChevronLeft, ChevronRight, CreditCard, Landmark, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
-import { accountBalance, addMonths, brl, cardAvailable, closingDateOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
+import { accountBalance, addMonths, brl, cardAvailable, closingDateOf, closingYmOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
@@ -140,7 +140,7 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
       {card && tab === "proximas" && (
         <div className="grid gap-4 sm:grid-cols-2" data-testid="fin-proximas">{upcomingInvoices(state, card, today, 6).slice(1).map((inv, i) => (
           <Panel key={inv.ym} glow={tone.glow} className="!p-4" style={{ animation: `fin-pop .5s ${i * 0.06}s both` }}>
-            <div className="flex items-center justify-between"><div><p className="font-display text-lg font-semibold">Vence {dateBR(inv.due).slice(0, 5)}</p><p className="text-xs text-muted-foreground">{invoiceLabel(card, inv.ym)}</p></div><b className="font-display text-xl tabular-nums">{brl(inv.total)}</b></div>
+            <div className="flex items-center justify-between"><div><p className="font-display text-lg font-semibold">Fatura de {monthName(closingYmOf(card, inv.ym)).replace(/ de \d{4}$/, "")}</p><p className="text-xs text-muted-foreground">{invoiceLabel(card, inv.ym)}</p></div><b className="font-display text-xl tabular-nums">{brl(inv.total)}</b></div>
             <ul className="mt-3 space-y-1 text-xs text-muted-foreground">{inv.lines.slice(0, 5).map((l) => <li key={l.id} className="flex justify-between gap-2"><span className="truncate">{l.desc}{l.parcel ? ` (${l.parcel})` : ""}</span><span className="tabular-nums">{brl(l.amount)}</span></li>)}{inv.lines.length === 0 && <li>Nada lançado ainda.</li>}{inv.lines.length > 5 && <li>+ {inv.lines.length - 5} itens</li>}</ul>
           </Panel>))}</div>
       )}
@@ -192,12 +192,12 @@ function InvoiceView({ card }: { card: Card }) {
         {months.map((m) => { const i = invoiceFor(state, card, m), on = m === ym; return (
           <button key={m} onClick={() => setYm(m)} aria-pressed={on} data-testid={`fin-fatura-mes-${m}`}
             className={`shrink-0 rounded-2xl border px-3.5 py-2 text-left transition ${on ? "border-cyan/50 bg-cyan/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}>
-            <p className="text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">vence {monthLabel(m)}{m === open ? " · atual" : ""}</p>
+            <p className="text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">fatura {monthLabel(closingYmOf(card, m))}{m === open ? " · atual" : ""}</p>
             <p className="font-display text-base font-semibold tabular-nums">{i.total > 0 ? brl(i.total) : "—"}</p>
           </button>); })}
       </div>
       <Panel glow={TONES[card.tone].glow}>
-        <Head icon={Receipt} title={`Fatura que vence em ${dateBR(inv.due)}`} sub={`Fecha em ${dateBR(closingDateOf(card, inv.ym))}${isOpen ? " · fatura aberta" : ""}`}
+        <Head icon={Receipt} title={`Fatura de ${monthName(closingYmOf(card, inv.ym))}`} sub={`Fecha em ${dateBR(closingDateOf(card, inv.ym))} · vence em ${dateBR(inv.due)}${isOpen ? " · fatura aberta" : ""}`}
           right={<div className="flex items-center gap-1"><button className={btn.icon} aria-label="Mês anterior" onClick={() => setYm(addMonths(ym, -1))}><ChevronLeft size={16} /></button><b className="min-w-[7.5rem] text-center font-display text-2xl tabular-nums" data-testid="fin-fatura-total">{brl(inv.total)}</b><button className={btn.icon} aria-label="Próximo mês" onClick={() => setYm(addMonths(ym, 1))}><ChevronRight size={16} /></button></div>} />
         <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <Field label="Total desta fatura (como aparece no app do banco)" hint={typed !== undefined ? (inv.over > 0 ? `Atenção: os itens cadastrados passam ${brl(inv.over)} do total informado. Confira o total ou os itens.` : inv.adjustment > 0 ? `Já detalhado: ${brl(inv.total - inv.adjustment)}. Faltam ${brl(inv.adjustment)} para detalhar; conforme você cadastra as compras e parcelas, esse valor diminui e o total não muda.` : "Tudo detalhado: os itens fecham com o total.") : "Opcional. Informe o total do banco e vá cadastrando as compras e parcelas: elas abatem desse valor, sem duplicar."}>
