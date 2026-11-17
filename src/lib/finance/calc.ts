@@ -350,6 +350,54 @@ export function cashBreakdown(s: FinanceState, today: Date): MonthBreakdown {
 }
 
 
+/* ───────────── projeção mês a mês ───────────── */
+export type PlanItem = { id: string; group: "entradas" | "fixas" | "assinaturas" | "faturas" | "avulsas"; label: string; amount: number; date: string; detail?: string | undefined; cardId?: string | undefined; lines?: InvoiceLine[] | undefined };
+export type MonthPlan = {
+  ym: string; label: string; entradas: number; fixas: number; assinaturas: number; faturas: number; avulsas: number;
+  /** Parte das faturas que são parcelas de compras parceladas (já dentro de `faturas`). */
+  parcelas: number;
+  /** Assinaturas cobradas no cartão (já dentro de `faturas`); somadas a `assinaturas` dão o custo total de assinaturas do mês. */
+  assinaturasCartao: number;
+  saidas: number; resultado: number; saldoFinal: number; items: PlanItem[];
+};
+/**
+ * O que entra e sai do caixa em cada um dos próximos meses (saldo de hoje como ponto de partida): salário e outras entradas fixas,
+ * contas fixas e assinaturas pagas em conta, avulsos futuros e as faturas dos cartões que vencem no mês (compras, parcelas,
+ * assinaturas e fixas no cartão já estão dentro delas). No mês atual só entra o que ainda não aconteceu.
+ */
+export function monthPlan(s: FinanceState, today: Date, months = 12): MonthPlan[] {
+  const todayIso = isoOf(today), cur = ymOf(today), out: MonthPlan[] = [];
+  let bal = totalBalance(s, today);
+  for (let i = 0; i < months; i++) {
+    const ym = addMonths(cur, i), items: PlanItem[] = [], future = (d: string) => d > todayIso;
+    for (const r of s.recurring) {
+      if (r.cardId || r.method === "credito" || !recurringActiveIn(r, ym)) continue;
+      const date = dayIn(ym, r.day);
+      if (!future(date)) continue;
+      items.push({ id: `${r.id}:${ym}`, group: r.kind === "receita" ? "entradas" : isSubscription(r) ? "assinaturas" : "fixas", label: r.desc, amount: r.amount, date });
+    }
+    for (const t of s.transactions) {
+      if (ymOf(t.date) !== ym || !future(t.date) || t.method === "credito" || t.cardId) continue;
+      items.push({ id: t.id, group: t.kind === "receita" ? "entradas" : "avulsas", label: t.desc, amount: t.amount, date: t.date });
+    }
+    let parcelas = 0, assinCartao = 0;
+    for (const c of s.cards) {
+      const inv = invoiceFor(s, c, ym);
+      if (inv.total <= 0 || !future(inv.due)) continue;
+      parcelas += sum(inv.lines.filter((l) => l.source === "parcela").map((l) => l.amount));
+      for (const l of inv.lines) if (l.source === "recorrente") { const r = s.recurring.find((x) => x.id === l.id.slice(0, l.id.lastIndexOf(":"))); if (r && isSubscription(r)) assinCartao += l.amount; }
+      items.push({ id: `fat:${c.id}:${ym}`, group: "faturas", label: `Fatura ${c.name}`, amount: inv.total, date: inv.due, cardId: c.id, detail: invoiceLabel(c, ym), lines: inv.lines });
+    }
+    items.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+    const g = (id: PlanItem["group"]) => sum(items.filter((x) => x.group === id).map((x) => x.amount));
+    const entradas = g("entradas"), fixas = g("fixas"), assinaturas = g("assinaturas"), faturas = g("faturas"), avulsas = g("avulsas");
+    const saidas = round2(fixas + assinaturas + faturas + avulsas), resultado = round2(entradas - saidas);
+    bal = round2(bal + resultado);
+    out.push({ ym, label: monthLabel(ym), entradas, fixas, assinaturas, faturas, avulsas, parcelas: round2(parcelas), assinaturasCartao: round2(assinCartao), saidas, resultado, saldoFinal: bal, items });
+  }
+  return out;
+}
+
 export type FlowEvent = { id: string; date: string; label: string; amount: number; kind: "receita" | "despesa" | "fatura"; cardId?: string | undefined; balance: number };
 export type Cashflow = { start: number; events: FlowEvent[]; end: number; min: number; firstNegative: FlowEvent | null; until: string };
 /**

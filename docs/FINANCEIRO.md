@@ -41,6 +41,8 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 
 **Sobra de caixa** (`monthClose` / `cashBreakdown` em `calc.ts`): saldo de hoje + o que ainda entra no mês − contas que saem da conta − faturas abertas dos cartões (compras e parcelas no crédito já estão dentro das faturas). A bola da visão geral abre o detalhamento (`MonthBreakdown.tsx`, vindo do Lovable e adaptado para essa conta); a função `monthBreakdown` (resultado por competência, sem faturas) segue disponível, mas a tela usa a de caixa. Faturas são mostradas pelo **mês de fechamento** (`closingYmOf`); internamente continuam indexadas pelo mês de vencimento. Sem tabelas novas: tudo é calculado a partir dos dados já na nuvem.
 
+**Próximos meses** (aba `meses`, `Months.tsx`, `monthPlan` em `calc.ts`): projeção de 6, 12 ou 18 meses a partir do saldo de hoje: entradas (salário e outras fixas), contas fixas e assinaturas pagas em conta, avulsos futuros e as faturas dos cartões **no mês em que vencem**; compras, parcelas e assinaturas no cartão aparecem dentro de cada fatura (e somam em "parcelas nas faturas" e "assinaturas no total" sem duplicar). Mês atual: só o que ainda falta. O saldo acumulado bate com `cashflow`. Pela voz: ferramenta `financeiro`, ação `meses`.
+
 **Voz** (`src/lib/voice/finance-tool.ts`, ferramenta `financeiro`): `resumo`, `categorias`, `saldo`, `fatura`, `parcelas`, `assinaturas`, `ultimos` e `lancar` (frase → `parseNatural` → grava em `fin_transactions`; só grava se entendeu valor, forma de pagamento e conta/cartão; parcelado não). Usa `calc.ts` no servidor, então os números são os mesmos da tela.
 
 **Próximo**: Open Finance (agregador) alimentando `fin_transactions`, com o mesmo `id` estável por lançamento do banco para não duplicar.

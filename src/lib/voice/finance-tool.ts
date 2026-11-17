@@ -1,5 +1,5 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
-import { addMonths, alertsFor, brl, cashBreakdown, cashflow, categoryTotals, dateBR, dueYmOfClosing, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
+import { addMonths, alertsFor, brl, cashBreakdown, cashflow, categoryTotals, dateBR, dueYmOfClosing, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthPlan, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
 import { cloudFinanceRepo } from "../finance/cloud-repo";
 import { catOf } from "../finance/categories";
 import { parseNatural } from "../finance/parse";
@@ -43,6 +43,12 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
     const b = cashBreakdown(s, today), c = monthClose(s, today);
     return { result: { ok: true, resultado: c.sobra, situacao: c.sobra >= 0 ? "sobra" : "falta", tem_na_conta: c.saldo, ainda_entra: c.aReceber, ainda_sai: b.expenses, onde_vai: b.groups.map((g) => ({ grupo: g.label, valor: g.total })), maiores: b.biggest.map((e) => ({ item: e.desc, valor: e.amount })), dica: "Explique em 2 ou 3 frases: o que tem, o que entra, o que mais pesa (normalmente as faturas) e quanto falta ou sobra." },
       panel: panel(c.sobra >= 0 ? "Por que sobra" : "Por que falta", [{ titulo: "A conta", itens: [item("Tem hoje", brl(c.saldo)), item("Ainda entra", brl(c.aReceber)), ...b.groups.map((g) => item(g.label, `− ${brl(g.total)}`)), item(c.sobra >= 0 ? "Sobra" : "Falta", brl(Math.abs(c.sobra)))] }]) };
+  }
+
+  if (acao === "meses") {
+    const n = Math.min(12, Math.max(1, Number(args["quantidade"]) || 6)), plan = monthPlan(s, today, n);
+    return { result: { ok: true, meses: plan.map((m) => ({ mes: monthName(m.ym), entra: m.entradas, sai: m.saidas, resultado: m.resultado, faturas: m.faturas, parcelas_nas_faturas: m.parcelas, assinaturas: round2(m.assinaturas + m.assinaturasCartao), saldo_no_fim: m.saldoFinal })), dica: "Resuma em poucas frases: os meses que sobram, os que faltam e quando o saldo fica negativo. Faturas contam no mês em que vencem." },
+      panel: panel(`Próximos ${n} meses`, [{ titulo: "Sobra ou falta por mês", itens: plan.map((m) => item(monthName(m.ym), `${m.resultado >= 0 ? "sobra" : "falta"} ${brl(Math.abs(m.resultado))} · saldo ${brl(m.saldoFinal)}`)) }], "/financeiro?aba=meses") };
   }
 
   if (acao === "categorias") {

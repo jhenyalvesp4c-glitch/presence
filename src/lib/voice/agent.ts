@@ -126,8 +126,8 @@ export const TOOLS = [
     prioridade: { type: "string", enum: ["alta", "media", "baixa"] }, local: { type: "string" },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
   }, required: ["item", "acao"] }),
-  fn("financeiro", "Consulta o FINANCEIRO real da pessoa (contas, cartões, parcelas, assinaturas) e lança gastos/ganhos. Ações: resumo (saldo, o que entrou e saiu, o que falta pagar, alertas), detalhe (POR QUE sobra ou falta dinheiro: a conta completa com faturas), categorias (onde gastou), saldo (por conta), fatura (cartão), parcelas, assinaturas, ultimos (movimentações, com busca opcional), lancar (grava uma despesa/receita a partir de uma frase).", { type: "object", properties: {
-    acao: { type: "string", enum: ["resumo", "detalhe", "categorias", "saldo", "fatura", "parcelas", "assinaturas", "ultimos", "lancar"] },
+  fn("financeiro", "Consulta o FINANCEIRO real da pessoa (contas, cartões, parcelas, assinaturas) e lança gastos/ganhos. Ações: resumo (saldo, o que entrou e saiu, o que falta pagar, alertas), detalhe (POR QUE sobra ou falta dinheiro: a conta completa com faturas), meses (projeção dos PRÓXIMOS MESES: quanto entra, sai, sobra e o saldo de cada mês; use `quantidade`), categorias (onde gastou), saldo (por conta), fatura (cartão), parcelas, assinaturas, ultimos (movimentações, com busca opcional), lancar (grava uma despesa/receita a partir de uma frase).", { type: "object", properties: {
+    acao: { type: "string", enum: ["resumo", "detalhe", "meses", "categorias", "saldo", "fatura", "parcelas", "assinaturas", "ultimos", "lancar"] },
     mes: { type: "string", description: "Mês (na acao fatura é o mês de FECHAMENTO: a fatura \"de novembro\" fecha em novembro; sem mês = fatura aberta): 'dezembro', 'mês passado' ou AAAA-MM. Vazio = mês atual." },
     conta: { type: "string", description: "Nome da conta (acao saldo)." }, cartao: { type: "string", description: "Nome do cartão (acao fatura)." },
     busca: { type: "string", description: "Texto ou categoria para filtrar (acao ultimos)." }, quantidade: { type: "number" },

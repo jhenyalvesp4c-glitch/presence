@@ -269,7 +269,7 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
 
       <div className="grid gap-5 lg:grid-cols-5">
         <Panel glow="var(--amber)" className="lg:col-span-3" data-testid="fin-projecao">
-          <Head icon={Layers} title="Comprometimento dos próximos meses" sub="Parcelas já assumidas, por cartão" right={<button className={btn.ghost} onClick={() => onTab("parcelas")}>Ver parcelas</button>} />
+          <Head icon={Layers} title="Comprometimento dos próximos meses" sub="Parcelas já assumidas, por cartão" right={<div className="flex gap-2"><button className={btn.ghost} onClick={() => onTab("meses")} data-testid="ver-proximos-meses">Próximos meses</button><button className={btn.ghost} onClick={() => onTab("parcelas")}>Ver parcelas</button></div>} />
           {state.plans.length === 0 ? <Empty title="Nenhuma compra parcelada" hint="Cadastre as parcelas que ainda está pagando para ver o peso nos próximos meses." /> : (
             <>
               <StackedBars highlight={0} points={model.future.map((m) => ({ label: m.label, segs: state.cards.filter((c) => m.porCartao[c.id]).map((c) => ({ name: c.name, color: TONES[c.tone].glow, value: m.porCartao[c.id]! })) }))} />

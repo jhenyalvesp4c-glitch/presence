@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, CreditCard, Gauge, Layers, LayoutDashboard, MoreHorizontal, Plus, Receipt, Repeat, Sparkles, Target } from "lucide-react";
+import { ArrowLeft, CalendarRange, CreditCard, Gauge, Layers, LayoutDashboard, MoreHorizontal, Plus, Receipt, Repeat, Sparkles, Target } from "lucide-react";
 import { Briefing } from "@/components/finance/Briefing";
 import { AccountsView, type Sel } from "@/components/finance/Accounts";
 import { Dashboard } from "@/components/finance/Dashboard";
@@ -9,16 +9,17 @@ import { InstallmentsView } from "@/components/finance/Installments";
 import { QuickAddModal } from "@/components/finance/QuickAdd";
 import { TransactionsView } from "@/components/finance/Transactions";
 import { SubscriptionsView } from "@/components/finance/Subscriptions";
+import { MonthsView } from "@/components/finance/Months";
 import { ConfirmDelete, btn } from "@/components/finance/ui";
 import { FinBackdrop, LiveDot } from "@/components/finance/fx";
 import { monthName, ymOf } from "@/lib/finance/calc";
 import type { Draft } from "@/lib/finance/parse";
 import { FinanceProvider, useFinance } from "@/lib/finance/store";
 
-const TABS = ["visao", "contas", "parcelas", "movimentacoes", "assinaturas", "metas"] as const;
+const TABS = ["visao", "contas", "parcelas", "meses", "movimentacoes", "assinaturas", "metas"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_META: Record<Tab, { label: string; icon: typeof Gauge }> = {
-  visao: { label: "Visão geral", icon: LayoutDashboard }, contas: { label: "Contas e cartões", icon: CreditCard }, parcelas: { label: "Parcelas", icon: Layers },
+  visao: { label: "Visão geral", icon: LayoutDashboard }, contas: { label: "Contas e cartões", icon: CreditCard }, parcelas: { label: "Parcelas", icon: Layers }, meses: { label: "Próximos meses", icon: CalendarRange },
   movimentacoes: { label: "Movimentações", icon: Receipt }, assinaturas: { label: "Assinaturas", icon: Repeat }, metas: { label: "Metas", icon: Target },
 };
 
@@ -93,6 +94,7 @@ function FinancePage() {
             {tab === "visao" && <Dashboard onOpenCard={(id) => go("contas", `card:${id}`)} onOpenAccount={(id) => go("contas", `acc:${id}`)} onAdd={() => open()} onTab={(t) => go(t as Tab)} onDraft={(d) => open(d)} />}
             {tab === "contas" && <AccountsView sel={sel} onSel={(s) => go("contas", s ? `${s.type}:${s.id}` : undefined)} />}
             {tab === "parcelas" && <InstallmentsView />}
+            {tab === "meses" && <MonthsView />}
             {tab === "movimentacoes" && <TransactionsView onAdd={() => open()} />}
             {tab === "assinaturas" && <SubscriptionsView />}
             {tab === "metas" && <GoalsView />}

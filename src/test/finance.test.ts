@@ -476,3 +476,38 @@ describe("detalhar uma assinatura dentro da fatura", () => {
     expect(invoiceFor(pausada, card, "2027-02").lines.some((l) => l.desc === "ChatGPT")).toBe(false);
   });
 });
+
+describe("próximos meses (projeção mês a mês)", () => {
+  const today = new Date(2026, 10, 17);
+  const st = (): FinanceState => ({ ...EMPTY_STATE, onboarded: true,
+    accounts: [{ id: "a", name: "Nubank", kind: "banco", tone: "roxo", balanceBase: 0.4, baseDate: "2026-11-17" }],
+    cards: [
+      { id: "n", name: "Nubank", brand: "mastercard", last4: "1", tone: "roxo", limit: 5000, availableBase: 3886.44, baseDate: "2026-11-17", closingDay: 28, dueDay: 5, adjustments: {}, declared: { "2026-12": 1113.56 } },
+      { id: "m", name: "Mercado Pago", brand: "mastercard", last4: "2", tone: "azul", limit: 3000, availableBase: 2565, baseDate: "2026-11-17", closingDay: 9, dueDay: 15, adjustments: {}, declared: { "2026-12": 435 } },
+    ],
+    plans: [{ id: "p", desc: "Notebook", cardId: "n", total: 600, count: 6, per: 100, purchaseYm: "2026-11", first: "2027-01", category: "compras", createdAt: "2026-11-10" }],
+    recurring: [
+      { id: "s", kind: "receita", desc: "Salário", amount: 1500, day: 30, category: "salario", method: "pix", accountId: "a", startYm: "2026-01" },
+      { id: "c", kind: "despesa", desc: "Moradia", amount: 500, day: 30, category: "moradia", method: "pix", accountId: "a", startYm: "2026-01" },
+      { id: "net", kind: "despesa", desc: "Netflix", amount: 55.9, day: 8, category: "assinaturas", method: "credito", cardId: "n", startYm: "2026-01" },
+      { id: "gym", kind: "despesa", desc: "Academia", amount: 80, day: 10, category: "saude", method: "debito", accountId: "a", startYm: "2026-01", subscription: true },
+    ] });
+  it("mês atual traz só o que falta; dezembro traz o salário, a moradia e as duas faturas", () => {
+    const p = calcMod.monthPlan(st(), today, 3);
+    expect(p[0]!.ym).toBe("2026-11"); expect(p[0]!.entradas).toBe(1500); expect(p[0]!.faturas).toBe(0); expect(p[0]!.fixas).toBe(500);
+    expect(p[1]!.ym).toBe("2026-12"); expect(p[1]!.faturas).toBeCloseTo(1548.56, 2); expect(p[1]!.items.filter((i) => i.group === "faturas")).toHaveLength(2);
+  });
+  it("o saldo acumula mês a mês e bate com a projeção de saldo do painel (cashflow)", () => {
+    const s = st(), p = calcMod.monthPlan(s, today, 3), cf = calcMod.cashflow(s, today, 44); // 17/11 + 44 dias = 31/12
+    expect(p[0]!.saldoFinal).toBeCloseTo(0.4 + p[0]!.resultado, 2);
+    expect(p[1]!.saldoFinal).toBeCloseTo(p[0]!.saldoFinal + p[1]!.resultado, 2);
+    expect(p[1]!.saldoFinal).toBeCloseTo(cf.end, 2); // mesma conta do painel, até o fim de dezembro
+  });
+  it("assinaturas: em conta e no cartão, e parcelas dentro das faturas (sem somar duas vezes)", () => {
+    const p = calcMod.monthPlan(st(), today, 4), jan = p[2]!, dez = p[1]!;
+    expect(dez.assinaturas).toBe(80); expect(dez.assinaturasCartao).toBe(55.9);
+    expect(jan.parcelas).toBe(100); // 1ª parcela do notebook em janeiro
+    expect(jan.saidas).toBeCloseTo(jan.fixas + jan.assinaturas + jan.faturas + jan.avulsas, 2);
+    expect(jan.faturas).toBeGreaterThanOrEqual(jan.parcelas + jan.assinaturasCartao);
+  });
+});
