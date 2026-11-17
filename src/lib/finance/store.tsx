@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { migrateInvoiceTotals } from "./calc";
+import { migrateInvoiceTotals, migratePaidManual } from "./calc";
 import { makeMock } from "./mock";
 import { cloudFinanceRepo as financeRepo, type SyncStatus } from "./cloud-repo";
 import { EMPTY_STATE, type Account, type Card, type FinanceState, type Goal, type Plan, type Recurring, type Transaction } from "./types";
@@ -33,7 +33,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => financeRepo.subscribe(setSync), []);
   const [today] = useState(() => new Date());
 
-  useEffect(() => { let alive = true; void financeRepo.load().then((s0) => { const s = migrateInvoiceTotals(s0); if (alive) { setState(s); loaded.current = true; setReady(true); } }); return () => { alive = false; }; }, []);
+  useEffect(() => { let alive = true; void financeRepo.load().then((s0) => { const s = migratePaidManual(migrateInvoiceTotals(s0), new Date()); if (alive) { setState(s); loaded.current = true; setReady(true); } }); return () => { alive = false; }; }, []);
   useEffect(() => { if (loaded.current) void financeRepo.save(state); }, [state]);
   // ao voltar para a aba/app, traz o que foi lançado em outro aparelho (só se não houver gravação em andamento)
   useEffect(() => {

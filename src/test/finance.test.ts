@@ -302,3 +302,44 @@ describe("fatura com total informado: cadastrar as compras não duplica", () => 
     expect(withDeclaredTotal(a, "2026-12", undefined).declared).toEqual({});
   });
 });
+
+describe("em qual fatura cada compra cai", () => {
+  const today = new Date(2026, 10, 17); // 17/11/2026
+  const nu = { id: "n", name: "Nubank", brand: "mastercard" as const, last4: "1", tone: "roxo" as const, limit: 5000, availableBase: 4000, baseDate: "2026-11-17", closingDay: 28, dueDay: 5, adjustments: {} };
+  const st = (over: Partial<FinanceState> = {}): FinanceState => ({ ...EMPTY_STATE, onboarded: true, cards: [nu], ...over });
+  it("compra de hoje cai na fatura aberta (fecha 28/11, vence 05/12); depois do fechamento, na seguinte", async () => {
+    const { invoiceMonthOf, invoiceFor } = await import("@/lib/finance/calc");
+    expect(invoiceMonthOf(nu, "2026-11-17")).toBe("2026-12");
+    expect(invoiceMonthOf(nu, "2026-11-28")).toBe("2026-12");
+    expect(invoiceMonthOf(nu, "2026-11-29")).toBe("2027-01");
+    const tx = { id: "t", kind: "despesa" as const, desc: "Livro", amount: 30, date: "2026-11-17", method: "credito" as const, cardId: "n", category: "educacao" };
+    expect(invoiceFor(st({ transactions: [tx] }), nu, "2026-12").total).toBe(30);
+    expect(invoiceFor(st({ transactions: [tx] }), nu, "2027-01").total).toBe(0);
+  });
+  it("compra parcelada de meses atrás: só a parcela de cada mês entra na fatura daquele mês", async () => {
+    const { invoiceFor, planInfo } = await import("@/lib/finance/calc");
+    // comprada em agosto (1ª parcela vence 05/09), 10 parcelas de 100: dez e as seguintes ainda faltam
+    const p: Plan = { id: "p", desc: "Notebook", cardId: "n", total: 1000, count: 10, per: 100, purchaseYm: "2026-08", first: "2026-09", category: "compras", createdAt: "2026-08-10" };
+    const s = st({ plans: [p] });
+    expect(invoiceFor(s, nu, "2026-12").lines.filter((l) => l.source === "parcela").map((l) => l.parcel)).toEqual(["4/10"]);
+    expect(invoiceFor(s, nu, "2026-11").lines.filter((l) => l.parcel).map((l) => l.parcel)).toEqual(["3/10"]); // a de novembro (já vencida) não conta na de dezembro
+    expect(planInfo(p, nu, today).paid).toBe(3);
+  });
+  it("'já paguei N parcelas' alinha o contador e a fatura: a próxima parcela cai na próxima fatura a vencer", async () => {
+    const { migratePaidManual, invoiceFor, planInfo, firstFromPaid } = await import("@/lib/finance/calc");
+    expect(firstFromPaid(nu, today, 3)).toBe("2026-09"); // próxima a vencer é 05/12; 3 pagas → 1ª foi em setembro
+    // o calendário dizia outra coisa (1ª em jun = 5 pagas), mas ela informou 3
+    const p: Plan = { id: "p", desc: "Sofá", cardId: "n", total: 1000, count: 10, per: 100, purchaseYm: "2026-05", first: "2026-06", category: "moradia", paidManual: 3, createdAt: "2026-05-10" };
+    const m = migratePaidManual(st({ plans: [p] }), today), q = m.plans[0]!;
+    expect(q.paidManual).toBeUndefined(); expect(q.first).toBe("2026-09");
+    expect(planInfo(q, nu, today).paid).toBe(3);
+    expect(invoiceFor(m, nu, "2026-12").lines.find((l) => l.source === "parcela")?.parcel).toBe("4/10");
+    expect(migratePaidManual(m, today)).toBe(m); // idempotente
+  });
+  it("depois do vencimento deste mês, a próxima a vencer passa para o mês seguinte", async () => {
+    const { nextUnpaidYm } = await import("@/lib/finance/calc");
+    expect(nextUnpaidYm(nu, new Date(2026, 10, 3))).toBe("2026-11");
+    expect(nextUnpaidYm(nu, new Date(2026, 10, 5))).toBe("2026-12"); // vence hoje = já tratada como paga
+    expect(nextUnpaidYm(nu, new Date(2026, 10, 30))).toBe("2026-12");
+  });
+});

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
-import { addMonths, brl, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, planInfo, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, planInfo, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
 import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
 import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Tone, Transaction, TxKind } from "@/lib/finance/types";
@@ -95,14 +95,16 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const [per, setPer] = useState<number | undefined>(initial?.per), [perTouched, setPerTouched] = useState(!!initial);
   const [purchaseYm, setPurchaseYm] = useState(initial?.purchaseYm ?? addMonths(todayYm, -2));
   const [first, setFirst] = useState(initial?.first ?? addMonths(todayYm, -1)), [firstTouched, setFirstTouched] = useState(!!initial);
-  const [mode, setMode] = useState<"datas" | "manual">(initial?.paidManual !== undefined ? "manual" : "datas"), [paid, setPaid] = useState(String(initial?.paidManual ?? 3));
+  const [mode, setMode] = useState<"datas" | "manual">("datas"), [paid, setPaid] = useState(String(initial ? planInfo(initial, state.cards.find((c) => c.id === initial.cardId), today).paid : 3));
   const [cat, setCat] = useState(initial?.category ?? "compras");
   const card = state.cards.find((c) => c.id === cardId);
   const n = Math.max(1, Math.min(60, Math.round(Number(count) || 1)));
   const perV = perTouched && per !== undefined ? per : total ? Math.round((total / n) * 100) / 100 : undefined;
   // primeira parcela sugerida: a fatura em que a compra caiu (se o mês da compra mudar e a pessoa não mexeu)
-  const firstV = firstTouched ? first : card ? invoiceMonthOf(card, `${purchaseYm}-15`) : first;
-  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, paidManual: mode === "manual" ? Math.max(0, Math.min(n, Math.round(Number(paid) || 0))) : undefined, createdAt: initial?.createdAt ?? isoOf(today) } : null;
+  const paidN = Math.max(0, Math.min(n, Math.round(Number(paid) || 0)));
+  // "já paguei N": a próxima parcela (N+1) cai na próxima fatura a vencer; o mês da 1ª parcela sai dessa conta
+  const firstV = mode === "manual" ? firstFromPaid(card, today, paidN) : firstTouched ? first : card ? invoiceMonthOf(card, `${purchaseYm}-15`) : first;
+  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today) } : null;
   const info = useMemo(() => (draft ? planInfo(draft, card, today) : null), [draft, card, today]);
   return (
     <div className="space-y-4">
@@ -113,7 +115,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
         <Field label="Quantidade de parcelas"><TextInput type="number" min={1} max={60} value={count} onChange={(e) => setCount(e.target.value)} data-testid="fin-plano-parcelas" /></Field>
         <Field label="Valor de cada parcela" hint="Calculado pelo total; pode ajustar."><MoneyInput value={perV} onChange={(v) => { setPer(v); setPerTouched(true); }} /></Field>
         <Field label="Mês e ano da compra"><TextInput type="month" value={purchaseYm} onChange={(e) => setPurchaseYm(e.target.value)} /></Field>
-        <Field label="Primeira parcela (mês do vencimento)"><TextInput type="month" value={firstV} onChange={(e) => { setFirst(e.target.value); setFirstTouched(true); }} /></Field>
+        <Field label="Primeira parcela (mês do vencimento)" hint={mode === "manual" ? "Calculado a partir das parcelas já pagas." : undefined}><TextInput type="month" value={firstV} disabled={mode === "manual"} onChange={(e) => { setFirst(e.target.value); setFirstTouched(true); }} /></Field>
       </Grid>
       <Field group label="Situação atual"><Segmented value={mode} onChange={setMode} options={[{ value: "datas", label: "Calcular pelas datas" }, { value: "manual", label: "Informar parcelas pagas" }]} /></Field>
       {mode === "manual" && <Field label="Quantas parcelas já foram pagas?"><TextInput type="number" min={0} max={n} value={paid} onChange={(e) => setPaid(e.target.value)} /></Field>}

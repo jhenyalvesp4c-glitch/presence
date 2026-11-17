@@ -41,6 +41,23 @@ export const parcelAmount = (plan: Plan, n: number) => {
   const last = round2(plan.total - plan.per * (plan.count - 1));
   return last > 0 ? last : plan.per;
 };
+/** Mês de vencimento da primeira fatura ainda não paga (vence depois de hoje). */
+export function nextUnpaidYm(card: Pick<Card, "dueDay"> | undefined, today: Date): string {
+  const todayIso = isoOf(today), dueDay = card?.dueDay ?? 10;
+  for (let ym = ymOf(today), i = 0; i < 3; i++, ym = addMonths(ym, 1)) if (dayIn(ym, dueDay) > todayIso) return ym;
+  return addMonths(ymOf(today), 1);
+}
+/** Mês da 1ª parcela para que a próxima a pagar seja a de número `paid + 1`, caindo na próxima fatura a vencer. */
+export const firstFromPaid = (card: Pick<Card, "dueDay"> | undefined, today: Date, paid: number): string => addMonths(nextUnpaidYm(card, today), -Math.max(0, paid));
+/**
+ * "Já paguei N parcelas" valia só no contador, e as faturas seguiam o calendário (podia cair a parcela errada nesta fatura).
+ * Passa a valer nos dois: ajusta o mês da 1ª parcela e tira o contador manual, e dali em diante tudo segue o calendário.
+ */
+export function migratePaidManual(st: FinanceState, today: Date): FinanceState {
+  if (!st.plans.some((p) => p.paidManual !== undefined)) return st;
+  return { ...st, plans: st.plans.map((p) => { if (p.paidManual === undefined) return p; const { paidManual, ...rest } = p; return { ...rest, first: firstFromPaid(st.cards.find((c) => c.id === p.cardId), today, Math.min(p.count, paidManual)) }; }) };
+}
+
 export function planInfo(plan: Plan, card: Pick<Card, "dueDay"> | undefined, today: Date): PlanInfo {
   const dueDay = card?.dueDay ?? 10;
   const todayIso = isoOf(today);
