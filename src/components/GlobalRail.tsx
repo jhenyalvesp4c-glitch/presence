@@ -3,9 +3,8 @@ import type { CSSProperties } from "react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { Brain, CalendarCheck, Calendar, ClipboardList, Heart, Home, ListChecks, Settings, Sprout, Wallet } from "lucide-react";
 
-/** Telas que já desenham a própria barra lateral (assistente, PlanShell). Nas demais, a barra global aparece. */
-const OWN_RAIL = ["/assistente", "/planejamento", "/projetos", "/tarefas", "/cerebro", "/organizar"];
-export const hasOwnRail = (path: string) => path === "/" || path === "/treino" || OWN_RAIL.some((p) => path === p || path.startsWith(`${p}/`));
+/** Telas sem barra lateral: a raiz (só redireciona) e o treino (tela cheia). Todas as outras usam a MESMA barra, montada uma vez só na raiz (assim ela não "pisca" ao trocar de tela). */
+export const hasOwnRail = (path: string) => path === "/" || path === "/treino";
 
 const items = [
   { Icon: Home, label: "Início", c: "cyan", to: "/assistente" },

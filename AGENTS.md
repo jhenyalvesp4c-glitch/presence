@@ -21,3 +21,4 @@
 
 ## Módulo financeiro
 Frontend em `/financeiro` com dados locais (etapa 1; Supabase na etapa 2). Regras em `src/lib/finance/calc.ts` (testadas em `src/test/finance.test.ts`), telas em `src/components/finance/`. Detalhes em `docs/FINANCEIRO.md`.
+- **Barra lateral de botões flutuantes** (`GlobalRail.tsx`): é a ÚNICA barra e fica montada uma vez em `__root.tsx` (só `/` e `/treino` ficam sem ela). Nunca desenhe uma barra própria dentro de uma página/`PlanShell`: trocar de tela alternava entre barras diferentes e os botões "piscavam"/sumiam.
