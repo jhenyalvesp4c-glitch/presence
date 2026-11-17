@@ -201,11 +201,11 @@ export function OrionReport({ r }: { r: Report }) {
             <a href={urls[fkey(zoom)]!.download} download={zoom.name} aria-label="Baixar" title="Baixar" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:text-foreground"><Download size={15} /></a>
             <button onClick={() => setZoom(null)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:text-foreground"><X size={16} /></button>
           </div>
-          <div className="relative mt-3 grid min-h-0 flex-1 place-items-center" onClick={(e) => e.stopPropagation()}>
+          <div className="relative mt-3 min-h-0 flex-1" onClick={(e) => e.stopPropagation()}>
             {isImg(zoom) && images.length > 1 && <button onClick={() => { const n = images[zoomAt - 1]; if (n) setZoom(n); }} disabled={zoomAt <= 0} aria-label="Anterior" className="absolute left-0 z-10 grid h-11 w-11 place-items-center rounded-full border border-border bg-background/70 backdrop-blur disabled:opacity-30"><ChevronLeft size={20} /></button>}
             {isImg(zoom) && images.length > 1 && <button onClick={() => { const n = images[zoomAt + 1]; if (n) setZoom(n); }} disabled={zoomAt < 0 || zoomAt >= images.length - 1} aria-label="Próxima" className="absolute right-0 z-10 grid h-11 w-11 place-items-center rounded-full border border-border bg-background/70 backdrop-blur disabled:opacity-30"><ChevronRight size={20} /></button>}
-            {isImg(zoom) ? <img src={urls[fkey(zoom)]!.view} alt={zoom.name} className="max-h-full max-w-[min(92vw,1400px)] rounded-2xl border border-border object-contain shadow-[0_0_60px_-10px_var(--violet)]" />
-              : <a href={urls[fkey(zoom)]!.view} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-border bg-background/80 px-4 py-3 text-sm"><ExternalLink size={14} /> Abrir {zoom.name}</a>}
+            {isImg(zoom) ? <div className="absolute inset-0 flex items-center justify-center px-12"><img src={urls[fkey(zoom)]!.view} alt={zoom.name} className="max-h-full max-w-full rounded-2xl border border-border object-contain shadow-[0_0_60px_-10px_var(--violet)]" /></div>
+              : <div className="absolute inset-0 grid place-items-center"><a href={urls[fkey(zoom)]!.view} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-border bg-background/80 px-4 py-3 text-sm"><ExternalLink size={14} /> Abrir {zoom.name}</a></div>}
           </div>
         </div>,
         document.body,
