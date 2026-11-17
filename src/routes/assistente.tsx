@@ -222,7 +222,7 @@ function Assistente() {
             </div>
           </section>
 
-          <div className="-mt-4 text-center max-sm:-mt-1" aria-live="polite">
+          <div className="relative z-10 -mt-4 text-center max-sm:-mt-1" aria-live="polite" data-testid="frase-esfera">
             {voice.active && voice.phase !== "idle" ? (
               <div className="mx-auto flex min-h-[3.2rem] max-w-xl flex-col items-center gap-1.5 animate-rise" data-testid="voz-estado">
                 <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em]" style={{ color: voice.phase === "listening" ? "var(--emerald)" : voice.phase === "thinking" ? "oklch(0.8 0.15 75)" : "var(--cyan)" }} data-testid="voz-fase">
