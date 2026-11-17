@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
-import { addMonths, brl, invoiceMonthOf, isoOf, monthLabel, planInfo, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, planInfo, ymOf } from "@/lib/finance/calc";
 import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
 import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Tone, Transaction, TxKind } from "@/lib/finance/types";
@@ -79,7 +79,7 @@ export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undef
         <Field label="Dia de fechamento da fatura"><TextInput type="number" min={1} max={31} value={closing} onChange={(e) => setClosing(e.target.value)} /></Field>
         <Field label="Dia de vencimento da fatura"><TextInput type="number" min={1} max={31} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
       </Grid>
-      <Field label={`Outros valores pendentes na fatura de ${monthLabel(openYm)}`} hint="Opcional: fatura anterior em aberto, juros, anuidade…"><MoneyInput value={extra} onChange={setExtra} /></Field>
+      <Field label={`Valor atual da fatura (${invoiceLabel({ closingDay: day(closing), dueDay: day(due) }, openYm)})`} hint="Opcional. Se já sabe o total da fatura aberta, informe aqui; compras que você lançar depois somam a este valor."><MoneyInput value={extra} onChange={setExtra} /></Field>
       <Field group label="Cor"><TonePicker value={tone} onChange={setTone} /></Field>
       <Actions onCancel={onCancel} onSave={save} disabled={!ok} />
     </div>

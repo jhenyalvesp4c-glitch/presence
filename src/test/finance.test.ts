@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountBalance, addMonths, alertsFor, cardAvailable, categoryTotals, commitments, invoiceFor, invoiceMonthOf, monthEntries, monthlySeries, openInvoice, planInfo, totalFutureParcels, whyChanged, ymOf, expensesOf, total } from "@/lib/finance/calc";
+import { accountBalance, addMonths, closingDateOf, invoiceLabel, alertsFor, cardAvailable, categoryTotals, commitments, invoiceFor, invoiceMonthOf, monthEntries, monthlySeries, openInvoice, planInfo, totalFutureParcels, whyChanged, ymOf, expensesOf, total } from "@/lib/finance/calc";
 import { makeMock } from "@/lib/finance/mock";
 import { parseNatural } from "@/lib/finance/parse";
 import { normalizeState } from "@/lib/finance/repo";
@@ -23,6 +23,16 @@ describe("fatura do cartão", () => {
     expect(invoiceMonthOf(mp, "2026-11-11")).toBe("2026-12");
   });
   it("vira o ano", () => { expect(invoiceMonthOf(nubank, "2026-12-30")).toBe("2027-02"); });
+});
+
+describe("rótulo da fatura (fechamento e vencimento)", () => {
+  it("fecha em um mês e vence no seguinte: mostra as duas datas", () => {
+    const c = { closingDay: 28, dueDay: 5 };
+    expect(closingDateOf(c, "2026-12")).toBe("2026-11-28");
+    expect(invoiceLabel(c, "2026-12")).toBe("fecha 28/11 · vence 05/12");
+    expect(invoiceLabel(c, "2027-01")).toBe("fecha 28/12 · vence 05/01");
+  });
+  it("fecha e vence no mesmo mês", () => { expect(invoiceLabel({ closingDay: 20, dueDay: 28 }, "2026-11")).toBe("fecha 20/11 · vence 28/11"); });
 });
 
 describe("compras parceladas", () => {

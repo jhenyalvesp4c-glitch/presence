@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark, Layers, PartyPopper, Pencil, Plus, Receipt, Repeat, ShoppingBag, ShoppingCart, Sparkles, Target, Trash2 } from "lucide-react";
-import { accountBalance, brl, cardAvailable, invoiceMonthOf, isoOf, monthLabel, openInvoice, totalFutureParcels, totalBalance, totalOpenInvoices, sum } from "@/lib/finance/calc";
+import { accountBalance, brl, cardAvailable, invoiceLabel, invoiceMonthOf, isoOf, openInvoice, totalFutureParcels, totalBalance, totalOpenInvoices, sum } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Goal, Plan, Recurring, Transaction } from "@/lib/finance/types";
@@ -46,6 +46,27 @@ function ListStep<T extends { id: string }>({ items, render, form, addLabel, hin
 }
 const Remove = ({ onClick, label }: { onClick: () => void; label: string }) => <button className={`${btn.icon} hover:!border-destructive/50 hover:!text-destructive`} aria-label={`Excluir ${label}`} onClick={onClick}><Trash2 size={14} /></button>;
 
+/** Fatura atual de um cartão: mostra as datas de fechamento e vencimento e deixa a pessoa informar o total que vê no app do banco. */
+function InvoiceStepRow({ card: c }: { card: Card }) {
+  const f = useFinance(), { state, today } = f, ym = invoiceMonthOf(c, isoOf(today)), inv = openInvoice(state, c, today), extra = c.adjustments[ym] ?? 0, base = Math.round((inv.total - extra) * 100) / 100;
+  const [typed, setTyped] = useState<number | undefined>(inv.total > 0 ? inv.total : undefined);
+  const set = (v: number | undefined) => {
+    setTyped(v);
+    const adj = { ...c.adjustments }, rest = v === undefined ? 0 : Math.round(Math.max(0, v - base) * 100) / 100;
+    if (rest > 0) adj[ym] = rest; else delete adj[ym];
+    f.upsertCard({ ...c, adjustments: adj });
+  };
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4" style={{ borderColor: `color-mix(in oklab, ${TONES[c.tone].glow} 28%, transparent)` }} data-testid="fin-fatura-linha">
+      <div className="flex flex-wrap items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl text-white" style={{ background: TONES[c.tone].bg }}><CreditCard size={18} /></span><div className="min-w-0 flex-1"><p className="font-medium">{c.name} •••• {c.last4}</p><p className="text-xs text-muted-foreground">Fatura atual · {invoiceLabel(c, ym)}</p></div><div className="text-right"><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">Total da fatura</p><p className="font-display text-xl font-semibold tabular-nums" data-testid="fin-fatura-total"><Money value={inv.total} /></p></div></div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+        <Field label="Total da fatura atual (como aparece no app do banco)" hint={base > 0 ? `Suas compras e parcelas já somam ${brl(base)}; o restante entra como “outros valores pendentes”.` : "Ainda não há compras lançadas neste ciclo: o valor informado entra como “outros valores pendentes”."}><MoneyInput value={typed} onChange={set} data-testid="fin-fatura-total-campo" /></Field>
+        <p className="pb-2 text-xs text-muted-foreground">{inv.lines.filter((l) => l.source !== "ajuste").length} compras e parcelas nesta fatura</p>
+      </div>
+    </div>
+  );
+}
+
 export function Briefing({ onDone }: { onDone: () => void }) {
   const f = useFinance(), { state, today } = f;
   const [i, setI] = useState(0), [dir, setDir] = useState<1 | -1>(1);
@@ -73,15 +94,7 @@ export function Briefing({ onDone }: { onDone: () => void }) {
         grid="grid gap-4 sm:grid-cols-2" render={(c: Card, act) => <div><CardVisual card={c} compact usedPct={c.limit ? (1 - cardAvailable(state, c) / c.limit) * 100 : 0} /><span className="mt-2 flex justify-end gap-1.5">{act}<Remove label={c.name} onClick={() => f.removeCard(c.id)} /></span></div>}
         form={(init, d) => <CardForm initial={init} onCancel={state.cards.length ? d : undefined} onSave={(c) => { f.upsertCard(c); d(); }} />} />;
       case "faturas": return state.cards.length === 0 ? <p className="rounded-2xl border border-dashed border-white/12 p-6 text-center text-sm text-muted-foreground">Cadastre um cartão na etapa anterior para ver as faturas.</p> : (
-        <div className="space-y-3" data-testid="fin-step-faturas">{state.cards.map((c) => {
-          const inv = openInvoice(state, c, today), ym = invoiceMonthOf(c, isoOf(today)), extra = c.adjustments[ym];
-          return (
-            <div key={c.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-4" style={{ borderColor: `color-mix(in oklab, ${TONES[c.tone].glow} 28%, transparent)` }}>
-              <div className="flex flex-wrap items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl text-white" style={{ background: TONES[c.tone].bg }}><CreditCard size={18} /></span><div className="min-w-0 flex-1"><p className="font-medium">{c.name} •••• {c.last4}</p><p className="text-xs text-muted-foreground">Fatura de {monthLabel(ym)} · vence dia {c.dueDay}</p></div><div className="text-right"><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">Valor atual</p><p className="font-display text-xl font-semibold tabular-nums"><Money value={inv.total} /></p></div></div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"><Field label="Outros valores pendentes nesta fatura" hint="Ex.: fatura anterior em aberto, juros, anuidade. Vazio = nada além das compras."><MoneyInput value={extra} onChange={(v) => { const adj = { ...c.adjustments }; if (v) adj[ym] = v; else delete adj[ym]; f.upsertCard({ ...c, adjustments: adj }); }} /></Field>
-                <p className="pb-2 text-xs text-muted-foreground">{inv.lines.filter((l) => l.source !== "ajuste").length} compras e parcelas nesta fatura</p></div>
-            </div>);
-        })}</div>);
+        <div className="space-y-3" data-testid="fin-step-faturas">{state.cards.map((c) => <InvoiceStepRow key={c.id} card={c} />)}</div>);
       case "recorrentes": return <ListStep testId="fin-step-recorrentes" items={state.recurring} addLabel="Adicionar despesa ou receita fixa" hint="Aluguel, assinaturas, salário…"
         render={(r: Recurring, act) => <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2.5"><CatBadge id={r.category} size={36} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{r.desc}</p><p className="text-xs text-muted-foreground">todo dia {r.day} · {catOf(r.category).name}</p></div><b className={`text-sm tabular-nums ${r.kind === "receita" ? "text-emerald" : ""}`}>{r.kind === "receita" ? "+" : "−"}{brl(r.amount)}</b>{act}<Remove label={r.desc} onClick={() => f.removeRecurring(r.id)} /></div>}
         form={(init, d) => <RecurringForm initial={init} onCancel={state.recurring.length ? d : undefined} onSave={(r) => { f.upsertRecurring(r); d(); }} />} />;

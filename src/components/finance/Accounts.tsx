@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, CreditCard, Landmark, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
-import { accountBalance, addMonths, brl, cardAvailable, dateBR, invoiceFor, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
+import { accountBalance, addMonths, brl, cardAvailable, closingDateOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
@@ -100,7 +100,7 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
       {card && tab === "proximas" && (
         <div className="grid gap-4 sm:grid-cols-2" data-testid="fin-proximas">{upcomingInvoices(state, card, today, 6).slice(1).map((inv, i) => (
           <Panel key={inv.ym} glow={tone.glow} className="!p-4" style={{ animation: `fin-pop .5s ${i * 0.06}s both` }}>
-            <div className="flex items-center justify-between"><div><p className="font-display text-lg font-semibold capitalize">{monthName(inv.ym)}</p><p className="text-xs text-muted-foreground">vence {dateBR(inv.due)}</p></div><b className="font-display text-xl tabular-nums">{brl(inv.total)}</b></div>
+            <div className="flex items-center justify-between"><div><p className="font-display text-lg font-semibold">Vence {dateBR(inv.due).slice(0, 5)}</p><p className="text-xs text-muted-foreground">{invoiceLabel(card, inv.ym)}</p></div><b className="font-display text-xl tabular-nums">{brl(inv.total)}</b></div>
             <ul className="mt-3 space-y-1 text-xs text-muted-foreground">{inv.lines.slice(0, 5).map((l) => <li key={l.id} className="flex justify-between gap-2"><span className="truncate">{l.desc}{l.parcel ? ` (${l.parcel})` : ""}</span><span className="tabular-nums">{brl(l.amount)}</span></li>)}{inv.lines.length === 0 && <li>Nada lançado ainda.</li>}{inv.lines.length > 5 && <li>+ {inv.lines.length - 5} itens</li>}</ul>
           </Panel>))}</div>
       )}
@@ -135,7 +135,7 @@ function CardStats({ card }: { card: Card }) {
         <Stat label="Usado" color={usedPct >= 80 ? ROSE : undefined}><Money value={used} /></Stat>
       </div>
       <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"><div className="mb-2 flex justify-between text-xs text-muted-foreground"><span>Uso do limite</span><b className="text-foreground">{usedPct.toFixed(0)}%</b></div><Meter pct={usedPct} color={TONES[card.tone].glow} height={10} />
-        <p className="mt-2 text-xs text-muted-foreground">Fecha dia {card.closingDay} e vence dia {card.dueDay}. Compras até o dia {card.closingDay} entram na fatura de {monthLabel(invoiceMonthOf(card, `${ymOf(today)}-${String(card.closingDay).padStart(2, "0")}`))}.</p></div>
+        <p className="mt-2 text-xs text-muted-foreground">Fecha dia {card.closingDay} e vence dia {card.dueDay}. Compras feitas até o dia {card.closingDay} entram na fatura que vence {invoiceLabel(card, invoiceMonthOf(card, `${ymOf(today)}-${String(card.closingDay).padStart(2, "0")}`)).replace(/^fecha \d\d\/\d\d · vence /, "")}.</p></div>
     </div>
   );
 }
@@ -144,7 +144,7 @@ function InvoiceView({ card, ym }: { card: Card; ym: string }) {
   const { state } = useFinance(), inv = invoiceFor(state, card, ym);
   return (
     <Panel glow={TONES[card.tone].glow} data-testid="fin-fatura">
-      <Head icon={Receipt} title={`Fatura de ${monthName(inv.ym)}`} sub={`Vence em ${dateBR(inv.due)}`} right={<b className="font-display text-2xl tabular-nums">{brl(inv.total)}</b>} />
+      <Head icon={Receipt} title={`Fatura que vence em ${dateBR(inv.due)}`} sub={`Fecha em ${dateBR(closingDateOf(card, inv.ym))}`} right={<b className="font-display text-2xl tabular-nums">{brl(inv.total)}</b>} />
       {inv.lines.length === 0 ? <Empty icon={Receipt} title="Fatura vazia" hint="As compras no crédito deste cartão aparecem aqui." /> : (
         <ul className="space-y-0.5">{inv.lines.map((l, i) => (
           <li key={l.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/[0.04]" style={{ animation: `fin-pop .4s ${Math.min(i, 12) * 0.03}s both` }}>

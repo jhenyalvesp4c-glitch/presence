@@ -133,6 +133,10 @@ export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice 
   if (adjustment) lines.push({ id: `adj:${dueYm}`, desc: "Outros valores pendentes", amount: adjustment, date: dueDateOf(card, dueYm), category: "outros", source: "ajuste" });
   return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total: sum(lines.map((l) => l.amount)), adjustment };
 }
+/** Data de fechamento da fatura que vence em `dueYm`. */
+export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);
+/** "fecha 28/11 · vence 05/12": sempre as duas datas, para não confundir mês de fechamento com mês de vencimento. */
+export const invoiceLabel = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => `fecha ${dateBR(closingDateOf(card, dueYm)).slice(0, 5)} · vence ${dateBR(dueDateOf(card, dueYm)).slice(0, 5)}`;
 /** A fatura aberta agora (a do ciclo em que hoje está). */
 export const openInvoice = (s: FinanceState, card: Card, today: Date): Invoice => invoiceFor(s, card, invoiceMonthOf(card, isoOf(today)));
 export const upcomingInvoices = (s: FinanceState, card: Card, today: Date, n = 4): Invoice[] => { const m = invoiceMonthOf(card, isoOf(today)); return Array.from({ length: n }, (_, i) => invoiceFor(s, card, addMonths(m, i))); };
