@@ -39,19 +39,6 @@ export const Route = createFileRoute("/assistente")({
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
-const rail: { Icon: typeof Home; label: string; c: string; to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" | "/configuracoes" | "/financeiro" }[] = [
-  { Icon: Home, label: "Início", c: "cyan" },
-  { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/projetos" },
-  { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" },
-  { Icon: Wallet, label: "Financeiro", c: "emerald", to: "/financeiro" },
-  { Icon: Calendar, label: "Agenda", c: "cyan", to: "/planejamento" },
-  { Icon: BarChart3, label: "Progresso", c: "violet" },
-  { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" },
-  { Icon: Brain, label: "Segundo cérebro", c: "violet", to: "/cerebro" },
-  { Icon: Puzzle, label: "Integrações", c: "cyan", to: "/configuracoes" },
-  { Icon: Workflow, label: "Fluxos", c: "violet" },
-  { Icon: Settings, label: "Configurações", c: "cyan", to: "/configuracoes" },
-];
 
 
 const quick = [
@@ -73,42 +60,6 @@ const cards = [
   { img: imgProj, Icon: Lightbulb, t: "Projetos e ideias", d: ["Registre e desenvolva", "suas ideias"], c: "violet" },
 ];
 
-function RailIcon({ Icon, label, c, on = false, to, onClick, delay = "0s" }: {
-  Icon: typeof Home; label: string; c: string; on?: boolean;
-  to?: "/saude" | "/projetos" | "/tarefas" | "/planejamento" | "/cerebro" | "/configuracoes" | "/financeiro" | undefined; onClick?: () => void; delay?: string;
-
-}) {
-  const cls = `group relative grid h-10 w-10 place-items-center rounded-full transition duration-500 hover:-translate-y-0.5 hover:scale-[1.14] ${
-    on ? "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)] text-[color:var(--glow)] shadow-[inset_0_0_20px_-6px_var(--glow)]" : "text-muted-foreground/55 hover:text-[color:var(--glow)]"
-  }`;
-
-  return (
-    <div className="rail-float" style={{ animationDelay: delay } as CSSProperties}>
-      {to ? (
-        <Link to={to} aria-label={label} className={cls} style={tint(c)}>
-          <RailBits Icon={Icon} label={label} on={on} />
-        </Link>
-      ) : (
-        <button type="button" onClick={onClick} aria-label={label} className={cls} style={tint(c)}>
-          <RailBits Icon={Icon} label={label} on={on} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function RailBits({ Icon, label, on }: { Icon: typeof Home; label: string; on: boolean }) {
-  return (
-    <>
-      <span aria-hidden className={`rail-halo transition-opacity duration-500 ${on ? "opacity-75" : "opacity-0 group-hover:opacity-100"}`} />
-      <span aria-hidden className={`rail-ring transition-opacity duration-700 ${on ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
-
-      <Icon size={19} className="relative z-10 transition duration-500 group-hover:-rotate-6" />
-      <span aria-hidden className={`rail-label -translate-x-1.5 opacity-0 transition duration-300 group-hover:translate-x-0 group-hover:opacity-100 ${on ? "group-hover:opacity-100" : ""}`}>{label}</span>
-    </>
-  );
-}
-
 function Assistente() {
 
   const home = useHome();
@@ -123,7 +74,6 @@ function Assistente() {
   const panelRef = useRef<HTMLDivElement>(null);
   const pick = (a: HomeAction) => { setChooser(false); setPanel(a); setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 120); };
   const [incoming, setIncoming] = useState<{ id: number; text: string } | null>(null);
-  const [active, setActive] = useState(0);
   const voiceTarget = useRef<"chat" | "demand">("chat");
 
   useEffect(() => {
@@ -152,18 +102,6 @@ function Assistente() {
   return (
     <div className="min-h-screen p-3 [background:radial-gradient(60%_50%_at_50%_30%,color-mix(in_oklab,var(--cyan)_7%,transparent),transparent_70%),oklch(0.11_0.025_265)]">
       <div className="mx-auto flex w-full max-w-[1680px] items-stretch gap-4">
-        {/* Rail — floating icons */}
-        <aside className="sticky top-3 z-30 hidden h-[calc(100vh-1.5rem)] w-16 shrink-0 flex-col items-start pl-3 md:flex">
-
-
-          <div className="flex flex-1 flex-col items-center justify-center gap-1.5">
-            {rail.map(({ Icon, label, c, to }, i) => (
-              <RailIcon key={label} Icon={Icon} label={label} c={c} to={to} on={i === active}
-                onClick={() => setActive(i)} delay={`${(i % 5) * 0.7}s`} />
-            ))}
-          </div>
-          <div className="absolute bottom-24 left-3"><AccountMenu /></div>
-        </aside>
 
 
         <main className="flex min-w-0 flex-1 flex-col gap-6 max-md:gap-5 max-md:pb-28">
