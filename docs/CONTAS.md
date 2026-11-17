@@ -16,7 +16,7 @@ A migração `20261124000200_presence_app_close_anon_access.sql` removeu as pol�
 - Consequência: o modo de teste local sem login (`VITE_AUTH_DISABLED=1`) e o MCP (que usava a chave pública como a conta principal) não leem mais os dados. Para ligar o MCP de novo é preciso um login de serviço no servidor (ainda não feito).
 
 ## Para conferir no painel da Supabase (Authentication)
-- **URL Configuration:** "Site URL" = endereço de produção do Orion; sem isso o link do e-mail de confirmação leva para o lugar errado.
+- **URL Configuration → Redirect URLs:** adicionar o endereço de produção do Orion (`https://spark-mind-friend-htvx.vercel.app/**`). O cadastro pede que o link do e-mail de confirmação volte para o endereço de onde a pessoa se cadastrou (`emailRedirectTo`); a Supabase só aceita se o endereço estiver nessa lista. "Site URL" é o plano B (o projeto da Supabase é compartilhado com outro app: só mude se for o Orion o principal).
 - **Providers → Email:** cadastro por e-mail ativo.
 - **Leaked password protection:** ligar (impede senhas vazadas).
 - E-mails de confirmação: o envio padrão da Supabase tem limite baixo por hora; para muitas contas, configurar um SMTP próprio.

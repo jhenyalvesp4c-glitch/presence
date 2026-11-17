@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback<Auth["signUp"]>(async (name, email, password) => {
     try { localStorage.setItem(NAME_KEY, name.trim()); } catch { /* sem armazenamento */ }
-    const { data, error } = await authClient.auth.signUp({ email: email.trim(), password, options: { data: { name: name.trim() } } });
+    const { data, error } = await authClient.auth.signUp({ email: email.trim(), password, options: { data: { name: name.trim() }, ...(typeof window !== "undefined" ? { emailRedirectTo: window.location.origin } : {}) } });
     if (error) return { ok: false, error: explain(error.message) };
     if (!data.session) return { ok: true, message: "Conta criada! Enviamos um e-mail de confirmação: abra o link e depois volte para entrar." };
     return { ok: true };
