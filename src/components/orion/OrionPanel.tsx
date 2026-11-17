@@ -6,7 +6,7 @@ import { addEntry, deleteEntry, listEntries, todayIso, type BrainEntry } from "@
 import { orionAsk, type AskResult } from "@/lib/orion.functions";
 import { transcribeAudio } from "@/lib/audio.functions";
 import { summarizeFiles } from "@/lib/brain.functions";
-import { MAX_PENDING, filesFromClipboard, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
+import { ARCHIVE_LIMITS, filesFromClipboard, readArchive, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
 import { OrionReport, type Report } from "./OrionReport";
 
@@ -59,7 +59,7 @@ export function OrionPanel({ autoFocus = false, className = "", onDocumented, in
     if (!list.length) return;
     setMode("doc"); setError("");
     try {
-      const { added, rejected } = await toPending(list, pending);
+      const { added, rejected } = await toPending(list, pending, ARCHIVE_LIMITS);
       if (added.length) setPending((p) => [...p, ...added]);
       if (rejected.length) setError(rejected.join(" · "));
     } catch (e) { setError((e as Error).message); }
@@ -70,18 +70,15 @@ export function OrionPanel({ autoFocus = false, className = "", onDocumented, in
     if ((!text.trim() && !pending.length) || busy) return;
     setBusy(true); setError("");
     try {
-      // Lê o conteúdo dos anexos (print, PDF, texto) para a busca achar depois.
+      // Lê o conteúdo dos anexos (print, PDF, texto) para a busca achar depois; muitos arquivos são lidos em grupos.
       let summary = "";
-      const textual = pending.filter((p) => p.ai?.mime === "text/plain").map((p) => `## ${p.name}\n${new TextDecoder().decode(Uint8Array.from(atob(p.ai!.data), (c) => c.charCodeAt(0)))}`);
-      const visual = pending.filter((p) => p.ai && p.ai.mime !== "text/plain").map((p) => ({ name: p.name, mime: p.ai!.mime, data: p.ai!.data }));
-      if (visual.length) {
+      if (pending.some((p) => p.ai)) {
         setStage("Lendo os arquivos…");
-        const r = await summarizeFiles({ data: { files: visual } });
-        if (r.ok) { summary = r.text; if (r.note) toast.message(r.note); } else toast.error(r.error);
+        const r = await readArchive(pending, (i, n) => setStage(n > 1 ? `Lendo os arquivos (${i + 1} de ${n})…` : "Lendo os arquivos…"));
+        summary = r.summary; if (r.note) toast.message(r.note);
       }
-      summary = [...textual, summary].filter(Boolean).join("\n\n");
       setStage(pending.length ? "Guardando os arquivos…" : "");
-      const e = await addEntry({ text, date: date || todayIso(), summary, files: pending.map((p) => ({ name: p.name, mime: p.mime, blob: p.blob })) });
+      const e = await addEntry({ text, date: date || todayIso(), summary, files: pending.map((p) => ({ name: p.name, mime: p.mime, blob: p.blob })), onProgress: (d, n) => setStage(`Guardando os arquivos (${d} de ${n})…`) });
       setText(""); setDate(todayIso()); setPending([]);
       toast.success(e.dossiers.length ? `Documentado · ${e.dossiers.join(", ")}` : "Documentado no Orion");
       refresh(); onDocumented?.();
@@ -174,7 +171,9 @@ export function OrionPanel({ autoFocus = false, className = "", onDocumented, in
       </div>
 
       {mode === "doc" && pending.length > 0 && (
-        <ul className="flex flex-wrap gap-2" data-testid="orion-anexos">
+        <div className="space-y-1.5">
+        <p className="text-[0.7rem] text-muted-foreground" data-testid="orion-anexos-resumo">{pending.length} {pending.length === 1 ? "arquivo" : "arquivos"} · {sizeLabel(pending.reduce((n, p) => n + p.size, 0))}{pending.length > ARCHIVE_LIMITS.aiCap ? ` · a IA lê os primeiros ${ARCHIVE_LIMITS.aiCap}; todos ficam guardados` : ""}</p>
+        <ul className="flex max-h-64 flex-wrap gap-2 overflow-y-auto pr-1" data-testid="orion-anexos">
           {pending.map((p) => (
             <li key={p.key} className="group/f relative flex max-w-full items-center gap-2 rounded-xl border border-border bg-secondary/40 p-1.5 pr-7 transition hover:border-cyan/50">
               {p.preview ? <img src={p.preview} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="icon-tile h-9 w-9 shrink-0 !rounded-lg"><FileText size={15} /></span>}
@@ -182,8 +181,9 @@ export function OrionPanel({ autoFocus = false, className = "", onDocumented, in
               <button onClick={() => dropPending(p.key)} aria-label={`Remover ${p.name}`} className="absolute right-1.5 top-1.5 text-muted-foreground hover:text-destructive"><X size={12} /></button>
             </li>
           ))}
-          {pending.length < MAX_PENDING && <li><button onClick={() => fileInput.current?.click()} className="grid h-12 place-items-center rounded-xl border border-dashed border-border px-3 text-[0.65rem] text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">+ anexar</button></li>}
+          {pending.length < ARCHIVE_LIMITS.maxFiles && <li><button onClick={() => fileInput.current?.click()} className="grid h-12 place-items-center rounded-xl border border-dashed border-border px-3 text-[0.65rem] text-muted-foreground transition hover:border-cyan/50 hover:text-cyan">+ anexar</button></li>}
         </ul>
+        </div>
       )}
 
       {mode === "ask" && !answer && !busy && !error && (

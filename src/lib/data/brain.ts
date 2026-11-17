@@ -36,24 +36,33 @@ const safeName = (n: string) => n.normalize("NFD").replace(/[̀-ͯ]/g, "").repla
 export type NewFile = { name: string; mime: string; blob: Blob };
 
 /** Envia arquivos para o Storage (pasta do dono / pasta lógica) e devolve as referências. Se um falhar, apaga os já enviados. */
-export async function uploadFiles(folder: string, files: NewFile[]): Promise<Attachment[]> {
-  const done: Attachment[] = [];
-  try {
-    for (const f of files) {
-      const path = `${ownerId()}/${folder}/${Date.now().toString(36)}${done.length}-${safeName(f.name)}`;
+export async function uploadFiles(folder: string, files: NewFile[], onProgress?: (done: number, total: number) => void): Promise<Attachment[]> {
+  const out: (Attachment | undefined)[] = new Array(files.length).fill(undefined);
+  const stamp = Date.now().toString(36), owner = ownerId();
+  let next = 0, done = 0, failed: Error | null = null;
+  // até 4 envios ao mesmo tempo: dezenas de imagens não precisam ir uma por uma
+  const worker = async () => {
+    while (!failed) {
+      const i = next++;
+      if (i >= files.length) return;
+      const f = files[i]!, path = `${owner}/${folder}/${stamp}${i}-${safeName(f.name)}`;
       const up = await supabase.storage.from(BUCKET).upload(path, f.blob, { contentType: f.mime || "application/octet-stream", upsert: true });
-      if (up.error) throw new Error(`Não consegui guardar "${f.name}": ${up.error.message}`);
-      done.push({ path, name: f.name, mime: f.mime, size: f.blob.size });
+      if (up.error) { failed = new Error(`Não consegui guardar "${f.name}": ${up.error.message}`); return; }
+      out[i] = { path, name: f.name, mime: f.mime, size: f.blob.size };
+      onProgress?.(++done, files.length);
     }
-    return done;
-  } catch (e) {
-    if (done.length) await supabase.storage.from(BUCKET).remove(done.map((a) => a.path));
-    throw e;
+  };
+  await Promise.all(Array.from({ length: Math.min(4, files.length) }, worker));
+  if (failed) {
+    const got = out.filter((a): a is Attachment => !!a);
+    if (got.length) await supabase.storage.from(BUCKET).remove(got.map((a) => a.path));
+    throw failed;
   }
+  return out as Attachment[];
 }
 
 /** Salva a anotação (com arquivos, se houver). Os dossiês citados no texto viram etiquetas. */
-export async function addEntry(input: { text: string; date?: string; title?: string; files?: NewFile[]; summary?: string }): Promise<BrainEntry> {
+export async function addEntry(input: { text: string; date?: string; title?: string; files?: NewFile[]; summary?: string; onProgress?: (done: number, total: number) => void }): Promise<BrainEntry> {
   const files = input.files ?? [];
   const clean = input.text.trim().slice(0, 6000);
   if (!clean && !files.length) throw new Error("Escreva ou anexe algo para documentar.");
@@ -61,7 +70,7 @@ export async function addEntry(input: { text: string; date?: string; title?: str
   const id = crypto.randomUUID();
   const attachments: Attachment[] = [];
   try {
-    attachments.push(...(await uploadFiles(id, files)));
+    attachments.push(...(await uploadFiles(id, files, input.onProgress)));
     const row = must(await supabase.from("brain_entries").insert({
       id, user_id: ownerId(), text: clean, title: (input.title ?? "").slice(0, 200), entry_date: input.date || todayIso(),
       dossier_names: mentionedDossiers(`${clean} ${input.title ?? ""} ${files.map((f) => f.name).join(" ")}`, names),
