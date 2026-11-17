@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { CalendarCheck, ChevronDown, CreditCard, Layers, Pencil, Plus, Trash2, Wallet } from "lucide-react";
-import { brl, commitments, dateBR, monthLabel, planInfo, sum, totalFutureParcels, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, commitments, dateBR, monthLabel, planInfo, sum, totalFutureParcels, ymOf } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
 import type { Plan } from "@/lib/finance/types";
-import { Money, Ring, StackedBars } from "./charts";
+import { AreaChart, Money, Ring, StackedBars } from "./charts";
+import { HeroPanel, SectionTitle } from "./fx";
 import { PlanForm } from "./forms";
 import { CatBadge, ConfirmDelete, Empty, Head, Modal, Panel, Pill, Segmented, TONES, btn } from "./ui";
 
@@ -13,8 +14,9 @@ export function PlanCard({ plan, onEdit, onDelete, index = 0 }: { plan: Plan; on
   const card = state.cards.find((c) => c.id === plan.cardId), info = useMemo(() => planInfo(plan, card, today), [plan, card, today]);
   const color = card ? TONES[card.tone].glow : "var(--cyan)";
   return (
-    <article className="glass relative overflow-hidden rounded-[1.5rem] p-4 transition duration-500 hover:-translate-y-0.5" style={{ animation: `fin-pop .5s ${Math.min(index, 8) * 0.06}s both`, boxShadow: `inset 0 1px 0 oklch(1 0 0 / 6%), 0 18px 46px -34px ${color}` }} data-testid="fin-plano">
-      <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full opacity-20 blur-2xl" style={{ background: color }} />
+    <article className="glass group relative overflow-hidden rounded-[1.5rem] p-4 transition duration-500 hover:-translate-y-1 hover:border-white/15" style={{ animation: `fin-pop .5s ${Math.min(index, 8) * 0.06}s both`, boxShadow: `inset 0 1px 0 oklch(1 0 0 / 6%), 0 18px 46px -34px ${color}` }} data-testid="fin-plano">
+      <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full opacity-20 blur-2xl transition-opacity duration-500 group-hover:opacity-45" style={{ background: color }} />
+      <span aria-hidden className="pointer-events-none absolute inset-x-6 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
       <div className="relative flex items-center gap-4">
         <Ring pct={info.pct} color={color} size={72}><span className="text-center leading-tight"><b className="block text-[0.95rem] tabular-nums" data-testid="fin-plano-progresso">{info.paid}/{plan.count}</b><span className="text-[0.58rem] uppercase tracking-wider text-muted-foreground">pagas</span></span></Ring>
         <div className="min-w-0 flex-1">
@@ -27,7 +29,7 @@ export function PlanCard({ plan, onEdit, onDelete, index = 0 }: { plan: Plan; on
         <div className="hidden text-right sm:block"><p className="font-display text-lg font-semibold tabular-nums">{brl(plan.per)}</p><p className="text-[0.7rem] text-muted-foreground">por parcela</p></div>
       </div>
       <div className="relative mt-3 flex items-center gap-[3px]" aria-hidden>
-        {info.schedule.slice(0, 36).map((p) => <span key={p.n} className="h-1.5 flex-1 rounded-full" style={{ background: p.paid ? color : "color-mix(in oklab, white 10%, transparent)", boxShadow: p.paid ? `0 0 6px -1px ${color}` : undefined }} />)}
+        {info.schedule.slice(0, 36).map((p, k) => <span key={p.n} className="h-2 flex-1 rounded-full" style={{ background: p.paid ? `linear-gradient(90deg, ${color}, color-mix(in oklab, ${color} 60%, var(--violet)))` : "color-mix(in oklab, white 10%, transparent)", boxShadow: p.paid ? `0 0 8px -1px ${color}` : undefined, animation: `fin-pop .35s ${0.2 + k * 0.025}s both` }} />)}
       </div>
       <div className="relative mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="text-muted-foreground">Falta pagar <b className="text-foreground tabular-nums">{brl(info.remainingAmount)}</b>{info.nextDue ? <> · próxima em <b className="text-foreground">{dateBR(info.nextDue)}</b></> : null}</span>
@@ -60,28 +62,34 @@ export function InstallmentsView({ defaultCardId }: { defaultCardId?: string }) 
   const restante = totalFutureParcels(state, today), esteMes = future[0]?.parcelas ?? 0, ativas = infos.filter((x) => !x.i.done);
   const last = ativas.map((x) => x.i.lastYm).sort().at(-1);
   const peak = future.reduce((m, x) => (x.parcelas > m.parcelas ? x : m), future[0]!);
+  const paidAll = sum(infos.map((x) => x.i.paidAmount)), owedAll = sum(infos.map((x) => x.i.remainingAmount)), paidPct = paidAll + owedAll > 0 ? (paidAll / (paidAll + owedAll)) * 100 : 0;
+  const unpaid = infos.flatMap((x) => x.i.schedule.filter((p) => !p.paid));
+  const debtCurve = [{ label: "hoje", value: sum(unpaid.map((p) => p.amount)) }, ...Array.from({ length: 12 }, (_, k) => { const m = addMonths(ym, k); return { label: monthLabel(m).slice(0, 3), value: sum(unpaid.filter((p) => p.ym > m).map((p) => p.amount)) }; })];
   return (
     <div className="space-y-5" data-testid="fin-parcelas">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="font-serif text-3xl">Compras <span className="text-gradient italic">parceladas</span></h2><p className="text-sm text-muted-foreground">Tudo que ainda está pagando e o peso nos próximos meses.</p></div>
-        <button className={btn.primary} onClick={() => setEditing("new")} data-testid="fin-add-plano"><Plus size={16} /> Cadastrar compra parcelada</button>
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[{ icon: Wallet, label: "Ainda falta pagar", v: restante, c: "var(--amber)" }, { icon: CalendarCheck, label: "Parcelas deste mês", v: esteMes, c: "var(--violet)" }, { icon: Layers, label: "Compras ativas", v: ativas.length, c: "var(--cyan)", n: true }].map((k, i) => (
-          <div key={k.label} className="glass relative overflow-hidden rounded-[1.5rem] p-4" style={{ animation: `fin-pop .5s ${i * 0.06}s both` }}>
-            <span aria-hidden className="absolute -right-8 -top-10 h-24 w-24 rounded-full opacity-20 blur-2xl" style={{ background: k.c }} />
-            <span className="relative grid h-9 w-9 place-items-center rounded-xl" style={{ color: k.c, background: `color-mix(in oklab, ${k.c} 15%, transparent)` }}><k.icon size={17} /></span>
-            <p className="relative mt-3 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{k.label}</p>
-            <p className="relative font-display text-[1.6rem] font-semibold">{k.n ? k.v : <Money value={k.v} />}</p>
+      <SectionTitle kicker="Crédito parcelado" title="Compras" accent="parceladas" sub="Tudo que ainda está pagando e o peso nos próximos meses."
+        right={<button className={btn.primary} onClick={() => setEditing("new")} data-testid="fin-add-plano"><Plus size={16} /> Cadastrar compra parcelada</button>} />
+      <HeroPanel glow="var(--amber)" data-testid="fin-parcelas-hero">
+        <div className="grid items-center gap-6 lg:grid-cols-[auto_1fr_1.3fr]">
+          <Ring pct={paidPct} color="var(--amber)" size={150} thickness={12}><span className="text-center leading-tight"><b className="block font-display text-3xl tabular-nums">{Math.round(paidPct)}%</b><span className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">já pago</span></span></Ring>
+          <div className="min-w-0">
+            <p className="mono-caps">Ainda falta pagar</p>
+            <p className="mt-1 whitespace-nowrap font-display text-4xl font-semibold tracking-tight md:text-5xl"><span className="text-gradient"><Money value={restante} /></span></p>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[{ icon: CalendarCheck, label: "Este mês", v: <Money value={esteMes} cents={false} />, c: "var(--violet)" }, { icon: Layers, label: "Ativas", v: ativas.length, c: "var(--cyan)" }, { icon: Wallet, label: "Livre em", v: last ? monthLabel(last) : "—", c: "var(--emerald)" }].map((k, i) => (
+                <div key={k.label} className="rounded-2xl border bg-white/[0.03] px-3 py-2" style={{ borderColor: `color-mix(in oklab, ${k.c} 28%, transparent)`, animation: `fin-rise .6s ${0.15 + i * 0.07}s both` }}>
+                  <p className="flex items-center gap-1 text-[0.6rem] font-semibold uppercase tracking-[0.12em]" style={{ color: k.c }}><k.icon size={11} />{k.label}</p>
+                  <p className="font-display text-base font-semibold tabular-nums">{k.v}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-        <div className="glass relative overflow-hidden rounded-[1.5rem] p-4" style={{ animation: "fin-pop .5s .18s both" }}>
-          <span aria-hidden className="absolute -right-8 -top-10 h-24 w-24 rounded-full bg-emerald opacity-20 blur-2xl" />
-          <span className="relative grid h-9 w-9 place-items-center rounded-xl bg-emerald/15 text-emerald"><CalendarCheck size={17} /></span>
-          <p className="relative mt-3 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Livre de parcelas em</p>
-          <p className="relative font-display text-[1.6rem] font-semibold">{last ? monthLabel(last) : "—"}</p>
+          <div className="min-w-0">
+            <p className="mb-1 text-xs text-muted-foreground">Como a dívida vai diminuindo</p>
+            {restante > 0 ? <AreaChart points={debtCurve} color="var(--amber)" height={170} /> : <p className="rounded-2xl border border-emerald/30 bg-emerald/[0.07] px-4 py-6 text-center text-sm">Nenhuma parcela pendente. 🎉</p>}
+          </div>
         </div>
-      </div>
+      </HeroPanel>
       <Panel glow="var(--amber)" data-testid="fin-projecao-parcelas">
         <Head icon={Layers} title="Quanto as parcelas pesam, mês a mês" sub={peak && peak.parcelas > 0 ? `O mês mais pesado é ${monthLabel(peak.ym)}, com ${brl(peak.parcelas)}.` : "Nenhuma parcela futura."} />
         <StackedBars highlight={0} points={future.map((m) => ({ label: m.label, segs: state.cards.filter((c) => m.porCartao[c.id]).map((c) => ({ name: c.name, color: TONES[c.tone].glow, value: m.porCartao[c.id]! })) }))} />

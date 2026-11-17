@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { accountBalance, addMonths, cashflow, closingDateOf, invoiceLabel, monthSummary, totalBalance, alertsFor, cardAvailable, categoryTotals, commitments, invoiceFor, invoiceMonthOf, monthEntries, monthlySeries, openInvoice, planInfo, totalFutureParcels, whyChanged, ymOf, expensesOf, total } from "@/lib/finance/calc";
+import { accountBalance, addMonths, cashflow, closingDateOf, invoiceLabel, monthSummary, totalBalance, alertsFor, cardAvailable, categoryTotals, commitments, invoiceFor, invoiceMonthOf, monthEntries, monthlySeries, openInvoice, planInfo, totalFutureParcels, whyChanged, ymOf, expensesOf, total, pauseRecurring, resumeRecurring, isPaused, recurringActiveIn, nextCharge } from "@/lib/finance/calc";
 import { makeMock } from "@/lib/finance/mock";
 import { parseNatural } from "@/lib/finance/parse";
 import { normalizeState } from "@/lib/finance/repo";
-import { EMPTY_STATE, type FinanceState, type Plan } from "@/lib/finance/types";
+import { EMPTY_STATE, type FinanceState, type Plan, type Recurring } from "@/lib/finance/types";
 
 const TODAY = new Date(2026, 10, 17); // 17/11/2026
 const mock = () => makeMock(TODAY);
@@ -200,5 +200,43 @@ describe("fluxo de caixa: salário no dia 30 e faturas em dezembro", () => {
     const s = mk(); s.recurring.push({ id: "net", kind: "despesa", desc: "Netflix", amount: 55.9, day: 20, category: "assinaturas", method: "credito", cardId: "nu", startYm: "2026-11" });
     expect(cashflow(s, TODAY, 60).events.some((e) => e.label === "Netflix")).toBe(false);
     expect(openInvoice(s, s.cards[0]!, TODAY).total).toBe(1169.46);
+  });
+});
+
+describe("assinaturas: pausar e reativar", () => {
+  const card = { id: "c1", name: "Nubank", brand: "visa" as const, last4: "0001", tone: "roxo" as const, limit: 1000, availableBase: 1000, baseDate: "2026-01-01", closingDay: 25, dueDay: 5, adjustments: {} };
+  const netflix: Recurring = { id: "r1", kind: "despesa", desc: "Netflix", amount: 50, day: 25, category: "assinaturas", method: "credito", cardId: "c1", startYm: "2026-01", subscription: true };
+  const state = (r: Recurring): FinanceState => ({ ...EMPTY_STATE, onboarded: true, cards: [card], recurring: [r] });
+  const inMonth = (s: FinanceState, ym: string) => monthEntries(s, ym).filter((e) => e.desc === "Netflix").length;
+
+  it("pausada não aparece nas movimentações nem na fatura a partir da pausa", () => {
+    const p = pauseRecurring(netflix, TODAY); // dia 17/11, cobrança dia 25 ainda não aconteceu
+    expect(isPaused(p)).toBe(true);
+    expect(inMonth(state(p), "2026-11")).toBe(0);
+    expect(inMonth(state(p), "2027-02")).toBe(0);
+    expect(invoiceFor(state(p), card, "2026-12").lines.some((l) => l.desc === "Netflix")).toBe(false);
+    expect(commitments(state(p), "2026-11", 3).every((m) => m.recorrentes === 0)).toBe(true);
+  });
+  it("pausar não apaga a cobrança deste mês que já aconteceu", () => {
+    const p = pauseRecurring({ ...netflix, day: 8 }, TODAY); // cobrou dia 8
+    expect(recurringActiveIn(p, "2026-11")).toBe(true);
+    expect(recurringActiveIn(p, "2026-12")).toBe(false);
+  });
+  it("os meses antes da pausa continuam no histórico", () => {
+    const p = pauseRecurring(netflix, TODAY);
+    expect(inMonth(state(p), "2026-10")).toBe(1);
+  });
+  it("reativar volta a mostrar nas movimentações a partir da próxima cobrança", () => {
+    const paused = { ...netflix, pauses: [{ from: "2026-09" }] };
+    const r = resumeRecurring(paused, TODAY);
+    expect(isPaused(r)).toBe(false);
+    expect(inMonth(state(r), "2026-11")).toBe(1); // dia 25 ainda vem
+    expect(inMonth(state(r), "2026-10")).toBe(0); // período pausado fica fora
+    expect(nextCharge(r, TODAY)).toBe("2026-11-25");
+  });
+  it("pausar e reativar no mesmo dia não deixa rastro", () => {
+    const r = resumeRecurring(pauseRecurring(netflix, TODAY), TODAY);
+    expect(r.pauses).toEqual([]);
+    expect(inMonth(state(r), "2026-11")).toBe(1);
   });
 });

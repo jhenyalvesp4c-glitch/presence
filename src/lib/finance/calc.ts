@@ -58,9 +58,40 @@ export function planInfo(plan: Plan, card: Pick<Card, "dueDay"> | undefined, tod
   };
 }
 
+/* ───────────── recorrentes: ativas, pausadas e assinaturas ───────────── */
+/** A recorrente conta no mês `ym`? (já começou e não está dentro de uma pausa) */
+export const recurringActiveIn = (r: Recurring, ym: string): boolean => ym >= r.startYm && !(r.pauses ?? []).some((p) => ym >= p.from && (!p.to || ym <= p.to));
+/** Está pausada agora (tem uma pausa sem fim). */
+export const isPaused = (r: Recurring): boolean => (r.pauses ?? []).some((p) => !p.to);
+export const isSubscription = (r: Recurring): boolean => r.kind === "despesa" && (!!r.subscription || r.category === "assinaturas");
+/**
+ * Pausa a partir da próxima cobrança: se a deste mês já passou (ou é hoje), a pausa começa no mês seguinte,
+ * para não apagar uma cobrança que já aconteceu.
+ */
+export function pauseRecurring(r: Recurring, today: Date): Recurring {
+  if (isPaused(r)) return r;
+  const cur = ymOf(today), from = dayIn(cur, r.day) > isoOf(today) ? cur : addMonths(cur, 1);
+  return { ...r, pauses: [...(r.pauses ?? []), { from: from < r.startYm ? r.startYm : from }] };
+}
+/** Reativa a partir da próxima cobrança (a de hoje conta). Se nenhum mês chegou a ficar pausado, a pausa some. */
+export function resumeRecurring(r: Recurring, today: Date): Recurring {
+  if (!isPaused(r)) return r;
+  const cur = ymOf(today), back = dayIn(cur, r.day) >= isoOf(today) ? cur : addMonths(cur, 1), to = addMonths(back, -1);
+  const pauses = (r.pauses ?? []).flatMap((p) => (p.to ? [p] : to < p.from ? [] : [{ from: p.from, to }]));
+  return { ...r, pauses };
+}
+/** Mês em que a pausa aberta começou (ou começa). */
+export const pausedSince = (r: Recurring): string | null => (r.pauses ?? []).find((p) => !p.to)?.from ?? null;
+/** Data da próxima cobrança de uma recorrente ativa (hoje conta). */
+export function nextCharge(r: Recurring, today: Date): string | null {
+  const todayIso = isoOf(today);
+  for (let i = 0, ym = ymOf(today); i < 24; i++, ym = addMonths(ym, 1)) { if (!recurringActiveIn(r, ym)) continue; const d = dayIn(ym, r.day); if (d >= todayIso) return d; }
+  return null;
+}
+
 /* ───────────── lançamentos de um mês ───────────── */
 function recurringEntry(r: Recurring, ym: string): Entry | null {
-  if (ym < r.startYm) return null;
+  if (!recurringActiveIn(r, ym)) return null;
   return { id: `${r.id}:${ym}`, kind: r.kind, desc: r.desc, amount: r.amount, date: dayIn(ym, r.day), category: r.category, method: r.method, accountId: r.accountId, cardId: r.cardId, source: "recorrente" };
 }
 const txEntry = (t: Transaction): Entry => ({ id: t.id, kind: t.kind, desc: t.desc, amount: t.amount, date: t.date, category: t.category, method: t.method, accountId: t.accountId, cardId: t.cardId, source: "tx" });
@@ -124,7 +155,7 @@ export function accountBalance(s: FinanceState, a: Account, today: Date = new Da
   const todayIso = isoOf(today);
   for (let ym = ymOf(a.baseDate); ym <= ymOf(todayIso); ym = addMonths(ym, 1)) {
     for (const r of s.recurring) {
-      if (r.accountId !== a.id || r.method === "credito" || ym < r.startYm) continue;
+      if (r.accountId !== a.id || r.method === "credito" || !recurringActiveIn(r, ym)) continue;
       const d = dayIn(ym, r.day);
       if (d >= a.baseDate && d <= todayIso) v += r.kind === "receita" ? r.amount : -r.amount;
     }
@@ -147,7 +178,7 @@ export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice 
   const lines: InvoiceLine[] = [];
   for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx" });
   for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela" });
-  for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa" && dueYm >= r.startYm) lines.push({ id: `${r.id}:${dueYm}`, desc: r.desc, amount: r.amount, date: dayIn(dueYm, r.day), category: r.category, source: "recorrente" });
+  for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa" && recurringActiveIn(r, dueYm)) lines.push({ id: `${r.id}:${dueYm}`, desc: r.desc, amount: r.amount, date: dayIn(dueYm, r.day), category: r.category, source: "recorrente" });
   const adjustment = card.adjustments[dueYm] ?? 0;
   if (adjustment) lines.push({ id: `adj:${dueYm}`, desc: "Outros valores pendentes", amount: adjustment, date: dueDateOf(card, dueYm), category: "outros", source: "ajuste" });
   return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total: sum(lines.map((l) => l.amount)), adjustment };
@@ -174,7 +205,7 @@ export function cashflow(s: FinanceState, today: Date, days = 60): Cashflow {
   const raw: Omit<FlowEvent, "balance">[] = [];
   for (let ym = ymOf(todayIso); ym <= ymOf(end); ym = addMonths(ym, 1)) {
     for (const r of s.recurring) {
-      if (r.cardId || r.method === "credito" || ym < r.startYm) continue;
+      if (r.cardId || r.method === "credito" || !recurringActiveIn(r, ym)) continue;
       const d = dayIn(ym, r.day);
       if (d > todayIso && d <= end) raw.push({ id: `${r.id}:${ym}`, date: d, label: r.desc, amount: r.kind === "receita" ? r.amount : -r.amount, kind: r.kind });
     }
@@ -194,7 +225,7 @@ export function commitments(s: FinanceState, currentYm: string, n = 12): Commitm
     const porCartao: Record<string, number> = {};
     let parcelas = 0;
     for (const p of s.plans) for (let k = 1; k <= p.count; k++) if (addMonths(p.first, k - 1) === ym) { const v = parcelAmount(p, k); parcelas += v; porCartao[p.cardId] = round2((porCartao[p.cardId] ?? 0) + v); }
-    const recorrentes = sum(s.recurring.filter((r) => r.kind === "despesa" && ym >= r.startYm).map((r) => r.amount));
+    const recorrentes = sum(s.recurring.filter((r) => r.kind === "despesa" && recurringActiveIn(r, ym)).map((r) => r.amount));
     return { ym, label: monthShort(ym), parcelas: round2(parcelas), recorrentes, total: round2(parcelas + recorrentes), porCartao };
   });
 }

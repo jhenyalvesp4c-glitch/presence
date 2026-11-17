@@ -5,7 +5,8 @@ import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
 import { AccountTile, CardVisual, KIND_LABEL } from "./CardVisual";
-import { Meter, Money } from "./charts";
+import { Donut, Meter, Money, RadialRings } from "./charts";
+import { HeroPanel, SectionTitle, Tilt } from "./fx";
 import { AccountForm, CardForm, TxForm } from "./forms";
 import { PlanCard } from "./Installments";
 import { EntryRow } from "./rows";
@@ -26,15 +27,16 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
   const [edit, setEdit] = useState<{ type: "card" | "acc"; item?: Card | Account } | null>(null);
   if (sel) return <Detail sel={sel} onBack={() => onSel(null)} />;
   return (
-    <div className="space-y-7" data-testid="fin-contas">
-      <section>
-        <div className="mb-3 flex items-end justify-between"><div><h2 className="font-serif text-3xl">Seus <span className="text-gradient italic">cartões</span></h2><p className="text-sm text-muted-foreground">Toque num cartão para ver fatura, limite e compras.</p></div></div>
+    <div className="space-y-8" data-testid="fin-contas">
+      <WealthHero />
+      <section className="space-y-4">
+        <SectionTitle kicker="Crédito" title="Seus" accent="cartões" sub="Toque num cartão para ver fatura, limite e compras." />
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {state.cards.map((c, i) => {
             const used = c.limit ? (1 - cardAvailable(state, c) / c.limit) * 100 : 0, inv = openInvoice(state, c, today);
             return (
               <div key={c.id} style={{ animation: `fin-pop .55s ${i * 0.08}s both` }}>
-                <CardVisual card={c} usedPct={used} onClick={() => onSel({ type: "card", id: c.id })} />
+                <Tilt max={12}><CardVisual card={c} usedPct={used} onClick={() => onSel({ type: "card", id: c.id })} /></Tilt>
                 <div className="mt-3 flex items-center justify-between px-1 text-xs"><span className="text-muted-foreground">Fatura atual · vence {dateBR(inv.due).slice(0, 5)}</span><b className="text-sm tabular-nums">{brl(inv.total)}</b></div>
                 <div className="mt-1.5 px-1"><Meter pct={used} color={TONES[c.tone].glow} height={6} /><div className="mt-1 flex justify-between text-[0.7rem] text-muted-foreground"><span>Disponível {brl(cardAvailable(state, c))}</span><span>Limite {brl(c.limit)}</span></div></div>
               </div>
@@ -43,8 +45,8 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
           <AddTile label="Adicionar cartão" onClick={() => setEdit({ type: "card" })} testId="fin-add-cartao" />
         </div>
       </section>
-      <section>
-        <div className="mb-3"><h2 className="font-serif text-3xl">Contas e <span className="text-gradient italic">carteiras</span></h2><p className="text-sm text-muted-foreground">Bancos, carteiras digitais e dinheiro.</p></div>
+      <section className="space-y-4">
+        <SectionTitle kicker="Dinheiro em conta" title="Contas e" accent="carteiras" sub="Bancos, carteiras digitais e dinheiro." />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {state.accounts.map((a, i) => <div key={a.id} style={{ animation: `fin-pop .55s ${i * 0.07}s both` }}><AccountTile account={a} balance={accountBalance(state, a, today)} onClick={() => onSel({ type: "acc", id: a.id })} /></div>)}
           <AddTile label="Adicionar conta" onClick={() => setEdit({ type: "acc" })} testId="fin-add-conta" />
@@ -58,8 +60,46 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
   );
 }
 
+/** Topo da aba: quanto há nas contas, distribuição por conta e limite livre nos cartões. */
+function WealthHero() {
+  const { state, today } = useFinance(), [active, setActive] = useState<string | null>(null);
+  const balances = state.accounts.map((a) => ({ id: a.id, name: a.name, color: TONES[a.tone].glow, value: accountBalance(state, a, today) }));
+  const totalBal = balances.reduce((a, b) => a + b.value, 0), pos = balances.filter((b) => b.value > 0);
+  const limit = state.cards.reduce((a, c) => a + c.limit, 0), free = state.cards.reduce((a, c) => a + Math.max(0, cardAvailable(state, c)), 0), inv = state.cards.reduce((a, c) => a + openInvoice(state, c, today).total, 0);
+  const on = balances.find((b) => b.id === active);
+  return (
+    <HeroPanel glow="var(--violet)" data-testid="fin-patrimonio">
+      <div className="grid items-center gap-6 md:grid-cols-[1.3fr_auto_auto]">
+        <div className="min-w-0">
+          <p className="mono-caps">Patrimônio em contas</p>
+          <p className="mt-2 whitespace-nowrap font-display text-5xl font-semibold leading-none tracking-tight md:text-6xl"><span className="text-gradient"><Money value={totalBal} /></span></p>
+          <p className="mt-2 text-sm text-muted-foreground">{state.accounts.length} contas e carteiras · {state.cards.length} cartões</p>
+          <div className="mt-5 grid grid-cols-3 gap-2.5">
+            {[{ l: "Limite total", v: limit, c: "var(--cyan)" }, { l: "Livre nos cartões", v: free, c: "var(--emerald)" }, { l: "Faturas abertas", v: inv, c: "var(--violet)" }].map((k, i) => (
+              <div key={k.l} className="rounded-2xl border bg-white/[0.03] px-3 py-2.5" style={{ borderColor: `color-mix(in oklab, ${k.c} 28%, transparent)`, animation: `fin-rise .6s ${0.15 + i * 0.07}s both` }}>
+                <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: k.c }}>{k.l}</p>
+                <p className="mt-0.5 font-display text-base font-semibold tabular-nums sm:text-lg"><Money value={k.v} cents={false} /></p>
+              </div>
+            ))}
+          </div>
+        </div>
+        {pos.length > 0 && (
+          <div className="flex flex-col items-center gap-2">
+            <Donut data={pos} size={200} thickness={22} active={active} onActive={setActive} center={on ? <div><p className="text-xs text-muted-foreground">{on.name}</p><p className="font-display text-lg font-semibold tabular-nums">{brl(on.value)}</p></div> : <div><p className="text-[0.62rem] uppercase tracking-wider text-muted-foreground">Por conta</p><p className="font-display text-lg font-semibold">{pos.length}</p></div>} />
+          </div>
+        )}
+        {state.cards.length > 0 && (
+          <div className="hidden flex-col items-center gap-2 lg:flex">
+            <RadialRings size={180} thickness={10} items={state.cards.map((c) => ({ id: c.id, label: c.name, color: TONES[c.tone].glow, pct: c.limit ? (1 - cardAvailable(state, c) / c.limit) * 100 : 0 }))} center={<div><p className="text-[0.62rem] uppercase tracking-wider text-muted-foreground">Limite usado</p><p className="font-display text-lg font-semibold tabular-nums">{limit ? Math.round((1 - free / limit) * 100) : 0}%</p></div>} />
+          </div>
+        )}
+      </div>
+    </HeroPanel>
+  );
+}
+
 function Stat({ label, children, color }: { label: string; children: React.ReactNode; color?: string | undefined }) {
-  return <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3.5"><p className="text-[0.66rem] font-semibold uppercase tracking-[0.13em] text-muted-foreground">{label}</p><div className="mt-1 font-display text-xl font-semibold tabular-nums" style={{ color }}>{children}</div></div>;
+  return <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-3.5 transition hover:-translate-y-0.5 hover:border-white/15" style={{ boxShadow: color ? `0 16px 40px -30px ${color}` : undefined }}>{color && <span aria-hidden className="absolute inset-x-3 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />}<p className="text-[0.66rem] font-semibold uppercase tracking-[0.13em] text-muted-foreground">{label}</p><div className="mt-1 font-display text-xl font-semibold tabular-nums" style={{ color }}>{children}</div></div>;
 }
 
 function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) {
@@ -80,7 +120,7 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
       <button className="flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground" onClick={onBack} data-testid="fin-voltar"><ArrowLeft size={16} /> Contas e cartões</button>
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,26rem)_1fr]">
         <div className="space-y-4">
-          {card ? <CardVisual card={card} usedPct={card.limit ? (1 - cardAvailable(state, card) / card.limit) * 100 : 0} /> : <AccountTile account={acc!} balance={accountBalance(state, acc!, today)} selected />}
+          {card ? <Tilt max={12} style={{ animation: "fin-rise .6s both" }}><CardVisual card={card} usedPct={card.limit ? (1 - cardAvailable(state, card) / card.limit) * 100 : 0} /></Tilt> : <AccountTile account={acc!} balance={accountBalance(state, acc!, today)} selected />}
           <div className="flex gap-2"><button className={`${btn.ghost} flex-1`} onClick={() => setEdit(true)}><Pencil size={14} /> Editar</button><button className={`${btn.danger} flex-1`} onClick={() => setDel(true)}><Trash2 size={14} /> Excluir</button></div>
         </div>
         {card ? <CardStats card={card} /> : (

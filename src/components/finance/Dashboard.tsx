@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CreditCard, Info, Layers, PiggyBank, Scale, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CalendarDays, CreditCard, Gauge as GaugeIcon, Info, Layers, PiggyBank, Scale, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { addMonths, alertsFor, brl, cashflow, categoryTotals, commitments, dateBR, isoOf, monthName, monthSummary, monthlySeries, openInvoice, parseIso, sameDayPrev, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
-import { AreaChart, BarsChart, Donut, Money, Sparkline, StackedBars } from "./charts";
+import { AreaChart, BarsChart, Donut, Gauge, Heatmap, Money, RadialRings, Sparkline, StackedBars } from "./charts";
+import { HeroPanel, OrbitArt, Tilt } from "./fx";
 import { NaturalComposer } from "./QuickAdd";
 import { CatBadge, Empty, Head, Panel, Pill, TONES, btn } from "./ui";
 import type { Draft } from "@/lib/finance/parse";
@@ -11,8 +12,11 @@ const ROSE = "oklch(0.72 0.18 10)";
 
 function Kpi({ icon: I, label, value, color, spark, foot, delay = 0, testId }: { icon: typeof Wallet; label: string; value: number; color: string; spark?: number[]; foot?: React.ReactNode; delay?: number; testId?: string }) {
   return (
-    <div className="glass group relative overflow-hidden rounded-[1.5rem] p-4 transition duration-500 hover:-translate-y-1" style={{ animation: `fin-pop .6s ${delay}s both`, boxShadow: `inset 0 1px 0 oklch(1 0 0 / 6%), 0 18px 50px -34px ${color}` }} data-testid={testId}>
-      <span aria-hidden className="absolute -right-8 -top-10 h-28 w-28 rounded-full opacity-20 blur-2xl transition group-hover:opacity-40" style={{ background: color }} />
+    <Tilt max={8} style={{ animation: `fin-pop .6s ${delay}s both` }}>
+    <div className="glass group relative h-full overflow-hidden rounded-[1.5rem] p-4" style={{ boxShadow: `inset 0 1px 0 oklch(1 0 0 / 6%), 0 18px 50px -30px ${color}` }} data-testid={testId}>
+      <span aria-hidden className="absolute -right-8 -top-10 h-28 w-28 rounded-full opacity-25 blur-2xl transition group-hover:opacity-50" style={{ background: color }} />
+      <span aria-hidden className="absolute inset-x-4 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
+      <span aria-hidden className="absolute -bottom-px left-0 h-[3px] w-full origin-left" style={{ background: `linear-gradient(90deg, ${color}, transparent)`, animation: `bar-grow 1.4s cubic-bezier(.2,.7,.2,1) ${delay + 0.2}s both` }} />
       <div className="relative flex items-center justify-between">
         <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ color, background: `color-mix(in oklab, ${color} 15%, transparent)`, border: `1px solid color-mix(in oklab, ${color} 30%, transparent)` }}><I size={17} /></span>
         {spark && <Sparkline values={spark} color={color} width={86} height={30} />}
@@ -21,6 +25,7 @@ function Kpi({ icon: I, label, value, color, spark, foot, delay = 0, testId }: {
       <p className="relative mt-0.5 whitespace-nowrap font-display text-[1.5rem] font-semibold leading-tight"><Money value={value} cents={false} /></p>
       {foot && <div className="relative mt-1 text-xs text-muted-foreground">{foot}</div>}
     </div>
+    </Tilt>
   );
 }
 const Delta = ({ now, prev, goodWhenUp = true }: { now: number; prev: number; goodWhenUp?: boolean }) => {
@@ -65,6 +70,50 @@ function FlowPanel({ flow, today, onAddMov }: { flow: ReturnType<typeof cashflow
   );
 }
 
+type Model = { sum: ReturnType<typeof monthSummary>; series: ReturnType<typeof monthlySeries>; saldo: number; faturas: number; parcelas: number; flow: ReturnType<typeof cashflow> };
+/** Topo da visão geral: saldo gigante, ritmo do mês e a órbita com o que sobra no fim do mês. */
+function Hero({ model, cards, accounts, today }: { model: Model; cards: number; accounts: number; today: Date }) {
+  const income = model.sum.receitas + model.sum.aReceber, saved = income > 0 ? Math.max(-100, Math.min(100, (model.sum.previsto / income) * 100)) : 0, good = model.sum.previsto >= 0;
+  const stats = [
+    { l: "A receber no mês", v: model.sum.aReceber, c: "var(--emerald)", i: ArrowUpRight },
+    { l: "A pagar no mês", v: model.sum.aPagar, c: ROSE, i: ArrowDownRight },
+    { l: "Saldo em 60 dias", v: model.flow.end, c: "var(--cyan)", i: CalendarClock },
+    { l: "Menor saldo previsto", v: model.flow.min, c: model.flow.min < 0 ? ROSE : "var(--violet)", i: Activity },
+  ];
+  return (
+    <HeroPanel data-testid="fin-hero">
+      <div className="grid items-center gap-6 lg:grid-cols-[1.35fr_1fr]">
+        <div className="min-w-0">
+          <p className="mono-caps flex items-center gap-2"><Sparkles size={13} className="text-cyan" />Saldo disponível hoje</p>
+          <p className="mt-2 whitespace-nowrap font-display text-5xl font-semibold leading-none tracking-tight sm:text-6xl md:text-7xl" style={{ animation: "fin-rise .8s .1s both" }}>
+            <span className="text-gradient drop-shadow-[0_0_40px_color-mix(in_oklab,var(--cyan)_35%,transparent)]"><Money value={model.saldo} /></span>
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">Em {accounts} {accounts === 1 ? "conta" : "contas e carteiras"} · {cards} {cards === 1 ? "cartão" : "cartões"} · {today.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
+          <div className="mt-4 overflow-hidden"><Sparkline values={model.series.map((p) => p.acumulado)} color="var(--cyan)" width={420} height={56} /></div>
+          <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {stats.map((k, i) => (
+              <div key={k.l} className="rounded-2xl border bg-white/[0.03] px-3 py-2.5 backdrop-blur" style={{ borderColor: `color-mix(in oklab, ${k.c} 28%, transparent)`, animation: `fin-rise .6s ${0.2 + i * 0.07}s both` }}>
+                <p className="flex items-center gap-1 text-[0.64rem] font-semibold uppercase tracking-[0.12em]" style={{ color: k.c }}><k.i size={12} />{k.l}</p>
+                <p className="mt-0.5 font-display text-lg font-semibold tabular-nums"><Money value={k.v} cents={false} /></p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="relative grid place-items-center">
+          <OrbitArt size={290}>
+            <div>
+              <p className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{good ? "Sobra prevista" : "Falta prevista"}</p>
+              <p className="font-display text-2xl font-semibold tabular-nums" style={{ color: good ? "var(--emerald)" : ROSE, textShadow: `0 0 24px ${good ? "var(--emerald)" : ROSE}` }}><Money value={Math.abs(model.sum.previsto)} cents={false} /></p>
+              <p className="text-[0.68rem] text-muted-foreground">{income > 0 ? `${Math.abs(Math.round(saved))}% da renda` : "no fim do mês"}</p>
+            </div>
+          </OrbitArt>
+          {model.flow.firstNegative && <span className="absolute left-0 top-0 rounded-full border px-3 py-1 text-[0.7rem]" style={{ color: ROSE, borderColor: `color-mix(in oklab, ${ROSE} 40%, transparent)`, background: `color-mix(in oklab, ${ROSE} 10%, transparent)` }}>saldo negativo em {dateBR(model.flow.firstNegative.date).slice(0, 5)}</span>}
+        </div>
+      </div>
+    </HeroPanel>
+  );
+}
+
 export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: { onOpenCard: (id: string) => void; onOpenAccount: (id: string) => void; onAdd: () => void; onTab: (t: string) => void; onDraft: (d: Draft) => void }) {
   const { state, today } = useFinance();
   const ym = ymOf(today), [active, setActive] = useState<string | null>(null);
@@ -75,15 +124,22 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
       sum, prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
       series, cats, future, saldo: totalBalance(state, today), faturas: totalOpenInvoices(state, today), parcelas: totalFutureParcels(state, today),
       alerts: alertsFor(state, today), why: whyChanged(state, ym, todayIso), flow: cashflow(state, today, 60),
+      daily: expensesOf(monthEntries(state, ym, todayIso)).reduce<Record<number, number>>((m, e) => { const d = Number(e.date.slice(8, 10)); m[d] = (m[d] ?? 0) + e.amount; return m; }, {}),
     };
   }, [state, ym, today]);
   const nowCard = model.cats.find((c) => c.id === active);
   const upcoming = useMemo(() => state.cards.map((c) => ({ card: c, inv: openInvoice(state, c, today) })).filter((x) => x.inv.total > 0).sort((a, b) => a.inv.due.localeCompare(b.inv.due)), [state, today]);
   const net = model.sum.resultado;
   const levelColor = { danger: ROSE, warning: "var(--amber)", info: "var(--cyan)" } as const;
+  const incomeMonth = model.sum.receitas + model.sum.aReceber, spendMonth = model.sum.despesas + model.sum.aPagar;
+  const pctIncome = incomeMonth > 0 ? Math.min(100, (spendMonth / incomeMonth) * 100) : spendMonth > 0 ? 100 : 0;
+  const limits = state.cards.map((c) => ({ id: c.id, label: c.name, color: TONES[c.tone].glow, pct: c.limit ? (1 - cardAvailable(state, c) / c.limit) * 100 : 0 }));
+  const freeTotal = state.cards.reduce((a, c) => a + Math.max(0, cardAvailable(state, c)), 0);
 
   return (
     <div className="space-y-5" data-testid="fin-dashboard">
+      <Hero model={model} cards={state.cards.length} accounts={state.accounts.length} today={today} />
+
       <Panel glow="var(--violet)" className="!p-4 sm:!p-5"><NaturalComposer onOpenForm={onDraft} /></Panel>
 
       {model.alerts.some((a) => a.id !== "fluxo") && (
@@ -99,13 +155,38 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
 
       <FlowPanel flow={model.flow} today={today} onAddMov={onAdd} />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Kpi testId="kpi-saldo" icon={Wallet} label="Saldo disponível" value={model.saldo} color="var(--cyan)" spark={model.series.map((p) => p.acumulado)} foot={<span>{state.accounts.length} contas e carteiras</span>} delay={0} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Kpi testId="kpi-receitas" icon={TrendingUp} label="Receitas até hoje" value={model.sum.receitas} color="var(--emerald)" foot={model.sum.aReceber > 0 ? <span>+ {brl(model.sum.aReceber)} a receber no mês</span> : <Delta now={model.sum.receitas} prev={model.prevR} />} delay={0.05} />
         <Kpi testId="kpi-despesas" icon={TrendingDown} label="Despesas até hoje" value={model.sum.despesas} color={ROSE} foot={model.sum.aPagar > 0 ? <span>+ {brl(model.sum.aPagar)} a pagar no mês</span> : <Delta now={model.sum.despesas} prev={model.prevD} goodWhenUp={false} />} delay={0.1} />
         <Kpi testId="kpi-faturas" icon={CreditCard} label="Faturas abertas" value={model.faturas} color="var(--violet)" foot={<span>{state.cards.length} cartões</span>} delay={0.15} />
         <Kpi testId="kpi-parcelas" icon={Layers} label="Parcelas futuras" value={model.parcelas} color="var(--amber)" foot={<span>{state.plans.length} compras parceladas</span>} delay={0.2} />
         <Kpi testId="kpi-saldo-mes" icon={Scale} label="Resultado até hoje" value={net} color={net >= 0 ? "var(--emerald)" : ROSE} foot={<span>previsto no fim do mês: <b className={model.sum.previsto >= 0 ? "text-emerald" : ""} style={model.sum.previsto < 0 ? { color: ROSE } : undefined}>{brl(model.sum.previsto)}</b></span>} delay={0.25} />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-3">
+        <Panel glow="var(--amber)" data-testid="fin-termometro">
+          <Head icon={GaugeIcon} title="Termômetro do mês" sub="Quanto da renda do mês já está comprometida" />
+          <div className="grid place-items-center pt-1">
+            <Gauge pct={pctIncome} size={250} from="var(--emerald)" mid="var(--amber)" to={ROSE} label="da renda" value={`${Math.round(pctIncome)}%`} sub={pctIncome < 70 ? "folga saudável" : pctIncome < 95 ? "atenção ao ritmo" : "no limite"} />
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-2.5"><p className="text-muted-foreground">Entra no mês</p><b className="tabular-nums text-emerald">{brl(incomeMonth)}</b></div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-2.5"><p className="text-muted-foreground">Sai no mês</p><b className="tabular-nums" style={{ color: ROSE }}>{brl(spendMonth)}</b></div>
+          </div>
+        </Panel>
+        <Panel glow="var(--violet)" data-testid="fin-calendario">
+          <Head icon={CalendarDays} title="Calendário de gastos" sub={`Quanto saiu em cada dia de ${monthName(ym).split(" ")[0]}`} />
+          <Heatmap ym={ym} values={model.daily} today={today.getDate()} />
+        </Panel>
+        <Panel glow="var(--cyan)" data-testid="fin-limites">
+          <Head icon={Activity} title="Uso dos limites" sub="Quanto de cada cartão já está usado" />
+          {state.cards.length === 0 ? <Empty icon={CreditCard} title="Nenhum cartão" hint="Cadastre um cartão para ver o uso do limite." /> : (
+            <div className="flex flex-col items-center gap-4">
+              <RadialRings items={limits} size={190} center={<div><p className="text-[0.62rem] uppercase tracking-wider text-muted-foreground">Livre</p><p className="font-display text-lg font-semibold tabular-nums">{brl(freeTotal).replace(/,\d\d$/, "")}</p></div>} />
+              <ul className="w-full space-y-1.5">{limits.map((l) => <li key={l.id} className="flex items-center gap-2 text-sm"><i className="h-2.5 w-2.5 rounded-full" style={{ background: l.color, boxShadow: `0 0 8px ${l.color}` }} /><span className="flex-1 truncate">{l.label}</span><b className="tabular-nums">{Math.round(l.pct)}%</b></li>)}</ul>
+            </div>
+          )}
+        </Panel>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-5">

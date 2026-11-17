@@ -131,20 +131,21 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
 }
 
 /* ───────────── despesa ou receita recorrente ───────────── */
-export function RecurringForm({ initial, onSave, onCancel }: { initial?: Recurring | undefined; onSave: (r: Recurring) => void; onCancel?: (() => void) | undefined }) {
+export function RecurringForm({ initial, onSave, onCancel, subscription = false }: { initial?: Recurring | undefined; onSave: (r: Recurring) => void; onCancel?: (() => void) | undefined; subscription?: boolean }) {
   const { state, today } = useFinance();
-  const [kind, setKind] = useState<TxKind>(initial?.kind ?? "despesa"), [desc, setDesc] = useState(initial?.desc ?? ""), [amount, setAmount] = useState<number | undefined>(initial?.amount), [day, setDay] = useState(String(initial?.day ?? 5));
-  const [cat, setCat] = useState(initial?.category ?? "moradia"), [method, setMethod] = useState<Method>(initial?.method ?? "debito");
-  const [payId, setPayId] = useState(initial?.cardId ?? initial?.accountId ?? (state.accounts[0]?.id ?? ""));
+  const [kind, setKind] = useState<TxKind>(subscription ? "despesa" : initial?.kind ?? "despesa"), [desc, setDesc] = useState(initial?.desc ?? ""), [amount, setAmount] = useState<number | undefined>(initial?.amount), [day, setDay] = useState(String(initial?.day ?? 5));
+  const [cat, setCat] = useState(initial?.category ?? (subscription ? "assinaturas" : "moradia")), [method, setMethod] = useState<Method>(initial?.method ?? "debito");
+  const [payId, setPayId] = useState(initial?.cardId ?? initial?.accountId ?? ((subscription ? state.cards[0]?.id : undefined) ?? state.accounts[0]?.id ?? ""));
   const isCard = state.cards.some((c) => c.id === payId);
-  const save = () => onSave({ id: initial?.id ?? uid("rec-"), kind, desc: desc.trim(), amount: amount ?? 0, day: Math.max(1, Math.min(31, Math.round(Number(day) || 1))), category: cat, method: isCard ? "credito" : method === "credito" ? "debito" : method, accountId: isCard ? undefined : payId || undefined, cardId: isCard ? payId : undefined, startYm: initial?.startYm ?? ymOf(today) });
+  // mantém pausas e a marca de assinatura ao editar
+  const save = () => onSave({ ...initial, id: initial?.id ?? uid("rec-"), kind, desc: desc.trim(), amount: amount ?? 0, day: Math.max(1, Math.min(31, Math.round(Number(day) || 1))), category: cat, method: isCard ? "credito" : method === "credito" ? "debito" : method, accountId: isCard ? undefined : payId || undefined, cardId: isCard ? payId : undefined, startYm: initial?.startYm ?? ymOf(today), subscription: subscription || initial?.subscription || undefined });
   return (
     <div className="space-y-4">
-      <Segmented value={kind} onChange={(k) => { setKind(k); setCat(k === "receita" ? "salario" : "moradia"); }} options={[{ value: "despesa", label: "Despesa fixa" }, { value: "receita", label: "Receita fixa" }]} />
+      {!subscription && <Segmented value={kind} onChange={(k) => { setKind(k); setCat(k === "receita" ? "salario" : "moradia"); }} options={[{ value: "despesa", label: "Despesa fixa" }, { value: "receita", label: "Receita fixa" }]} />}
       <Grid>
-        <Field label="Descrição"><TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={kind === "despesa" ? "Ex.: Aluguel, Netflix, academia" : "Ex.: Salário"} autoFocus data-testid="fin-rec-desc" /></Field>
+        <Field label={subscription ? "Nome da assinatura" : "Descrição"}><TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={subscription ? "Ex.: Netflix, Fortnite Crew, iFood Club" : kind === "despesa" ? "Ex.: Aluguel, Netflix, academia" : "Ex.: Salário"} autoFocus data-testid="fin-rec-desc" /></Field>
         <Field label="Valor"><MoneyInput value={amount} onChange={setAmount} data-testid="fin-rec-valor" /></Field>
-        <Field label="Dia do mês"><TextInput type="number" min={1} max={31} value={day} onChange={(e) => setDay(e.target.value)} /></Field>
+        <Field label={subscription ? "Dia da cobrança" : "Dia do mês"}><TextInput type="number" min={1} max={31} value={day} onChange={(e) => setDay(e.target.value)} /></Field>
         <Field label={kind === "despesa" ? "Paga com" : "Cai em"}>
           <Select value={payId} onChange={(e) => setPayId(e.target.value)}>
             <optgroup label="Contas">{state.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup>

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, CreditCard, Gauge, Layers, LayoutDashboard, MoreHorizontal, Plus, Receipt, Sparkles, Target } from "lucide-react";
+import { ArrowLeft, CreditCard, Gauge, Layers, LayoutDashboard, MoreHorizontal, Plus, Receipt, Repeat, Sparkles, Target } from "lucide-react";
 import { Briefing } from "@/components/finance/Briefing";
 import { AccountsView, type Sel } from "@/components/finance/Accounts";
 import { Dashboard } from "@/components/finance/Dashboard";
@@ -8,16 +8,18 @@ import { GoalsView } from "@/components/finance/Goals";
 import { InstallmentsView } from "@/components/finance/Installments";
 import { QuickAddModal } from "@/components/finance/QuickAdd";
 import { TransactionsView } from "@/components/finance/Transactions";
+import { SubscriptionsView } from "@/components/finance/Subscriptions";
 import { ConfirmDelete, btn } from "@/components/finance/ui";
+import { FinBackdrop, LiveDot } from "@/components/finance/fx";
 import { monthName, ymOf } from "@/lib/finance/calc";
 import type { Draft } from "@/lib/finance/parse";
 import { FinanceProvider, useFinance } from "@/lib/finance/store";
 
-const TABS = ["visao", "contas", "parcelas", "movimentacoes", "metas"] as const;
+const TABS = ["visao", "contas", "parcelas", "movimentacoes", "assinaturas", "metas"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_META: Record<Tab, { label: string; icon: typeof Gauge }> = {
   visao: { label: "Visão geral", icon: LayoutDashboard }, contas: { label: "Contas e cartões", icon: CreditCard }, parcelas: { label: "Parcelas", icon: Layers },
-  movimentacoes: { label: "Movimentações", icon: Receipt }, metas: { label: "Metas", icon: Target },
+  movimentacoes: { label: "Movimentações", icon: Receipt }, assinaturas: { label: "Assinaturas", icon: Repeat }, metas: { label: "Metas", icon: Target },
 };
 
 export const Route = createFileRoute("/financeiro")({
@@ -42,12 +44,12 @@ function FinancePage() {
 
   return (
     <main className="relative mx-auto min-h-screen max-w-6xl px-4 pb-40 pt-6 md:py-10 md:pl-24" data-testid="financeiro">
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"><span className="absolute -left-32 top-10 h-96 w-96 rounded-full bg-[var(--violet)] opacity-[0.10] blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} /><span className="absolute -right-24 top-1/2 h-96 w-96 rounded-full bg-[var(--cyan)] opacity-[0.08] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} /></div>
+      <FinBackdrop />
 
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mono-caps">Finanças pessoais · {monthName(ymOf(f.today))}</p>
-          <h1 className="mt-1 font-serif text-5xl leading-none md:text-6xl">Meu <span className="text-gradient italic">financeiro</span></h1>
+          <div className="flex flex-wrap items-center gap-3"><p className="mono-caps">Finanças pessoais · {monthName(ymOf(f.today))}</p>{!onboarding && <LiveDot label="Atualizado agora" />}</div>
+          <h1 className="relative mt-2 font-serif text-6xl leading-[0.9] md:text-7xl" style={{ animation: "fin-rise .7s both" }}>Meu <span className="text-gradient italic drop-shadow-[0_0_30px_color-mix(in_oklab,var(--cyan)_45%,transparent)]">financeiro</span></h1>
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">{onboarding ? "Responda ao briefing e o Orion monta o seu painel." : "Para onde o dinheiro vai, o que já está comprometido e como estão as suas metas."}</p>
         </div>
         <div className="relative flex items-center gap-2">
@@ -71,17 +73,21 @@ function FinancePage() {
         </>
       ) : (
         <>
-          <nav aria-label="Seções do financeiro" className="glass sticky top-3 z-20 mb-6 flex gap-1 overflow-x-auto rounded-2xl p-1.5 scroll-neon" role="tablist" data-testid="fin-abas">
+          <nav aria-label="Seções do financeiro" className="glass fin-frame sticky top-3 z-20 mb-7 flex gap-1 overflow-x-auto rounded-2xl p-1.5 scroll-neon" role="tablist" data-testid="fin-abas">
             {TABS.map((t) => { const M = TAB_META[t], on = t === tab; return (
               <button key={t} role="tab" aria-selected={on} onClick={() => go(t)} data-testid={`fin-aba-${t}`}
-                className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm transition ${on ? "bg-cyan/12 text-cyan shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--cyan)_45%,transparent),0_0_24px_-8px_var(--cyan)]" : "text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"}`}><M.icon size={16} />{M.label}</button>); })}
+                className={`relative flex shrink-0 items-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-sm transition ${on ? "text-cyan shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--cyan)_45%,transparent),0_0_28px_-6px_var(--cyan)]" : "text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"}`}>
+                {on && <span aria-hidden className="absolute inset-0 bg-gradient-to-br from-cyan/20 via-cyan/5 to-violet/20" style={{ animation: "fin-fade .35s both" }} />}
+                {on && <span aria-hidden className="absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan to-transparent" />}
+                <M.icon size={16} className="relative" /><span className="relative">{M.label}</span></button>); })}
             <button className="sticky right-0 ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-brand text-[#04121a] shadow-[0_8px_24px_-8px_var(--cyan)] md:hidden" onClick={() => open()} aria-label="Adicionar movimentação (atalho)" data-testid="fin-adicionar-rapido"><Plus size={18} /></button>
           </nav>
-          <div key={tab + (item ?? "")} style={{ animation: "fin-fade .4s both" }}>
+          <div key={tab + (item ?? "")} style={{ animation: "fin-rise .5s both" }}>
             {tab === "visao" && <Dashboard onOpenCard={(id) => go("contas", `card:${id}`)} onOpenAccount={(id) => go("contas", `acc:${id}`)} onAdd={() => open()} onTab={(t) => go(t as Tab)} onDraft={(d) => open(d)} />}
             {tab === "contas" && <AccountsView sel={sel} onSel={(s) => go("contas", s ? `${s.type}:${s.id}` : undefined)} />}
             {tab === "parcelas" && <InstallmentsView />}
             {tab === "movimentacoes" && <TransactionsView onAdd={() => open()} />}
+            {tab === "assinaturas" && <SubscriptionsView />}
             {tab === "metas" && <GoalsView />}
           </div>
         </>

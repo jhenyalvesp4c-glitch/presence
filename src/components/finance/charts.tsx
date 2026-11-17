@@ -115,6 +115,7 @@ export function AreaChart({ points, color = "var(--cyan)", height = 220, format 
         {xy.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={hover === i ? 6 : 3.5} fill="var(--background)" stroke={color} strokeWidth={2.5} vectorEffect="non-scaling-stroke" style={{ transition: "r .2s", filter: hover === i ? `drop-shadow(0 0 8px ${color})` : undefined }} />)}
         {points.map((p, i) => <text key={i} x={xy[i]!.x} y={H - 6} textAnchor="middle" fontSize="11" fill="currentColor" opacity={hover === i ? 1 : 0.5} className="select-none">{p.label}</text>)}
       </svg>
+      {xy.length > 0 && <span aria-hidden className="pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${(xy.at(-1)!.x / W) * 100}%`, top: `${(xy.at(-1)!.y / H) * 100}%`, background: color, animation: "fin-pulse 2.2s ease-out infinite" }} />}
       {hover !== null && (
         <div className="pointer-events-none absolute -translate-x-1/2 -translate-y-full rounded-xl border border-white/10 bg-[oklch(0.18_0.03_262/0.95)] px-3 py-1.5 text-xs shadow-xl backdrop-blur"
           style={{ left: `${(xy[hover]!.x / W) * 100}%`, top: `${(xy[hover]!.y / H) * 100}%`, marginTop: -10 }}>
@@ -205,3 +206,110 @@ export function Meter({ pct, color = "var(--cyan)", height = 8, warn = true }: {
   );
 }
 
+
+/* ───────────── velocímetro (meia-lua) ───────────── */
+export function Gauge({ pct, size = 240, label, value, sub, from = "oklch(0.72 0.18 10)", mid = "var(--amber)", to = "var(--emerald)" }: { pct: number; size?: number; label?: ReactNode; value?: ReactNode; sub?: ReactNode; from?: string; mid?: string; to?: string }) {
+  const uid = useId().replace(/:/g, ""), p = Math.max(0, Math.min(100, pct)), W = size, H = size * 0.62, cx = W / 2, cy = H - 10, r = W / 2 - 18;
+  const [shown, setShown] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setShown(p), 60); return () => clearTimeout(t); }, [p]);
+  const ang = Math.PI * (1 - shown / 100), kx = cx + Math.cos(ang) * r, ky = cy - Math.sin(ang) * r;
+  const arc = `M${cx - r},${cy} A${r},${r} 0 0 1 ${cx + r},${cy}`, len = Math.PI * r;
+  return (
+    <div className="relative" style={{ width: W, height: H + 8 }}>
+      <svg viewBox={`0 0 ${W} ${H + 8}`} className="h-full w-full overflow-visible" role="img" aria-label={`${Math.round(p)}%`}>
+        <defs><linearGradient id={uid} x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor={from} /><stop offset="50%" stopColor={mid} /><stop offset="100%" stopColor={to} /></linearGradient></defs>
+        {Array.from({ length: 41 }, (_, i) => { const a = Math.PI * (1 - i / 40), big = i % 5 === 0, r1 = r + 9, r2 = r + (big ? 16 : 12); return <line key={i} x1={cx + Math.cos(a) * r1} y1={cy - Math.sin(a) * r1} x2={cx + Math.cos(a) * r2} y2={cy - Math.sin(a) * r2} stroke="currentColor" strokeOpacity={i / 40 <= shown / 100 ? 0.7 : 0.15} strokeWidth={big ? 1.6 : 1} style={{ transition: "stroke-opacity .6s" }} />; })}
+        <path d={arc} fill="none" stroke="color-mix(in oklab, var(--foreground) 8%, transparent)" strokeWidth="14" strokeLinecap="round" />
+        <path d={arc} fill="none" stroke={`url(#${uid})`} strokeWidth="14" strokeLinecap="round" strokeDasharray={len} strokeDashoffset={len * (1 - shown / 100)} style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(.2,.8,.2,1)", filter: "drop-shadow(0 0 10px color-mix(in oklab, var(--cyan) 45%, transparent))" }} />
+        <circle cx={kx} cy={ky} r="9" fill="var(--background)" stroke="var(--foreground)" strokeWidth="3" style={{ transition: "cx 1.4s cubic-bezier(.2,.8,.2,1), cy 1.4s cubic-bezier(.2,.8,.2,1)", filter: "drop-shadow(0 0 10px var(--cyan))" }} />
+      </svg>
+      <div className="pointer-events-none absolute inset-x-0 text-center" style={{ top: H * 0.42 }}>
+        {label && <p className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>}
+        {value && <p className="font-display text-3xl font-semibold tabular-nums leading-tight">{value}</p>}
+        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────── anéis concêntricos ───────────── */
+export type RingItem = { id: string; label: string; pct: number; color: string; detail?: string };
+export function RadialRings({ items, size = 220, thickness = 11, center }: { items: RingItem[]; size?: number; thickness?: number; center?: ReactNode }) {
+  const [shown, setShown] = useState(false), c = size / 2, gap = thickness + 6;
+  useEffect(() => { const t = setTimeout(() => setShown(true), 80); return () => clearTimeout(t); }, []);
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90 h-full w-full overflow-visible" role="img" aria-label="Progresso">
+        {items.slice(0, 5).map((it, i) => {
+          const r = c - thickness / 2 - i * gap, len = 2 * Math.PI * r, p = Math.max(0, Math.min(100, it.pct));
+          return (
+            <g key={it.id}>
+              <circle cx={c} cy={c} r={r} fill="none" stroke="color-mix(in oklab, var(--foreground) 7%, transparent)" strokeWidth={thickness} />
+              <circle cx={c} cy={c} r={r} fill="none" stroke={it.color} strokeWidth={thickness} strokeLinecap="round" strokeDasharray={len} strokeDashoffset={shown ? len * (1 - p / 100) : len}
+                style={{ transition: `stroke-dashoffset 1.3s cubic-bezier(.2,.8,.2,1) ${i * 0.12}s`, filter: `drop-shadow(0 0 7px color-mix(in oklab, ${it.color} 70%, transparent))` }} />
+            </g>
+          );
+        })}
+      </svg>
+      <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">{center}</div>
+    </div>
+  );
+}
+
+/* ───────────── calendário de calor (gasto por dia) ───────────── */
+export function Heatmap({ ym, values, today, color = "var(--violet)" }: { ym: string; values: Record<number, number>; today?: number | undefined; color?: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const [y, m] = ym.split("-").map(Number), days = new Date(y!, m!, 0).getDate(), first = new Date(y!, m! - 1, 1).getDay();
+  const max = Math.max(1, ...Object.values(values)), cells = [...Array.from({ length: first }, () => null), ...Array.from({ length: days }, (_, i) => i + 1)];
+  return (
+    <div className="relative">
+      <div className="mb-1.5 grid grid-cols-7 gap-1.5 text-center text-[0.62rem] uppercase tracking-wider text-muted-foreground">{["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => <span key={i}>{d}</span>)}</div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {cells.map((d, i) => {
+          if (d === null) return <span key={`x${i}`} />;
+          const v = values[d] ?? 0, k = v / max, future = today !== undefined && d > today, isToday = d === today;
+          return (
+            <button type="button" key={d} onMouseEnter={() => setHover(d)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(d)} onBlur={() => setHover(null)}
+              className="relative grid aspect-square place-items-center rounded-lg text-[0.66rem] tabular-nums transition hover:scale-110"
+              style={{ background: v ? `color-mix(in oklab, ${color} ${18 + k * 72}%, transparent)` : "color-mix(in oklab, var(--foreground) 4%, transparent)", boxShadow: k > 0.6 ? `0 0 14px -3px ${color}` : isToday ? "inset 0 0 0 1.5px var(--cyan)" : undefined, opacity: future ? 0.35 : 1, color: k > 0.5 ? "var(--foreground)" : "var(--muted-foreground)", animation: `fin-pop .4s ${i * 0.012}s both` }}
+              aria-label={`Dia ${d}: ${brl(v)}`}>{d}</button>
+          );
+        })}
+      </div>
+      {hover !== null && <div className="pointer-events-none absolute -top-2 right-0 -translate-y-full rounded-xl border border-white/10 bg-[oklch(0.18_0.03_262/0.95)] px-3 py-1.5 text-xs shadow-xl backdrop-blur">Dia {hover} · <b className="tabular-nums">{brl(values[hover] ?? 0)}</b></div>}
+      <div className="mt-3 flex items-center justify-end gap-1.5 text-[0.62rem] text-muted-foreground">menos{[0.1, 0.35, 0.6, 0.85].map((k) => <span key={k} className="h-2.5 w-2.5 rounded" style={{ background: `color-mix(in oklab, ${color} ${18 + k * 72}%, transparent)` }} />)}mais</div>
+    </div>
+  );
+}
+
+/* ───────────── barras por dia + linha acumulada ───────────── */
+export function DailyBars({ days, height = 170, today, color = "var(--cyan)", lineColor = "var(--violet)" }: { days: { day: number; value: number }[]; height?: number; today?: number | undefined; color?: string; lineColor?: string }) {
+  const uid = useId().replace(/:/g, ""), [hover, setHover] = useState<number | null>(null), W = 640, H = height, padX = 8, padT = 12, padB = 22;
+  const max = Math.max(1, ...days.map((d) => d.value)), slot = (W - padX * 2) / Math.max(1, days.length), bw = Math.max(3, slot * 0.58);
+  let acc = 0; const cum = days.map((d) => (acc += d.value)), cmax = Math.max(1, acc);
+  const line = smooth(days.map((_, i) => ({ x: padX + slot * i + slot / 2, y: padT + (1 - cum[i]! / cmax) * (H - padT - padB) })));
+  return (
+    <div className="relative w-full" style={{ height }}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full overflow-visible" role="img" aria-label="Gastos por dia" onMouseLeave={() => setHover(null)}>
+        <defs><linearGradient id={uid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} /><stop offset="100%" stopColor={color} stopOpacity=".15" /></linearGradient></defs>
+        {[0.33, 0.66].map((g) => <line key={g} x1={padX} x2={W - padX} y1={padT + g * (H - padT - padB)} y2={padT + g * (H - padT - padB)} stroke="currentColor" strokeOpacity=".06" strokeDasharray="3 6" />)}
+        {days.map((d, i) => {
+          const x = padX + slot * i + slot / 2, h = (d.value / max) * (H - padT - padB), on = hover === i, isT = d.day === today;
+          return (
+            <g key={d.day} onMouseEnter={() => setHover(i)}>
+              <rect x={x - slot / 2} y={padT} width={slot} height={H - padT - padB} fill="currentColor" opacity={on ? 0.05 : 0} />
+              <rect x={x - bw / 2} y={H - padB - h} width={bw} height={Math.max(d.value ? 2 : 0, h)} rx={Math.min(4, bw / 2)} fill={isT ? "var(--amber)" : `url(#${uid})`} style={{ transformOrigin: `${x}px ${H - padB}px`, animation: `fin-bar .7s cubic-bezier(.2,.8,.2,1) ${i * 0.015}s both`, filter: on || isT ? `drop-shadow(0 0 7px ${isT ? "var(--amber)" : color})` : undefined }} />
+              {(d.day === 1 || d.day % 5 === 0) && <text x={x} y={H - 6} textAnchor="middle" fontSize="10" fill="currentColor" opacity=".45">{d.day}</text>}
+            </g>
+          );
+        })}
+        <path d={line} fill="none" stroke={lineColor} strokeWidth="2" strokeDasharray="5 5" vectorEffect="non-scaling-stroke" style={{ animation: "fin-dash 2s linear infinite", filter: `drop-shadow(0 0 5px ${lineColor})` }} />
+      </svg>
+      {hover !== null && (
+        <div className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-xl border border-white/10 bg-[oklch(0.18_0.03_262/0.95)] px-3 py-1.5 text-xs shadow-xl backdrop-blur" style={{ left: `${((padX + slot * hover + slot / 2) / W) * 100}%` }}>
+          <div className="text-muted-foreground">Dia {days[hover]!.day}</div><div className="font-semibold tabular-nums" style={{ color }}>{brl(days[hover]!.value)}</div><div className="text-[0.66rem] text-muted-foreground">acumulado {brl(cum[hover]!)}</div>
+        </div>
+      )}
+    </div>
+  );
+}

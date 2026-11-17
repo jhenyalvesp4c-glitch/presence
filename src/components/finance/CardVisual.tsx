@@ -21,7 +21,8 @@ export function CardVisual({ card, usedPct, selected = false, onClick, compact =
       <span aria-hidden className="absolute -right-10 -top-12 h-48 w-48 rounded-full bg-white/15 blur-2xl" />
       <span aria-hidden className="absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-black/25 blur-2xl" />
       <svg aria-hidden className="absolute inset-0 h-full w-full opacity-[0.12]" viewBox="0 0 200 126" preserveAspectRatio="none"><path d="M-10 90 C 40 50, 80 130, 130 80 S 190 40, 215 70" stroke="white" strokeWidth="1.2" fill="none" /><path d="M-10 105 C 50 70, 90 140, 140 95 S 195 60, 215 88" stroke="white" strokeWidth="1" fill="none" /></svg>
-      <span aria-hidden className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 group-hover:opacity-100" style={{ animation: "fin-sheen 1.6s ease both" }} />
+      <span aria-hidden className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent" style={{ animation: "fin-sheen 4.5s ease-in-out infinite" }} />
+      <span aria-hidden className="absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 group-hover:opacity-60" style={{ background: "conic-gradient(from 200deg at 70% 30%, var(--cyan), var(--violet), var(--pink), var(--amber), var(--emerald), var(--cyan))" }} />
       <div className="relative flex h-full flex-col justify-between p-5">
         <div className="flex items-start justify-between">
           <div><p className="text-[0.62rem] uppercase tracking-[0.22em] text-white/65">Crédito</p><p className="font-display text-lg font-semibold leading-tight">{card.name}</p></div>

@@ -27,7 +27,15 @@ export type Plan = {
   /** Se informado, vale no lugar do cálculo por datas ("já paguei N parcelas"). */
   paidManual?: number | undefined; createdAt: string;
 };
-export type Recurring = { id: string; kind: TxKind; desc: string; amount: number; day: number; category: string; method: Method; accountId?: string | undefined; cardId?: string | undefined; startYm: string };
+/** Pausa de uma recorrente: não conta nos meses de `from` até `to` (inclusive). Sem `to` = continua pausada. */
+export type RecurringPause = { from: string; to?: string | undefined };
+export type Recurring = {
+  id: string; kind: TxKind; desc: string; amount: number; day: number; category: string; method: Method; accountId?: string | undefined; cardId?: string | undefined; startYm: string;
+  /** Marcada como assinatura (Netflix, Spotify, clubes…). Recorrentes da categoria "assinaturas" também contam. */
+  subscription?: boolean | undefined;
+  /** Períodos pausados: nesses meses a recorrente não aparece em movimentações, faturas, saldo nem projeções. */
+  pauses?: RecurringPause[] | undefined;
+};
 export type Goal = {
   id: string; kind: GoalKind; title: string; target: number; current: number; deadline?: string | undefined;
   category?: string | undefined; cardId?: string | undefined; monthly?: number | undefined;

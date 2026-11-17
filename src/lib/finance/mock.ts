@@ -26,6 +26,9 @@ export function makeMock(today: Date = new Date()): FinanceState {
     { id: "rec-internet", kind: "despesa", desc: "Internet fibra", amount: 119.9, day: 12, category: "moradia", method: "credito", cardId: "card-picpay", startYm: addMonths(ym0, -9) },
     { id: "rec-netflix", kind: "despesa", desc: "Netflix", amount: 55.9, day: 8, category: "assinaturas", method: "credito", cardId: "card-nubank", startYm: addMonths(ym0, -9) },
     { id: "rec-spotify", kind: "despesa", desc: "Spotify", amount: 21.9, day: 14, category: "assinaturas", method: "credito", cardId: "card-nubank", startYm: addMonths(ym0, -9) },
+    { id: "rec-fortnite", kind: "despesa", desc: "Fortnite Crew", amount: 44.9, day: 18, category: "assinaturas", method: "credito", cardId: "card-picpay", startYm: addMonths(ym0, -5), subscription: true },
+    { id: "rec-ifood", kind: "despesa", desc: "iFood Club", amount: 12.9, day: 3, category: "assinaturas", method: "credito", cardId: "card-nubank", startYm: addMonths(ym0, -7), subscription: true },
+    { id: "rec-disney", kind: "despesa", desc: "Disney+", amount: 43.9, day: 22, category: "assinaturas", method: "credito", cardId: "card-nubank", startYm: addMonths(ym0, -9), subscription: true, pauses: [{ from: addMonths(ym0, -2) }] },
     { id: "rec-academia", kind: "despesa", desc: "Academia", amount: 129.9, day: 10, category: "saude", method: "credito", cardId: "card-mp", startYm: addMonths(ym0, -9) },
   ];
   const plans: Plan[] = [

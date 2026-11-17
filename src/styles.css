@@ -470,3 +470,45 @@ html, body { max-width: 100%; overflow-x: clip; }
 @keyframes fin-modal { from { opacity: 0; transform: translateY(18px) scale(.97); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes fin-glow { 0%,100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--cyan) 45%, transparent); } 50% { box-shadow: 0 0 0 10px transparent; } }
 @media (prefers-reduced-motion: reduce) { [style*="fin-"] { animation: none !important; } }
+
+/* ---------- Financeiro: efeitos premium ---------- */
+@keyframes fin-spin { to { transform: rotate(360deg); } }
+@keyframes fin-spin-rev { to { transform: rotate(-360deg); } }
+@keyframes fin-twinkle { 0%,100% { opacity: .15; } 50% { opacity: .9; } }
+@keyframes fin-grid { from { background-position: 0 0; } to { background-position: 0 56px; } }
+@keyframes fin-beam { 0% { transform: translateX(-60%) rotate(18deg); opacity: 0; } 20%,80% { opacity: .55; } 100% { transform: translateX(160%) rotate(18deg); opacity: 0; } }
+@keyframes fin-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes fin-rise { from { opacity: 0; transform: translateY(22px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes fin-breathe { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.06); } }
+@keyframes fin-dash { to { stroke-dashoffset: -40; } }
+@keyframes fin-bob { 0%,100% { transform: translateY(-5px); } 50% { transform: translateY(5px); } }
+
+@property --fin-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes fin-angle { to { --fin-angle: 360deg; } }
+
+/* Borda de luz girando em volta do bloco (o bloco precisa de border-radius). */
+@utility fin-frame {
+  isolation: isolate;
+  &::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 1;
+    background: conic-gradient(from var(--fin-angle), transparent 0 55%, var(--cyan) 70%, var(--violet) 82%, transparent 92%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+    animation: fin-angle 6s linear infinite;
+  }
+}
+/* Grade em perspectiva (chão de "sala de controle"). */
+@utility fin-floor {
+  background-image: linear-gradient(color-mix(in oklab, var(--cyan) 18%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in oklab, var(--cyan) 18%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  transform: perspective(520px) rotateX(62deg);
+  transform-origin: 50% 0;
+  mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 55%, transparent);
+  animation: fin-grid 4s linear infinite;
+}
+/* Pontinhos de grade bem sutis dentro de painéis. */
+@utility fin-dots {
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 9%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+@media (prefers-reduced-motion: reduce) { .fin-frame::before, .fin-floor { animation: none !important; } }

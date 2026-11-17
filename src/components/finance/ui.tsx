@@ -33,8 +33,10 @@ export function CatBadge({ id, size = 36 }: { id: string; size?: number }) {
 /** Cartão de vidro com um brilho de cor no canto (a marca visual do módulo). */
 export function Panel({ children, glow = "var(--cyan)", className = "", style, as: Tag = "section", ...rest }: { children: ReactNode; glow?: string; className?: string; style?: CSSProperties; as?: "section" | "div" | "article" } & Record<string, unknown>) {
   return (
-    <Tag className={`glass relative overflow-hidden rounded-[1.6rem] p-5 sm:p-6 ${className}`} style={style} {...rest}>
-      <span aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full opacity-[0.16] blur-3xl" style={{ background: glow }} />
+    <Tag className={`glass group/panel relative overflow-hidden rounded-[1.6rem] p-5 transition duration-500 hover:border-white/15 sm:p-6 ${className}`} style={{ boxShadow: `inset 0 1px 0 oklch(1 0 0 / 6%), 0 30px 80px -55px ${glow}`, ...style }} {...rest}>
+      <span aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full opacity-[0.16] blur-3xl transition-opacity duration-700 group-hover/panel:opacity-[0.3]" style={{ background: glow }} />
+      <span aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px opacity-70" style={{ background: `linear-gradient(90deg, transparent, ${glow}, transparent)` }} />
+      <span aria-hidden className="fin-dots pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_top_right,#000,transparent_60%)]" />
       <div className="relative">{children}</div>
     </Tag>
   );
@@ -43,7 +45,7 @@ export function Head({ icon: I, title, sub, right }: { icon?: typeof Icons.Home;
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
       <div className="flex items-center gap-3">
-        {I && <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-cyan"><I size={17} /></span>}
+        {I && <span className="relative grid h-10 w-10 place-items-center rounded-xl border border-cyan/25 bg-gradient-to-br from-cyan/15 to-violet/15 text-cyan shadow-[0_0_22px_-8px_var(--cyan)]"><I size={17} /></span>}
         <div><h3 className="font-display text-base font-semibold leading-tight">{title}</h3>{sub && <p className="text-xs text-muted-foreground">{sub}</p>}</div>
       </div>
       {right}
