@@ -1,5 +1,6 @@
+import { useShownPath } from "@/lib/shown-path";
 import { SpeechText } from "./SpeechText";
-import { useRouter, useRouterState } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import { Mic } from "lucide-react";
 
 import { VoicePanel } from "@/components/voice/VoicePanel";
@@ -42,7 +43,7 @@ function MiniOrb({ phase, onClick }: { phase: Phase; onClick: () => void }) {
 export function VoiceDock() {
   const v = useVoice();
   const router = useRouter();
-  const path = useRouterState({ select: (s) => s.location.pathname });
+  const path = useShownPath();
   const go = (href: string) => router.history.push(href);
   const onHome = path === "/assistente";
 

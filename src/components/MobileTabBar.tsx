@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useShownPath } from "@/lib/shown-path";
+import { Link } from "@tanstack/react-router";
 import { Brain, ClipboardList, Heart, Home, ListChecks, Wallet } from "lucide-react";
 
 const items = [
@@ -12,7 +13,7 @@ const items = [
 
 /** Barra de navegação de baixo, só no celular: os 5 lugares principais, como num aplicativo. */
 export function MobileTabBar() {
-  const path = useRouterState({ select: (s) => s.location.pathname });
+  const path = useShownPath();
   return (
     <nav aria-label="Navegação principal" data-testid="barra-inferior"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[oklch(0.13_0.03_265/0.92)] pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden">

@@ -1,4 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useShownPath } from "@/lib/shown-path";
+import { Link } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { Brain, CalendarCheck, Calendar, ClipboardList, Heart, Home, ListChecks, Settings, Sprout, Wallet } from "lucide-react";
@@ -24,7 +25,7 @@ const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 
 /** Botões flutuantes à esquerda, presentes em todas as telas (menos nas que já têm a sua). */
 export function GlobalRail() {
-  const path = useRouterState({ select: (s) => s.location.pathname });
+  const path = useShownPath();
   if (hasOwnRail(path)) return null;
   const on = (to: string) => path === to || path.startsWith(`${to}/`) || (to === "/saude" && ["/hoje", "/dieta", "/medidas", "/treino"].some((p) => path.startsWith(p)));
   return (
@@ -50,6 +51,6 @@ export function GlobalRail() {
 
 /** Reserva espaço à esquerda nas telas que recebem a barra global, para ela não cobrir o conteúdo. */
 export function useRailPad(): string {
-  const path = useRouterState({ select: (s) => s.location.pathname });
+  const path = useShownPath();
   return hasOwnRail(path) ? "" : "md:pl-16";
 }
