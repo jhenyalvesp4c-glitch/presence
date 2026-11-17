@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 
 import { authClient, setClientOwner } from "@/lib/supabase";
@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>(DISABLED ? "ready" : "loading");
   const [account, setAccount] = useState<Account | null>(null);
   const [blocked, setBlocked] = useState("");
+  const statusRef = useRef<Status>(status); statusRef.current = status;
 
   const claim = useCallback(async (session: Session) => {
     let name: string | null = null;
@@ -54,6 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (DISABLED) return;
+    (window as unknown as { __orionOk?: boolean }).__orionOk = true; // o app carregou no navegador (desarma o aviso de "não carregou")
+    // se abrir a conta travar (rede, bloqueio de armazenamento), não fica para sempre na tela de abertura
+    const stuck = setTimeout(() => { if (statusRef.current === "loading") { setBlocked("Demorou demais para abrir a sua conta. Confira a internet e tente de novo."); setStatus("blocked"); } }, 15000);
     let alive = true;
     const apply = (s: Session | null) => {
       if (!alive) return;
@@ -66,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (ev === "TOKEN_REFRESHED") return;
       if (ev === "SIGNED_IN" || ev === "SIGNED_OUT" || ev === "INITIAL_SESSION") setTimeout(() => apply(s), 0);
     });
-    return () => { alive = false; sub.subscription.unsubscribe(); };
+    return () => { alive = false; clearTimeout(stuck); sub.subscription.unsubscribe(); };
   }, [claim]);
 
   const signIn = useCallback<Auth["signIn"]>(async (email, password) => {

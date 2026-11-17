@@ -115,6 +115,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+/** Se o app não terminar de carregar em 12 s (erro de configuração, sem internet, versão antiga guardada), mostra o motivo em vez de ficar parado na tela de abertura. */
+const BOOT_WATCHDOG = `(function(){var err="";window.addEventListener("error",function(e){if(!err&&e&&e.message)err=String(e.message)});window.addEventListener("unhandledrejection",function(e){if(!err&&e&&e.reason)err=String(e.reason&&e.reason.message||e.reason)});
+setTimeout(function(){if(window.__orionOk)return;var d=document.createElement("div");d.setAttribute("role","alert");d.setAttribute("data-testid","boot-watchdog");
+d.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;max-width:min(560px,92vw);padding:16px 18px;border-radius:16px;border:1px solid rgba(255,255,255,.18);background:rgba(8,10,20,.96);color:#e8ecf5;font:14px/1.5 system-ui,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.6)";
+var hint=/VITE_SUPABASE|Defina VITE/.test(err)?"Faltam as chaves de acesso no arquivo .env deste computador (VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY).":"Pode ser falta de internet, o arquivo .env deste computador sem as chaves (VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY) ou uma versão antiga guardada.";
+d.innerHTML="<b>O Orion não terminou de carregar.</b><br>"+hint+(err?'<br><span style="opacity:.7;font-size:12px">Detalhe: '+err.replace(/[<>&]/g,"")+"</span>":"")+'<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="ow-r" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;cursor:pointer">Recarregar</button><button id="ow-c" style="padding:8px 14px;border-radius:10px;border:0;background:linear-gradient(90deg,#22d3ee,#a78bfa);color:#04121a;font-weight:600;cursor:pointer">Limpar o que ficou guardado e recarregar</button></div>';
+document.body.appendChild(d);document.getElementById("ow-r").onclick=function(){location.reload()};
+document.getElementById("ow-c").onclick=function(){try{Object.keys(localStorage).filter(function(k){return k.indexOf("presence-app-auth")===0||k.indexOf("sb-")===0}).forEach(function(k){localStorage.removeItem(k)})}catch(e){}
+var jobs=[];try{if(navigator.serviceWorker)jobs.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister()}))}))}catch(e){}try{if(window.caches)jobs.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}))}catch(e){}
+Promise.all(jobs).catch(function(){}).then(function(){location.reload()})}},12000)})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
@@ -122,6 +133,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: BOOT_WATCHDOG }} />
         {children}
         <Scripts />
       </body>

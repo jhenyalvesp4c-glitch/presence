@@ -98,7 +98,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <Brand />
         <div className="glass space-y-4 rounded-3xl p-6 text-center" role="alert" data-testid="conta-bloqueada">
           <p className="text-sm">{blocked}</p>
-          <button onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm hover:border-cyan/50 hover:text-cyan"><LogOut size={14} /> Sair</button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button onClick={() => window.location.reload()} data-testid="conta-tentar-de-novo" className="inline-flex items-center gap-2 rounded-full bg-gradient-brand px-5 py-2 text-sm font-semibold text-primary-foreground">Tentar de novo</button>
+            <button onClick={() => void signOut()} className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm hover:border-cyan/50 hover:text-cyan"><LogOut size={14} /> Sair</button>
+          </div>
         </div>
       </Shell>
     );
