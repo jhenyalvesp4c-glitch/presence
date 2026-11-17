@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
-  ChevronRight, Heart, Home, ClipboardList, ListChecks, CalendarDays,
-  BarChart3, Dumbbell, Utensils, UserRound,
+  ChevronRight, Heart, Dumbbell, Utensils, UserRound,
 } from "lucide-react";
 import treinoAsset from "@/assets/treino.jpg";
 import dietaAsset from "@/assets/dieta.jpg";
@@ -44,15 +43,6 @@ const cards = [
     desc: "Registre seu peso, medidas corporais e acompanhe sua evolução com fotos.", cta: "Criar ficha de peso e medidas" },
 ] as const;
 
-const nav = [
-  { Icon: Home, label: "Início", to: "/assistente" },
-  { Icon: ClipboardList, label: "Projetos", to: "/projetos" },
-  { Icon: ListChecks, label: "Tarefas", to: "/tarefas" },
-  { Icon: CalendarDays, label: "Planejamento", to: "/planejamento" },
-  { Icon: BarChart3, label: "Progresso", to: "/progresso" },
-  { Icon: Heart, label: "Saúde", to: "/saude" },
-] as const;
-
 function Index() {
   const [ficha, setFicha] = useState<Ficha | null>(null);
   return (
@@ -60,18 +50,7 @@ function Index() {
       <div className="aurora pointer-events-none absolute inset-0" />
       <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
 
-      <aside className="glass-h fixed inset-y-3 left-0 z-20 hidden w-[60px] flex-col items-center justify-between rounded-3xl py-6 md:flex">
-        <div className="flex flex-col items-center gap-3">
-          {nav.map(({ Icon, label, to }) => (
-            <Button asChild variant="ghost" size="icon" key={label} title={label} className={`h-11 w-11 rounded-2xl ${to === "/saude" ? "bg-primary/15 text-primary shadow-glow" : "text-muted-foreground"}`}>
-              <Link to={to} aria-label={label} aria-current={to === "/saude" ? "page" : undefined}><Icon className="h-5 w-5" /></Link>
-            </Button>
-          ))}
-        </div>
-        <Button variant="ghost" size="icon" title="Minha conta (em breve)" aria-label="Minha conta (em breve)" className="h-11 w-11 text-muted-foreground"><UserRound /></Button>
-      </aside>
-
-      <main className="relative z-10 px-5 py-6 md:pl-[88px] md:pr-5">
+      <main className="relative z-10 px-5 py-6 md:px-5">
         <HealthTabs active="saude" />
 
         <header className="mb-10 flex items-center gap-5">
