@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CalendarDays, CreditCard, Gauge as GaugeIcon, Info, Layers, PiggyBank, Scale, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { addMonths, alertsFor, brl, cashflow, categoryTotals, commitments, dateBR, isoOf, monthName, monthSummary, monthlySeries, openInvoice, parseIso, sameDayPrev, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
+import { addMonths, alertsFor, brl, cashflow, categoryTotals, commitments, dateBR, isoOf, monthName, monthSummary, monthClose, monthlySeries, openInvoice, parseIso, sameDayPrev, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
 import { AreaChart, BarsChart, Donut, Gauge, Heatmap, Money, RadialRings, Sparkline, StackedBars } from "./charts";
 import { HeroPanel, OrbitArt, Tilt } from "./fx";
@@ -70,10 +70,10 @@ function FlowPanel({ flow, today, onAddMov }: { flow: ReturnType<typeof cashflow
   );
 }
 
-type Model = { sum: ReturnType<typeof monthSummary>; series: ReturnType<typeof monthlySeries>; saldo: number; faturas: number; parcelas: number; flow: ReturnType<typeof cashflow> };
+type Model = { close: ReturnType<typeof monthClose>; sum: ReturnType<typeof monthSummary>; series: ReturnType<typeof monthlySeries>; saldo: number; faturas: number; parcelas: number; flow: ReturnType<typeof cashflow> };
 /** Topo da visão geral: saldo gigante, ritmo do mês e a órbita com o que sobra no fim do mês. */
 function Hero({ model, cards, accounts, today }: { model: Model; cards: number; accounts: number; today: Date }) {
-  const income = model.sum.receitas + model.sum.aReceber, saved = income > 0 ? Math.max(-100, Math.min(100, (model.sum.previsto / income) * 100)) : 0, good = model.sum.previsto >= 0;
+  const c = model.close, good = c.sobra >= 0;
   const stats = [
     { l: "A receber no mês", v: model.sum.aReceber, c: "var(--emerald)", i: ArrowUpRight },
     { l: "A pagar no mês", v: model.sum.aPagar, c: ROSE, i: ArrowDownRight },
@@ -102,11 +102,17 @@ function Hero({ model, cards, accounts, today }: { model: Model; cards: number; 
         <div className="relative grid place-items-center">
           <OrbitArt size={290}>
             <div>
-              <p className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{good ? "Sobra prevista" : "Falta prevista"}</p>
-              <p className="font-display text-2xl font-semibold tabular-nums" style={{ color: good ? "var(--emerald)" : ROSE, textShadow: `0 0 24px ${good ? "var(--emerald)" : ROSE}` }}><Money value={Math.abs(model.sum.previsto)} cents={false} /></p>
-              <p className="text-[0.68rem] text-muted-foreground">{income > 0 ? `${Math.abs(Math.round(saved))}% da renda` : "no fim do mês"}</p>
+              <p className="text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{good ? "Sobra de caixa" : "Falta no caixa"}</p>
+              <p className="font-display text-2xl font-semibold tabular-nums" style={{ color: good ? "var(--emerald)" : ROSE, textShadow: `0 0 24px ${good ? "var(--emerald)" : ROSE}` }}><Money value={Math.abs(c.sobra)} cents={false} /></p>
+              <p className="text-[0.68rem] text-muted-foreground">depois de pagar as faturas</p>
             </div>
           </OrbitArt>
+          <dl className="mt-3 w-full max-w-[19rem] space-y-1 text-xs tabular-nums" data-testid="fin-sobra-conta" aria-label="Como chegamos nesse número">
+            {[["Saldo hoje", c.saldo, ""], ["+ Ainda entra no mês", c.aReceber, "var(--emerald)"], ["− Contas a pagar no mês", -c.aPagarConta, ROSE], ["− Faturas dos cartões", -c.faturas, ROSE]].map(([l, v, col]) => (
+              <div key={String(l)} className="flex items-baseline justify-between gap-3"><dt className="text-muted-foreground">{l}</dt><dd className="font-medium" style={col ? { color: String(col) } : undefined}><Money value={Number(v)} cents={false} /></dd></div>
+            ))}
+            <div className="flex items-baseline justify-between gap-3 border-t border-white/10 pt-1"><dt className="font-semibold">= Resultado</dt><dd className="font-semibold" style={{ color: good ? "var(--emerald)" : ROSE }}><Money value={c.sobra} cents={false} /></dd></div>
+          </dl>
           {model.flow.firstNegative && <span className="absolute left-0 top-0 rounded-full border px-3 py-1 text-[0.7rem]" style={{ color: ROSE, borderColor: `color-mix(in oklab, ${ROSE} 40%, transparent)`, background: `color-mix(in oklab, ${ROSE} 10%, transparent)` }}>saldo negativo em {dateBR(model.flow.firstNegative.date).slice(0, 5)}</span>}
         </div>
       </div>
@@ -121,7 +127,7 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
     const todayIso = isoOf(today), sum = monthSummary(state, ym, todayIso), prevEs = monthEntries(state, addMonths(ym, -1), sameDayPrev(ym, todayIso));
     const series = monthlySeries(state, ym, 6, todayIso), cats = categoryTotals(state, ym, todayIso), future = commitments(state, ym, 12);
     return {
-      sum, prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
+      close: monthClose(state, today), sum, prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
       series, cats, future, saldo: totalBalance(state, today), faturas: totalOpenInvoices(state, today), parcelas: totalFutureParcels(state, today),
       alerts: alertsFor(state, today), why: whyChanged(state, ym, todayIso), flow: cashflow(state, today, 60),
       daily: expensesOf(monthEntries(state, ym, todayIso)).reduce<Record<number, number>>((m, e) => { const d = Number(e.date.slice(8, 10)); m[d] = (m[d] ?? 0) + e.amount; return m; }, {}),
@@ -160,7 +166,7 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
         <Kpi testId="kpi-despesas" icon={TrendingDown} label="Despesas até hoje" value={model.sum.despesas} color={ROSE} foot={model.sum.aPagar > 0 ? <span>+ {brl(model.sum.aPagar)} a pagar no mês</span> : <Delta now={model.sum.despesas} prev={model.prevD} goodWhenUp={false} />} delay={0.1} />
         <Kpi testId="kpi-faturas" icon={CreditCard} label="Faturas abertas" value={model.faturas} color="var(--violet)" foot={<span>{state.cards.length} cartões</span>} delay={0.15} />
         <Kpi testId="kpi-parcelas" icon={Layers} label="Parcelas futuras" value={model.parcelas} color="var(--amber)" foot={<span>{state.plans.length} compras parceladas</span>} delay={0.2} />
-        <Kpi testId="kpi-saldo-mes" icon={Scale} label="Resultado até hoje" value={net} color={net >= 0 ? "var(--emerald)" : ROSE} foot={<span>previsto no fim do mês: <b className={model.sum.previsto >= 0 ? "text-emerald" : ""} style={model.sum.previsto < 0 ? { color: ROSE } : undefined}>{brl(model.sum.previsto)}</b></span>} delay={0.25} />
+        <Kpi testId="kpi-saldo-mes" icon={Scale} label="Resultado até hoje" value={net} color={net >= 0 ? "var(--emerald)" : ROSE} foot={<span>caixa depois das faturas: <b className={model.close.sobra >= 0 ? "text-emerald" : ""} style={model.close.sobra < 0 ? { color: ROSE } : undefined}>{brl(model.close.sobra)}</b></span>} delay={0.25} />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">

@@ -193,6 +193,19 @@ export const upcomingInvoices = (s: FinanceState, card: Card, today: Date, n = 4
 export const totalOpenInvoices = (s: FinanceState, today: Date) => sum(s.cards.map((c) => openInvoice(s, c, today).total));
 
 /* ───────────── fluxo de caixa previsto ───────────── */
+/**
+ * Sobra (ou falta) de caixa depois de pagar tudo que já está comprometido:
+ * saldo de hoje + o que ainda entra no mês − contas que saem da conta no mês − faturas abertas dos cartões.
+ * Compras no crédito não entram à parte (já estão dentro das faturas), para não contar duas vezes.
+ */
+export type MonthClose = { saldo: number; aReceber: number; aPagarConta: number; faturas: number; sobra: number };
+export function monthClose(s: FinanceState, today: Date): MonthClose {
+  const todayIso = isoOf(today), later = monthEntries(s, ymOf(today)).filter((e) => e.date > todayIso);
+  const saldo = totalBalance(s, today), aReceber = total(incomeOf(later));
+  const aPagarConta = total(expensesOf(later).filter((e) => !e.cardId && e.method !== "credito")), faturas = totalOpenInvoices(s, today);
+  return { saldo, aReceber, aPagarConta, faturas, sobra: round2(saldo + aReceber - aPagarConta - faturas) };
+}
+
 export type FlowEvent = { id: string; date: string; label: string; amount: number; kind: "receita" | "despesa" | "fatura"; cardId?: string | undefined; balance: number };
 export type Cashflow = { start: number; events: FlowEvent[]; end: number; min: number; firstNegative: FlowEvent | null; until: string };
 /**

@@ -1,5 +1,5 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
-import { addMonths, alertsFor, brl, cashflow, categoryTotals, dateBR, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
+import { addMonths, alertsFor, brl, cashflow, categoryTotals, dateBR, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
 import { cloudFinanceRepo } from "../finance/cloud-repo";
 import { catOf } from "../finance/categories";
 import { parseNatural } from "../finance/parse";
@@ -32,10 +32,10 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
   const acao = String(args["acao"] ?? "resumo"), ym = resolveMonth(args["mes"], today), todayIso = isoOf(today);
 
   if (acao === "resumo") {
-    const m = monthSummary(s, ym, todayIso), saldo = totalBalance(s, today), cf = cashflow(s, today, 60);
+    const close = monthClose(s, today), m = monthSummary(s, ym, todayIso), saldo = totalBalance(s, today), cf = cashflow(s, today, 60);
     const faturas = sum(s.cards.map((c) => openInvoice(s, c, today).total));
     const alertas = alertsFor(s, today).slice(0, 3);
-    return { result: { ok: true, mes: monthName(ym), saldo_hoje: saldo, entrou: m.receitas, saiu: m.despesas, a_receber_ate_fim_do_mes: m.aReceber, a_pagar_ate_fim_do_mes: m.aPagar, resultado_previsto_do_mes: m.resultado, faturas_abertas: faturas, menor_saldo_nos_proximos_60_dias: cf.min, fica_negativo: cf.firstNegative ? { quando: dateBR(cf.firstNegative.date), motivo: cf.firstNegative.label } : null, alertas: alertas.map((a) => a.title), dica: "Fale poucos números: saldo, o que saiu e o que ainda vai pagar. Se o saldo ficar negativo, avise quando." },
+    return { result: { ok: true, mes: monthName(ym), saldo_hoje: saldo, entrou: m.receitas, saiu: m.despesas, a_receber_ate_fim_do_mes: m.aReceber, a_pagar_ate_fim_do_mes: m.aPagar, sobra_de_caixa_depois_de_pagar_as_faturas: close.sobra, faturas_abertas: faturas, menor_saldo_nos_proximos_60_dias: cf.min, fica_negativo: cf.firstNegative ? { quando: dateBR(cf.firstNegative.date), motivo: cf.firstNegative.label } : null, alertas: alertas.map((a) => a.title), dica: "Fale poucos números: saldo, o que saiu e a sobra (ou falta) de caixa depois de pagar as faturas; nunca chame de sobra o resultado do mês sem as faturas. Se o saldo ficar negativo, avise quando." },
       panel: panel(`Resumo · ${monthName(ym)}`, [{ titulo: "Agora", itens: [item("Saldo nas contas", brl(saldo)), item("Entrou no mês", brl(m.receitas)), item("Saiu no mês", brl(m.despesas)), item("Ainda a pagar no mês", brl(m.aPagar)), item("Faturas abertas", brl(faturas))] }, ...(alertas.length ? [{ titulo: "Atenção", itens: alertas.map((a) => item(a.title, a.detail)) }] : [])]) };
   }
 

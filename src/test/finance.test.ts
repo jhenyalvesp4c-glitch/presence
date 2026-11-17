@@ -240,3 +240,24 @@ describe("assinaturas: pausar e reativar", () => {
     expect(inMonth(state(r), "2026-11")).toBe(1);
   });
 });
+
+describe("sobra de caixa (o caso real: salário 1.500, casa 500, faturas 1.113,56 + 435, saldo R$ 0,40)", () => {
+  it("desconta as faturas dos cartões e dá falta, não sobra", async () => {
+    const { monthClose } = await import("@/lib/finance/calc");
+    const today = new Date(2026, 10, 17);
+    const st: FinanceState = { ...EMPTY_STATE, onboarded: true,
+      accounts: [{ id: "a", name: "Nubank", kind: "banco", tone: "roxo", balanceBase: 0.4, baseDate: "2026-11-17" }],
+      cards: [
+        { id: "n", name: "Nubank", brand: "mastercard", last4: "1", tone: "roxo", limit: 5000, availableBase: 3886.44, baseDate: "2026-11-17", closingDay: 28, dueDay: 5, adjustments: { "2026-12": 1113.56 } },
+        { id: "m", name: "Mercado Pago", brand: "mastercard", last4: "2", tone: "azul", limit: 3000, availableBase: 2565, baseDate: "2026-11-17", closingDay: 9, dueDay: 15, adjustments: { "2026-12": 435 } },
+      ],
+      recurring: [
+        { id: "s", kind: "receita", desc: "Salário", amount: 1500, day: 30, category: "salario", method: "pix", accountId: "a", startYm: "2026-01" },
+        { id: "c", kind: "despesa", desc: "Moradia", amount: 500, day: 30, category: "moradia", method: "pix", accountId: "a", startYm: "2026-01" },
+      ] };
+    const c = monthClose(st, today);
+    expect(c.aReceber).toBe(1500); expect(c.aPagarConta).toBe(500); expect(c.faturas).toBeCloseTo(1548.56, 2);
+    expect(c.sobra).toBeCloseTo(0.4 + 1500 - 500 - 1548.56, 2); // ≈ −548,16
+    expect(c.sobra).toBeLessThan(0);
+  });
+});
