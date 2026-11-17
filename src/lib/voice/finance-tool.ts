@@ -1,6 +1,7 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
 import { addMonths, alertsFor, brl, cashBreakdown, cashflow, categoryTotals, dateBR, dueYmOfClosing, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthPlan, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
-import { cloudFinanceRepo } from "../finance/cloud-repo";
+import { cloudFinanceRepo, persistChange } from "../finance/cloud-repo";
+import { READ_ACTIONS_V2, WRITE_ACTIONS, applyWrite, readMore } from "./finance-write";
 import { catOf } from "../finance/categories";
 import { parseNatural } from "../finance/parse";
 import { supabase } from "../supabase";
@@ -105,10 +106,18 @@ export async function launch(s: FinanceState, frase: string, today: Date): Promi
   return { result: { ok: true, lancado: { tipo: d.kind, descricao: d.desc, valor: d.amount, data: dateBR(d.date), em: onde ?? "dinheiro", categoria: catOf(d.category).name } }, panel: panel("Lançado", [{ titulo: d.kind === "receita" ? "Receita" : "Despesa", itens: [item(d.desc, `${brl(d.amount)} · ${dateBR(d.date)} · ${onde ?? "dinheiro"}`)] }], "/financeiro?aba=movimentacoes") };
 }
 
-export async function runFinanceTool(args: Record<string, unknown>): Promise<{ result: Record<string, unknown>; panel?: Panel }> {
+export async function runFinanceTool(args: Record<string, unknown>): Promise<{ result: Record<string, unknown>; panel?: Panel; navegar?: string; mudou?: boolean }> {
   const today = new Date();
   const s = await cloudFinanceRepo.readCloud();
   if (!s || !s.onboarded && !s.accounts.length) return { result: { ok: false, erro: "O financeiro ainda não tem dados na nuvem. Peça para ela abrir o Financeiro e responder ao briefing." } };
-  if (String(args["acao"]) === "lancar") return launch(s, String(args["frase"] ?? ""), today);
+  const acao = String(args["acao"]);
+  if (acao === "lancar") return launch(s, String(args["frase"] ?? ""), today);
+  if (READ_ACTIONS_V2.has(acao)) return readMore(s, args, today);
+  if (WRITE_ACTIONS.has(acao)) {
+    const out = applyWrite(s, args, today);
+    if (!out.state) return out;
+    try { await persistChange(s, out.state); } catch { return { result: { ok: false, erro: "Não consegui salvar a alteração. Nada foi mudado." } }; }
+    return { ...out, mudou: true };
+  }
   return answer(s, args, today);
 }

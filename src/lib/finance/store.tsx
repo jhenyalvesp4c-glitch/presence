@@ -35,6 +35,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { let alive = true; void financeRepo.load().then((s0) => { const s = migratePaidManual(migrateInvoiceTotals(s0), new Date()); if (alive) { setState(s); loaded.current = true; setReady(true); } }); return () => { alive = false; }; }, []);
   useEffect(() => { if (loaded.current) void financeRepo.save(state); }, [state]);
+  // a voz alterou o financeiro no servidor: traz o que mudou (se não há gravação em andamento)
+  useEffect(() => {
+    const refresh = () => { if (!loaded.current || financeRepo.status() === "saving") return; void financeRepo.load().then((s) => setState((cur) => (JSON.stringify(cur) === JSON.stringify(s) || financeRepo.status() === "error" ? cur : s))); };
+    window.addEventListener("orion:financeiro-atualizado", refresh);
+    return () => window.removeEventListener("orion:financeiro-atualizado", refresh);
+  }, []);
   // ao voltar para a aba/app, traz o que foi lançado em outro aparelho (só se não houver gravação em andamento)
   useEffect(() => {
     const onShow = () => {

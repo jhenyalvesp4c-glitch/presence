@@ -71,7 +71,7 @@ export function OrionChat({ autoFocus = false }: { autoFocus?: boolean }) {
         const handle = (e: VoiceEvent) => {
           if (e.t === "texto") { said += e.d; patch(reply.id, (b) => ({ ...b, text: said, busy: true })); }
           else if (e.t === "painel") { patch(reply.id, (b) => ({ ...b, panel: e.p })); setPanel(e.p); }
-          else if (e.t === "acao") { if (e.a.tipo === "navegar") router.history.push(e.a.para); }
+          else if (e.t === "acao") { if (e.a.tipo === "navegar") router.history.push(e.a.para); else if (e.a.tipo === "atualizar") window.dispatchEvent(new Event("orion:financeiro-atualizado")); }
           else if (e.t === "ferramenta") tools = e;
           else if (e.t === "erro") { said = said ? `${said}\n\n${e.m}` : e.m; patch(reply.id, (b) => ({ ...b, text: said })); }
         };

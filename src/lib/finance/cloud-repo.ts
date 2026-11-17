@@ -5,7 +5,7 @@
  * - Sem login ou sem rede: continua funcionando com a cópia local, e avisa no indicador.
  */
 import { supabase } from "../supabase";
-import { diffRows, emptyRows, fromRows, hasData, TABLES, toRows, type Row, type Rows, type TableName } from "./db-map";
+import { diffRows, emptyRows, fromRows, hasData, TABLES, toRows, type Row, type RowDiff, type Rows, type TableName } from "./db-map";
 import { LocalFinanceRepo, type FinanceRepo } from "./repo";
 import { EMPTY_STATE, type FinanceState } from "./types";
 
@@ -14,6 +14,29 @@ export interface ObservableRepo extends FinanceRepo { status(): SyncStatus; subs
 
 const CHUNK = 400, PAGE = 1000;
 const BACKUP_KEY = "presence.financeiro.v1.migrado";
+
+/** Grava no Supabase só o que mudou (usado pelo navegador e pela voz no servidor). */
+async function writeDiff(d: RowDiff, next: Rows): Promise<void> {
+  const now = new Date().toISOString();
+  if (d.settings) { const { error } = await supabase.from("fin_settings").upsert({ onboarded: next.settings.onboarded, mock: next.settings.mock, updated_at: now }, { onConflict: "user_id" }); if (error) throw new Error(error.message); }
+  for (const t of TABLES) {
+    for (let i = 0; i < d.upserts[t].length; i += CHUNK) {
+      const rows = d.upserts[t].slice(i, i + CHUNK).map((r) => ({ ...r, updated_at: now }));
+      const { error } = await supabase.from(t).upsert(rows, { onConflict: "user_id,id" });
+      if (error) throw new Error(error.message);
+    }
+    for (let i = 0; i < d.deletes[t].length; i += CHUNK) {
+      const { error } = await supabase.from(t).delete().in("id", d.deletes[t].slice(i, i + CHUNK));
+      if (error) throw new Error(error.message);
+    }
+  }
+}
+
+/** Salva uma mudança feita fora do navegador (a voz, no servidor): compara o antes e o depois e grava só a diferença. */
+export async function persistChange(prev: FinanceState, next: FinanceState): Promise<void> {
+  const d = diffRows(toRows(prev), toRows(next));
+  if (!d.empty) await writeDiff(d, toRows(next));
+}
 
 export class CloudFinanceRepo implements ObservableRepo {
   private local = new LocalFinanceRepo();
@@ -84,19 +107,7 @@ export class CloudFinanceRepo implements ObservableRepo {
     const next = toRows(state), prev = this.last ?? emptyRows(), d = diffRows(prev, next);
     if (d.empty) return;
     this.set("saving");
-    const now = new Date().toISOString();
-    if (d.settings) { const { error } = await supabase.from("fin_settings").upsert({ onboarded: next.settings.onboarded, mock: next.settings.mock, updated_at: now }, { onConflict: "user_id" }); if (error) throw new Error(error.message); }
-    for (const t of TABLES) {
-      for (let i = 0; i < d.upserts[t].length; i += CHUNK) {
-        const rows = d.upserts[t].slice(i, i + CHUNK).map((r) => ({ ...r, updated_at: now }));
-        const { error } = await supabase.from(t).upsert(rows, { onConflict: "user_id,id" });
-        if (error) throw new Error(error.message);
-      }
-      for (let i = 0; i < d.deletes[t].length; i += CHUNK) {
-        const { error } = await supabase.from(t).delete().in("id", d.deletes[t].slice(i, i + CHUNK));
-        if (error) throw new Error(error.message);
-      }
-    }
+    await writeDiff(d, next);
     this.last = next; this.set("saved");
   }
 

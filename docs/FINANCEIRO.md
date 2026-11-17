@@ -45,4 +45,9 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 
 **Voz** (`src/lib/voice/finance-tool.ts`, ferramenta `financeiro`): `resumo`, `categorias`, `saldo`, `fatura`, `parcelas`, `assinaturas`, `ultimos` e `lancar` (frase → `parseNatural` → grava em `fin_transactions`; só grava se entendeu valor, forma de pagamento e conta/cartão; parcelado não). Usa `calc.ts` no servidor, então os números são os mesmos da tela.
 
+**Voz: o que o Orion faz no financeiro** (ferramenta `financeiro`; leitura em `finance-tool.ts`, alterações puras em `finance-write.ts`, gravadas com `persistChange`, que envia só a diferença):
+- Consulta: `resumo`, `detalhe` (por que sobra/falta), `meses`, `categorias`, `saldo`, `fatura` (por mês de fechamento), `parcelas`, `parcela_detalhe`, `assinaturas`, `fixas`, `metas`, `ultimos`, `abrir` (abre a aba; com `cartao`/`conta` abre o detalhe).
+- Alteração: `lancar`, `pausar`/`reativar`, `fatura_total`, `detalhar` (parcelada, à vista ou assinatura dentro da fatura, sem mudar o total e sem consumir limite), `cadastrar_parcelada` (com parcelas pagas alinha o calendário e não consome limite), `cadastrar_fixa` (conta fixa, entrada fixa ou assinatura), `editar` (movimentação, fixa/assinatura, parcelada, saldo de conta, limite/fechamento/vencimento de cartão, meta) e `excluir`.
+- **Excluir sempre pede confirmação** (`precisa_confirmar` → só com `confirmado: true`). Falha ao gravar não muda nada. Depois de gravar, o servidor manda `{tipo: "atualizar"}` e a tela recarrega do banco (`orion:financeiro-atualizado`).
+
 **Próximo**: Open Finance (agregador) alimentando `fin_transactions`, com o mesmo `id` estável por lançamento do banco para não duplicar.

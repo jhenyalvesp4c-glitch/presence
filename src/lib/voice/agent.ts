@@ -30,7 +30,7 @@ export type Confirmar = { titulo: string; pedido: string; detalhes: string; area
 export type Panel = { titulo: string; secoes: { titulo: string; itens: PanelItem[] }[]; chat?: ChatView; abrir?: { rotulo: string; para: string }; confirmar?: Confirmar };
 export type VoiceEvent =
   | { t: "texto"; d: string }
-  | { t: "acao"; a: { tipo: "navegar"; para: string } | { tipo: "encerrar" } }
+  | { t: "acao"; a: { tipo: "navegar"; para: string } | { tipo: "encerrar" } | { tipo: "atualizar"; o: "financeiro" } }
   | { t: "painel"; p: Panel }
   | { t: "erro"; m: string }
   | { t: "status"; m: string }
@@ -84,6 +84,7 @@ Regras de fala:
 - ROTEIROS de treinamento: pedidos para criar, editar, acrescentar ou tirar coisas de um roteiro (ou bloco, passo, dica, pergunta frequente) → use roteiro. Faça na hora e escreva você mesmo o conteúdo bom e completo em português (passos curtos e objetivos, uma dica, perguntas frequentes com resposta); não peça o texto a ela. Sem projeto citado, a ferramenta acha o roteiro sozinha. Confirme em uma frase o que mudou e nunca diga que não consegue editar roteiros.
 - QUANDO NÃO CONSEGUE: se ela pedir algo que nenhuma ferramenta sua faz (função nova, editar algo que o sistema ainda não deixa, ou uma ferramenta devolveu que não é possível), não pare em "não consigo". Diga em uma frase que no momento não consegue e use pedir_melhoria com um título curto, o pedido dela e os detalhes de como deve ficar. A pessoa confere e confirma na tela; só então vai para o Claude. Nunca prometa que já está sendo feito: diga que o pedido segue para o Claude depois da confirmação. Se ela perguntar do andamento dos pedidos, use pedir_melhoria com acao listar.
 - FINANCEIRO: para dinheiro ("quanto gastei", "quanto tenho", "como está minha fatura", "o que falta pagar", "minhas assinaturas", "gastei 50 no mercado") use a ferramenta financeiro. Ela traz os números reais; nunca invente valores. Responda em uma ou duas frases, com poucos números (valor falado como "mil duzentos e cinquenta reais"). Para registrar um gasto ou ganho, use acao lancar com a frase dela exatamente como foi dita; se faltar conta ou cartão, pergunte só isso. Compra parcelada não se lança por voz.
+- FINANCEIRO, ALTERAR: você também mexe no financeiro pela ferramenta financeiro: pausar/reativar assinaturas, informar o total de uma fatura (fatura_total), detalhar uma compra, parcela ou assinatura dentro de uma fatura (detalhar: o total do banco NÃO muda), cadastrar_parcelada, cadastrar_fixa, editar e excluir. Faça na hora o que foi pedido com clareza e confirme em UMA frase com o antes e o depois ("Mudei a Netflix de 55,90 para 59,90"). EXCLUIR sempre pede confirmação: chame excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim. Faltou um dado (qual cartão, que valor, que dia)? Pergunte só isso. Fatura "de novembro" é a que FECHA em novembro. Para "me leva/abre os próximos meses" use acao abrir com aba.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
@@ -126,11 +127,22 @@ export const TOOLS = [
     prioridade: { type: "string", enum: ["alta", "media", "baixa"] }, local: { type: "string" },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
   }, required: ["item", "acao"] }),
-  fn("financeiro", "Consulta o FINANCEIRO real da pessoa (contas, cartões, parcelas, assinaturas) e lança gastos/ganhos. Ações: resumo (saldo, o que entrou e saiu, o que falta pagar, alertas), detalhe (POR QUE sobra ou falta dinheiro: a conta completa com faturas), meses (projeção dos PRÓXIMOS MESES: quanto entra, sai, sobra e o saldo de cada mês; use `quantidade`), categorias (onde gastou), saldo (por conta), fatura (cartão), parcelas, assinaturas, ultimos (movimentações, com busca opcional), lancar (grava uma despesa/receita a partir de uma frase).", { type: "object", properties: {
-    acao: { type: "string", enum: ["resumo", "detalhe", "meses", "categorias", "saldo", "fatura", "parcelas", "assinaturas", "ultimos", "lancar"] },
+  fn("financeiro", "Consulta o FINANCEIRO real da pessoa (contas, cartões, parcelas, assinaturas) e lança gastos/ganhos. Ações: resumo (saldo, o que entrou e saiu, o que falta pagar, alertas), detalhe (POR QUE sobra ou falta dinheiro: a conta completa com faturas), meses (projeção dos PRÓXIMOS MESES: quanto entra, sai, sobra e o saldo de cada mês; use `quantidade`), categorias (onde gastou), saldo (por conta), fatura (cartão), parcelas, assinaturas, ultimos (movimentações, com busca opcional), lancar (grava uma despesa/receita a partir de uma frase), fixas (contas fixas), parcela_detalhe (parcela por parcela de uma compra), metas, abrir (abre uma aba: aba=meses…), pausar/reativar (assinatura ou fixa), fatura_total (informa o total do banco numa fatura), detalhar (cadastra uma compra, parcela ou assinatura DENTRO de uma fatura sem mudar o total), cadastrar_parcelada, cadastrar_fixa, editar (valor, nome, dia, data, saldo de conta, limite de cartão, meta) e excluir (pede confirmação).", { type: "object", properties: {
+    acao: { type: "string", enum: ["resumo", "detalhe", "meses", "categorias", "saldo", "fatura", "parcelas", "assinaturas", "ultimos", "lancar", "fixas", "parcela_detalhe", "metas", "abrir", "pausar", "reativar", "fatura_total", "detalhar", "editar", "excluir", "cadastrar_parcelada", "cadastrar_fixa"] },
     mes: { type: "string", description: "Mês (na acao fatura é o mês de FECHAMENTO: a fatura \"de novembro\" fecha em novembro; sem mês = fatura aberta): 'dezembro', 'mês passado' ou AAAA-MM. Vazio = mês atual." },
     conta: { type: "string", description: "Nome da conta (acao saldo)." }, cartao: { type: "string", description: "Nome do cartão (acao fatura)." },
     busca: { type: "string", description: "Texto ou categoria para filtrar (acao ultimos)." }, quantidade: { type: "number" },
+    alvo: { type: "string", description: "Nome (aproximado) do item a pausar, reativar, editar, excluir ou ver em detalhe (a Netflix, o notebook, a conta Nubank…)." },
+    tipo_alvo: { type: "string", enum: ["movimentacao", "fixa", "assinatura", "parcelada", "conta", "cartao", "meta"], description: "Que tipo de item é o alvo (ajuda a desempatar nomes iguais)." },
+    valor: { type: "number", description: "Valor em reais: total da fatura (fatura_total), parcela (detalhar/cadastrar_parcelada), valor mensal (cadastrar_fixa), novo valor ou novo saldo/guardado (editar)." },
+    descricao: { type: "string", description: "Descrição ou novo nome (detalhar, cadastrar_*, editar)." },
+    parcelas_total: { type: "number" }, parcela_atual: { type: "number", description: "Qual parcela está na fatura (detalhar)." }, parcelas_pagas: { type: "number", description: "Quantas parcelas já pagou (cadastrar_parcelada)." },
+    forma: { type: "string", description: "detalhar: parcelada | avista | assinatura. cadastrar_fixa: despesa | receita | assinatura." },
+    dia: { type: "number", description: "Dia do mês da cobrança (1 a 31)." }, data: { type: "string", description: "AAAA-MM-DD (editar movimentação)." }, categoria: { type: "string" },
+    disponivel: { type: "number", description: "Limite disponível certo do cartão (editar cartão)." }, limite: { type: "number" }, fechamento: { type: "number" }, vencimento: { type: "number" }, objetivo: { type: "number" },
+    aba: { type: "string", description: "Aba a abrir (acao abrir): visao, contas, parcelas, meses, movimentacoes, assinaturas ou metas." },
+    valor_atual: { type: "number", description: "Valor do lançamento, para desempatar quando há vários com o mesmo nome." }, data_atual: { type: "string" },
+    confirmado: { type: "boolean", description: "true SÓ depois que ela confirmar uma exclusão." },
     frase: { type: "string", description: "A frase dela, como falou (acao lancar). Ex.: 'gastei 50 no mercado no débito pelo Nubank'." },
   }, required: ["acao"] }),
   fn("lista", "Cria e ajusta LISTAS/CHECKLISTS salvas (o que levar para a praia, compras, preparar uma viagem, passos de algo). Ações: criar (com titulo e itens agrupados), adicionar, remover, marcar (feito), desmarcar, mostrar, listar, renomear, excluir. Em criar/adicionar/mostrar passe sempre `sugestoes` com 4 a 6 ideias úteis que ainda NÃO estão na lista. Quando ela pedir uma lista sem dizer os itens, monte você mesmo uma lista completa e bem pensada, agrupada por tema.", { type: "object", properties: {
@@ -307,8 +319,10 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
 
     case "financeiro": {
       const { runFinanceTool } = await import("./finance-tool");
-      const out = await runFinanceTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui olhar o financeiro." } }));
+      const out = await runFinanceTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined; navegar?: undefined; mudou?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui olhar o financeiro." } }));
       if (out.panel) emit({ t: "painel", p: out.panel });
+      if (out.navegar) emit({ t: "acao", a: { tipo: "navegar", para: out.navegar } });
+      if (out.mudou) emit({ t: "acao", a: { tipo: "atualizar", o: "financeiro" } });
       return out.result;
     }
 

@@ -227,11 +227,15 @@ export const totalBalance = (s: FinanceState, today: Date = new Date()) => sum(s
  * Quanto do limite está livre: o informado (o que o banco mostra) menos o que foi gasto no crédito depois dele.
  * Não consome limite o que já estava dentro do valor informado (`inLimit`, como o detalhamento de uma fatura).
  */
-export function cardAvailable(s: FinanceState, c: Card): number {
+/** Quanto do limite foi usado depois da data-base (compras novas no crédito e parcelamentos novos). */
+export function cardUsed(s: FinanceState, c: Card): number {
   let used = 0;
   for (const t of s.transactions) if (t.cardId === c.id && t.method === "credito" && t.kind === "despesa" && t.date >= c.baseDate && !t.inLimit) used += t.amount;
   for (const p of s.plans) if (p.cardId === c.id && p.createdAt >= c.baseDate && !p.inLimit) used += p.total;
-  return Math.max(0, round2(c.availableBase - used));
+  return round2(used);
+}
+export function cardAvailable(s: FinanceState, c: Card): number {
+  return Math.max(0, round2(c.availableBase - cardUsed(s, c)));
 }
 
 export type InvoiceLine = { id: string; desc: string; amount: number; date: string; category: string; parcel?: string | undefined; source: Entry["source"] | "ajuste" };

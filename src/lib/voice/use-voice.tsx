@@ -368,7 +368,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
             const t = takeSentences(buffer, { first });
             buffer = t.rest; first = t.first; say(t.chunks);
           } else if (e.t === "acao") {
-            if (e.a.tipo === "navegar") router.history.push(e.a.para); else endAfter.current = true;
+            if (e.a.tipo === "navegar") router.history.push(e.a.para); else if (e.a.tipo === "atualizar") window.dispatchEvent(new Event("orion:financeiro-atualizado")); else endAfter.current = true;
           } else if (e.t === "painel") setPanel(e.p);
           else if (e.t === "ferramenta") { box.tools = e; cur.tools = true; }
           else if (e.t === "erro") { said = said || e.m; say([e.m]); }
