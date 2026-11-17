@@ -22,7 +22,7 @@ const cur: { t0: number; text?: number; audio?: number; tools?: boolean } = { t0
 export type Phase = "idle" | "listening" | "thinking" | "speaking";
 export type Voice = {
   active: boolean; phase: Phase; status: string | null; userText: string; botText: string; interim: string; panel: Panel | null; canListen: boolean; note: string | null;
-  wake: boolean; wakeSupported: boolean; wakeInfo: { modo: string; estado: string; ouvido: string }; setWake: (on: boolean) => void;
+  wake: boolean; wakeSupported: boolean; wakeInfo: { modo: string; estado: string; ouvido: string; nivel?: number; limiar?: number }; setWake: (on: boolean) => void;
   testVoice: () => void; announce: (text: string) => Promise<void>; toggle: () => void; stop: () => void; sendText: (t: string) => void; closePanel: () => void;
 };
 const Ctx = createContext<Voice | null>(null);
@@ -446,6 +446,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setWakeInfo((w) => ({ ...w, modo: "gravação", estado: "iniciando o microfone…" }));
     wakeStop.current = startRecordedWake({
       onStatus: (estado) => setWakeInfo((w) => ({ ...w, modo: "gravação", estado })),
+      onLevel: (nivel, limiar) => setWakeInfo((w) => ({ ...w, nivel, limiar })),
       onText: (text) => { setWakeInfo((w) => ({ ...w, ouvido: text })); if (heardWake(text)) { stopWake(); activate(afterWake(text)); } },
       onFail: (msg) => { stopWake(); setWakeEnabled(false); setWakeState(false); setWakeInfo((w) => ({ ...w, estado: msg })); setNote(msg); },
     });

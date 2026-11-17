@@ -6,12 +6,13 @@
 import { transcribeAudio } from "@/lib/audio.functions";
 
 const TARGET_SR = 16000;
-const MAX_SEG_S = 6, MIN_LOUD_S = 0.3, PREROLL_S = 0.5, END_QUIET_S = 0.55, MAX_PER_MIN = 24, STALE_MS = 4000;
+const MAX_SEG_S = 6, MIN_LOUD_S = 0.2, PREROLL_S = 0.5, END_QUIET_S = 0.55, MAX_PER_MIN = 24, STALE_MS = 4000, MIN_THRESHOLD = 0.012;
 /**
- * Dica neutra, SEM o nome: o modelo de transcrição repete a dica quando só ouve ruído ou silêncio. Com "Orion" na dica, qualquer batida
- * virava "Orion" e ativava o assistente. O nome é reconhecido pelo texto (wake.ts), que aceita as variações de escrita.
+ * Dica da transcrição. O modelo REPETE a dica quando só ouve ruído, então o nome não pode estar no começo dela nem repetido:
+ * com "Orion. Assistente Orion. Ei Orion…" qualquer batida virava "Orion" e ativava. Aqui o nome aparece uma vez, no fim de uma frase
+ * longa: ajuda a acertar a escrita, e se o modelo repetir a frase inteira o "Orion" cai fora da janela do começo da fala (wake.ts) e não ativa.
  */
-const HINT = "Fala curta em português do Brasil.";
+export const HINT = "Ela chama o assistente pelo nome: Orion.";
 /** Frases que o modelo inventa quando o áudio é só ruído (e que nunca são um chamado). */
 const GHOST = /^(obrigad[oa]\.?|tchau\.?|valeu\.?|hum+\.?|ahn+\.?|é\.?|\.+|\[?m[úu]sica\]?\.?|\(?m[úu]sica\)?\.?|\s*)$|legendas?|amara\.org|inscreva|se inscreva|tradu[cç][aã]o|assist[ae]m? ao|até a próxima/i;
 
@@ -26,7 +27,7 @@ export function pcmToWavBase64(pcm: Float32Array, sr = TARGET_SR): string {
   return btoa(bin);
 }
 
-export type WakeListen = { onText: (text: string) => void; onStatus: (s: string) => void; onFail: (msg: string) => void };
+export type WakeListen = { onText: (text: string) => void; onStatus: (s: string) => void; onFail: (msg: string) => void; onLevel?: (rms: number, threshold: number) => void };
 
 /**
  * Decide quando há "uma fala" para mandar transcrever. Pura (recebe blocos de áudio, devolve o trecho pronto) para poder testar.
@@ -37,24 +38,26 @@ export type WakeListen = { onText: (text: string) => void; onStatus: (s: string)
  */
 export function createSegmenter(sampleRate: number) {
   const ratio = sampleRate / TARGET_SR, preMax = Math.round(PREROLL_S * TARGET_SR);
-  let noise = 0.008, loudRun = 0, quiet = 0, speaking = false, loudSamples = 0, sumRms = 0, blocks = 0;
+  let lastRms = 0, lastThr = MIN_THRESHOLD, noise = 0.008, loudRun = 0, quiet = 0, speaking = false, loudSamples = 0, sumRms = 0, blocks = 0;
   let pre: number[] = [], seg: number[] = [];
   const reset = () => { speaking = false; loudRun = 0; pre = []; seg = []; loudSamples = 0; quiet = 0; sumRms = 0; blocks = 0; };
   return {
     /** Nível de ruído de fundo aprendido (para testes e ajuste). */
     get noise() { return noise; },
+    /** Volume do último bloco e o mínimo para contar como fala (para mostrar na tela e achar problema de microfone baixo). */
+    get level() { return { rms: lastRms, threshold: lastThr }; },
     push(inp: Float32Array): { started?: true; pcm?: Float32Array; ended?: true } {
       let sum = 0; for (let i = 0; i < inp.length; i++) sum += inp[i]! * inp[i]!;
       const rms = Math.sqrt(sum / inp.length);
       // reduz para 16 kHz (média por janela)
       const out: number[] = [];
       for (let p = 0; p < inp.length; p += ratio) { let a = 0, c = 0; for (let k = Math.floor(p); k < Math.min(inp.length, Math.floor(p + ratio)); k++) { a += inp[k]!; c++; } out.push(c ? a / c : 0); }
-      const thr = Math.max(0.025, noise * 3.5), loud = rms > thr;
+      const thr = Math.max(MIN_THRESHOLD, noise * 3), loud = rms > thr; lastRms = rms; lastThr = thr;
       if (!speaking) {
         pre.push(...out); if (pre.length > preMax) pre = pre.slice(pre.length - preMax);
         if (!loud) noise = noise * 0.97 + rms * 0.03;
         loudRun = loud ? loudRun + 1 : 0;
-        if (loudRun >= 4) { speaking = true; seg = [...pre]; loudSamples = 0; quiet = 0; sumRms = 0; blocks = 0; return { started: true }; }
+        if (loudRun >= 3) { speaking = true; seg = [...pre]; loudSamples = 0; quiet = 0; sumRms = 0; blocks = 0; return { started: true }; }
         return {};
       }
       seg.push(...out); sumRms += rms; blocks++;
@@ -122,12 +125,13 @@ export function startRecordedWake(o: WakeListen): () => void {
     node = ctx.createScriptProcessor(2048, 1, 1);
     const mute = ctx.createGain(); mute.gain.value = 0;
     src.connect(node); node.connect(mute); mute.connect(ctx.destination);
-    const seg = createSegmenter(ctx.sampleRate);
+    const seg = createSegmenter(ctx.sampleRate); let lastLevelAt = 0;
     o.onStatus("Ouvindo…");
 
     node.onaudioprocess = (ev) => {
       if (stopped) return;
       const r = seg.push(ev.inputBuffer.getChannelData(0));
+      const t = Date.now(); if (o.onLevel && t - lastLevelAt > 250) { lastLevelAt = t; o.onLevel(seg.level.rms, seg.level.threshold); }
       if (r.started) o.onStatus("Ouvindo você…");
       if (r.pcm) void send(r.pcm);
       else if (r.ended) o.onStatus("Ouvindo…");

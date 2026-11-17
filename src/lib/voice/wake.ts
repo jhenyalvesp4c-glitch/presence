@@ -4,6 +4,7 @@ const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerC
 /** Letras parecidas viram uma só (y→i, sem h, letras dobradas viram uma) e tira o "s" do plural: "Hórion", "Orions", "Oryan" → orion/orian. */
 const phon = (w: string) => w.replace(/y/g, "i").replace(/h/g, "").replace(/(.)\1+/g, "$1").replace(/s$/, "");
 /** Como o reconhecimento costuma escrever "Orion" falado. Não entram "aria", "origem", "oriente", "Marion"… */
+const FUZZY = ["orion", "orian", "aurion", "aurian", "ourion", "ourian"];
 const VARIANTS = new Set(["orion", "orian", "oriam", "oriom", "orium", "orio", "orioa", "oriao", "oria", "auria", "aurion", "aurian", "ourion", "ourian", "orien"]);
 
 const lev = (a: string, b: string): number => {
@@ -15,7 +16,10 @@ const lev = (a: string, b: string): number => {
 export const isOrionWord = (raw: string): boolean => {
   const w = phon(raw);
   if (w.length < 4 || w.length > 7) return false;
-  return VARIANTS.has(w) || (w.length === 5 && lev(w, "orion") === 1);
+  if (VARIANTS.has(w)) return true;
+  // uma letra de diferença de uma escrita conhecida ("auriao", "ouriom", "oreon"): só palavras de 5 a 6 letras que começam igual
+  // ("or…", "au…", "ou…"), para não pegar "Marion", "Adrian", "orgão", "origem"…
+  return w.length >= 5 && w.length <= 6 && FUZZY.some((v) => v.slice(0, 2) === w.slice(0, 2) && Math.abs(v.length - w.length) <= 1 && lev(w, v) === 1);
 };
 
 /** Quantos tokens do começo podem vir antes de "Orion" ("ei", "oi", "bom dia"…): chamar é no começo da fala, não no meio de uma conversa. */

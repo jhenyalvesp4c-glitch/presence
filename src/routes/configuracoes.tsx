@@ -201,6 +201,12 @@ function ChamarPorVoz() {
         <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs" data-testid="cfg-chamar-estado">
           <p><b className="text-foreground">Estado:</b> {v.wakeInfo.estado}{v.wakeInfo.modo ? ` · modo ${v.wakeInfo.modo}` : ""}</p>
           {v.wakeInfo.ouvido && <p className="mt-1 text-muted-foreground">Última coisa que ouvi: “{v.wakeInfo.ouvido}”</p>}
+          {v.wakeInfo.nivel !== undefined && v.wakeInfo.limiar !== undefined && (
+            <div className="mt-2" data-testid="nivel-microfone">
+              <p className="text-muted-foreground">Volume do microfone agora: <b className="text-foreground">{Math.round(Math.min(1, v.wakeInfo.nivel / 0.3) * 100)}%</b> · para eu perceber a fala precisa passar de <b className="text-foreground">{Math.round(Math.min(1, v.wakeInfo.limiar / 0.3) * 100)}%</b>. Fale “Orion” e veja se a barra passa da marca.</p>
+              <div className="relative mt-1 h-2 overflow-hidden rounded-full bg-white/10"><span className="absolute inset-y-0 left-0 rounded-full bg-cyan transition-[width] duration-150" style={{ width: `${Math.round(Math.min(1, v.wakeInfo.nivel / 0.3) * 100)}%` }} /><span className="absolute inset-y-0 w-0.5 bg-amber" style={{ left: `${Math.round(Math.min(1, v.wakeInfo.limiar / 0.3) * 100)}%` }} /></div>
+            </div>
+          )}
         </div>
       )}
       <ul className="mt-4 space-y-1.5 text-xs text-muted-foreground">

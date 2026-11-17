@@ -39,3 +39,16 @@ describe("palavra de ativação: menos falsos chamados, mais acertos", () => {
     expect(afterWake("falei com o Orion ontem")).toBe("");
   });
 });
+
+describe("palavra de ativação: escritas com uma letra diferente", () => {
+  it("aceita erros pequenos de escrita do reconhecimento", () => { for (const t of ["Oreon", "Auriao", "Ouriom", "Orien", "Orrion", "Oriaon"]) expect(heardWake(t), t).toBe(true); });
+  it("continua não pegando nomes e palavras parecidas", () => { for (const t of ["Marion", "Mario", "Adrian", "Aurora", "Orlando", "Lion", "origem", "oriente", "Oriane" + "s" + "a"]) expect(heardWake(t), t).toBe(false); });
+});
+
+describe("dica enviada à transcrição", () => {
+  it("se o modelo repetir a dica (ruído virando texto), isso NÃO ativa o assistente", async () => {
+    const { HINT } = await import("@/lib/voice/wake-listen");
+    expect(heardWake(HINT)).toBe(false);
+    expect(HINT.toLowerCase()).toContain("orion"); // ainda ajuda a acertar a escrita do nome
+  });
+});
