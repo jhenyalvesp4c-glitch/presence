@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WorkspaceSection } from "@/components/workspace-section";
+import { HealthProgress } from "@/components/health-progress";
 
 
 export const Route = createFileRoute("/analise")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/analise")({
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
-  component: () => <WorkspaceSection section="analise" />,
+  component: () => <HealthProgress tab="analise" />,
 });

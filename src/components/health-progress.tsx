@@ -96,13 +96,13 @@ function Panel({ title, icon: Icon, color = "var(--cyan)", children, className =
   </section>;
 }
 
-export function HealthProgress() {
+export function HealthProgress({ tab = "saude" }: { tab?: "saude" | "analise" } = {}) {
   const { measurementHistory: history, ready } = useHealthPreview();
   const [active, setActive] = useState<string[]>(["cintura", "quadril", "braco"]);
   const first = history[0], last = history[history.length - 1];
 
   if (!ready) return <HealthLoading />;
-  if (!first || !last) return <Shell><div style={glow("var(--violet)")} className="accent-card mx-auto max-w-2xl p-8 text-center"><img src={heroAsset} alt="Análise corporal futurista" className="holo-float mx-auto mb-6 aspect-[4/3] w-full max-w-sm rounded-2xl object-cover" /><h2 className="font-display-h text-2xl">Comece sua <span className="text-gradient">evolução</span></h2><p className="mt-2 text-sm text-muted-foreground">Crie sua ficha de peso e medidas para ver gráficos do seu progresso.</p><Button asChild className="mt-6 rounded-full bg-gradient-brand text-primary-foreground"><Link to="/medidas/nova"><Plus />Criar ficha de medidas</Link></Button></div></Shell>;
+  if (!first || !last) return <Shell tab={tab}><div style={glow("var(--violet)")} className="accent-card mx-auto max-w-2xl p-8 text-center"><img src={heroAsset} alt="Análise corporal futurista" className="holo-float mx-auto mb-6 aspect-[4/3] w-full max-w-sm rounded-2xl object-cover" /><h2 className="font-display-h text-2xl">Comece sua <span className="text-gradient">evolução</span></h2><p className="mt-2 text-sm text-muted-foreground">Crie sua ficha de peso e medidas para ver gráficos do seu progresso.</p><Button asChild className="mt-6 rounded-full bg-gradient-brand text-primary-foreground"><Link to="/medidas/nova"><Plus />Criar ficha de medidas</Link></Button></div></Shell>;
 
   const dates = history.map(h => h.data);
   const pesos = history.map(h => toNumber(h.peso));
@@ -120,7 +120,7 @@ export function HealthProgress() {
   const photoFirst = history.find(h => Object.keys(h.fotos).length), photoLast = [...history].reverse().find(h => Object.keys(h.fotos).length);
   const series: Series[] = keys.filter(k => active.includes(k)).map(k => ({ key: k, label: measurementLabels[k]!, color: colorOf(k), values: history.map(h => toNumber(h.valores[k])) }));
 
-  return <Shell>
+  return <Shell tab={tab}>
     <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[
         { icon: Scale, color: "var(--cyan)", label: "Peso atual", value: last.peso || "—", unit: "kg", sub: `início ${first.peso || "—"} kg`, spark: pesos },
@@ -174,12 +174,12 @@ export function HealthProgress() {
   </Shell>;
 }
 
-function Shell({ children }: { children: ReactNode }) {
+function Shell({ children, tab = "saude" }: { children: ReactNode; tab?: "saude" | "analise" }) {
   return <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
     <div className="aurora pointer-events-none absolute inset-0" /><div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
     <div className="pointer-events-none absolute -left-40 top-40 h-[28rem] w-[28rem] rounded-full bg-violet/20 blur-3xl" /><div className="pointer-events-none absolute -right-40 top-[40rem] h-[28rem] w-[28rem] rounded-full bg-cyan/15 blur-3xl" />
     <main className="relative z-10 mx-auto max-w-[1440px] px-5 py-6 sm:px-8 lg:px-12">
-      <HealthTabs active="saude" />
+      <HealthTabs active={tab} />
       <header className="mb-8 flex items-center gap-4"><div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-brand shadow-glow"><Sparkles className="h-7 w-7 text-primary-foreground" /><span className="absolute inset-0 animate-ping rounded-2xl bg-cyan/20 [animation-duration:3s]" /></div><div><p className="mono-caps mb-1 text-[10px] text-cyan">Saúde · Evolução corporal</p><h1 className="font-display-h text-4xl font-semibold sm:text-5xl">Seu <span className="text-gradient">progresso</span>.</h1></div></header>
       <HealthSheetTabs active="progresso" />
       {children}
