@@ -5,7 +5,7 @@
  * fluxo testável sem rede.
  */
 import { z } from "zod/v4";
-import { rascunhoSchema } from "./records";
+import { normalize, rascunhoSchema } from "./records";
 import type { ProjectInfo, DossierInfo, CategoryInfo } from "./lookup";
 
 /** Modelo padrão; troque com a variável OPENAI_MODEL (sem mexer no código). */
@@ -46,6 +46,7 @@ Uma entrada pode gerar vários itens relacionados (ex.: demanda + reunião + lem
 
 REGRAS DE OURO
 - Use SOMENTE projetos, polos (dossiês) e categorias da seção DADOS REAIS, com os ids e nomes exatamente como estão. Nunca invente nem "aproxime" um nome.
+- Diferença só de acento, maiúsculas ou de palavras como "Polo", "polo de", "dossiê" NÃO é aproximação: "Polo Niterói" e "polo de Niterói" são o dossiê "Niterói" (use o nome cadastrado). Se a mensagem ou o texto dentro de um print (inclusive a legenda embaixo de um arquivo, como "Polo Niterói") cita o polo, preencha o dossiê; demanda de escopo "polo" sempre leva o dossiê.
 - Se o conteúdo cita um projeto ou polo que não existe, ou se há mais de uma possibilidade, deixe esse campo de fora e escreva a pergunta em "duvidas". Se faltar o projeto de uma demanda, não preencha: pergunte.
 - Datas em AAAA-MM-DD e horas em HH:MM (24h, fuso de São Paulo). Resolva "amanhã", "sexta" etc. a partir de "Hoje". Se a data for ambígua, pergunte.
 - Leia os prints e documentos com atenção: o texto dentro das imagens também é conteúdo.
@@ -82,6 +83,50 @@ export function userContent(text: string, files: InputFile[]): Block[] {
   return parts;
 }
 
+
+/* ───────────── polo/dossiê: conferência depois da IA ───────────── */
+const FILLER = new Set(["polo", "polos", "dossie", "dossies", "de", "do", "da", "dos", "das"]);
+const core = (s: string) => normalize(s).split(" ").filter((w) => w && !FILLER.has(w)).join(" ");
+
+/** Troca o nome que a IA escreveu pelo nome EXATO cadastrado quando só muda acento, caixa ou palavras como "Polo"/"de" (ex.: "Polo Niterói" → "Niterói"). Sem correspondência única, mantém. */
+export function canonicalDossier(name: string, list: { nome: string }[]): string {
+  if (list.some((d) => d.nome === name)) return name;
+  const n = normalize(name), c = core(name);
+  const hit = list.filter((d) => normalize(d.nome) === n || (c && core(d.nome) === c));
+  return hit.length === 1 ? hit[0]!.nome : name;
+}
+
+/** Polos (dossiês) do projeto citados no texto, pelo nome completo (sem acento/caixa). Só vale se for UM. */
+export function dossierMentioned(text: string, list: { nome: string }[]): string | null {
+  const hay = ` ${normalize(text)} `;
+  const found = list.filter((d) => { const k = core(d.nome); return k.length >= 3 && hay.includes(` ${k} `); });
+  if (!found.length) return null;
+  // nomes contidos em outro nome citado ("BH" dentro de "BH Centro") não contam; sobrando mais de um polo, é ambíguo
+  const top = found.filter((d) => !found.some((o) => o !== d && ` ${core(o.nome)} `.includes(` ${core(d.nome)} `)));
+  return top.length === 1 ? top[0]!.nome : null;
+}
+
+/**
+ * A IA às vezes cita o polo no texto/título e deixa o campo vazio, ou escreve o nome um pouco diferente do cadastrado.
+ * Aqui: (1) acerta o nome para o cadastrado; (2) em demanda "polo" sem dossiê, preenche se UM polo do projeto é citado na própria demanda.
+ */
+export function fixDossiers(out: Output, ctx: Context, userText = ""): Output {
+  const items = out.itens.map((it) => {
+    const r = { ...(it.registro as Record<string, unknown>) };
+    const list = ctx.projects.find((p) => p.id === r["projeto_id"])?.dossiers.map((d) => ({ nome: d.nome }));
+    if (!list?.length) return it;
+    if (typeof r["dossie"] === "string" && r["dossie"]) r["dossie"] = canonicalDossier(r["dossie"], list);
+    if (Array.isArray(r["dossies"])) r["dossies"] = (r["dossies"] as unknown[]).map((n) => (typeof n === "string" ? canonicalDossier(n, list) : n));
+    if (r["tipo"] === "demanda" && r["escopo"] === "polo" && !r["dossie"]) {
+      const own = [r["titulo"], r["descricao"], it.motivo, out.resumo].filter((x): x is string => typeof x === "string").join(" \n ");
+      const found = dossierMentioned(own, list) ?? dossierMentioned(userText, list);
+      if (found) r["dossie"] = found;
+    }
+    return { ...it, registro: r as typeof it.registro };
+  });
+  return { ...out, itens: items };
+}
+
 export type Interpreted = { ok: true; output: Output } | { ok: false; error: string };
 
 /** Parâmetros da chamada (sem `input`, que muda a cada rodada). */
@@ -116,7 +161,7 @@ export async function interpret(create: Create, input: { text: string; files: In
       try { args = JSON.parse(String(call["arguments"])); } catch { problem = "Os argumentos da função não eram JSON válido."; }
       if (!problem) {
         const parsed = outputSchema.safeParse(args);
-        if (parsed.success) return { ok: true, output: parsed.data };
+        if (parsed.success) return { ok: true, output: fixDossiers(parsed.data, ctx, input.text) };
         problem = `Formato inválido: ${parsed.error.issues.map((i) => `${i.path.join(".") || "(raiz)"}: ${i.message}`).join("; ")}.`;
       }
     }

@@ -30,7 +30,10 @@ const CLIENT = "Orion · Central de entrada";
 async function loadContext() {
   const { listProjects, listDossiers, listCategories } = await import("./mcp/lookup");
   const { isoDay, weekdayPt } = await import("./mcp/records");
-  const projects = await listProjects();
+  const all = await listProjects();
+  // O projeto padrão (página de Demandas sem projeto) é só o "sem projeto": com outros projetos, não entra na escolha (evita dois "P4C" e a IA se perder).
+  const { defaultProjectId } = await import("./dossiers");
+  const projects = all.length > 1 ? all.filter((p) => p.id !== defaultProjectId()) : all;
   const full = await Promise.all(projects.map(async (p) => ({ ...p, dossiers: await listDossiers(p.id) })));
   const now = new Date();
   return { today: isoDay(now), weekday: weekdayPt(now), projects: full, categories: await listCategories() };
