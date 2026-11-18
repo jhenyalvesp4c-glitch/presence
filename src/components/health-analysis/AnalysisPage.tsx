@@ -97,14 +97,15 @@ function TrainingDiet({ workout, diet, demo }: { workout: WorkoutSheet | null; d
   const num = (v: string | undefined) => { const n = parseFloat((v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
   const p = num(d?.macros.protein) * 4, c = num(d?.macros.carbs) * 4, f = num(d?.macros.fat) * 9, tot = p + c + f;
   const today = days[new Date().getDay()];
-  return <div className="space-y-4">
-    <div className="grid gap-3 sm:grid-cols-2">
-      <div className="rounded-2xl border border-cyan/25 bg-cyan/5 p-4">
+  // Layout pela largura do cartão (não da tela): em cartão estreito, treino e dieta ficam um embaixo do outro e os dias cabem na linha.
+  return <div className="@container space-y-4">
+    <div className="grid gap-3 @[560px]:grid-cols-2">
+      <div className="min-w-0 rounded-2xl border border-cyan/25 bg-cyan/5 p-4">
         <div className="flex items-center gap-3"><span className="icon-tile h-11 w-11" style={glow(C.cyan)}><Dumbbell className="h-5 w-5" /></span><div><p className="text-xs text-muted-foreground">Treinos por semana</p><p className="font-display-h text-2xl font-semibold">{w ? perWeek : "—"}<span className="ml-1 text-xs font-normal text-muted-foreground">{w ? `· ${exercises} exercícios` : ""}</span></p></div></div>
-        <div className="mt-3 flex justify-between gap-1">{days.map((day) => { const on = trainDays.has(day); return <span key={day} className={`grid h-8 flex-1 place-items-center rounded-lg text-[10px] font-medium uppercase transition ${on ? "bg-cyan/20 text-cyan shadow-[0_0_12px_-2px_var(--cyan)]" : "bg-border/40 text-muted-foreground"} ${day === today ? "ring-1 ring-violet" : ""}`}>{day.slice(0, 3)}</span>; })}</div>
+        <div className="mt-3 grid grid-cols-7 gap-1">{days.map((day) => { const on = trainDays.has(day); return <span key={day} className={`grid h-8 min-w-0 place-items-center overflow-hidden rounded-lg text-[9px] font-medium uppercase transition ${on ? "bg-cyan/20 text-cyan shadow-[0_0_12px_-2px_var(--cyan)]" : "bg-border/40 text-muted-foreground"} ${day === today ? "ring-1 ring-violet" : ""}`}>{day.slice(0, 3)}</span>; })}</div>
         {!w && <Button asChild size="sm" variant="outline" className="mt-3 w-full rounded-full border-cyan/40 text-cyan"><Link to="/treino/nova"><Plus />Montar treino</Link></Button>}
       </div>
-      <div className="rounded-2xl border border-violet/25 bg-violet/5 p-4">
+      <div className="min-w-0 rounded-2xl border border-violet/25 bg-violet/5 p-4">
         <div className="flex items-center gap-3"><span className="icon-tile h-11 w-11" style={glow(C.violet)}><Utensils className="h-5 w-5" /></span><div><p className="text-xs text-muted-foreground">Dieta por dia</p><p className="font-display-h text-2xl font-semibold">{d && num(d.macros.calories) ? num(d.macros.calories) : "—"}<span className="ml-1 text-xs font-normal text-muted-foreground">{d ? `kcal · ${d.meals.length} refeições` : ""}</span></p></div></div>
         {d && tot > 0 ? <>
           <div className="mt-3 flex h-3 overflow-hidden rounded-full">{[{ v: p, c: C.cyan }, { v: c, c: C.violet }, { v: f, c: C.amber }].map((m, i) => <span key={i} className="bar-grow h-full" style={{ width: `${(m.v / tot) * 100}%`, background: m.c, boxShadow: `0 0 10px ${m.c}`, animationDelay: `${i * 150}ms` }} />)}</div>
