@@ -38,7 +38,7 @@ export function WhatsAppWatcher() {
     busy.current = true;
     try {
       const st = await waGet<WaStatus>("status");
-      if (!st.ok) { delay.current = 60_000; return; }
+      if (!st.ok) { delay.current = 300_000; return; }
       delay.current = 20_000;
       if (st.data.phase !== "conectado") return;
       const cursor = waPrefs.cursor();

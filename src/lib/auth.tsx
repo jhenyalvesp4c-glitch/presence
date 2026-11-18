@@ -62,10 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // se abrir a conta travar (rede, bloqueio de armazenamento), não fica para sempre na tela de abertura
     const stuck = setTimeout(() => { if (statusRef.current === "loading") { setBlocked("Demorou demais para abrir a sua conta. Confira a internet e tente de novo."); setStatus("blocked"); } }, 15000);
     let alive = true;
+    let claimedFor: string | null = null; // o login avisa 2-3 vezes ao abrir; abre a conta uma vez só (menos espera)
     const apply = (s: Session | null) => {
       if (!alive) return;
-      if (!s) { setClientOwner(undefined); setAccount(null); setStatus("out"); return; }
-      void claim(s);
+      if (!s) { claimedFor = null; setClientOwner(undefined); setAccount(null); setStatus("out"); return; }
+      if (claimedFor === s.user.id) return;
+      claimedFor = s.user.id;
+      void claim(s).catch(() => { claimedFor = null; });
     };
     authClient.auth.getSession().then(({ data }) => apply(data.session)).catch(() => apply(null));
     const { data: sub } = authClient.auth.onAuthStateChange((ev, s) => {

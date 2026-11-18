@@ -40,6 +40,8 @@ export async function waGet<T>(r: string, params: Record<string, string> = {}): 
   const q = new URLSearchParams(params).toString();
   const d = await bridgeDirect<T>(`/${r}${q ? `?${q}` : ""}`);
   if (d.ok) return d;
+  // No site publicado o servidor não enxerga a ponte (ela mora no computador da pessoa): nem pergunta, para não gastar uma chamada a cada poucos segundos.
+  if (!isLocalPage()) return d;
   try {
     const sp = new URLSearchParams({ r, ...params });
     const res = await fetch(`/api/whatsapp?${sp}`, { headers: await authHeaders() });
