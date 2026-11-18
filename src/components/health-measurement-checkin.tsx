@@ -38,7 +38,7 @@ export function MeasurementCheckIn({ embedded = false, onCancel }: { embedded?: 
   const filled = Object.values(valores).filter(v => v.trim()).length + (peso.trim() ? 1 : 0);
   const total = Object.keys(measurementLabels).length + 1;
   const save = () => {
-    setMeasurements({ nome: last.nome, altura: last.altura, data, peso: peso || last.peso, valores: Object.fromEntries(Object.keys(measurementLabels).map(k => [k, valores[k]?.trim() || last.valores[k] || ""])), obs, fotos });
+    setMeasurements({ nome: last.nome, altura: last.altura, data, peso: peso || last.peso, valores: Object.fromEntries(Object.keys(measurementLabels).map(k => [k, valores[k]?.trim() || ""])), obs, fotos });
     if (onCancel) onCancel();
     navigate({ to: "/progresso" });
   };

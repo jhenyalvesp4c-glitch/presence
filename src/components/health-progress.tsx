@@ -111,7 +111,8 @@ export function HealthProgress() {
   const alt = toNumber(last.altura);
   const imc = p1 && alt ? p1 / (alt > 3 ? (alt / 100) ** 2 : alt ** 2) : null;
   const days = Math.max(0, Math.round((new Date(last.data).getTime() - new Date(first.data).getTime()) / 86400000));
-  const deltas = keys.map(k => { const a = toNumber(first.valores[k]), b = toNumber(last.valores[k]); return { k, a, b, d: a !== null && b !== null ? b - a : null }; });
+  // primeira e última medida que a pessoa realmente anotou em cada parte (um registro só com peso não zera o resto)
+  const deltas = keys.map(k => { const vals = history.map(h => toNumber(h.valores[k])).filter((v): v is number => v !== null); const a = vals[0] ?? null, b = vals[vals.length - 1] ?? null; return { k, a, b, d: a !== null && b !== null && vals.length > 1 ? b - a : null }; });
   const maxAbs = Math.max(1, ...deltas.map(d => Math.abs(d.d ?? 0)));
   const totalCm = deltas.reduce((s, d) => s + (d.d ?? 0), 0);
   const cinturaSeries = history.map(h => toNumber(h.valores["cintura"]));
