@@ -135,11 +135,12 @@ function NovaFichaMedidasForm({ embedded = false, onCancel }: { embedded?: boole
                   <p className="text-xs text-muted-foreground">Preencha seus dados atuais.</p>
                 </div>
               </div>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
                 <Field label="Nome da ficha" value={nome} onChange={setNome} placeholder="Meu progresso 2026" />
                 <Field label="Data da medição" type="date" value={data} onChange={setData} icon={CalendarDays} />
                 <Field label="Altura" suffix="m" value={altura} onChange={setAltura} placeholder="1,70" />
                 <Field label="Peso atual" suffix="kg" value={peso} onChange={setPeso} placeholder="80,0" />
+                <Field label="Gordura medida (opcional)" suffix="%" value={valores["gordura_pct"] ?? ""} onChange={(v) => setValores((p) => ({ ...p, gordura_pct: v }))} placeholder="ex.: 28,5" />
               </div>
             </section>
 

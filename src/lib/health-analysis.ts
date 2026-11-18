@@ -55,8 +55,13 @@ export function periodSlice(history: MeasurementSheet[], period: PeriodKey, toda
   return before ? [before, ...inside] : inside;
 }
 
+/** Chave (dentro de `valores` da medição) onde fica o % de gordura medido pela pessoa (bioimpedância, adipômetro…). */
+export const FAT_KEY = "gordura_pct";
+
 export type Snapshot = {
   date: string; weight: number | null; heightCm: number | null; waist: number | null; hip: number | null;
+  /** true = % de gordura informado pela pessoa; false = estimativa pela altura e cintura. */
+  fatManual: boolean;
   fatPct: number | null; fatKg: number | null; leanKg: number | null; bmi: number | null;
   whtr: number | null; whr: number | null; values: Record<string, number | null>;
 };
@@ -66,10 +71,12 @@ export function snapshot(sheet: MeasurementSheet, sexo: Sexo, fallbackHeight: nu
   const h = heightCm(sheet.altura) ?? fallbackHeight;
   const values = Object.fromEntries(Object.keys(measurementLabels).map((k) => [k, toNumber(sheet.valores[k])]));
   const waist = values["cintura"] ?? null, hip = values["quadril"] ?? null;
-  const fatPct = rfm(sexo, h, waist);
+  const typed = toNumber(sheet.valores[FAT_KEY]);
+  const fatManual = typed !== null && typed >= 3 && typed <= 70;
+  const fatPct = fatManual ? typed : rfm(sexo, h, waist);
   const fatKg = fatPct !== null && weight ? (weight * fatPct) / 100 : null;
   return {
-    date: sheet.data, weight, heightCm: h, waist, hip, fatPct, fatKg,
+    date: sheet.data, weight, heightCm: h, waist, hip, fatManual, fatPct, fatKg,
     leanKg: fatKg !== null && weight ? weight - fatKg : null,
     bmi: bmi(weight, h), whtr: waist && h ? waist / h : null, whr: waist && hip ? waist / hip : null, values,
   };
@@ -193,6 +200,24 @@ export function buildInsights(a: Analysis): Insight[] {
   if (a.sinceLast > 14) out.push({ tone: "info", text: `Sua última medição foi há ${a.sinceLast} dias. Registre uma nova para manter a análise em dia.` });
   if (!multi) out.push({ tone: "info", text: "Com a próxima medição eu passo a mostrar a sua evolução e o seu ritmo." });
   return out;
+}
+
+export type Goal = {
+  /** 0 a 100: quanto do caminho (do início até a meta) já foi percorrido. */
+  pct: number; remaining: number; reached: boolean;
+  /** Dias até a meta mantendo o ritmo atual; null se o ritmo não leva à meta. */
+  etaDays: number | null;
+};
+
+/** Progresso até uma meta (peso em kg ou cintura em cm). `pacePerWeek` = variação por semana (negativa quando está caindo). */
+export function goalProgress(start: number | null, current: number | null, target: number | null, pacePerWeek: number | null): Goal | null {
+  if (start === null || current === null || target === null || start === target) return null;
+  const goingDown = target < start;
+  const reached = goingDown ? current <= target : current >= target;
+  const total = Math.abs(start - target), done = goingDown ? start - current : current - start;
+  const remaining = reached ? 0 : Math.abs(current - target);
+  const toward = pacePerWeek !== null && Math.abs(pacePerWeek) >= 0.02 && (goingDown ? pacePerWeek < 0 : pacePerWeek > 0);
+  return { pct: Math.max(0, Math.min(100, (done / total) * 100)), remaining, reached, etaDays: reached ? 0 : toward ? Math.round((remaining / Math.abs(pacePerWeek!)) * 7) : null };
 }
 
 /** Histórico de exemplo (só para a demonstração quando ainda não há medições). */

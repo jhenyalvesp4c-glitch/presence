@@ -30,6 +30,7 @@ export function MeasurementCheckIn({ embedded = false, onCancel }: { embedded?: 
   const navigate = useNavigate();
   const [data, setData] = useState("");
   const [peso, setPeso] = useState("");
+  const [gordura, setGordura] = useState("");
   const [valores, setValores] = useState<Record<string, string>>({});
   const [obs, setObs] = useState("");
   const [fotos, setFotos] = useState<Record<string, string>>({});
@@ -38,7 +39,7 @@ export function MeasurementCheckIn({ embedded = false, onCancel }: { embedded?: 
   const filled = Object.values(valores).filter(v => v.trim()).length + (peso.trim() ? 1 : 0);
   const total = Object.keys(measurementLabels).length + 1;
   const save = () => {
-    setMeasurements({ nome: last.nome, altura: last.altura, data, peso: peso || last.peso, valores: Object.fromEntries(Object.keys(measurementLabels).map(k => [k, valores[k]?.trim() || ""])), obs, fotos });
+    setMeasurements({ nome: last.nome, altura: last.altura, data, peso: peso || last.peso, valores: { ...Object.fromEntries(Object.keys(measurementLabels).map(k => [k, valores[k]?.trim() || ""])), gordura_pct: gordura.trim() }, obs, fotos });
     if (onCancel) onCancel();
     navigate({ to: "/progresso" });
   };
@@ -76,6 +77,7 @@ export function MeasurementCheckIn({ embedded = false, onCancel }: { embedded?: 
               <label className="block"><span className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase text-muted-foreground"><CalendarDays className="h-3 w-3" />Data da medição</span><input aria-label="Data da medição" type="date" value={data} onChange={e => setData(e.target.value)} className="w-full rounded-2xl border border-border bg-card/60 px-4 py-3.5 text-sm outline-none focus:border-primary/60 focus:shadow-glow" /></label>
               <label className="block"><span className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase text-muted-foreground"><span className="flex items-center gap-2"><Scale className="h-3 w-3" />Peso</span><span>antes {last.peso || "—"} kg</span></span><div className="relative"><input aria-label="Peso" inputMode="decimal" value={peso} onChange={e => setPeso(e.target.value)} placeholder={last.peso || "0"} className="w-full rounded-2xl border border-border bg-card/60 px-4 py-3.5 pr-12 text-sm outline-none focus:border-primary/60 focus:shadow-glow" /><span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs text-muted-foreground">kg</span></div></label>
             </div>
+            <label className="mt-5 block"><span className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase text-muted-foreground"><span>% de gordura medida (opcional)</span><span>antes {last.valores["gordura_pct"] || "—"} %</span></span><div className="relative"><input aria-label="Gordura medida" inputMode="decimal" value={gordura} onChange={e => setGordura(e.target.value)} placeholder={last.valores["gordura_pct"] || "ex.: 28,5"} className="w-full rounded-2xl border border-border bg-card/60 px-4 py-3.5 text-sm outline-none focus:border-primary/60" /><span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-xs text-muted-foreground">%</span></div><p className="mt-1.5 text-[11px] text-muted-foreground">Da balança de bioimpedância ou do adipômetro. Se ficar vazio, a análise estima pela altura e cintura.</p></label>
           </section>
 
           <section className="glass-h rounded-[2rem] p-6 md:p-8">

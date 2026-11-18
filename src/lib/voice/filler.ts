@@ -1,5 +1,5 @@
 /** Frase curta falada quando o Orion vai demorar (consultar, pesquisar, mexer em algo), para nunca ficar em silêncio. Pura, sem IA. */
-const LOOKUP = new Set(["buscar_no_orion", "consultar_registros", "resumo_do_dia", "whatsapp_mencoes", "financeiro", "planejamento"]);
+const LOOKUP = new Set(["buscar_no_orion", "consultar_registros", "resumo_do_dia", "whatsapp_mencoes", "financeiro", "planejamento", "analise_corporal"]);
 const WHATS = new Set(["whatsapp_ler", "whatsapp_conversas", "whatsapp_marcar_lidas"]);
 const DOING = new Set(["registrar", "atualizar_demanda", "gerenciar_tarefa", "documentar", "lembrar", "esquecer", "lista", "roteiro"]);
 

@@ -2,7 +2,7 @@
 // Lê as medições reais; sem nenhuma medição, mostra um exemplo marcado como tal.
 
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity, ArrowDownRight, ArrowUpRight, BrainCircuit, CalendarDays, Camera, CheckCircle2, Droplet, Dumbbell, Gauge, HeartPulse,
   Info, Plus, Ruler, Scale, ScanLine, Sparkles, Target, TrendingUp, TriangleAlert, Utensils, Zap,
@@ -14,9 +14,9 @@ import { HealthTabs } from "@/components/health-tabs";
 import { HealthLoading } from "@/components/health-loading";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { todayIso } from "@/lib/dates";
-import { useAnalysisSex } from "@/lib/data/analysis";
-import { analyze, addDays, demoHistory, periodSlice, PERIODS, type Analysis, type PeriodKey, type Sexo, type Status } from "@/lib/health-analysis";
-import type { DietSheet, MeasurementSheet, WorkoutSheet } from "@/lib/health-preview";
+import { useAnalysisPrefs } from "@/lib/data/analysis";
+import { analyze, addDays, demoHistory, goalProgress, periodSlice, PERIODS, slopePerDay, type Analysis, type PeriodKey, type Sexo, type Status } from "@/lib/health-analysis";
+import { toNumber as toNum, type DietSheet, type MeasurementSheet, type WorkoutSheet } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
 import { Counter, Donut, GlowBar, MultiLine, PhotoCompare, ScoreRing, Sparkline, WeightChart, ZoneBar, glow, longDate, shortDate, type Series } from "./charts";
 
@@ -120,12 +120,43 @@ function TrainingDiet({ workout, diet, demo }: { workout: WorkoutSheet | null; d
   </div>;
 }
 
+/** Meta de peso e de cintura: o quanto já andou do início até o alvo e quando chega no ritmo atual. */
+function GoalCard({ icon: Icon, title, unit, start, current, target, pacePerWeek, color, goingHint, onSave, today }: {
+  icon: typeof Scale; title: string; unit: string; start: number | null; current: number | null; target: number | null; pacePerWeek: number | null; color: string; goingHint: string; onSave: (v: number | null) => void; today: string;
+}) {
+  const [text, setText] = useState(target === null ? "" : String(target).replace(".", ","));
+  useEffect(() => { setText(target === null ? "" : String(target).replace(".", ",")); }, [target]);
+  const commit = () => {
+    const raw = text.trim().replace(",", ".");
+    if (!raw) return void (target !== null && onSave(null));
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0 && n !== target) onSave(Math.round(n * 10) / 10); else setText(target === null ? "" : String(target).replace(".", ","));
+  };
+  const g = goalProgress(start, current, target, pacePerWeek);
+  return <div className="rounded-2xl border p-4" style={{ ...glow(color), borderColor: `color-mix(in oklab, ${color} 30%, transparent)` }}>
+    <div className="flex items-center justify-between gap-3">
+      <p className="flex items-center gap-2 text-sm font-medium"><span className="icon-tile h-9 w-9"><Icon className="h-4 w-4" /></span>{title}</p>
+      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Meta
+        <input aria-label={`Meta de ${title.toLowerCase()}`} inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="—" className="w-20 rounded-lg border border-border bg-card/60 px-2 py-1 text-right font-mono text-sm text-foreground outline-none focus:border-cyan/60" /> {unit}
+      </label>
+    </div>
+    {g ? <>
+      <div className="mt-4 flex items-end justify-between font-mono text-[11px] text-muted-foreground"><span>início {n1(start)} {unit}</span><span className="text-foreground">agora {n1(current)} {unit}</span><span style={{ color }}>meta {n1(target)} {unit}</span></div>
+      <div className="mt-1.5"><GlowBar pct={g.pct} from={color} to="var(--emerald)" /></div>
+      <p className="mt-3 text-sm">{g.reached ? <span className="flex items-center gap-2 text-emerald"><CheckCircle2 className="h-4 w-4" />Meta atingida. Parabéns!</span>
+        : <>Faltam <b style={{ color }}>{n1(g.remaining)} {unit}</b> ({Math.round(g.pct)}% do caminho).{g.etaDays !== null ? ` No ritmo atual, você chega por volta de ${new Date(`${addDays(today, g.etaDays)}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}.` : ` ${goingHint}`}</>}</p>
+    </> : <p className="mt-3 text-xs text-muted-foreground">{target === null ? "Defina uma meta para acompanhar o quanto falta e quando você chega nela." : "A meta precisa ser diferente do ponto de partida."}</p>}
+  </div>;
+}
+
 export function AnalysisPage() {
   const { measurementHistory, workout, diet, ready } = useHealthPreview();
-  const [period, setPeriod] = useState<PeriodKey>("90");
-  const { sexo, setSexo: chooseSexo } = useAnalysisSex();
+  const { prefs, update } = useAnalysisPrefs();
+  const { sexo, period, hidden } = prefs;
+  const chooseSexo = (v: Sexo) => update({ sexo: v });
+  const setPeriod = (v: PeriodKey) => update({ period: v });
+  const setHidden = (f: (h: string[]) => string[]) => update({ hidden: f(hidden) });
   const [spot, setSpot] = useState<string | null>(null);
-  const [hidden, setHidden] = useState<string[]>(["abdomen", "gluteo"]);
 
   const today = todayIso();
   const demo = ready && measurementHistory.length === 0;
@@ -182,8 +213,8 @@ export function AnalysisPage() {
       <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Scale} label="Peso atual" value={last.weight} unit="kg" delta={delta.weight} deltaUnit="kg" goodWhen="down" spark={entries.map((e) => e.weight)} color={C.emerald} delay={0} />
         <Kpi icon={Ruler} label="Cintura" value={last.waist} unit="cm" decimals={last.waist !== null && Number.isInteger(last.waist) ? 0 : 1} delta={delta.waist} deltaUnit="cm" goodWhen="down" spark={entries.map((e) => e.waist)} color={C.cyan} delay={80} />
-        <Kpi icon={Dumbbell} label="Massa magra" note="est." value={last.leanKg} unit="kg" delta={delta.lean} deltaUnit="kg" goodWhen="up" spark={entries.map((e) => e.leanKg)} color={C.violet} delay={160} />
-        <Kpi icon={Droplet} label="% Gordura" note="est." value={last.fatPct} unit="%" delta={delta.fatPct} deltaUnit="p.p." goodWhen="down" spark={entries.map((e) => e.fatPct)} color={C.pink} delay={240} />
+        <Kpi icon={Dumbbell} label="Massa magra" note={last.fatManual ? "c/ gordura medida" : "est."} value={last.leanKg} unit="kg" delta={delta.lean} deltaUnit="kg" goodWhen="up" spark={entries.map((e) => e.leanKg)} color={C.violet} delay={160} />
+        <Kpi icon={Droplet} label="% Gordura" note={last.fatManual ? "medida" : "est."} value={last.fatPct} unit="%" delta={delta.fatPct} deltaUnit="p.p." goodWhen="down" spark={entries.map((e) => e.fatPct)} color={C.pink} delay={240} />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-12">
@@ -271,7 +302,14 @@ export function AnalysisPage() {
           <ul className="space-y-2.5">{a.insights.map((ins, i) => { const col = ins.tone === "good" ? C.emerald : ins.tone === "warn" ? C.amber : C.cyan; const Icon = ins.tone === "good" ? CheckCircle2 : ins.tone === "warn" ? TriangleAlert : Info; return <li key={i} className="flex gap-3 rounded-xl border border-transparent p-2 text-sm transition hover:border-border hover:bg-foreground/5 animate-rise" style={{ animationDelay: `${600 + i * 90}ms` }}>
             <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: col, filter: `drop-shadow(0 0 6px ${col})` }} /><span>{ins.text}</span>
           </li>; })}</ul>
-          <p className="mt-4 text-[10px] text-muted-foreground">Massa magra e gordura são estimativas pela altura e cintura; não substituem avaliação profissional.</p>
+          <p className="mt-4 text-[10px] text-muted-foreground">{last.fatManual ? "A gordura é a que você informou; a massa magra é calculada a partir dela." : "Massa magra e gordura são estimativas pela altura e cintura; informe a gordura medida na medição para mais precisão."} Não substituem avaliação profissional.</p>
+        </Panel>
+
+        <Panel title="Minhas metas" icon={Target} color={C.emerald} className="xl:col-span-12" delay={560}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <GoalCard icon={Scale} title="Peso" unit="kg" start={source[0] ? toNum(source[0].peso) : null} current={last.weight} target={prefs.goalWeight} pacePerWeek={a.paceKgWeek} color={C.emerald} goingHint="Mantenha as medições em dia para eu calcular o seu ritmo." onSave={(v) => update({ goalWeight: v })} today={today} />
+            <GoalCard icon={Ruler} title="Cintura" unit="cm" start={source[0] ? toNum(source[0].valores["cintura"]) : null} current={last.waist} target={prefs.goalWaist} pacePerWeek={(() => { const sl = slopePerDay(entries.map((e) => ({ date: e.date, value: e.waist }))); return sl === null ? null : sl * 7; })()} color={C.cyan} goingHint="Mantenha as medições em dia para eu calcular o seu ritmo." onSave={(v) => update({ goalWaist: v })} today={today} />
+          </div>
         </Panel>
 
         <Panel title="Linha do tempo das medições" icon={CalendarDays} color={C.emerald} className="xl:col-span-12" delay={580}

@@ -39,7 +39,7 @@ export type VoiceEvent =
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -83,6 +83,7 @@ Regras de fala:
 - Você pode fazer por voz tudo o que ela faz na tela. Criar: use registrar (demanda, tarefa, lembrete, compromisso, anotação). Mudar o que já existe: atualizar_demanda (em andamento, concluída, a fazer, editar título/prazo/prioridade/descrição, observação, excluir) e gerenciar_tarefa (concluir, reabrir, editar ou excluir tarefa, lembrete ou compromisso). Faça na hora, sem pedir permissão, e confirme em uma frase curta. Se achar mais de um item parecido, pergunte qual citando as opções. Ela pode falar "conclui" ou "terminei": isso é concluir, nunca excluir.
 - ROTEIROS de treinamento: pedidos para criar, editar, acrescentar ou tirar coisas de um roteiro (ou bloco, passo, dica, pergunta frequente) → use roteiro. Faça na hora e escreva você mesmo o conteúdo bom e completo em português (passos curtos e objetivos, uma dica, perguntas frequentes com resposta); não peça o texto a ela. Sem projeto citado, a ferramenta acha o roteiro sozinha. Confirme em uma frase o que mudou e nunca diga que não consegue editar roteiros.
 - QUANDO NÃO CONSEGUE: se ela pedir algo que nenhuma ferramenta sua faz (função nova, editar algo que o sistema ainda não deixa, ou uma ferramenta devolveu que não é possível), não pare em "não consigo". Diga em uma frase que no momento não consegue e use pedir_melhoria com um título curto, o pedido dela e os detalhes de como deve ficar. A pessoa confere e confirma na tela; só então vai para o Claude. Nunca prometa que já está sendo feito: diga que o pedido segue para o Claude depois da confirmação. Se ela perguntar do andamento dos pedidos, use pedir_melhoria com acao listar.
+- ANÁLISE CORPORAL: para "como está minha evolução", "quanto emagreci", "como está meu peso/cintura/gordura", "qual minha meta" use analise_corporal (acao resumo). Responda em 1 ou 2 frases com poucos números. A gordura e a massa magra costumam ser ESTIMATIVAS pela altura e cintura (diga "estimada" quando for o caso; nunca como exame). "Minha meta de peso é 70" → acao meta, tipo peso, valor 70 (cintura: tipo cintura). "Medi 28 de gordura" → acao gordura, valor 28. Nunca invente números nem dê diagnóstico.
 - PLANEJAMENTO: para o plano do dia ("o que tenho hoje", "monta meu dia", "adiciona X às 15h", "move X para 16h", "adia X", "conclui X", "como está amanhã") use a ferramenta planejamento. Ela usa os dados reais (compromissos, tarefas, hábitos, treino, contas). Responda em uma ou duas frases. Remover pede confirmação (precisa_confirmar → pergunte e repita com confirmado=true). Sem horário numa adição, pergunte só isso. "fontes" liga/desliga o que entra no plano; "aprendizado" conta o que você percebeu do ritmo dela.
 - FINANCEIRO: para dinheiro ("quanto gastei", "quanto tenho", "como está minha fatura", "o que falta pagar", "minhas assinaturas", "gastei 50 no mercado") use a ferramenta financeiro. Ela traz os números reais; nunca invente valores. Responda em uma ou duas frases, com poucos números (valor falado como "mil duzentos e cinquenta reais"). Para registrar um gasto ou ganho, use acao lancar com a frase dela exatamente como foi dita; se faltar conta ou cartão, pergunte só isso. Compra parcelada não se lança por voz.
 - FINANCEIRO, ALTERAR: você também mexe no financeiro pela ferramenta financeiro: pausar/reativar assinaturas, informar o total de uma fatura (fatura_total), detalhar uma compra, parcela ou assinatura dentro de uma fatura (detalhar: o total do banco NÃO muda), cadastrar_parcelada, cadastrar_fixa, editar e excluir. Faça na hora o que foi pedido com clareza e confirme em UMA frase com o antes e o depois ("Mudei a Netflix de 55,90 para 59,90"). EXCLUIR sempre pede confirmação: chame excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim. Faltou um dado (qual cartão, que valor, que dia)? Pergunte só isso. Fatura "de novembro" é a que FECHA em novembro. Para "me leva/abre os próximos meses" use acao abrir com aba.
@@ -128,6 +129,12 @@ export const TOOLS = [
     prioridade: { type: "string", enum: ["alta", "media", "baixa"] }, local: { type: "string" },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
   }, required: ["item", "acao"] }),
+  fn("analise_corporal", "Evolução do CORPO da pessoa (Saúde → Análise): peso, cintura, gordura, massa magra, pontuação, indicadores, ritmo e metas. Ações: resumo (padrão; `periodo` opcional: 'mês', '3 meses', '6 meses', 'ano', 'tudo'), meta (define a meta de peso ou de cintura; sem `valor` só mostra as metas), gordura (registra o % de gordura medido, na última medição).", { type: "object", properties: {
+    acao: { type: "string", enum: ["resumo", "meta", "gordura"] },
+    periodo: { type: "string", description: "Período do resumo, em palavras." },
+    tipo: { type: "string", enum: ["peso", "cintura"], description: "Qual meta (acao meta)." },
+    valor: { type: "number", description: "Meta em kg/cm (acao meta) ou % de gordura medido (acao gordura)." },
+  }, required: ["acao"] }),
   fn("planejamento", "Vê e ajusta o PLANO DO DIA real da pessoa. Ações: ver (plano salvo ou prévia de hoje/amanhã/data), gerar (monta o plano com os dados reais), adicionar (titulo + hora + duracao_min), mover (titulo + hora nova), concluir, adiar (passa para o dia seguinte), remover (pede confirmação), fontes (lista ou liga/desliga uma fonte: calendário, tarefas, hábitos, saúde, financeiro, demandas, rotina), aprendizado (o que o Orion percebeu do ritmo dela).", { type: "object", properties: {
     acao: { type: "string", enum: ["ver", "gerar", "adicionar", "mover", "concluir", "adiar", "remover", "fontes", "aprendizado"] },
     data: { type: "string", description: "'hoje' (padrão), 'amanhã', dia da semana ou AAAA-MM-DD." },
@@ -324,6 +331,13 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
         prioridade: args["prioridade"] as "alta" | "media" | "baixa" | undefined, local: args["local"] as string | undefined, confirmado: args["confirmado"] === true,
       }).catch((e): Record<string, unknown> => ({ ok: false, erro: e instanceof Error ? e.message : "Não consegui alterar o item." }));
       return r;
+    }
+
+    case "analise_corporal": {
+      const { runAnalysisTool } = await import("./analysis-tool");
+      const out = await runAnalysisTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined; navegar?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui olhar a sua evolução." } }));
+      if (out.panel) emit({ t: "painel", p: out.panel });
+      return out.result;
     }
 
     case "planejamento": {

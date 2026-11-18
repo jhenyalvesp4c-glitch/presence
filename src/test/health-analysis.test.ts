@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addDays, analyze, demoHistory, heightCm, periodSlice, rfm, slopePerDay } from "@/lib/health-analysis";
+import { addDays, analyze, demoHistory, FAT_KEY, goalProgress, heightCm, periodSlice, rfm, slopePerDay } from "@/lib/health-analysis";
+import { prefsFromRow } from "@/lib/data/analysis";
 import type { MeasurementSheet } from "@/lib/health-preview";
 
 const sheet = (data: string, peso: string, cintura: string, altura = "1,68"): MeasurementSheet => ({ nome: "t", data, altura, peso, valores: { cintura, quadril: "100" }, obs: "", fotos: {} });
@@ -27,4 +28,27 @@ describe("Análise de saúde", () => {
     expect(addDays("2026-11-18", -90)).toBe("2026-08-20");
   });
   it("sem medições não há análise", () => { expect(analyze([], "feminino", "2026-11-18")).toBeNull(); });
+
+  it("gordura medida pela pessoa vale mais que a estimativa", () => {
+    const m = { ...sheet("2026-11-01", "80", "90"), valores: { cintura: "90", [FAT_KEY]: "28,5" } };
+    const a = analyze([m], "feminino", "2026-11-18")!;
+    expect(a.last.fatManual).toBe(true); expect(a.last.fatPct).toBeCloseTo(28.5); expect(a.last.fatKg).toBeCloseTo(22.8); expect(a.last.leanKg).toBeCloseTo(57.2);
+    const est = analyze([sheet("2026-11-01", "80", "90")], "feminino", "2026-11-18")!;
+    expect(est.last.fatManual).toBe(false);
+    const absurdo = analyze([{ ...m, valores: { cintura: "90", [FAT_KEY]: "2" } }], "feminino", "2026-11-18")!;
+    expect(absurdo.last.fatManual).toBe(false); // fora de 3–70%: ignora
+  });
+  it("progresso até a meta", () => {
+    const g = goalProgress(80, 74, 70, -0.5)!;
+    expect(g.pct).toBeCloseTo(60); expect(g.remaining).toBeCloseTo(4); expect(g.reached).toBe(false); expect(g.etaDays).toBe(56);
+    expect(goalProgress(80, 80.5, 70, 0.4)!.etaDays).toBeNull(); // está indo para o lado errado
+    expect(goalProgress(80, 69, 70, -0.5)).toMatchObject({ reached: true, pct: 100, remaining: 0 });
+    expect(goalProgress(60, 62, 65, 0.3)!.pct).toBeCloseTo(40); // meta de ganhar
+    expect(goalProgress(80, 75, 80, null)).toBeNull(); expect(goalProgress(null, 75, 70, 0)).toBeNull();
+  });
+  it("preferências vêm do banco com padrões seguros", () => {
+    expect(prefsFromRow(null)).toMatchObject({ sexo: "feminino", period: "90", hidden: ["abdomen", "gluteo"], goalWeight: null });
+    expect(prefsFromRow({ analysis_sex: "masculino", analysis_period: "180", analysis_hidden: [], goal_weight_kg: "70.5", goal_waist_cm: null })).toEqual({ sexo: "masculino", period: "180", hidden: [], goalWeight: 70.5, goalWaist: null });
+    expect(prefsFromRow({ analysis_sex: "x", analysis_period: "7", analysis_hidden: null, goal_weight_kg: null, goal_waist_cm: null }).period).toBe("90");
+  });
 });
