@@ -30,9 +30,10 @@ export type Task = {
 
 export type RoutineItem = {
   id: string; time: string; title: string; description: string; tag: string; color: Color; icon: string; kind: Kind; position: number;
+  duration_min?: number; weekdays?: number[]; active?: boolean;
 };
 
-export type ScheduleItem = RoutineItem & { plan_date: string; done: boolean; task_id: string | null };
+export type ScheduleItem = RoutineItem & { plan_date: string; done: boolean; task_id: string | null; source?: string; source_ref?: string | null };
 
 export type DayPlan = {
   id: string; plan_date: string; disposicao: "alta" | "normal" | "baixa"; tempo: "completo" | "manha" | "tarde" | "pouco";

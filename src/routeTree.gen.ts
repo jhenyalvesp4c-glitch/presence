@@ -37,6 +37,7 @@ import { Route as DietaNovaRouteImport } from './routes/dieta.nova'
 import { Route as MedidasNovaRouteImport } from './routes/medidas.nova'
 import { Route as OrganizarProntoRouteImport } from './routes/organizar_.pronto'
 import { Route as PlanejamentoDiaRouteImport } from './routes/planejamento_.dia'
+import { Route as PlanejamentoSemanaRouteImport } from './routes/planejamento_.semana'
 import { Route as SaudeDietaRouteImport } from './routes/saude_.dieta'
 import { Route as SaudeTreinoRouteImport } from './routes/saude_.treino'
 import { Route as TreinoExerciciosRouteImport } from './routes/treino_.exercicios'
@@ -183,6 +184,11 @@ const PlanejamentoDiaRoute = PlanejamentoDiaRouteImport.update({
   path: '/planejamento/dia',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlanejamentoSemanaRoute = PlanejamentoSemanaRouteImport.update({
+  id: '/planejamento_/semana',
+  path: '/planejamento/semana',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SaudeDietaRoute = SaudeDietaRouteImport.update({
   id: '/saude_/dieta',
   path: '/saude/dieta',
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
   '/planejamento/dia': typeof PlanejamentoDiaRoute
+  '/planejamento/semana': typeof PlanejamentoSemanaRoute
   '/saude/dieta': typeof SaudeDietaRoute
   '/saude/treino': typeof SaudeTreinoRoute
   '/treino/exercicios': typeof TreinoExerciciosRoute
@@ -273,6 +280,7 @@ export interface FileRoutesByTo {
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar/pronto': typeof OrganizarProntoRoute
   '/planejamento/dia': typeof PlanejamentoDiaRoute
+  '/planejamento/semana': typeof PlanejamentoSemanaRoute
   '/saude/dieta': typeof SaudeDietaRoute
   '/saude/treino': typeof SaudeTreinoRoute
   '/treino/exercicios': typeof TreinoExerciciosRoute
@@ -309,6 +317,7 @@ export interface FileRoutesById {
   '/medidas/nova': typeof MedidasNovaRoute
   '/organizar_/pronto': typeof OrganizarProntoRoute
   '/planejamento_/dia': typeof PlanejamentoDiaRoute
+  '/planejamento_/semana': typeof PlanejamentoSemanaRoute
   '/saude_/dieta': typeof SaudeDietaRoute
   '/saude_/treino': typeof SaudeTreinoRoute
   '/treino_/exercicios': typeof TreinoExerciciosRoute
@@ -346,6 +355,7 @@ export interface FileRouteTypes {
     | '/medidas/nova'
     | '/organizar/pronto'
     | '/planejamento/dia'
+    | '/planejamento/semana'
     | '/saude/dieta'
     | '/saude/treino'
     | '/treino/exercicios'
@@ -381,6 +391,7 @@ export interface FileRouteTypes {
     | '/medidas/nova'
     | '/organizar/pronto'
     | '/planejamento/dia'
+    | '/planejamento/semana'
     | '/saude/dieta'
     | '/saude/treino'
     | '/treino/exercicios'
@@ -416,6 +427,7 @@ export interface FileRouteTypes {
     | '/medidas/nova'
     | '/organizar_/pronto'
     | '/planejamento_/dia'
+    | '/planejamento_/semana'
     | '/saude_/dieta'
     | '/saude_/treino'
     | '/treino_/exercicios'
@@ -452,6 +464,7 @@ export interface RootRouteChildren {
   MedidasNovaRoute: typeof MedidasNovaRoute
   OrganizarProntoRoute: typeof OrganizarProntoRoute
   PlanejamentoDiaRoute: typeof PlanejamentoDiaRoute
+  PlanejamentoSemanaRoute: typeof PlanejamentoSemanaRoute
   SaudeDietaRoute: typeof SaudeDietaRoute
   SaudeTreinoRoute: typeof SaudeTreinoRoute
   TreinoExerciciosRoute: typeof TreinoExerciciosRoute
@@ -656,6 +669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanejamentoDiaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/planejamento_/semana': {
+      id: '/planejamento_/semana'
+      path: '/planejamento/semana'
+      fullPath: '/planejamento/semana'
+      preLoaderRoute: typeof PlanejamentoSemanaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/saude_/dieta': {
       id: '/saude_/dieta'
       path: '/saude/dieta'
@@ -734,6 +754,7 @@ const rootRouteChildren: RootRouteChildren = {
   MedidasNovaRoute: MedidasNovaRoute,
   OrganizarProntoRoute: OrganizarProntoRoute,
   PlanejamentoDiaRoute: PlanejamentoDiaRoute,
+  PlanejamentoSemanaRoute: PlanejamentoSemanaRoute,
   SaudeDietaRoute: SaudeDietaRoute,
   SaudeTreinoRoute: SaudeTreinoRoute,
   TreinoExerciciosRoute: TreinoExerciciosRoute,

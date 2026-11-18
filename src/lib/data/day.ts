@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { fromMin, hhmm, toMin } from "../dates";
+import { fromMin, hhmm, isoDate, toMin } from "../dates";
 import type { Category, Color, DayPlan, DayPriority, Kind, RoutineItem, ScheduleItem, Task } from "../types";
 import { must, supabase } from "./db";
+import { loadEngineInput, logPlanEvent, nowHHMM } from "./planning";
+import { planDay } from "../planning/engine";
 
-const ITEM_COLS = "id, plan_date, time, title, description, tag, color, icon, kind, done, position, task_id";
+const ITEM_COLS = "id, plan_date, time, title, description, tag, color, icon, kind, done, position, task_id, duration_min, source, source_ref";
 const ROUTINE_COLS = "id, time, title, description, tag, color, icon, kind, position";
 const PLAN_COLS = "id, plan_date, disposicao, tempo, prioridade, pausas, categories, focus_areas, started_at";
 
+const todayKey = () => isoDate(new Date());
 const norm = <T extends { time: string }>(i: T): T => ({ ...i, time: hhmm(i.time) });
 
 export function useRoutine() {
@@ -57,9 +60,10 @@ function useInvalidateDay() {
 export function useToggleScheduleItem() {
   const invalidate = useInvalidateDay();
   return useMutation({
-    mutationFn: async (item: Pick<ScheduleItem, "id" | "done" | "task_id">) => {
+    mutationFn: async (item: Pick<ScheduleItem, "id" | "done" | "task_id"> & Partial<Pick<ScheduleItem, "time" | "title" | "kind" | "plan_date">>) => {
       const done = !item.done;
       must(await supabase.from("schedule_items").update({ done }).eq("id", item.id).select("id"));
+      if (item.title) void logPlanEvent({ plan_date: item.plan_date ?? todayKey(), action: done ? "feito" : "desfeito", kind: item.kind ?? "extra", title: item.title, planned_time: item.time ?? null, at_time: done ? nowHHMM() : null });
       if (item.task_id) {
         must(await supabase.from("tasks").update({ done, done_at: done ? new Date().toISOString() : null }).eq("id", item.task_id).select("id"));
       }
@@ -76,10 +80,11 @@ export function useSaveScheduleItem() {
     mutationFn: async (item: ItemDraft) => {
       const row = {
         plan_date: item.plan_date, time: item.time, title: item.title.trim().slice(0, 120), description: item.description.slice(0, 300),
-        tag: item.tag.slice(0, 30), color: item.color, icon: item.icon, kind: item.kind,
+        tag: item.tag.slice(0, 30), color: item.color, icon: item.icon, kind: item.kind, duration_min: Math.max(5, Math.min(720, Math.round(item.duration_min ?? 30))),
       };
       if (item.id) must(await supabase.from("schedule_items").update(row).eq("id", item.id).select("id"));
-      else must(await supabase.from("schedule_items").insert(row).select("id"));
+      else must(await supabase.from("schedule_items").insert({ ...row, source: "manual" }).select("id"));
+      void logPlanEvent({ plan_date: item.plan_date, action: item.id ? "editado" : "adicionado", kind: item.kind, title: item.title, planned_time: item.time });
     },
     onSuccess: invalidate,
   });
@@ -88,8 +93,10 @@ export function useSaveScheduleItem() {
 export function useDeleteScheduleItem() {
   const invalidate = useInvalidateDay();
   return useMutation({
-    mutationFn: async (id: string) => {
-      must(await supabase.from("schedule_items").delete().eq("id", id).select("id"));
+    mutationFn: async (id: string | { id: string; title: string; kind: string; time: string; plan_date: string }) => {
+      const item = typeof id === "string" ? { id } : id;
+      must(await supabase.from("schedule_items").delete().eq("id", item.id).select("id"));
+      if ("title" in item) void logPlanEvent({ plan_date: item.plan_date, action: "removido", kind: item.kind, title: item.title, planned_time: item.time });
     },
     onSuccess: invalidate,
   });
@@ -194,7 +201,27 @@ function taskDraft(t: Task, cat: Category | undefined): Draft {
   };
 }
 
-export async function generateDay(opts: GenerateOptions) {
+/** Plano do dia a partir dos dados reais (calendário, tarefas, hábitos, saúde, financeiro, demandas e a sua rotina). */
+async function generatePlanned(opts: Extract<GenerateOptions, { mode: "planejamento" }>, now?: { date: string; time: string }) {
+  const { date } = opts;
+  const { input } = await loadEngineInput(date, { disposicao: opts.disposicao, tempo: opts.tempo, prioridade: opts.prioridade, pausas: opts.pausas }, undefined, now);
+  const plan = planDay(input);
+  const existing = must(await supabase.from("schedule_items").select("title, done").eq("plan_date", date)) as { title: string; done: boolean }[];
+  const wasDone = new Set(existing.filter((e) => e.done).map((e) => e.title));
+  must(await supabase.from("schedule_items").delete().eq("plan_date", date).select("id"));
+  if (plan.blocks.length) {
+    must(await supabase.from("schedule_items").insert(plan.blocks.map((b, position) => ({
+      plan_date: date, time: b.time, title: b.title, description: b.description, tag: b.tag, color: b.color, icon: b.icon, kind: b.kind, task_id: b.taskId,
+      duration_min: b.durationMin, source: b.source, source_ref: b.sourceRef, position, done: wasDone.has(b.title),
+    }))).select("id"));
+  }
+  must(await supabase.from("day_plans").upsert({ plan_date: date, disposicao: opts.disposicao, tempo: opts.tempo, prioridade: opts.prioridade.trim().slice(0, 120), pausas: opts.pausas }, { onConflict: "user_id,plan_date" }).select("id"));
+  return { count: plan.blocks.length, warnings: plan.warnings, unplaced: plan.unplaced };
+}
+
+export async function generateDay(opts: GenerateOptions, now?: { date: string; time: string }): Promise<{ count: number; warnings?: string[]; unplaced?: { title: string; reason: string }[] }> {
+  if (opts.mode === "planejamento") return generatePlanned(opts, now);
+  // "Organizar meu dia" (tela /organizar): monta o dia pela rotina e pelas tarefas das áreas escolhidas
   const { date } = opts;
   const [routine, tasks, cats, existing] = await Promise.all([
     supabase.from("routine_items").select(ROUTINE_COLS).order("time").order("position").then((r) => (must(r) as RoutineItem[]).map(norm)),
@@ -205,34 +232,10 @@ export async function generateDay(opts: GenerateOptions) {
   const catById = new Map(cats.map((c) => [c.id, c]));
 
   let list: Draft[] = routine.map((r) => ({ time: r.time, title: r.title, description: r.description, tag: r.tag, color: r.color, icon: r.icon, kind: r.kind, task_id: null }));
-  // Tarefas e compromissos do dia que têm horário entram na linha do tempo.
   for (const t of tasks) if (t.due_date === date && t.due_time && !t.done) list.push(taskDraft(t, t.category_id ? catById.get(t.category_id) : undefined));
 
-  if (opts.mode === "planejamento") {
-    if (opts.disposicao === "baixa") {
-      list = list.map((a) => (a.kind === "treino" ? { ...a, title: "Treino leve", description: "Alongamento e mobilidade • ~30 min" } : a));
-    }
-    if (opts.disposicao === "alta") {
-      list.push({ time: "10:00", title: "Bloco de foco profundo", description: "Aproveite a energia alta para a tarefa mais difícil.", tag: "Foco", color: "violet", icon: "layers", kind: "extra", task_id: null });
-    }
-    const p = opts.prioridade.trim();
-    if (p) list.push({ time: "09:30", title: `Prioridade: ${p}`, description: "Adicionada por você antes de gerar o plano.", tag: "Prioridade", color: "amber", icon: "star", kind: "extra", task_id: null });
-    if (opts.pausas) {
-      list.push(
-        { time: "10:45", title: "Pausa para café", description: "10 min longe das telas.", tag: "Pausa", color: "amber", icon: "coffee", kind: "pausa", task_id: null },
-        { time: "15:30", title: "Alongamento e água", description: "Respire e se hidrate.", tag: "Pausa", color: "amber", icon: "coffee", kind: "pausa", task_id: null },
-      );
-    }
-    const range = { completo: [0, 1440], manha: [0, 12 * 60 + 30], tarde: [12 * 60, 1440], pouco: [0, 1440] }[opts.tempo];
-    list = list.filter((a) => (toMin(a.time) >= range[0]! && toMin(a.time) <= range[1]!) || a.kind === "compromisso" || a.title.startsWith("Prioridade:"));
-    if (opts.tempo === "pouco") {
-      const firstHabit = [...list].filter((a) => a.kind === "habito").sort((a, b) => toMin(a.time) - toMin(b.time))[0];
-      list = list.filter((a) => a.kind !== "habito" || a === firstHabit);
-    }
-  } else {
-    const allowed = new Set(opts.categories.flatMap((c) => CAT_KINDS[c] ?? []));
-    list = list.filter((a) => a.kind === "extra" || allowed.has(a.kind));
-  }
+  const allowed = new Set(opts.categories.flatMap((c) => CAT_KINDS[c] ?? []));
+  list = list.filter((a) => a.kind === "extra" || allowed.has(a.kind));
 
   list.sort((a, b) => toMin(a.time) - toMin(b.time));
   const wasDone = new Set(existing.filter((e) => e.done).map((e) => e.title));
@@ -242,30 +245,37 @@ export async function generateDay(opts: GenerateOptions) {
     must(await supabase.from("schedule_items").insert(list.map((d, position) => ({ ...d, plan_date: date, position, done: wasDone.has(d.title) }))).select("id"));
   }
 
-  if (opts.mode === "planejamento") {
-    must(await supabase.from("day_plans").upsert(
-      { plan_date: date, disposicao: opts.disposicao, tempo: opts.tempo, prioridade: opts.prioridade.trim().slice(0, 120), pausas: opts.pausas },
-      { onConflict: "user_id,plan_date" },
-    ).select("id"));
-  } else {
-    must(await supabase.from("day_plans").upsert({ plan_date: date, categories: opts.categories, focus_areas: opts.focusAreas }, { onConflict: "user_id,plan_date" }).select("id"));
-    // Prioridades do dia: tarefas pendentes das áreas de foco, alta prioridade primeiro.
-    const slugs = new Set(opts.focusAreas.flatMap((a) => AREA_SLUGS[a] ?? []));
-    const picks = tasks
-      .filter((t) => !t.done && t.category_id && slugs.has(catById.get(t.category_id)?.slug ?? ""))
-      .sort((a, b) => RANK[a.priority] - RANK[b.priority] || a.position - b.position)
-      .slice(0, 5);
-    must(await supabase.from("day_priorities").delete().eq("plan_date", date).select("id"));
-    if (picks.length) {
-      must(await supabase.from("day_priorities").insert(picks.map((t, position) => ({ plan_date: date, title: t.title, starred: position === 0, position }))).select("id"));
-    }
+  must(await supabase.from("day_plans").upsert({ plan_date: date, categories: opts.categories, focus_areas: opts.focusAreas }, { onConflict: "user_id,plan_date" }).select("id"));
+  // Prioridades do dia: tarefas pendentes das áreas de foco, alta prioridade primeiro.
+  const slugs = new Set(opts.focusAreas.flatMap((a) => AREA_SLUGS[a] ?? []));
+  const picks = tasks
+    .filter((t) => !t.done && t.category_id && slugs.has(catById.get(t.category_id)?.slug ?? ""))
+    .sort((a, b) => RANK[a.priority] - RANK[b.priority] || a.position - b.position)
+    .slice(0, 5);
+  must(await supabase.from("day_priorities").delete().eq("plan_date", date).select("id"));
+  if (picks.length) {
+    must(await supabase.from("day_priorities").insert(picks.map((t, position) => ({ plan_date: date, title: t.title, starred: position === 0, position }))).select("id"));
   }
   return { count: list.length };
 }
 
+/** Adia um item para amanhã (ou outro dia): vai para o plano daquele dia; se é uma tarefa, a tarefa muda de data. */
+export function usePostponeItem() {
+  const invalidate = useInvalidateDay();
+  return useMutation({
+    mutationFn: async ({ item, toDate }: { item: Pick<ScheduleItem, "id" | "title" | "description" | "tag" | "color" | "icon" | "kind" | "task_id" | "time" | "plan_date"> & { duration_min?: number }; toDate: string }) => {
+      must(await supabase.from("schedule_items").delete().eq("id", item.id).select("id"));
+      must(await supabase.from("schedule_items").insert({ plan_date: toDate, time: item.time, title: item.title, description: item.description, tag: item.tag, color: item.color, icon: item.icon, kind: item.kind, task_id: item.task_id, duration_min: item.duration_min ?? 30, source: "manual", position: 99, done: false }).select("id"));
+      if (item.task_id) must(await supabase.from("tasks").update({ due_date: toDate }).eq("id", item.task_id).select("id"));
+      void logPlanEvent({ plan_date: item.plan_date, action: "adiado", kind: item.kind, title: item.title, planned_time: item.time });
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export function useGenerateDay() {
   const invalidate = useInvalidateDay();
-  return useMutation({ mutationFn: generateDay, onSuccess: invalidate });
+  return useMutation({ mutationFn: (o: GenerateOptions) => generateDay(o), onSuccess: invalidate });
 }
 
 export { fromMin };

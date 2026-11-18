@@ -1,16 +1,18 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Clock, Dumbbell, Heart, Lightbulb, Link2, ListChecks, Moon, ScanFace, Smile, Sparkles, Zap } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, CheckCircle2, Clock, Heart, Lightbulb, Moon, ScanFace, Smile, Sparkles, Zap } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
 import { Panel, PlanShell, colorVar, tint } from "@/components/PlanShell";
 import { tempoLabels, todayLabel, type Disposicao, type Tempo } from "@/lib/plan-data";
 import { hhmm, todayIso } from "@/lib/dates";
 import { getIcon } from "@/lib/icons";
 import { useCategories, useTasks } from "@/lib/data/tasks";
-import { useDayPlan, useGenerateDay, useRoutine, useSchedule } from "@/lib/data/day";
-import { compromissosForDay } from "@/lib/appointments";
-import { useSplit } from "@/lib/data/workouts";
+import { useDayPlan, useGenerateDay, useSchedule } from "@/lib/data/day";
+import { usePlanPreview } from "@/lib/data/planning";
+import { SourcesPanel } from "@/components/planning/SourcesPanel";
+import { SuggestionsPanel } from "@/components/planning/SuggestionsPanel";
+import type { SourceId } from "@/lib/planning/engine";
 
 export const Route = createFileRoute("/planejamento")({
   head: () => ({
@@ -33,11 +35,9 @@ const disp: { v: Disposicao; Icon: typeof Zap; l: string }[] = [
 function Planejamento() {
   const navigate = useNavigate();
   const today = todayIso();
-  const routineQ = useRoutine();
   const schedQ = useSchedule(today);
   const tasksQ = useTasks();
   const catsQ = useCategories();
-  const splitQ = useSplit();
   const planQ = useDayPlan(today);
   const generate = useGenerateDay();
   const [disposicao, setDisp] = useState<Disposicao>("normal");
@@ -56,49 +56,41 @@ function Planejamento() {
   const gerar = () => {
     generate.mutate(
       { mode: "planejamento", date: today, disposicao, tempo, prioridade, pausas },
-      { onSuccess: () => navigate({ to: "/planejamento/dia" }), onError: (e) => toast.error(`Não consegui gerar o plano: ${e.message}`) },
+      { onSuccess: (r) => { if (r.warnings?.length) toast.message(r.warnings.join(" ")); void navigate({ to: "/planejamento/dia" }); }, onError: (e) => toast.error(`Não consegui gerar o plano: ${e.message}`) },
     );
   };
 
-  // Prévia do dia: o plano já gerado ou, antes disso, a rotina-base + tarefas de hoje.
+  // Prévia do dia: o plano já gerado ou, antes disso, o que o motor monta AGORA com os seus dados reais e as fontes ligadas.
   const generated = (schedQ.data?.length ?? 0) > 0;
-  const compId = (catsQ.data ?? []).find((c) => c.slug === "comp")?.id;
-  const allTasks = tasksQ.data ?? [];
-  // Compromissos do calendário com horário já aparecem na prévia, no meio da rotina.
-  const compPreview = useMemo(() => compromissosForDay(allTasks, compId, today), [allTasks, compId, today]);
+  const previewQ = usePlanPreview(today, { disposicao, tempo, prioridade, pausas }, !generated);
+  const preview = previewQ.data;
   const agenda = useMemo(
-    () => (generated ? schedQ.data! : [...(routineQ.data ?? []), ...compPreview].sort((a, b) => a.time.localeCompare(b.time))),
-    [generated, schedQ.data, routineQ.data, compPreview],
+    () => (generated
+      ? schedQ.data!.map((a) => ({ id: a.id, time: a.time, title: a.title, description: a.description, tag: a.tag, color: a.color, icon: a.icon, kind: a.kind, source: a.source ?? "rotina" }))
+      : (preview?.blocks ?? []).map((b) => ({ id: `${b.time}-${b.title}`, time: b.time, title: b.title, description: b.description, tag: b.tag, color: b.color, icon: b.icon, kind: b.kind, source: b.source as string }))),
+    [generated, schedQ.data, preview],
   );
-  const pending = allTasks.filter((t) => !t.done);
-  const compToday = pending.filter((t) => t.category_id === compId && t.due_date === today).length;
+  const pending = (tasksQ.data ?? []).filter((t) => !t.done);
   const overdue = pending.filter((t) => t.due_date && t.due_date < today).length;
   const count = (k: string) => agenda.filter((a) => a.kind === k).length;
-  const nTarefas = count("tarefa") + (generated ? 0 : pending.filter((t) => t.category_id !== compId && t.due_date === today).length);
-  const nComp = count("compromisso") + (generated ? 0 : compToday - compPreview.length);
-  const nHabitos = count("habito");
-  const todaySplit = splitQ.data?.find((x) => x.weekday === new Date().getDay());
+  const nTarefas = count("tarefa"), nComp = count("compromisso"), nHabitos = count("habito");
   const doneCount = generated ? schedQ.data!.filter((a) => a.done).length : 0;
   const dayPct = generated ? Math.round((doneCount / schedQ.data!.length) * 100) : 0;
+  const counts = useMemo(() => { const c: Partial<Record<SourceId, number>> = {}; for (const a of agenda) c[a.source as SourceId] = (c[a.source as SourceId] ?? 0) + 1; return c; }, [agenda]);
 
   const stats = [
     { Icon: CheckCircle2, n: nTarefas, t: "Tarefas", c: "cyan" },
     { Icon: CalendarDays, n: nComp, t: "Compromissos", c: "violet" },
     { Icon: Heart, n: nHabitos, t: "Hábitos", c: "emerald" },
   ];
-  const integr = [
-    { Icon: CalendarDays, t: "Calendário", d: `${nComp} compromisso${nComp === 1 ? "" : "s"} encontrado${nComp === 1 ? "" : "s"}` },
-    { Icon: ListChecks, t: "Tarefas", d: `${pending.length} tarefa${pending.length === 1 ? "" : "s"} pendente${pending.length === 1 ? "" : "s"}` },
-    { Icon: Heart, t: "Hábitos", d: `${nHabitos} hábito${nHabitos === 1 ? "" : "s"} previsto${nHabitos === 1 ? "" : "s"}` },
-    { Icon: Dumbbell, t: "Saúde", d: todaySplit?.workout_id ? `Treino: ${todaySplit.title}` : (todaySplit?.title ?? "Sem treino cadastrado") },
-  ];
+  const warnings = generated ? [] : (preview?.warnings ?? []);
 
   return (
     <PlanShell>
       {/* Hero */}
       <div className="grid items-center gap-5 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1.1fr)]">
         <div className="animate-rise text-center lg:text-left" style={{ animationDelay: ".05s" }}>
-          <p className="mono-caps mb-3 !text-cyan">Planejamento inteligente</p>
+          <p className="mono-caps mb-3 flex items-center justify-center gap-3 !text-cyan lg:justify-start">Planejamento inteligente <Link to="/planejamento/semana" className="rounded-full border border-cyan/40 px-3 py-0.5 text-[0.65rem] normal-case tracking-normal hover:bg-cyan/10" data-testid="ver-semana">Ver a semana</Link></p>
           <h1 className="font-serif text-4xl leading-[1.02] tracking-tight sm:text-[clamp(2.2rem,3.6vw,3.6rem)]">
             Vamos planejar<br />seu dia de <span className="text-gradient">hoje?</span>
           </h1>
@@ -192,8 +184,9 @@ function Planejamento() {
             <span className="text-sm font-medium text-muted-foreground">{todayLabel()}</span>
           </div>
           <ol className="relative space-y-2 before:absolute before:bottom-4 before:left-[7px] before:top-4 before:w-px before:bg-cyan/40">
-            {agenda.length === 0 && <li className="py-6 text-center text-sm text-muted-foreground">Sua rotina-base está vazia.</li>}
-            {agenda.slice(0, 8).map((a) => {
+            {agenda.length === 0 && !previewQ.isLoading && <li className="py-6 text-center text-sm text-muted-foreground" data-testid="dia-vazio">Nada previsto para hoje com as fontes ligadas. Ligue mais fontes ao lado ou monte a sua rotina.</li>}
+            {agenda.length === 0 && previewQ.isLoading && <li className="py-6 text-center text-sm text-muted-foreground">Montando o seu dia…</li>}
+            {agenda.slice(0, 14).map((a) => {
               const I = getIcon(a.icon);
               return (
                 <li key={a.id} className="relative flex items-center gap-3 pl-6">
@@ -206,34 +199,26 @@ function Planejamento() {
               );
             })}
           </ol>
-          <p className="mt-4 text-center text-xs text-muted-foreground">{generated ? "Plano de hoje já gerado · gere de novo para refazer" : "Prévia · o plano completo é montado ao gerar"}</p>
+          {agenda.length > 14 && <p className="mt-3 text-center text-xs text-muted-foreground">+ {agenda.length - 14} itens no plano completo</p>}
+          {warnings.length > 0 && <div className="mt-4 space-y-1.5 rounded-xl border border-amber/40 bg-amber/[0.06] p-3 text-xs text-amber" data-testid="avisos-plano">{warnings.map((w) => <p key={w}>⚠ {w}</p>)}{(preview?.unplaced ?? []).slice(0, 4).map((u) => <p key={u.title} className="text-muted-foreground">• {u.title}: {u.reason}</p>)}</div>}
+          <p className="mt-4 text-center text-xs text-muted-foreground">{generated ? "Plano de hoje já gerado · gere de novo para refazer" : "Prévia com os seus dados reais · o plano completo é montado ao gerar"}</p>
         </Panel>
 
         <div className="flex flex-col gap-5">
           <Panel c="violet" style={{ animationDelay: ".46s" }}>
             <h2 className="mb-3 flex items-center gap-2.5 font-display text-lg font-semibold"><Sparkles size={20} className="text-violet" /> Análise do Orion</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">Hoje você tem {nTarefas} tarefa{nTarefas === 1 ? "" : "s"}, {nComp} compromisso{nComp === 1 ? "" : "s"} e {nHabitos} hábito{nHabitos === 1 ? "" : "s"} previstos{todaySplit?.workout_id ? `, além do treino ${todaySplit.title}` : ""}.</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">Hoje você tem {nTarefas} tarefa{nTarefas === 1 ? "" : "s"}, {nComp} compromisso{nComp === 1 ? "" : "s"} e {nHabitos} hábito{nHabitos === 1 ? "" : "s"} previstos{agenda.find((a) => a.kind === "treino") ? `, além de ${agenda.find((a) => a.kind === "treino")!.title}` : ""}.</p>
             <div className="mt-4 flex gap-3 border-t border-border pt-4">
               <AlertTriangle size={18} className="mt-0.5 shrink-0" style={{ color: colorVar("amber") }} />
               <p className="text-sm"><span className="font-semibold" style={{ color: colorVar("amber") }}>Atenção</span><br /><span className="text-muted-foreground">{overdue > 0 ? `Você tem ${overdue} tarefa${overdue === 1 ? "" : "s"} atrasada${overdue === 1 ? "" : "s"}. Recomendo encaixar ainda hoje.` : "Nenhuma tarefa atrasada. Bom trabalho!"}</span></p>
             </div>
             <div className="mt-4 flex gap-3 border-t border-border pt-4">
               <Lightbulb size={18} className="mt-0.5 shrink-0 text-cyan" />
-              <p className="text-sm"><span className="font-semibold text-cyan">Sugestão inteligente</span><br /><span className="text-muted-foreground">Agrupe tarefas semelhantes no período da manhã para ganhar foco e produtividade.</span></p>
+              <p className="text-sm"><span className="font-semibold text-cyan">Sugestão inteligente</span><br /><span className="text-muted-foreground" data-testid="dica-plano">{preview?.overload ? "O dia está pesado. Desligue uma fonte, ative a disposição baixa ou adie o que não for urgente." : (preview?.unplaced.length ?? 0) > 0 ? "Algumas tarefas não couberam hoje. Escolha mais tempo disponível ou deixe-as para outro dia." : "Quanto mais você marcar o que fez, mais eu acerto os horários e o ritmo do seu dia."}</span></p>
             </div>
           </Panel>
-          <Panel c="cyan" style={{ animationDelay: ".54s" }}>
-            <h2 className="mb-3 flex items-center gap-2.5 font-display text-lg font-semibold"><Link2 size={20} className="text-cyan" /> Integrações do planejamento</h2>
-            <ul className="space-y-2">
-              {integr.map(({ Icon, t, d }) => (
-                <li key={t} className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5">
-                  <span className="icon-tile h-9 w-9 shrink-0 !rounded-xl" style={tint("violet")}><Icon size={16} /></span>
-                  <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{t}</span><span className="block text-xs text-muted-foreground">{d}</span></span>
-                  <CheckCircle2 size={20} className="text-emerald" />
-                </li>
-              ))}
-            </ul>
-          </Panel>
+          <SourcesPanel counts={counts} />
+          <SuggestionsPanel />
         </div>
       </div>
     </PlanShell>
