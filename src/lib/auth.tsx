@@ -7,9 +7,11 @@ export type Account = { owner: string; name: string; principal: boolean; email: 
 type Status = "loading" | "out" | "ready" | "blocked";
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 type Auth = {
-  status: Status; account: Account | null; blocked: string;
+  status: Status; account: Account | null; blocked: string; recovering: boolean;
   signIn: (email: string, password: string) => Promise<Result>;
   signUp: (name: string, email: string, password: string) => Promise<Result>;
+  resetPassword: (email: string) => Promise<Result>;
+  setNewPassword: (password: string) => Promise<Result>;
   signOut: () => Promise<void>;
 };
 const Ctx = createContext<Auth | null>(null);
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>(DISABLED ? "ready" : "loading");
   const [account, setAccount] = useState<Account | null>(null);
   const [blocked, setBlocked] = useState("");
+  const [recovering, setRecovering] = useState(false);
   const statusRef = useRef<Status>(status); statusRef.current = status;
 
   const claim = useCallback(async (session: Session) => {
@@ -68,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = authClient.auth.onAuthStateChange((ev, s) => {
       // Renovação do token não precisa refazer a vinculação.
       if (ev === "TOKEN_REFRESHED") return;
+      if (ev === "PASSWORD_RECOVERY") setRecovering(true); // abriu o link de "esqueci a senha": pede a senha nova antes de entrar
       if (ev === "SIGNED_IN" || ev === "SIGNED_OUT" || ev === "INITIAL_SESSION") setTimeout(() => apply(s), 0);
     });
     return () => { alive = false; clearTimeout(stuck); sub.subscription.unsubscribe(); };
@@ -86,12 +90,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, []);
 
+  const resetPassword = useCallback<Auth["resetPassword"]>(async (email) => {
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return { ok: false, error: "Digite o e-mail da conta." };
+    const { error } = await authClient.auth.resetPasswordForEmail(email.trim(), typeof window !== "undefined" ? { redirectTo: window.location.origin } : {});
+    return error ? { ok: false, error: explain(error.message) } : { ok: true, message: "Se esse e-mail tem conta, enviamos um link para criar uma senha nova. Confira também o spam." };
+  }, []);
+
+  const setNewPassword = useCallback<Auth["setNewPassword"]>(async (password) => {
+    if (password.length < 6) return { ok: false, error: "A senha precisa ter pelo menos 6 caracteres." };
+    const { error } = await authClient.auth.updateUser({ password });
+    if (error) return { ok: false, error: explain(error.message) };
+    setRecovering(false);
+    return { ok: true };
+  }, []);
+
   const signOut = useCallback(async () => {
     try { await authClient.auth.signOut(); } catch { /* sem rede */ }
     setClientOwner(undefined);
     if (typeof window !== "undefined") window.location.assign("/");
   }, []);
 
-  const value = useMemo<Auth>(() => ({ status, account, blocked, signIn, signUp, signOut }), [status, account, blocked, signIn, signUp, signOut]);
+  const value = useMemo<Auth>(() => ({ status, account, blocked, recovering, signIn, signUp, resetPassword, setNewPassword, signOut }), [status, account, blocked, recovering, signIn, signUp, resetPassword, setNewPassword, signOut]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

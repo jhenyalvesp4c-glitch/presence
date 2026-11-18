@@ -34,6 +34,14 @@ function Login() {
   const [name, setName] = useState(""), [email, setEmail] = useState(""), [pw, setPw] = useState(""), [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [info, setInfo] = useState("");
 
+  async function forgot() {
+    if (busy) return;
+    setError(""); setInfo(""); setBusy(true);
+    const r = await auth.resetPassword(email);
+    setBusy(false);
+    if (r.ok) setInfo(r.message ?? ""); else setError(r.error);
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -81,7 +89,35 @@ function Login() {
         <button type="submit" disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-brand py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-60" data-testid="login-enviar">
           {busy && <Loader2 size={15} className="animate-spin" />} {mode === "in" ? "Entrar" : "Criar minha conta"}
         </button>
+        {mode === "in" && <button type="button" onClick={() => void forgot()} disabled={busy} data-testid="login-esqueci" className="block w-full text-center text-xs text-cyan transition hover:underline disabled:opacity-60">Esqueci minha senha (digite o e-mail acima)</button>}
         <p className="text-center text-[0.72rem] text-muted-foreground">{mode === "in" ? "Cada pessoa tem o seu espaço, com dados só dela." : "Seus dados ficam separados dos de qualquer outra conta."}</p>
+      </form>
+    </Shell>
+  );
+}
+
+function NewPassword() {
+  const { setNewPassword } = useAuth();
+  const [pw, setPw] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError(""); setBusy(true);
+    const r = await setNewPassword(pw);
+    setBusy(false);
+    if (!r.ok) setError(r.error);
+  }
+  return (
+    <Shell>
+      <Brand />
+      <form noValidate onSubmit={(e) => void submit(e)} className="glass space-y-4 rounded-3xl p-6 sm:p-7" data-testid="nova-senha-form">
+        <p className="text-sm">Crie a sua senha nova para continuar.</p>
+        <label className="relative block">
+          <Lock size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input className={FIELD} type="password" placeholder="Senha nova (mínimo 6 caracteres)" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" data-testid="nova-senha" />
+        </label>
+        {error && <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
+        <button type="submit" disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-brand py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="nova-senha-salvar">{busy && <Loader2 size={15} className="animate-spin" />} Salvar senha nova</button>
       </form>
     </Shell>
   );
@@ -89,7 +125,8 @@ function Login() {
 
 /** Mostra a tela de entrada até a pessoa estar logada; depois libera o app. */
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { status, blocked, signOut } = useAuth();
+  const { status, blocked, recovering, signOut } = useAuth();
+  if (recovering) return <NewPassword />;
   if (status === "ready") return <>{children}</>;
   if (status === "loading") return <Shell><Brand /><div className="grid place-items-center"><Loader2 className="animate-spin text-cyan" size={20} /></div></Shell>;
   if (status === "blocked") {
