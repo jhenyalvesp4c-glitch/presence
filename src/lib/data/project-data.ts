@@ -77,7 +77,7 @@ export async function ensureProject(pid: string) {
   if (found[0]) return found[0];
   if (pid !== defaultProjectId()) return null;
   const legacy = pid === P4C_ID;
-  must(await supabase.from("projects").upsert({ id: pid, name: legacy ? "P4C" : "Geral", description: legacy ? "Juntos por dossiês mais fortes." : "", color: "cyan", status: "Ativo", position: -1 }, { onConflict: "id" }).select("id"));
+  must(await supabase.from("projects").upsert({ id: pid, name: legacy ? "Demandas gerais (padrão)" : "Geral", description: legacy ? "Juntos por dossiês mais fortes." : "", color: "cyan", status: "Ativo", position: -1 }, { onConflict: "id" }).select("id"));
   return { id: pid, legacy_imported: false, label_singular: DEFAULT_LABEL.singular, label_plural: DEFAULT_LABEL.plural };
 }
 

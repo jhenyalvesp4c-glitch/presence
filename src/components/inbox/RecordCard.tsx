@@ -4,6 +4,7 @@ import { CATEGORY_SLUGS, type Tipo } from "@/lib/mcp/records";
 import { DESTINOS, convertTipo, titleOf, type Draft, type InboxItem } from "@/lib/inbox";
 import type { InboxContext } from "@/lib/inbox.functions";
 import type { LocalFile } from "./files";
+import { defaultProjectId } from "@/lib/dossiers";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 const field = "w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none transition focus:border-cyan/60";
@@ -175,7 +176,8 @@ export function RecordCard({ item, ctx, files, problems, warnings, duplicado, on
                 {s.kind === "project" && (
                   <select value={str(v)} onChange={(e) => set(s.k, e.target.value)} className={`${sel} mt-1`}>
                     <option value="">—</option>
-                    {ctx?.projects.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                    {/* o projeto padrão (página de Demandas sem projeto) é o mesmo que "—": não aparece na lista, para não ter dois "P4C" */}
+                    {ctx?.projects.filter((p) => p.id !== defaultProjectId() || p.id === str(v)).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                   </select>
                 )}
                 {s.kind === "dossie" && (
