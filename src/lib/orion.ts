@@ -33,7 +33,7 @@ const STOP = new Set(("a o as os um uma uns umas de do da dos das em no na nos n
   "e ou mas se foi fui era ser tem teve tinha houve eu me meu minha meus minhas voce seu sua ele ela eles elas isso isto esse essa esses essas aquele aquela " +
   "mais menos muito muita ja nao sim so tambem ainda mesmo hoje ontem anteontem semana mes ano dia dias passado passada proximo proxima este esta estes estas " +
   "fiz fez fazer feito feita alguma algum alguns algumas qualquer todo toda todos todas lembro lembrar lembra preciso quero quanto quantas quantos media " +
-  "houve aconteceu aconteceram falhas falha").split(" "));
+  "houve aconteceu aconteceram falhas falha documentei documentou documentamos documentado documentada documentados documentadas documentar documentacao documentacoes anotei anotou anotado anotada anotados anotadas registrei registrou registrado registrada registrados registradas salvei guardei adicionei").split(" "));
 
 /** Palavras que importam na pergunta (sem acento, sem palavras comuns). */
 export function keywords(q: string): string[] {
@@ -100,7 +100,10 @@ export function rank(docs: OrionDoc[], question: string, today: string, limit = 
   const kws = keywords(question);
   const period = periodOf(question, today);
   const inPeriod = (d: OrionDoc) => !period || (!!d.date && d.date >= period.from && d.date <= period.to);
-  const pool = period ? docs.filter(inPeriod) : docs;
+  // "o que eu documentei/anotei/registrei…": só o que foi escrito pela pessoa (anotações e documentação), não tarefas nem conversas.
+  const written = /\b(document\w*|anotei|anotou|anotad\w*|registrei|registrou|registrad\w*|salvei|guardei)\b/.test(normalize(question));
+  const kindOk = (d: OrionDoc) => !written || d.kind === "registro" || d.kind === "documentacao";
+  const pool = (period ? docs.filter(inPeriod) : docs).filter(kindOk);
   const byDate = (a: OrionDoc, b: OrionDoc) => (b.date ?? "").localeCompare(a.date ?? "");
   if (!kws.length) return { docs: [...pool].sort(byDate).slice(0, limit), period, kws };
   const scored = pool

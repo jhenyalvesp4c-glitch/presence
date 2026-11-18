@@ -91,4 +91,16 @@ describe("Fontes com arquivos", () => {
     expect(s!.files).toHaveLength(1);
     expect(toSources([{ ...d, files: undefined }], [])[0]!.files).toEqual([]);
   });
+
+  it("\"o que eu documentei hoje\" traz só o que foi escrito hoje, sem exigir a palavra no texto", () => {
+    const docs = [
+      doc("a", "Disparo Maceió", "Falha de envio", "2026-11-12", "documentacao"),
+      doc("b", "Anotação solta", "Reunião com o time", "2026-11-12", "registro"),
+      doc("c", "Tarefa", "Comprar pão", "2026-11-12", "tarefa"),
+      doc("d", "Antiga", "Ontem", "2026-11-11", "documentacao"),
+    ];
+    const r = rank(docs, "O que eu documentei hoje?", "2026-11-12");
+    expect(r.kws).toEqual([]);
+    expect(r.docs.map((d) => d.id).sort()).toEqual(["a", "b"]);
+  });
 });
