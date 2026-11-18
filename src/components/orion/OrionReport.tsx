@@ -85,7 +85,7 @@ function SourceCard({ s, i, cited, kws, urls, onZoom }: { s: OrionSource; i: num
 export function OrionReport({ r }: { r: Report }) {
   const [urls, setUrls] = useState<Urls>({});
   const [zoom, setZoom] = useState<FileRef | null>(null);
-  const [more, setMore] = useState(false), [allImgs, setAllImgs] = useState(false);
+  const [more, setMore] = useState(false);
 
   const cites = useMemo(() => new Set([...r.answer.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1]))), [r.answer]);
   const featured = useMemo(() => {
@@ -99,7 +99,7 @@ export function OrionReport({ r }: { r: Report }) {
     return out.slice(0, 200);
   }, [featured]);
   const images = files.filter(isImg), docs = files.filter((f) => !isImg(f));
-  const SHOWN = 12, shownImages = allImgs ? images : images.slice(0, SHOWN), zoomAt = zoom ? images.findIndex((f) => fkey(f) === fkey(zoom)) : -1;
+  const shownImages = images, zoomAt = zoom ? images.findIndex((f) => fkey(f) === fkey(zoom)) : -1;
 
   useEffect(() => {
     const need = r.sources.flatMap((s) => s.files);
@@ -158,7 +158,7 @@ export function OrionReport({ r }: { r: Report }) {
               {shownImages.map((f, i) => {
                 const u = urls[fkey(f)];
                 return (
-                  <button key={fkey(f)} onClick={() => setZoom(f)} style={{ animationDelay: `${i * 80}ms` }} aria-label={`Ampliar ${f.name}`} data-testid="imagem-encontrada"
+                  <button key={fkey(f)} onClick={() => setZoom(f)} style={{ animationDelay: `${Math.min(i, 11) * 80}ms` }} aria-label={`Ampliar ${f.name}`} data-testid="imagem-encontrada"
                     className="group/img relative overflow-hidden rounded-xl border border-border bg-secondary/40 animate-rise transition duration-300 hover:-translate-y-0.5 hover:border-emerald/60 hover:shadow-[0_12px_30px_-14px_var(--emerald)]">
                     <span className={`block w-full overflow-hidden ${images.length === 1 ? "aspect-[16/8]" : "aspect-video"}`}>
                       {u ? <img src={u.view} alt={f.name} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover/img:scale-110" /> : <span className="grid h-full place-items-center text-xs text-muted-foreground">carregando…</span>}
@@ -170,7 +170,6 @@ export function OrionReport({ r }: { r: Report }) {
               })}
             </div>
           )}
-          {images.length > SHOWN && <button onClick={() => setAllImgs((v) => !v)} className="mt-2 w-full rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-emerald/60 hover:text-emerald" data-testid="ver-todas-imagens">{allImgs ? "Mostrar menos" : `Ver todas as ${images.length} imagens`}</button>}
           {docs.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{docs.map((f) => <FileChip key={fkey(f)} f={f} urls={urls} onZoom={setZoom} />)}</div>}
         </div>
       )}
