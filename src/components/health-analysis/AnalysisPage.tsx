@@ -188,9 +188,11 @@ export function AnalysisPage() {
       <div className="grid gap-6 xl:grid-cols-12">
         <Panel title="Evolução geral" icon={ScanLine} className="xl:col-span-4 xl:row-span-2" delay={100}
           right={<span className="tag flex items-center gap-1.5" style={glow(C.emerald)}><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald" />scan ativo</span>}>
-          <div className="grid gap-4 sm:grid-cols-[1fr_1fr] xl:grid-cols-[1.1fr_1fr]">
+          {/* O cartão pode ficar estreito (coluna de 4/12): o layout muda pela largura DO CARTÃO, não da tela, para nada sair cortado. */}
+          <div className="@container">
+          <div className="grid gap-5 @[520px]:grid-cols-[1.1fr_1fr] @[520px]:gap-4">
             <Hologram active={spot} onHover={setSpot} measures={a.measures} />
-            <div className="flex flex-col items-center gap-4">
+            <div className="flex min-w-0 flex-col items-center gap-4">
               <ScoreRing value={a.score} label="pontuação de saúde" />
               <p className="-mt-2 flex items-center gap-1 text-center text-[10px] text-muted-foreground"><Info className="h-3 w-3" />média dos indicadores ao lado</p>
               <ul className="w-full space-y-1">
@@ -201,6 +203,7 @@ export function AnalysisPage() {
                 </li>; })}
               </ul>
             </div>
+          </div>
           </div>
         </Panel>
 
