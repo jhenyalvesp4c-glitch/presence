@@ -1,15 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HealthProgress } from "@/components/health-progress";
-
+import { AnalysisPage } from "@/components/health-analysis/AnalysisPage";
 
 export const Route = createFileRoute("/analise")({
   head: () => ({ meta: [
-    { title: "Análise — Orion Saúde" },
-    { name: "description", content: "Acesse a área de análise de peso e medidas do Saúde." },
-    { property: "og:title", content: "Análise — Orion Saúde" },
-    { property: "og:description", content: "Sua evolução corporal na área de análise." },
+    { title: "Análise corporal — Orion Saúde" },
+    { name: "description", content: "Painel da sua evolução corporal: peso, medidas, composição, indicadores de saúde e fotos." },
+    { property: "og:title", content: "Análise corporal — Orion Saúde" },
+    { property: "og:description", content: "Gráficos da evolução do peso, das medidas e dos indicadores de saúde." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
-  component: () => <HealthProgress tab="analise" />,
+  component: AnalysisPage,
 });
