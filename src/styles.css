@@ -512,3 +512,9 @@ html, body { max-width: 100%; overflow-x: clip; }
   background-size: 18px 18px;
 }
 @media (prefers-reduced-motion: reduce) { .fin-frame::before, .fin-floor { animation: none !important; } }
+
+/* Barra lateral flutuante: o conteúdo sai da frente dela (padding da raiz) mas o FUNDO da tela continua por baixo, sem faixa escura nem risco. */
+@media (min-width: 768px) {
+  .rail-pad > .health-area, .rail-pad > .rail-bleed { margin-left: -4rem; padding-left: 4rem; }
+  .rail-pad > .rail-bleed-p3 { margin-left: -4rem; padding-left: calc(4rem + 0.75rem); }
+}

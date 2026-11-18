@@ -51,5 +51,5 @@ export function GlobalRail() {
 /** Reserva espaço à esquerda nas telas que recebem a barra global, para ela não cobrir o conteúdo. */
 export function useRailPad(): string {
   const path = useShownPath();
-  return hasOwnRail(path) ? "" : "md:pl-16";
+  return hasOwnRail(path) ? "" : "rail-pad md:pl-16";
 }

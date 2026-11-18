@@ -323,7 +323,7 @@ function Demandas() {
   return (
     <LabelCtx.Provider value={L}>
     <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard, selecting, picked, toggle }}>
-    <div className="relative min-h-screen overflow-x-clip">
+    <div className="rail-bleed relative min-h-screen overflow-x-clip">
       <BgFx />
       <div className={`relative mx-auto max-w-[1500px] px-4 py-4 transition-[padding] duration-500 max-md:pb-40 md:px-8 md:py-6 ${sel ? "xl:pr-[500px]" : ""}`}>
         {/* topo */}

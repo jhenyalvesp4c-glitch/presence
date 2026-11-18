@@ -100,7 +100,7 @@ function Assistente() {
 
 
   return (
-    <div className="min-h-screen p-3 [background:radial-gradient(60%_50%_at_50%_30%,color-mix(in_oklab,var(--cyan)_7%,transparent),transparent_70%),oklch(0.11_0.025_265)]">
+    <div className="rail-bleed-p3 min-h-screen p-3 [background:radial-gradient(60%_50%_at_50%_30%,color-mix(in_oklab,var(--cyan)_7%,transparent),transparent_70%),oklch(0.11_0.025_265)]">
       <div className="mx-auto flex w-full max-w-[1680px] items-stretch gap-4">
 
 
