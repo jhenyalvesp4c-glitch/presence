@@ -1,7 +1,7 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
 import { addMonths, alertsFor, brl, cashBreakdown, cashflow, categoryTotals, dateBR, dueYmOfClosing, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthPlan, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
 import { cloudFinanceRepo, persistChange } from "../finance/cloud-repo";
-import { READ_ACTIONS_V2, WRITE_ACTIONS, applyWrite, readMore } from "./finance-write";
+import { READ_ACTIONS_V2, WRITE_ACTIONS, applyWrite, readMore, shareProp } from "./finance-write";
 import { catOf } from "../finance/categories";
 import { parseNatural } from "../finance/parse";
 import { supabase } from "../supabase";
@@ -95,12 +95,12 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
 }
 
 /** Lança uma despesa/receita dita em uma frase. Só grava quando entendeu valor, forma de pagamento e conta/cartão. */
-export async function launch(s: FinanceState, frase: string, today: Date): Promise<{ result: Record<string, unknown>; panel?: Panel }> {
+export async function launch(s: FinanceState, frase: string, today: Date, args: Record<string, unknown> = {}): Promise<{ result: Record<string, unknown>; panel?: Panel }> {
   const d = parseNatural(frase, s, today);
   if (d.installments > 1) return { result: { ok: false, erro: "Compra parcelada eu não lanço por voz. Peça para ela cadastrar na aba Parcelas do Financeiro." } };
   if (d.missing.length) return { result: { ok: false, erro: `Faltou: ${d.missing.join(", ")}.`, perguntar: d.missing[0], contas: s.accounts.map((a) => a.name), cartoes: s.cards.map((c) => c.name) } };
   const id = `tx-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const { error } = await supabase.from("fin_transactions").insert({ id, kind: d.kind, description: d.desc, amount: round2(d.amount), date: d.date, method: d.method, account_id: d.accountId ?? null, card_id: d.cardId ?? null, category: d.category });
+  const { error } = await supabase.from("fin_transactions").insert({ id, kind: d.kind, description: d.desc, amount: round2(d.amount), date: d.date, method: d.method, account_id: d.accountId ?? null, card_id: d.cardId ?? null, category: d.category, shared: d.kind === "despesa" ? (shareProp(args).shared ?? null) : null });
   if (error) return { result: { ok: false, erro: "Não consegui salvar o lançamento." } };
   const onde = d.cardId ? s.cards.find((c) => c.id === d.cardId)?.name : s.accounts.find((a) => a.id === d.accountId)?.name;
   return { result: { ok: true, lancado: { tipo: d.kind, descricao: d.desc, valor: d.amount, data: dateBR(d.date), em: onde ?? "dinheiro", categoria: catOf(d.category).name } }, panel: panel("Lançado", [{ titulo: d.kind === "receita" ? "Receita" : "Despesa", itens: [item(d.desc, `${brl(d.amount)} · ${dateBR(d.date)} · ${onde ?? "dinheiro"}`)] }], "/financeiro?aba=movimentacoes") };
@@ -111,7 +111,7 @@ export async function runFinanceTool(args: Record<string, unknown>): Promise<{ r
   const s = await cloudFinanceRepo.readCloud();
   if (!s || !s.onboarded && !s.accounts.length) return { result: { ok: false, erro: "O financeiro ainda não tem dados na nuvem. Peça para ela abrir o Financeiro e responder ao briefing." } };
   const acao = String(args["acao"]);
-  if (acao === "lancar") return launch(s, String(args["frase"] ?? ""), today);
+  if (acao === "lancar") return launch(s, String(args["frase"] ?? ""), today, args);
   if (READ_ACTIONS_V2.has(acao)) return readMore(s, args, today);
   if (WRITE_ACTIONS.has(acao)) {
     const out = applyWrite(s, args, today);

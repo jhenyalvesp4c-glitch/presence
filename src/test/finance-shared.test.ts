@@ -45,3 +45,29 @@ describe("Gasto dividido com outra pessoa", () => {
     expect(semDivisao.plans[0]?.shared).toBeUndefined();
   });
 });
+
+import { applyWrite, shareProp } from "@/lib/voice/finance-write";
+
+describe("Orion divide compras (voz/chat)", () => {
+  const hoje = new Date(2026, 10, 19);
+  it("shareProp lê pessoa e porcentagem (padrão 50)", () => {
+    expect(shareProp({ dividir_com: "Pedro" })).toEqual({ shared: { person: "Pedro", percent: 50 } });
+    expect(shareProp({ dividir_com: "Pedro", percentual_dela: 30 })).toEqual({ shared: { person: "Pedro", percent: 30 } });
+    expect(shareProp({})).toEqual({});
+  });
+  it("cadastrar parcelada já com divisão", () => {
+    const out = applyWrite(state({}), { acao: "cadastrar_parcelada", cartao: "Nubank", descricao: "Lava-louças", valor: 300, parcelas_total: 10, dividir_com: "Pedro", percentual_dela: 50 }, hoje);
+    expect(out.state?.plans[0]?.shared).toEqual({ person: "Pedro", percent: 50 });
+  });
+  it("dividir uma parcelada existente e remover a divisão", () => {
+    const base = state({ plans: [{ ...plan, shared: undefined }] });
+    const on = applyWrite(base, { acao: "dividir", alvo: "Lava-louças", tipo_alvo: "parcelada", pessoa: "Pedro", percentual_dela: 50 }, hoje);
+    expect(on.state?.plans[0]?.shared).toEqual({ person: "Pedro", percent: 50 }); expect(on.result["parte_dela"]).toBe(150); expect(on.result["sua_parte"]).toBe(150);
+    const off = applyWrite(on.state!, { acao: "dividir", alvo: "Lava-louças", tipo_alvo: "parcelada", pessoa: "remover" }, hoje);
+    expect(off.state?.plans[0]?.shared).toBeUndefined(); expect(off.result["acao"]).toBe("divisao_removida");
+  });
+  it("não divide receita", () => {
+    const base = state({ transactions: [{ id: "t9", kind: "receita", desc: "Freela", amount: 100, date: "2026-11-02", method: "pix", accountId: "a1", category: "outros" }] });
+    expect(applyWrite(base, { acao: "dividir", alvo: "Freela", tipo_alvo: "movimentacao", pessoa: "Pedro" }, hoje).result["ok"]).toBe(false);
+  });
+});

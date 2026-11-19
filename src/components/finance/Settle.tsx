@@ -1,5 +1,6 @@
 /** Financeiro → Acerto de contas: compras no cartão de um e do outro, quanto cada um deve e o pix final, com extrato para enviar. */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowRightLeft, Camera, Check, ClipboardCopy, FileText, Handshake, Home, Image as ImageIcon, Loader2, Pencil, Plus, Printer, Receipt, Trash2, Wallet } from "lucide-react";
 
@@ -18,7 +19,9 @@ const sameLine = (a: { date: string | null; description: string; amount: number 
 
 /* ───────────── tela principal ───────────── */
 export function SettleView() {
-  const list = useSettlements(), acts = useSettleActions(), { account } = useAuth();
+  const list = useSettlements(), acts = useSettleActions(), { account } = useAuth(), qc = useQueryClient();
+  // o Orion mexeu no acerto (por conversa ou voz): recarrega a tela
+  useEffect(() => { const h = () => { void qc.invalidateQueries({ queryKey: ["settlements"] }); void qc.invalidateQueries({ queryKey: ["settlement-items"] }); }; window.addEventListener("orion:financeiro-atualizado", h); return () => window.removeEventListener("orion:financeiro-atualizado", h); }, [qc]);
   const me = account?.name?.trim() || "Eu";
   const [selId, setSelId] = useState<string | null>(null), [newName, setNewName] = useState(""), [adding, setAdding] = useState(false);
   const [reader, setReader] = useState(false), [bills, setBills] = useState(false), [editor, setEditor] = useState<{ item: SettleItem | null; kind: SettleItem["kind"] } | null>(null);

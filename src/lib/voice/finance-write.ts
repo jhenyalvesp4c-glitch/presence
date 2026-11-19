@@ -4,15 +4,15 @@
  */
 import {
   addMonths, brl, cardAvailable, cardUsed, accountBalance, dateBR, dayIn, dueYmOfClosing, firstFromPaid, invoiceFor, invoiceMonthOf, isoOf, isSubscription, monthName, nextCharge,
-  pauseRecurring, planForInvoice, planInfo, resumeRecurring, round2, subscriptionForInvoice, withDeclaredTotal, ymOf, closingYmOf,
+  pauseRecurring, planForInvoice, planInfo, resumeRecurring, round2, sharedPart, subscriptionForInvoice, withDeclaredTotal, ymOf, closingYmOf,
 } from "../finance/calc";
 import { catOf, guessCategory } from "../finance/categories";
-import type { Account, Card, FinanceState, Goal, Plan, Recurring, Transaction } from "../finance/types";
+import type { Account, Card, FinanceState, Goal, Plan, Recurring, Shared, Transaction } from "../finance/types";
 import { normalize } from "../orion";
 import type { Panel, PanelItem } from "./agent";
 
 export type Outcome = { state?: FinanceState; result: Record<string, unknown>; panel?: Panel; navegar?: string };
-export const WRITE_ACTIONS = new Set(["pausar", "reativar", "fatura_total", "detalhar", "editar", "excluir", "cadastrar_parcelada", "cadastrar_fixa"]);
+export const WRITE_ACTIONS = new Set(["pausar", "reativar", "fatura_total", "detalhar", "editar", "excluir", "cadastrar_parcelada", "cadastrar_fixa", "dividir"]);
 export const READ_ACTIONS_V2 = new Set(["fixas", "parcela_detalhe", "metas", "abrir"]);
 
 const num = (v: unknown): number | undefined => { if (v === undefined || v === null || v === "") return undefined; const n = typeof v === "number" ? v : Number(String(v).replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : undefined; };
@@ -20,6 +20,13 @@ const str = (v: unknown): string => String(v ?? "").trim();
 const fail = (erro: string, extra: Record<string, unknown> = {}): Outcome => ({ result: { ok: false, erro, ...extra } });
 const item = (rotulo: string, detalhe?: string): PanelItem => ({ rotulo, ...(detalhe ? { detalhe } : {}) });
 const panel = (titulo: string, itens: PanelItem[], para = "/financeiro", rotulo = "Abrir o Financeiro"): Panel => ({ titulo, secoes: [{ titulo, itens }], abrir: { rotulo, para } });
+/** "Dividir com alguém" dito pela pessoa: dividir_com (nome) + percentual_dela (1–100, padrão 50). */
+export const shareProp = (args: Record<string, unknown>): { shared?: Shared } => {
+  const person = str(args["dividir_com"]);
+  if (!person) return {};
+  const pct = num(args["percentual_dela"]) ?? 50;
+  return { shared: { person: person.slice(0, 80), percent: Math.min(100, Math.max(1, Math.round(pct))) } };
+};
 const uid = (p: string) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 /* ───────────── achar o item pelo nome ───────────── */
@@ -107,7 +114,7 @@ export function readMore(s: FinanceState, args: Record<string, unknown>, today: 
       panel: { titulo: "Metas", secoes: [{ titulo: "Suas metas", itens: gs.length ? gs.map((g) => item(g.title, `${brl(g.current)} de ${brl(g.target)} · ${pct(g)}%${g.deadline ? ` · até ${dateBR(g.deadline)}` : ""}`)) : [item("Você ainda não tem metas.")] }], abrir: { rotulo: "Abrir metas", para: "/financeiro?aba=metas" } } };
   }
   if (acao === "abrir") {
-    const tabs: Record<string, string> = { visao: "visao", geral: "visao", inicio: "visao", contas: "contas", cartoes: "contas", parcelas: "parcelas", meses: "meses", proximos: "meses", movimentacoes: "movimentacoes", gastos: "movimentacoes", assinaturas: "assinaturas", metas: "metas" };
+    const tabs: Record<string, string> = { acerto: "acerto", acertodecontas: "acerto", visao: "visao", geral: "visao", inicio: "visao", contas: "contas", cartoes: "contas", parcelas: "parcelas", meses: "meses", proximos: "meses", movimentacoes: "movimentacoes", gastos: "movimentacoes", assinaturas: "assinaturas", metas: "metas" };
     const raw = normalize(str(args["aba"])).replace(/\s+/g, ""), key = Object.keys(tabs).find((k) => raw.includes(k));
     const q = str(args["cartao"] ?? args["conta"]);
     let para = "/financeiro" + (key && tabs[key] !== "visao" ? `?aba=${tabs[key]}` : "");
@@ -150,16 +157,16 @@ export function applyWrite(s: FinanceState, args: Record<string, unknown>, today
     const due = dueYmFor(c.item, args["mes"], today), tipo = normalize(str(args["forma"]));
     const cat = str(args["categoria"]) || guessCategory(desc);
     if (/assin|mensal|fixa/.test(tipo) || cat === "assinaturas") {
-      const day = num(args["dia"]) ?? today.getDate(), sub = subscriptionForInvoice(c.item, due, { id: uid("rec-"), desc, amount: v, day });
+      const day = num(args["dia"]) ?? today.getDate(), sub = { ...subscriptionForInvoice(c.item, due, { id: uid("rec-"), desc, amount: v, day }), ...shareProp(args) };
       return { state: { ...s, recurring: [...s.recurring, sub] }, result: { ok: true, acao: "assinatura_cadastrada", nome: desc, valor: v, dia: sub.day, aviso: "Entra todo mês nesta fatura e nas próximas até pausar.", total_da_fatura_continua: invoiceFor({ ...s, recurring: [...s.recurring, sub] }, c.item, due).total },
         panel: panel("Assinatura cadastrada", [item(desc, `${brl(v)} todo dia ${sub.day} · ${c.item.name}`)], "/financeiro?aba=assinaturas", "Abrir assinaturas") };
     }
     if (/vista/.test(tipo)) {
-      const tx: Transaction = { id: uid("tx-"), kind: "despesa", desc, amount: v, date: todayIso, method: "credito", cardId: c.item.id, category: cat, inLimit: true };
+      const tx: Transaction = { id: uid("tx-"), kind: "despesa", desc, amount: v, date: todayIso, method: "credito", cardId: c.item.id, category: cat, inLimit: true, ...shareProp(args) };
       return { state: { ...s, transactions: [...s.transactions, tx] }, result: { ok: true, acao: "compra_detalhada", nome: desc, valor: v }, panel: panel("Compra detalhada", [item(desc, `${brl(v)} · ${c.item.name}`)], `/financeiro?aba=contas&item=card:${c.item.id}`, "Abrir o cartão") };
     }
     const n = Math.max(1, Math.min(60, Math.round(num(args["parcelas_total"]) ?? 1))), x = Math.max(1, Math.min(n, Math.round(num(args["parcela_atual"]) ?? 1)));
-    const plan = planForInvoice(c.item, due, { id: uid("plan-"), desc, per: v, n, x, category: cat, todayIso }), next = { ...s, plans: [...s.plans, plan] }, inv = invoiceFor(next, c.item, due);
+    const plan = { ...planForInvoice(c.item, due, { id: uid("plan-"), desc, per: v, n, x, category: cat, todayIso }), ...shareProp(args) }, next = { ...s, plans: [...s.plans, plan] }, inv = invoiceFor(next, c.item, due);
     return { state: next, result: { ok: true, acao: "parcelada_detalhada", nome: desc, parcela: v, parcelas: n, esta_fatura_e_a_parcela: x, restantes: n - x, total_da_fatura: inv.total, ainda_a_detalhar: inv.adjustment, itens_passam_do_total: inv.over > 0 ? inv.over : undefined },
       panel: panel("Compra detalhada na fatura", [item(desc, `parcela ${x}/${n} de ${brl(v)}`), item("Total da fatura", brl(inv.total)), item("Ainda a detalhar", brl(inv.adjustment))], `/financeiro?aba=contas&item=card:${c.item.id}`, "Abrir o cartão") };
   }
@@ -171,7 +178,7 @@ export function applyWrite(s: FinanceState, args: Record<string, unknown>, today
     const pagas = Math.max(0, Math.min(n - 1, Math.round(num(args["parcelas_pagas"]) ?? 0)));
     const first = pagas > 0 ? firstFromPaid(c.item, today, pagas) : invoiceMonthOf(c.item, todayIso);
     // já pagou parcelas = compra antiga, que já está dentro do limite informado pelo banco; compra de hoje consome o limite
-    const plan: Plan = { id: uid("plan-"), desc, cardId: c.item.id, total: round2(per * n), count: n, per, purchaseYm: addMonths(cur, -pagas), first, category: str(args["categoria"]) || guessCategory(desc), createdAt: todayIso, ...(pagas > 0 ? { inLimit: true } : {}) };
+    const plan: Plan = { ...shareProp(args), id: uid("plan-"), desc, cardId: c.item.id, total: round2(per * n), count: n, per, purchaseYm: addMonths(cur, -pagas), first, category: str(args["categoria"]) || guessCategory(desc), createdAt: todayIso, ...(pagas > 0 ? { inLimit: true } : {}) };
     const info = planInfo(plan, c.item, today);
     return { state: { ...s, plans: [...s.plans, plan] }, result: { ok: true, acao: "parcelada_cadastrada", compra: desc, cartao: c.item.name, parcela: per, parcelas: n, pagas: info.paid, falta_pagar: info.remainingAmount, termina_em: monthName(info.lastYm) },
       panel: panel("Compra parcelada cadastrada", [item(desc, `${n}x de ${brl(per)} · ${c.item.name}`), item("Falta pagar", brl(info.remainingAmount)), item("Termina em", monthName(info.lastYm))], "/financeiro?aba=parcelas", "Abrir parcelas") };
@@ -187,9 +194,23 @@ export function applyWrite(s: FinanceState, args: Record<string, unknown>, today
     if (aa && "erro" in aa) return aa.erro;
     if (!cc && !aa) return fail("Em qual conta ou cartão?", { contas: s.accounts.map((a) => a.name), cartoes: s.cards.map((x) => x.name) });
     const startYm = dayIn(cur, day) >= todayIso ? cur : addMonths(cur, 1);
-    const r: Recurring = { id: uid("rec-"), kind: income ? "receita" : "despesa", desc, amount: v, day, category: str(args["categoria"]) || (sub ? "assinaturas" : guessCategory(desc, income)), method: cc ? "credito" : income ? "pix" : "debito", ...(cc && !("erro" in cc) ? { cardId: cc.item.id } : {}), ...(aa && !("erro" in aa) ? { accountId: aa.item.id } : {}), startYm, ...(sub ? { subscription: true } : {}) };
+    const r: Recurring = { ...(income ? {} : shareProp(args)), id: uid("rec-"), kind: income ? "receita" : "despesa", desc, amount: v, day, category: str(args["categoria"]) || (sub ? "assinaturas" : guessCategory(desc, income)), method: cc ? "credito" : income ? "pix" : "debito", ...(cc && !("erro" in cc) ? { cardId: cc.item.id } : {}), ...(aa && !("erro" in aa) ? { accountId: aa.item.id } : {}), startYm, ...(sub ? { subscription: true } : {}) };
     return { state: { ...s, recurring: [...s.recurring, r] }, result: { ok: true, acao: "fixa_cadastrada", nome: desc, valor: v, dia: day, tipo: income ? "entrada fixa" : sub ? "assinatura" : "conta fixa", comeca_em: monthName(startYm) },
       panel: panel(income ? "Entrada fixa cadastrada" : sub ? "Assinatura cadastrada" : "Conta fixa cadastrada", [item(desc, `${brl(v)} todo dia ${day}`), item("Começa em", monthName(startYm))], sub ? "/financeiro?aba=assinaturas" : "/financeiro?aba=meses", sub ? "Abrir assinaturas" : "Ver próximos meses") };
+  }
+
+  if (acao === "dividir") {
+    const loc = locate(s, args); if ("erro" in loc) return loc.erro;
+    const pessoa = str(args["pessoa"] ?? args["dividir_com"]), tirar = !pessoa || /^(remover|tirar|nenhum|ninguem|sem divisao)/.test(normalize(pessoa));
+    const sh: Shared | undefined = tirar ? undefined : { person: pessoa.slice(0, 80), percent: Math.min(100, Math.max(1, Math.round(num(args["percentual_dela"]) ?? 50))) };
+    let state: FinanceState, valor = 0, link = "/financeiro";
+    if (loc.tipo === "movimentacao") { const t = s.transactions.find((x) => x.id === loc.id)!; if (t.kind !== "despesa") return fail("Só despesas podem ser divididas."); valor = t.amount; state = { ...s, transactions: upsertList(s.transactions, { ...t, shared: sh }) }; }
+    else if (loc.tipo === "parcelada") { const p = s.plans.find((x) => x.id === loc.id)!; valor = p.per; link = "/financeiro?aba=parcelas"; state = { ...s, plans: upsertList(s.plans, { ...p, shared: sh }) }; }
+    else if (loc.tipo === "fixa" || loc.tipo === "assinatura") { const r = s.recurring.find((x) => x.id === loc.id)!; if (r.kind !== "despesa") return fail("Só despesas podem ser divididas."); valor = r.amount; state = { ...s, recurring: upsertList(s.recurring, { ...r, shared: sh }) }; }
+    else return fail("Só compras, parcelas e contas fixas podem ser divididas.");
+    const parte = sharedPart(valor, sh);
+    return { state, result: { ok: true, acao: sh ? "dividida" : "divisao_removida", item: loc.nome, pessoa: sh?.person ?? null, percentual_dela: sh?.percent ?? null, valor_da_parcela_ou_compra: valor, parte_dela: parte, sua_parte: round2(valor - parte), dica: sh ? "O total do banco não muda; a parte dela entra como receita a receber." : undefined },
+      panel: panel(sh ? "Dividido" : "Divisão removida", sh ? [item(loc.nome, `${sh.person} fica com ${sh.percent}% = ${brl(parte)}`), item("Sua parte", brl(round2(valor - parte)))] : [item(loc.nome)], link) };
   }
 
   if (acao === "editar") return edit(s, args, today);

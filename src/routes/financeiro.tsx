@@ -11,6 +11,7 @@ import { TransactionsView } from "@/components/finance/Transactions";
 import { SubscriptionsView } from "@/components/finance/Subscriptions";
 import { MonthsView } from "@/components/finance/Months";
 import { SettleView } from "@/components/finance/Settle";
+import { FinanceAssistant } from "@/components/finance/Assistant";
 import { ConfirmDelete, btn } from "@/components/finance/ui";
 import { FinBackdrop, LiveDot } from "@/components/finance/fx";
 import { monthName, ymOf } from "@/lib/finance/calc";
@@ -101,6 +102,7 @@ function FinancePage() {
             {tab === "acerto" && <SettleView />}
             {tab === "metas" && <GoalsView />}
           </div>
+          <div className="mt-6"><FinanceAssistant key={tab === "acerto" ? "a" : "b"} defaultOpen={tab === "acerto"} /></div>
         </>
       )}
       <QuickAddModal open={adding} onClose={() => { setAdding(false); setPreset(null); }} preset={preset} />

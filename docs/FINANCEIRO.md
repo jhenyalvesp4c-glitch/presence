@@ -65,3 +65,9 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 - Na fatura do cartão: chip "com Fulano · 50%", resumo (banco / a receber / minha parte) e a chave **Valor do banco | Só a minha parte**.
 - Dados: `shared jsonb` em `fin_transactions`, `fin_plans` e `fin_recurring` (`{"person","percent"}`); lógica em `calc.ts` (`sharedPart`, `myPart`, `invoiceFor`.`othersOwe/mine`).
 - Contas da casa (acerto de contas): "Contas da casa" cola as contas cheias e divide pela "divisão padrão" do acerto.
+
+## Orion no financeiro (conversa, voz e prints)
+- Na tela do Financeiro há o painel **Orion do financeiro** (aberto na aba Acerto): conversa escrita com anexos (imagens, PDFs, texto). Na voz funciona igual, sem imagens.
+- Ferramenta `acerto` (`src/lib/voice/settle-tool.ts`): listar, ver, extrato, criar, lançar (várias linhas de um print), contas da casa, pix, editar, excluir, divisão padrão, quitar/reabrir e excluir acerto. Excluir sempre pede confirmação. Compras repetidas não duplicam.
+- Ferramenta `financeiro` ganhou `dividir` e os campos `dividir_com`/`percentual_dela` ao lançar, cadastrar parcelada/fixa e detalhar.
+- Regra do Orion: nunca adivinhar de quem é cada compra nem em qual cartão foi; pergunta só o que faltar e usa a explicação escrita junto do print.
