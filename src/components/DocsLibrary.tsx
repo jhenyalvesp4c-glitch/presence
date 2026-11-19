@@ -12,6 +12,7 @@ import {
   Sparkles, Star, Trash2, User, Users, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil, ClipboardCopy,
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
+import { matchDossier, parseLogins, prettySlug } from "@/lib/login-import";
 import { OrionPanel } from "@/components/orion/OrionPanel";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -165,6 +166,7 @@ function Library({ projectId }: { projectId: string }) {
   const [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({});
   const [dossiers, setDossiers] = useState<string[]>([]);
   const [editing, setEditing] = useState<Doc | { preset: string } | null>(null);
+  const [importing, setImporting] = useState(false);
   const [group, setGroup] = useState<string | null>(null);
   const [allGroups, setAllGroups] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -207,6 +209,12 @@ function Library({ projectId }: { projectId: string }) {
   const saveLogin = (d: Doc) => {
     setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: f.docs.some((x) => x.id === d.id) ? f.docs.map((x) => (x.id === d.id ? d : x)) : [d, ...f.docs] })));
     setSelId(d.id); setCur("log"); setOpen((o) => ({ ...o, log: true })); setEditing(null);
+  };
+  const importLogins = (list: Doc[]) => {
+    if (!list.length) return setImporting(false);
+    setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: [...list, ...f.docs] })));
+    setCur("log"); setOpen((o) => ({ ...o, log: true })); setImporting(false); setAllGroups(true); setGroup(null);
+    toast.success(`${list.length} login${list.length === 1 ? "" : "s"} cadastrado${list.length === 1 ? "" : "s"} (as senhas ficam só neste navegador).`);
   };
   const removeLogin = (d: Doc) => {
     if (!window.confirm(`Excluir o login "${d.title}"? Esta ação não pode ser desfeita.`)) return;
@@ -371,6 +379,7 @@ function Library({ projectId }: { projectId: string }) {
                 <h3 className="font-display text-lg font-semibold">Logins dos Dossiês</h3>
                 <p className="text-[0.7rem] text-muted-foreground">{groups.length} dossiê{groups.length === 1 ? "" : "s"} · {logins.length} login{logins.length === 1 ? "" : "s"}</p>
               </div>
+              <button onClick={() => setImporting(true)} data-testid="importar-logins" className="flex items-center gap-1 rounded-full border border-violet/50 px-3 py-1.5 text-xs text-violet transition hover:bg-violet/10"><ClipboardCopy size={12} /> Importar lista</button>
               <button onClick={() => setEditing({ preset: group ?? "" })} data-testid="novo-login" className="flex items-center gap-1 rounded-full border border-amber/50 px-3 py-1.5 text-xs text-amber transition hover:bg-amber/10"><Plus size={12} /> Novo login</button>
               <button onClick={() => { setAllGroups((v) => !v); setGroup(null); }} data-testid="ver-tudo" aria-pressed={allGroups}
                 className={`glass flex items-center gap-1 rounded-full px-3 py-1.5 text-xs transition hover:text-cyan ${allGroups ? "!border-cyan/60 text-cyan" : ""}`}>{allGroups ? "Recolher" : "Ver tudo"} <ArrowRight size={12} className={allGroups ? "-rotate-90" : ""} /></button>
@@ -416,6 +425,7 @@ function Library({ projectId }: { projectId: string }) {
         {/* detalhes */}
         {editDoc && <DocEditor key={`edit-${editDoc.doc.id}`} isNew={editDoc.isNew} folderName={findFolder(folders, editDoc.folderId)?.name ?? "Documentos"} onSave={saveDoc} onClose={() => setEditDoc(null)}
           initial={{ title: editDoc.doc.title, desc: editDoc.doc.desc, kind: editDoc.doc.kind, color: editDoc.doc.color, rules: editDoc.doc.rules ?? [], steps: editDoc.doc.steps ?? [], attachments: editDoc.doc.attachments ?? [], summary: editDoc.doc.summary ?? "" }} />}
+        {importing && <LoginImporter dossiers={dossiers} existing={logins.map((l) => (l.login?.user ?? "").toLowerCase())} onImport={importLogins} onClose={() => setImporting(false)} />}
         {editing && <LoginEditor initial={"id" in editing ? editing : null} preset={"preset" in editing ? editing.preset : ""} dossiers={dossiers} onSave={saveLogin} onClose={() => setEditing(null)} />}
         <DocDetail key={sel?.id} urls={urls} onEdit={() => { if (sel) editExisting(sel.id); }} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
       </div>
@@ -674,6 +684,69 @@ function HoverActions({ onEdit, onDelete, className }: { onEdit: () => void; onD
       <span role="button" tabIndex={0} aria-label="Excluir login" data-testid="excluir-login" onClick={(e) => { e.stopPropagation(); onDelete(); }}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onDelete(); } }} className={`${btn} hover:border-destructive/60 hover:text-destructive`}><Trash2 size={12} /></span>
     </span>
+  );
+}
+
+/** Cola a lista de acessos (ex.: do WhatsApp) e cadastra um login por e-mail, já ligado ao dossiê do polo. Tudo acontece neste navegador. */
+function LoginImporter({ dossiers, existing, onImport, onClose }: { dossiers: string[]; existing: string[]; onImport: (docs: Doc[]) => void; onClose: () => void }) {
+  type Row = { email: string; polo: string; owner: string; pass: string; on: boolean; dup: boolean; matched: boolean };
+  const [text, setText] = useState("");
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [show, setShow] = useState(false);
+  const analyze = () => {
+    setRows(parseLogins(text).map((p) => {
+      const m = matchDossier(p.polo, dossiers), dup = existing.includes(p.email);
+      return { email: p.email, polo: m ?? prettySlug(p.polo), owner: p.owner, pass: p.pass, on: !dup, dup, matched: !!m };
+    }));
+  };
+  const set = (i: number, patch: Partial<Row>) => setRows((r) => r && r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const chosen = (rows ?? []).filter((r) => r.on && r.email && r.polo.trim());
+  const field = "w-full rounded-lg border border-border bg-secondary/40 px-2 py-1 text-xs outline-none focus:border-violet/60";
+  const submit = () => onImport(chosen.map((r) => mk(newId(), r.polo.trim(), `Acesso do polo ${r.polo.trim()} ao CRM e plataforma de disparo.`, "Login", "amber", { updated: "agora", login: { user: r.email, pass: r.pass, owner: r.owner.trim(), dossier: r.polo.trim() } })));
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-background/80 p-4 backdrop-blur-md" {...backdropProps(onClose)}>
+      <div onClick={(e) => e.stopPropagation()} data-testid="importar-logins-painel" className="glass mx-auto my-8 w-full max-w-3xl rounded-3xl p-5 animate-rise" style={tint("violet")}>
+        <div className="flex items-center gap-3">
+          <span className="icon-tile h-10 w-10 !rounded-2xl"><ClipboardCopy size={18} /></span>
+          <h3 className="mr-auto font-display text-lg font-semibold">Importar logins por polo</h3>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+        </div>
+        {!rows ? <>
+          <p className="mt-3 text-xs text-muted-foreground">Cole aqui o texto com os e-mails (um por linha, como na lista de acessos do WhatsApp). A senha de cada polo é montada pelo padrão <b>fecaf + nome do polo</b>, que é o trecho do e-mail entre o @ e o .com.br. Você confere tudo antes de cadastrar.</p>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={10} placeholder={"carla@fecafsinop.com.br\nleo@fecafbarra.com.br\n…"} data-testid="importar-texto" className="mt-3 w-full resize-y rounded-xl border border-border bg-secondary/40 px-3 py-2 font-mono text-xs outline-none focus:border-violet/60" />
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancelar</button>
+            <button type="button" onClick={analyze} disabled={!text.trim()} data-testid="importar-conferir" className="rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-primary-foreground transition enabled:hover:scale-105 disabled:opacity-40">Conferir</button>
+          </div>
+        </> : !rows.length ? <>
+          <p className="mt-4 text-sm text-muted-foreground">Não achei nenhum e-mail nesse texto.</p>
+          <div className="mt-3 flex justify-end"><button type="button" onClick={() => setRows(null)} className="rounded-xl border border-border px-4 py-2 text-sm">Voltar</button></div>
+        </> : <>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span>{rows.length} e-mail{rows.length === 1 ? "" : "s"} encontrado{rows.length === 1 ? "" : "s"} · <b className="text-foreground">{chosen.length}</b> para cadastrar</span>
+            <button type="button" onClick={() => setShow((v) => !v)} className="ml-auto flex items-center gap-1 hover:text-amber">{show ? <EyeOff size={12} /> : <Eye size={12} />} {show ? "Ocultar senhas" : "Mostrar senhas"}</button>
+          </div>
+          <div className="mt-2 overflow-x-auto" data-testid="importar-tabela">
+            <table className="w-full min-w-[640px] border-separate border-spacing-y-1 text-left">
+              <thead><tr className="text-[0.62rem] uppercase tracking-wider text-muted-foreground"><th className="w-8" /><th>E-mail</th><th>Polo / dossiê</th><th>Responsável</th><th>Senha</th></tr></thead>
+              <tbody>{rows.map((r, i) => <tr key={r.email} className={r.on ? "" : "opacity-50"}>
+                <td><input type="checkbox" checked={r.on} onChange={(e) => set(i, { on: e.target.checked })} aria-label={`Cadastrar ${r.email}`} /></td>
+                <td className="pr-2 font-mono text-[0.7rem]">{r.email}{r.dup && <span className="ml-1 rounded bg-amber/15 px-1 text-[0.6rem] text-amber">já cadastrado</span>}</td>
+                <td className="pr-2"><input list="dossies-importar" value={r.polo} onChange={(e) => set(i, { polo: e.target.value, matched: dossiers.includes(e.target.value) })} className={`${field} ${r.polo.trim() ? "" : "!border-destructive/60"}`} />{!r.matched && r.polo.trim() && <span className="block text-[0.58rem] text-amber">sem dossiê com esse nome</span>}</td>
+                <td className="pr-2"><input value={r.owner} onChange={(e) => set(i, { owner: e.target.value })} className={field} /></td>
+                <td><input type={show ? "text" : "password"} value={r.pass} onChange={(e) => set(i, { pass: e.target.value })} autoComplete="new-password" placeholder="preencher" className={`${field} font-mono`} /></td>
+              </tr>)}</tbody>
+            </table>
+            <datalist id="dossies-importar">{dossiers.map((n) => <option key={n} value={n} />)}</datalist>
+          </div>
+          <p className="mt-2 text-[0.65rem] leading-snug text-muted-foreground">Os logins ficam salvos só neste navegador; as senhas não vão para o banco de dados nem para o segundo cérebro.</p>
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" onClick={() => setRows(null)} className="rounded-xl border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Voltar</button>
+            <button type="button" onClick={submit} disabled={!chosen.length} data-testid="importar-cadastrar" className="rounded-xl bg-gradient-brand px-4 py-2 text-sm font-semibold text-primary-foreground transition enabled:hover:scale-105 disabled:opacity-40">Cadastrar {chosen.length}</button>
+          </div>
+        </>}
+      </div>
+    </div>
   );
 }
 
