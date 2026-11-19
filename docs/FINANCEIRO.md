@@ -51,3 +51,10 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 - **Excluir sempre pede confirmação** (`precisa_confirmar` → só com `confirmado: true`). Falha ao gravar não muda nada. Depois de gravar, o servidor manda `{tipo: "atualizar"}` e a tela recarrega do banco (`orion:financeiro-atualizado`).
 
 **Próximo**: Open Finance (agregador) alimentando `fin_transactions`, com o mesmo `id` estável por lançamento do banco para não duplicar.
+
+## Acerto de contas (aba "Acerto de contas")
+- Para quem compra no cartão um do outro: cada acerto é com uma pessoa; cada compra diz em qual cartão foi e de quem é (toda, dividida ou outra %); pix já feitos entram no saldo.
+- Saldo (centavos): `owedToMe − owedByMe + pix que eu fiz − pix que ela fez`; positivo = a outra pessoa paga. Lógica pura em `src/lib/finance/settle.ts` (testes em `src/test/settle.test.ts`).
+- "Ler extrato": foto, PDF ou texto → IA devolve as compras (`statement.functions.ts`); a pessoa marca de quem é cada linha antes de lançar. Linhas já lançadas vêm desmarcadas.
+- Saídas: copiar texto (WhatsApp), baixar imagem (PNG) e PDF pela impressão do navegador (`settle-export.ts`).
+- Banco: `fin_settlements` e `fin_settlement_items` (migração `20261126000300_fin_settlements.sql`), RLS só do dono, sem `anon`.

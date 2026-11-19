@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, CalendarRange, CreditCard, Gauge, Layers, LayoutDashboard, MoreHorizontal, Plus, Receipt, Repeat, Sparkles, Target } from "lucide-react";
+import { ArrowLeft, CalendarRange, CreditCard, Gauge, Handshake, Layers, LayoutDashboard, MoreHorizontal, Plus, Receipt, Repeat, Sparkles, Target } from "lucide-react";
 import { Briefing } from "@/components/finance/Briefing";
 import { AccountsView, type Sel } from "@/components/finance/Accounts";
 import { Dashboard } from "@/components/finance/Dashboard";
@@ -10,17 +10,18 @@ import { QuickAddModal } from "@/components/finance/QuickAdd";
 import { TransactionsView } from "@/components/finance/Transactions";
 import { SubscriptionsView } from "@/components/finance/Subscriptions";
 import { MonthsView } from "@/components/finance/Months";
+import { SettleView } from "@/components/finance/Settle";
 import { ConfirmDelete, btn } from "@/components/finance/ui";
 import { FinBackdrop, LiveDot } from "@/components/finance/fx";
 import { monthName, ymOf } from "@/lib/finance/calc";
 import type { Draft } from "@/lib/finance/parse";
 import { FinanceProvider, useFinance } from "@/lib/finance/store";
 
-const TABS = ["visao", "contas", "parcelas", "meses", "movimentacoes", "assinaturas", "metas"] as const;
+const TABS = ["visao", "contas", "parcelas", "meses", "movimentacoes", "assinaturas", "acerto", "metas"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_META: Record<Tab, { label: string; icon: typeof Gauge }> = {
   visao: { label: "Visão geral", icon: LayoutDashboard }, contas: { label: "Contas e cartões", icon: CreditCard }, parcelas: { label: "Parcelas", icon: Layers }, meses: { label: "Próximos meses", icon: CalendarRange },
-  movimentacoes: { label: "Movimentações", icon: Receipt }, assinaturas: { label: "Assinaturas", icon: Repeat }, metas: { label: "Metas", icon: Target },
+  movimentacoes: { label: "Movimentações", icon: Receipt }, assinaturas: { label: "Assinaturas", icon: Repeat }, acerto: { label: "Acerto de contas", icon: Handshake }, metas: { label: "Metas", icon: Target },
 };
 
 /** Indicador de onde os dados estão sendo guardados. */
@@ -97,6 +98,7 @@ function FinancePage() {
             {tab === "meses" && <MonthsView />}
             {tab === "movimentacoes" && <TransactionsView onAdd={() => open()} />}
             {tab === "assinaturas" && <SubscriptionsView />}
+            {tab === "acerto" && <SettleView />}
             {tab === "metas" && <GoalsView />}
           </div>
         </>
