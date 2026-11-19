@@ -83,7 +83,23 @@ export function statementText(opts: { me: string; person: string; items: SettleI
 export function parseMoney(s: string): number | null {
   const t = s.replace(/[^\d,.\-]/g, "");
   if (!/\d/.test(t)) return null;
-  const hasComma = t.includes(",");
-  const n = Number(hasComma ? t.replace(/\./g, "").replace(",", ".") : /\.\d{3}(\D|$)/.test(t) && t.split(".").length > 2 ? t.replace(/\./g, "") : t);
+  // "1.200" e "1.234.567" (sem vírgula, grupos de 3) são milhares; "89.90" é decimal
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : /^-?\d{1,3}(\.\d{3})+$/.test(t) ? t.replace(/\./g, "") : t);
   return Number.isFinite(n) ? Math.abs(n) : null;
+}
+
+/** Várias contas coladas de uma vez ("Luz 312,40", "Internet - R$ 120,00", "Condomínio: 1.200"): descrição + valor (o último número da linha). */
+export function parseBills(text: string): { description: string; amount: number }[] {
+  const out: { description: string; amount: number }[] = [];
+  for (const raw of text.split(/\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*$/.exec(line);
+    if (!m) continue;
+    const amount = parseMoney(m[1]!);
+    if (amount === null || amount <= 0) continue;
+    const description = line.slice(0, m.index).replace(/[\s:\-–—=R$]+$/g, "").trim();
+    out.push({ description: description || "Conta", amount });
+  }
+  return out;
 }

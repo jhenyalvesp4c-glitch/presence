@@ -1,12 +1,12 @@
 /** Financeiro → Acerto de contas: compras no cartão de um e do outro, quanto cada um deve e o pix final, com extrato para enviar. */
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ArrowRightLeft, Camera, Check, ClipboardCopy, FileText, Handshake, Image as ImageIcon, Loader2, Pencil, Plus, Printer, Receipt, Trash2, Wallet } from "lucide-react";
+import { ArrowRightLeft, Camera, Check, ClipboardCopy, FileText, Handshake, Home, Image as ImageIcon, Loader2, Pencil, Plus, Printer, Receipt, Trash2, Wallet } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
 import { readFiles, type LocalFile } from "@/components/inbox/files";
 import { readStatement, type StatementLine } from "@/lib/finance/statement.functions";
-import { balance, brl, fromCents, parseMoney, split, statementText, type Payer, type SettleItem } from "@/lib/finance/settle";
+import { balance, brl, fromCents, parseBills, parseMoney, split, statementText, type Payer, type SettleItem } from "@/lib/finance/settle";
 import { download, printStatement, statementPng } from "@/lib/finance/settle-export";
 import { useSettleActions, useSettlementItems, useSettlements, type ItemDraft, type Settlement } from "@/lib/finance/settle-data";
 import { Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TextInput, btn } from "./ui";
@@ -21,7 +21,7 @@ export function SettleView() {
   const list = useSettlements(), acts = useSettleActions(), { account } = useAuth();
   const me = account?.name?.trim() || "Eu";
   const [selId, setSelId] = useState<string | null>(null), [newName, setNewName] = useState(""), [adding, setAdding] = useState(false);
-  const [reader, setReader] = useState(false), [editor, setEditor] = useState<{ item: SettleItem | null; kind: SettleItem["kind"] } | null>(null);
+  const [reader, setReader] = useState(false), [bills, setBills] = useState(false), [editor, setEditor] = useState<{ item: SettleItem | null; kind: SettleItem["kind"] } | null>(null);
   const settlements = list.data ?? [];
   const sel: Settlement | undefined = settlements.find((s) => s.id === selId) ?? settlements.find((s) => !s.closed) ?? settlements[0];
   const items = useSettlementItems(sel?.id ?? null).data ?? [];
@@ -71,8 +71,10 @@ export function SettleView() {
               {(bal.paidByMe > 0 || bal.paidByOther > 0) && <><span className="text-muted-foreground">Pix que você já fez</span><b className="text-right tabular-nums">+ {brl(fromCents(bal.paidByMe))}</b><span className="text-muted-foreground">Pix que {sel.person} já fez</span><b className="text-right tabular-nums">− {brl(fromCents(bal.paidByOther))}</b></>}
             </div>
           </div>
+          <DefaultSplit person={sel.person} value={sel.defaultShare} onChange={(v) => acts.patch.mutate({ id: sel.id, defaultShare: v }, { onError: (e) => toast.error(`Não consegui salvar: ${e.message}`) })} />
           <div className="mt-4 flex flex-wrap gap-2">
             <button className={btn.primary} onClick={() => setReader(true)} data-testid="acerto-ler"><Camera size={15} /> Ler extrato (foto, PDF ou texto)</button>
+            <button className={btn.ghost} onClick={() => setBills(true)} data-testid="acerto-contas"><Home size={15} /> Contas da casa</button>
             <button className={btn.ghost} onClick={() => setEditor({ item: null, kind: "compra" })} data-testid="acerto-compra"><Receipt size={15} /> Lançar compra</button>
             <button className={btn.ghost} onClick={() => setEditor({ item: null, kind: "pagamento" })} data-testid="acerto-pix"><Wallet size={15} /> Registrar pix</button>
           </div>
@@ -103,7 +105,8 @@ export function SettleView() {
       </>}
 
       {sel && reader && <StatementReader person={sel.person} existing={items} onClose={() => setReader(false)} onSave={(d) => { void saveDrafts(d); setReader(false); }} />}
-      {sel && editor && <ItemEditor person={sel.person} initial={editor.item} kind={editor.kind} onClose={() => setEditor(null)}
+      {sel && bills && <BillsModal person={sel.person} defaultShare={sel.defaultShare} onClose={() => setBills(false)} onSave={(d) => { void saveDrafts(d); setBills(false); }} />}
+      {sel && editor && <ItemEditor person={sel.person} defaultShare={sel.defaultShare} initial={editor.item} kind={editor.kind} onClose={() => setEditor(null)}
         onSave={(d) => { if (editor.item) acts.updateItem.mutate({ settlementId: sel.id, id: editor.item.id, draft: d }, { onError: (e) => toast.error(`Não consegui salvar: ${e.message}`) }); else void saveDrafts([d]); setEditor(null); }} />}
     </div>
   );
@@ -124,15 +127,18 @@ function ItemRow({ it, person, onEdit, onDelete }: { it: SettleItem; person: str
 }
 
 /* ───────────── lançar à mão / editar ───────────── */
-function ItemEditor({ person, initial, kind, onSave, onClose }: { person: string; initial: SettleItem | null; kind: SettleItem["kind"]; onSave: (d: ItemDraft) => void; onClose: () => void }) {
+function ItemEditor({ person, defaultShare, initial, kind, onSave, onClose }: { person: string; defaultShare: number | null; initial: SettleItem | null; kind: SettleItem["kind"]; onSave: (d: ItemDraft) => void; onClose: () => void }) {
   const [payer, setPayer] = useState<Payer>(initial?.payer ?? "eu");
   const [desc, setDesc] = useState(initial?.description ?? ""), [amount, setAmount] = useState<number | undefined>(initial?.amount), [date, setDate] = useState(initial?.date ?? todayIso());
-  const [who, setWho] = useState<"tudo" | "metade" | "pct">(() => (initial ? (initial.otherShare === 50 ? "metade" : initial.otherShare === 100 || initial.otherShare === 0 ? "tudo" : "pct") : "tudo"));
-  const [pct, setPct] = useState(initial && ![0, 50, 100].includes(initial.otherShare) ? initial.otherShare : 30), [inst, setInst] = useState(initial?.installment ?? "");
+  // compra nova: começa pela divisão padrão do acerto (se houver); compra existente: como foi lançada
+  const start = initial ? initial.otherShare : defaultShare;
+  const [who, setWho] = useState<"tudo" | "metade" | "pct">(() => (start === null ? "tudo" : start === 50 ? "metade" : start === 100 || start === 0 ? "tudo" : "pct"));
+  const [pct, setPct] = useState(start !== null && ![0, 50, 100].includes(start) ? start : 30), [inst, setInst] = useState(initial?.installment ?? "");
   const pix = kind === "pagamento";
   // para quem é a compra: "tudo" = a parte inteira do OUTRO lado do cartão (se paguei eu, é dela; se ela pagou, é minha)
   const otherShare = pix ? 100 : who === "metade" ? 50 : who === "pct" ? Math.min(100, Math.max(0, pct)) : payer === "eu" ? 100 : 0;
   const ok = !!amount && amount > 0;
+  const parts = amount && !pix ? split({ amount, otherShare }) : null;
   return (
     <Modal open onClose={onClose} title={initial ? "Editar lançamento" : pix ? "Registrar pix" : "Lançar compra"} width="max-w-lg"
       footer={<><button className={btn.ghost} onClick={onClose}>Cancelar</button><button className={btn.primary} disabled={!ok} data-testid="acerto-salvar-item" onClick={() => amount && onSave({ kind, date: date || null, description: desc, amount, payer, otherShare, installment: inst })}>Salvar</button></>}>
@@ -149,7 +155,56 @@ function ItemEditor({ person, initial, kind, onSave, onClose }: { person: string
           <Field label="Data"><TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         </div>
         <Field label={pix ? "Observação (opcional)" : "Descrição"}><TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={pix ? "Ex.: pix de quitação" : "Ex.: Mercado, farmácia…"} maxLength={200} data-testid="acerto-desc" /></Field>
+        {parts && <p className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm" data-testid="acerto-divisor">Parte de {person}: <b className="text-emerald">{brl(fromCents(parts.other))}</b> · Sua parte: <b>{brl(fromCents(parts.mine))}</b> <span className="text-xs text-muted-foreground">({otherShare}% / {100 - otherShare}%)</span></p>}
         {!pix && <Field label="Parcela (opcional)"><TextInput value={inst} onChange={(e) => setInst(e.target.value)} placeholder="Ex.: 2/5" maxLength={20} /></Field>}
+      </div>
+    </Modal>
+  );
+}
+
+/** Quanto das contas da casa fica com cada um (usado como ponto de partida ao lançar). */
+function DefaultSplit({ person, value, onChange }: { person: string; value: number | null; onChange: (v: number | null) => void }) {
+  const [txt, setTxt] = useState(value === null ? "" : String(value));
+  const commit = () => { const n = txt.trim() === "" ? null : Math.min(100, Math.max(0, Math.round(Number(txt)))); if (n !== null && !Number.isFinite(n)) return; if (n !== value) onChange(n); };
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid="acerto-padrao">
+      <span>Divisão padrão das contas da casa:</span>
+      <span>{person} fica com</span>
+      <input aria-label="Porcentagem padrão da outra pessoa" inputMode="numeric" value={txt} onChange={(e) => setTxt(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} placeholder="50" className="w-14 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-right text-foreground" />
+      <span>% e você com {txt === "" ? "…" : 100 - Math.min(100, Number(txt))}%</span>
+      {[50, 60, 70].map((n) => <button key={n} type="button" className="rounded-full border border-white/10 px-2 py-0.5 hover:text-foreground" onClick={() => { setTxt(String(n)); onChange(n); }}>{n}/{100 - n}</button>)}
+    </div>
+  );
+}
+
+/** Contas da casa: cola as contas CHEIAS (uma por linha) e o app divide cada uma. */
+function BillsModal({ person, defaultShare, onSave, onClose }: { person: string; defaultShare: number | null; onSave: (d: ItemDraft[]) => void; onClose: () => void }) {
+  const [text, setText] = useState(""), [payer, setPayer] = useState<Payer>("outro"), [share, setShare] = useState(defaultShare ?? 50), [date, setDate] = useState(todayIso());
+  const rows = useMemo(() => parseBills(text), [text]);
+  const parts = rows.map((r) => split({ amount: r.amount, otherShare: share }));
+  const sumOther = parts.reduce((n, p) => n + p.other, 0), sumMine = parts.reduce((n, p) => n + p.mine, 0), total = rows.reduce((n, r) => n + Math.round(r.amount * 100), 0);
+  // quem pagou a conta cheia: se foi o outro, eu devo a minha parte; se fui eu, a outra pessoa deve a dela
+  return (
+    <Modal open onClose={onClose} title="Contas da casa" subtitle="Cole as contas cheias; o app divide cada uma" width="max-w-2xl"
+      footer={<><button className={btn.ghost} onClick={onClose}>Cancelar</button><button className={btn.primary} disabled={!rows.length} data-testid="acerto-contas-salvar"
+        onClick={() => onSave(rows.map((r) => ({ kind: "compra" as const, date: date || null, description: r.description, amount: r.amount, payer, otherShare: share, installment: "" })))}>Lançar {rows.length} conta{rows.length === 1 ? "" : "s"}</button></>}>
+      <div className="space-y-4">
+        <Field label="Quem pagou as contas cheias?" group><Segmented value={payer} onChange={setPayer} options={[{ value: "outro", label: `${person} pagou` }, { value: "eu", label: "Eu paguei" }]} /></Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={`Divisão: ${person} fica com`} hint={`Você fica com ${100 - share}%.`}>
+            <div className="flex items-center gap-2"><input type="number" min={0} max={100} value={share} onChange={(e) => setShare(Math.min(100, Math.max(0, Math.round(Number(e.target.value) || 0))))} className="w-24 rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5 text-right text-sm" data-testid="acerto-contas-pct" /><span className="text-sm text-muted-foreground">%</span>
+              {[50, 60, 70].map((n) => <button key={n} type="button" className="rounded-full border border-white/10 px-2.5 py-1 text-xs hover:text-foreground" onClick={() => setShare(n)}>{n}/{100 - n}</button>)}</div>
+          </Field>
+          <Field label="Data"><TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+        </div>
+        <Field label="Contas (uma por linha, com o valor cheio)" hint="Ex.: Luz 312,40 · Internet 120 · Condomínio 1.200,00">
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} placeholder={"Luz 312,40\nInternet 120,00\nCondomínio 1.200,00"} data-testid="acerto-contas-texto" className="w-full rounded-2xl border border-white/10 bg-black/25 px-3.5 py-2.5 font-mono text-sm outline-none focus:border-cyan/55" />
+        </Field>
+        {rows.length > 0 && <div className="rounded-2xl border border-white/10 bg-black/20 p-3 text-sm" data-testid="acerto-contas-previa">
+          <ul className="divide-y divide-white/5">{rows.map((r, i) => <li key={i} className="flex items-center gap-3 py-1.5"><span className="min-w-0 flex-1 truncate">{r.description}</span><span className="tabular-nums text-muted-foreground">{brl(r.amount)}</span><span className="w-28 text-right text-xs tabular-nums text-emerald">{person}: {brl(fromCents(parts[i]!.other))}</span><span className="w-24 text-right text-xs tabular-nums">você: {brl(fromCents(parts[i]!.mine))}</span></li>)}</ul>
+          <p className="mt-2 flex flex-wrap justify-between gap-2 border-t border-white/10 pt-2 font-medium"><span>Total {brl(fromCents(total))}</span><span className="text-emerald">{person}: {brl(fromCents(sumOther))}</span><span>Você: {brl(fromCents(sumMine))}</span></p>
+          <p className="mt-1 text-xs text-muted-foreground">{payer === "outro" ? `Como ${person} pagou, você deve a ele(a) ${brl(fromCents(sumMine))}.` : `Como você pagou, ${person} deve a você ${brl(fromCents(sumOther))}.`}</p>
+        </div>}
       </div>
     </Modal>
   );

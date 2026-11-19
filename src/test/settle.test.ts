@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balance, effect, parseMoney, split, statementText, type SettleItem } from "@/lib/finance/settle";
+import { balance, effect, parseBills, parseMoney, split, statementText, type SettleItem } from "@/lib/finance/settle";
 
 const mk = (p: Partial<SettleItem> & { amount: number; payer: SettleItem["payer"] }): SettleItem => ({ id: Math.random().toString(), kind: "compra", date: "2026-11-10", description: "x", otherShare: 100, installment: "", ...p });
 
@@ -43,5 +43,11 @@ describe("Acerto de contas", () => {
   });
   it("lê valores no formato brasileiro", () => {
     expect(parseMoney("R$ 1.234,56")).toBe(1234.56); expect(parseMoney("89,90")).toBe(89.9); expect(parseMoney("89.90")).toBe(89.9); expect(parseMoney("1.234.567")).toBe(1234567); expect(parseMoney("-45,00")).toBe(45); expect(parseMoney("abc")).toBeNull();
+  });
+  it("lê várias contas coladas de uma vez", () => {
+    expect(parseBills("Luz 312,40\nInternet - R$ 120,00\nCondomínio: 1.200\n\nÁgua  89.90\nsem valor aqui")).toEqual([
+      { description: "Luz", amount: 312.4 }, { description: "Internet", amount: 120 }, { description: "Condomínio", amount: 1200 }, { description: "Água", amount: 89.9 },
+    ]);
+    expect(parseBills("Parcela 3/10 da TV 150,00")).toEqual([{ description: "Parcela 3/10 da TV", amount: 150 }]);
   });
 });

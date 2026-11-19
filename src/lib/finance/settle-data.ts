@@ -5,16 +5,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { must, supabase } from "../data/db";
 import type { SettleItem } from "./settle";
 
-export type Settlement = { id: string; person: string; note: string; closed: boolean; createdAt: string };
+export type Settlement = { id: string; person: string; note: string; closed: boolean; createdAt: string; /** % das contas da casa que fica com a outra pessoa (null = não definido). */ defaultShare: number | null };
 export type ItemDraft = Omit<SettleItem, "id">;
 
 const LIST = ["settlements"] as const;
 const itemsKey = (id: string | null) => ["settlement-items", id] as const;
 
-type SRow = { id: string; person: string; note: string; closed: boolean; created_at: string };
+type SRow = { id: string; person: string; note: string; closed: boolean; created_at: string; default_share: number | null };
 type IRow = { id: string; kind: SettleItem["kind"]; item_date: string | null; description: string; amount: number | string; payer: SettleItem["payer"]; other_share: number; installment: string };
 
-const toSettlement = (r: SRow): Settlement => ({ id: r.id, person: r.person, note: r.note, closed: r.closed, createdAt: r.created_at });
+const toSettlement = (r: SRow): Settlement => ({ id: r.id, person: r.person, note: r.note, closed: r.closed, createdAt: r.created_at, defaultShare: r.default_share });
 const toItem = (r: IRow): SettleItem => ({ id: r.id, kind: r.kind, date: r.item_date, description: r.description, amount: Number(r.amount), payer: r.payer, otherShare: r.other_share, installment: r.installment });
 const toRow = (d: ItemDraft, settlementId: string, position: number) => ({
   settlement_id: settlementId, kind: d.kind, item_date: d.date || null, description: d.description.trim().slice(0, 200), amount: Math.round(d.amount * 100) / 100,
@@ -24,7 +24,7 @@ const toRow = (d: ItemDraft, settlementId: string, position: number) => ({
 export function useSettlements() {
   return useQuery({
     queryKey: LIST,
-    queryFn: async () => (must(await supabase.from("fin_settlements").select("id, person, note, closed, created_at").order("closed").order("created_at", { ascending: false })) as SRow[]).map(toSettlement),
+    queryFn: async () => (must(await supabase.from("fin_settlements").select("id, person, note, closed, created_at, default_share").order("closed").order("created_at", { ascending: false })) as SRow[]).map(toSettlement),
   });
 }
 
@@ -38,9 +38,9 @@ export function useSettlementItems(id: string | null) {
 export function useSettleActions() {
   const qc = useQueryClient();
   const refresh = useCallback((id?: string) => Promise.all([qc.invalidateQueries({ queryKey: LIST }), id ? qc.invalidateQueries({ queryKey: itemsKey(id) }) : Promise.resolve()]), [qc]);
-  const create = useMutation({ mutationFn: async (person: string) => (must(await supabase.from("fin_settlements").insert({ person: person.trim().slice(0, 80) }).select("id, person, note, closed, created_at")) as SRow[]).map(toSettlement)[0]!, onSuccess: () => void refresh() });
+  const create = useMutation({ mutationFn: async (person: string) => (must(await supabase.from("fin_settlements").insert({ person: person.trim().slice(0, 80) }).select("id, person, note, closed, created_at, default_share")) as SRow[]).map(toSettlement)[0]!, onSuccess: () => void refresh() });
   const patch = useMutation({
-    mutationFn: async (v: { id: string; person?: string; closed?: boolean; note?: string }) => { const { id, ...rest } = v; must(await supabase.from("fin_settlements").update({ ...rest, updated_at: new Date().toISOString() }).eq("id", id).select("id")); },
+    mutationFn: async (v: { id: string; person?: string; closed?: boolean; note?: string; defaultShare?: number | null }) => { const { id, defaultShare, ...rest } = v; must(await supabase.from("fin_settlements").update({ ...rest, ...(defaultShare !== undefined ? { default_share: defaultShare } : {}), updated_at: new Date().toISOString() }).eq("id", id).select("id")); },
     onSuccess: () => void refresh(),
   });
   const remove = useMutation({ mutationFn: async (id: string) => { must(await supabase.from("fin_settlements").delete().eq("id", id).select("id")); }, onSuccess: () => void refresh() });
