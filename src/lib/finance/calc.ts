@@ -17,6 +17,9 @@ export const monthShort = (ym: string) => MES[Number(ym.slice(5, 7)) - 1]!;
 export const monthLabel = (ym: string) => `${monthShort(ym)}/${ym.slice(2, 4)}`;
 export const monthName = (ym: string) => `${MES_FULL[Number(ym.slice(5, 7)) - 1]} de ${ym.slice(0, 4)}`;
 export const round2 = (n: number) => Math.round(n * 100) / 100;
+/** Parte da outra pessoa num gasto dividido (0 se não for dividido) e a sua. */
+export const sharedPart = (amount: number, sh?: { percent: number } | undefined): number => (sh ? round2((amount * Math.min(100, Math.max(0, sh.percent))) / 100) : 0);
+export const myPart = (amount: number, sh?: { percent: number } | undefined): number => round2(amount - sharedPart(amount, sh));
 export const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
 
 /* ───────────── fatura do cartão ───────────── */
@@ -114,14 +117,21 @@ function recurringEntry(r: Recurring, ym: string): Entry | null {
 const txEntry = (t: Transaction): Entry => ({ id: t.id, kind: t.kind, desc: t.desc, amount: t.amount, date: t.date, category: t.category, method: t.method, accountId: t.accountId, cardId: t.cardId, source: "tx" });
 
 /** Tudo que entra e sai no mês do calendário `ym` (compras na data da compra, parcelas no mês de vencimento, recorrentes). */
+/** A parte da outra pessoa de um gasto dividido vira uma receita a receber, no mesmo dia do gasto. */
+const receivable = (e: Entry, sh: { person: string; percent: number } | undefined): Entry | null => {
+  const part = e.kind === "despesa" ? sharedPart(e.amount, sh) : 0;
+  return sh && part > 0 ? { id: `${e.id}:sh`, kind: "receita", desc: `A receber de ${sh.person}: ${e.desc}`, amount: part, date: e.date, category: "outros", method: "pix", source: "compartilhada", person: sh.person, ...(e.parcel ? { parcel: e.parcel } : {}) } : null;
+};
+
 export function monthEntries(s: FinanceState, ym: string, upTo?: string): Entry[] {
   const out: Entry[] = [];
-  for (const t of s.transactions) if (ymOf(t.date) === ym) out.push(txEntry(t));
+  const add = (e: Entry, sh: { person: string; percent: number } | undefined) => { out.push(e); const r = receivable(e, sh); if (r) out.push(r); };
+  for (const t of s.transactions) if (ymOf(t.date) === ym) add(txEntry(t), t.shared);
   for (const p of s.plans) {
     const card = s.cards.find((c) => c.id === p.cardId), dueDay = card?.dueDay ?? 10;
-    for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === ym) out.push({ id: `${p.id}:${n}`, kind: "despesa", desc: p.desc, amount: parcelAmount(p, n), date: dayIn(ym, dueDay), category: p.category, method: "credito", cardId: p.cardId, source: "parcela", planId: p.id, parcel: `${n}/${p.count}` });
+    for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === ym) add({ id: `${p.id}:${n}`, kind: "despesa", desc: p.desc, amount: parcelAmount(p, n), date: dayIn(ym, dueDay), category: p.category, method: "credito", cardId: p.cardId, source: "parcela", planId: p.id, parcel: `${n}/${p.count}` }, p.shared);
   }
-  for (const r of s.recurring) { const e = recurringEntry(r, ym); if (e) out.push(e); }
+  for (const r of s.recurring) { const e = recurringEntry(r, ym); if (e) add(e, r.shared); }
   return out.filter((e) => !upTo || e.date <= upTo).sort((a, b) => b.date.localeCompare(a.date));
 }
 /** Mesmo dia do mês anterior (para comparar "até hoje" com o mês passado até o mesmo dia). */
@@ -238,20 +248,22 @@ export function cardAvailable(s: FinanceState, c: Card): number {
   return Math.max(0, round2(c.availableBase - cardUsed(s, c)));
 }
 
-export type InvoiceLine = { id: string; desc: string; amount: number; date: string; category: string; parcel?: string | undefined; source: Entry["source"] | "ajuste" };
+export type InvoiceLine = { id: string; desc: string; amount: number; date: string; category: string; parcel?: string | undefined; source: Entry["source"] | "ajuste"; /** Gasto dividido: quanto é da outra pessoa. */ shared?: { person: string; percent: number; part: number } | undefined };
 /** `declared` = total informado (se houver); `adjustment` = parte ainda não detalhada; `over` = quanto os itens passam do total informado. */
-export type Invoice = { cardId: string; ym: string; due: string; lines: InvoiceLine[]; total: number; adjustment: number; declared?: number | undefined; over: number };
+export type Invoice = { cardId: string; ym: string; due: string; lines: InvoiceLine[]; total: number; adjustment: number; declared?: number | undefined; over: number; /** Quanto dos itens é da(s) outra(s) pessoa(s) (o total do banco não muda). */ othersOwe: number; /** Total do banco menos a parte das outras pessoas. */ mine: number };
+const shareOf = (amount: number, sh: { person: string; percent: number } | undefined): { shared?: { person: string; percent: number; part: number } } => { const part = sharedPart(amount, sh); return sh && part > 0 ? { shared: { person: sh.person, percent: sh.percent, part } } : {}; };
 export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice {
   const lines: InvoiceLine[] = [];
-  for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx" });
-  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela" });
-  for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa" && recurringActiveIn(r, dueYm)) lines.push({ id: `${r.id}:${dueYm}`, desc: r.desc, amount: r.amount, date: dayIn(dueYm, r.day), category: r.category, source: "recorrente" });
+  for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx", ...shareOf(t.amount, t.shared) });
+  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...shareOf(parcelAmount(p, n), p.shared) });
+  for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa" && recurringActiveIn(r, dueYm)) lines.push({ id: `${r.id}:${dueYm}`, desc: r.desc, amount: r.amount, date: dayIn(dueYm, r.day), category: r.category, source: "recorrente", ...shareOf(r.amount, r.shared) });
   const items = sum(lines.map((l) => l.amount)), declared = card.declared?.[dueYm];
   // com total informado, o que ainda não foi detalhado é "total − itens" (nunca negativo): detalhar não muda o total
   const adjustment = declared !== undefined ? round2(Math.max(0, declared - items)) : (card.adjustments[dueYm] ?? 0);
   const over = declared !== undefined ? round2(Math.max(0, items - declared)) : 0;
   if (adjustment) lines.push({ id: `adj:${dueYm}`, desc: declared !== undefined ? "Outros valores (ainda não detalhados)" : "Outros valores pendentes", amount: adjustment, date: dueDateOf(card, dueYm), category: "outros", source: "ajuste" });
-  return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total: sum(lines.map((l) => l.amount)), adjustment, declared, over };
+  const total = sum(lines.map((l) => l.amount)), othersOwe = sum(lines.map((l) => l.shared?.part ?? 0));
+  return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total, adjustment, declared, over, othersOwe, mine: round2(total - othersOwe) };
 }
 /** Data de fechamento da fatura que vence em `dueYm`. */
 /**

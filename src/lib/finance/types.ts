@@ -8,6 +8,9 @@ export type GoalKind = "guardar" | "reserva" | "quitar_cartao" | "economizar_men
 /** Paletas de cartão/conta (gradientes). */
 export type Tone = "roxo" | "verde" | "azul" | "laranja" | "grafite" | "rosa" | "dourado" | "ciano";
 
+/** Gasto dividido com outra pessoa. `percent` é a fatia DELA (1 a 100); o resto é seu. O total do banco não muda: a parte dela entra como receita a receber. */
+export type Shared = { person: string; percent: number };
+
 export type Account = { id: string; name: string; kind: AccountKind; tone: Tone; balanceBase: number; baseDate: string };
 export type Card = {
   id: string; name: string; brand: CardBrand; last4: string; tone: Tone;
@@ -23,6 +26,7 @@ export type Transaction = {
   accountId?: string | undefined; cardId?: string | undefined; category: string;
   /** Já estava dentro do limite informado do cartão (ex.: detalhamento de uma fatura): não consome o limite de novo. */
   inLimit?: boolean | undefined;
+  shared?: Shared | undefined;
 };
 /** Compra parcelada. A fatura de cada parcela é calculada a partir de `first` (mês de vencimento da 1ª parcela). */
 export type Plan = {
@@ -32,6 +36,7 @@ export type Plan = {
   paidManual?: number | undefined; createdAt: string;
   /** Já estava dentro do limite informado do cartão (ex.: detalhamento de uma fatura): não consome o limite de novo. */
   inLimit?: boolean | undefined;
+  shared?: Shared | undefined;
 };
 /** Pausa de uma recorrente: não conta nos meses de `from` até `to` (inclusive). Sem `to` = continua pausada. */
 export type RecurringPause = { from: string; to?: string | undefined };
@@ -41,6 +46,7 @@ export type Recurring = {
   subscription?: boolean | undefined;
   /** Períodos pausados: nesses meses a recorrente não aparece em movimentações, faturas, saldo nem projeções. */
   pauses?: RecurringPause[] | undefined;
+  shared?: Shared | undefined;
 };
 export type Goal = {
   id: string; kind: GoalKind; title: string; target: number; current: number; deadline?: string | undefined;
@@ -54,4 +60,4 @@ export type FinanceState = {
 export const EMPTY_STATE: FinanceState = { version: 1, onboarded: false, mock: false, accounts: [], cards: [], plans: [], recurring: [], transactions: [], goals: [] };
 
 /** Um gasto ou ganho já "materializado" para um mês (compra, parcela ou recorrente). */
-export type Entry = { id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; method: Method; accountId?: string | undefined; cardId?: string | undefined; source: "tx" | "parcela" | "recorrente"; planId?: string | undefined; parcel?: string | undefined };
+export type Entry = { id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; method: Method; accountId?: string | undefined; cardId?: string | undefined; source: "tx" | "parcela" | "recorrente" | "compartilhada"; planId?: string | undefined; parcel?: string | undefined; /** compartilhada: de quem é a parte a receber. */ person?: string | undefined };

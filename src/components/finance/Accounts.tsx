@@ -182,7 +182,8 @@ function CardStats({ card }: { card: Card }) {
 
 /** Faturas mês a mês: navegue pelos meses, veja o que entra em cada uma e informe o total que o banco mostra. */
 function InvoiceView({ card }: { card: Card }) {
-  const f = useFinance(), { state, today } = f, open = invoiceMonthOf(card, isoOf(today)), [ym, setYm] = useState(open), [detail, setDetail] = useState(false);
+  const f = useFinance(), { state, today } = f, open = invoiceMonthOf(card, isoOf(today)), [ym, setYm] = useState(open), [detail, setDetail] = useState(false), [onlyMine, setOnlyMine] = useState(() => { try { return localStorage.getItem("fin.fatura.minha") === "1"; } catch { return false; } });
+  const pickView = (v: boolean) => { setOnlyMine(v); try { localStorage.setItem("fin.fatura.minha", v ? "1" : "0"); } catch { /* sem armazenamento */ } };
   const inv = invoiceFor(state, card, ym), months = Array.from({ length: 9 }, (_, i) => addMonths(open, i - 2));
   const typed = card.declared?.[ym], isOpen = ym === open;
   const itemized = inv.lines.filter((l) => l.source !== "ajuste");
@@ -205,13 +206,24 @@ function InvoiceView({ card }: { card: Card }) {
           </Field>
           <div className="flex flex-col items-end gap-1.5 pb-1"><button className={btn.primary} onClick={() => setDetail(true)} data-testid="fin-detalhar-abrir"><Plus size={15} /> Detalhar uma compra</button><p className="text-xs text-muted-foreground">{itemized.length} {itemized.length === 1 ? "item" : "itens"}{inv.adjustment > 0 ? ` · ${brl(inv.adjustment)} sem detalhar` : ""}</p></div>
         </div>
+        {inv.othersOwe > 0 && (
+          <div className="mb-3 rounded-2xl border border-emerald/25 bg-emerald/[0.05] p-3" data-testid="fin-fatura-dividida">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm">Fatura do banco <b className="tabular-nums">{brl(inv.total)}</b> · a receber de {[...new Set(inv.lines.flatMap((l) => (l.shared ? [l.shared.person] : [])))].join(", ")} <b className="tabular-nums text-emerald">{brl(inv.othersOwe)}</b> · minha parte <b className="tabular-nums">{brl(inv.mine)}</b></p>
+              <div role="radiogroup" className="flex gap-1 rounded-full border border-white/10 bg-black/25 p-1 text-xs">
+                {([[false, "Valor do banco"], [true, "Só a minha parte"]] as const).map(([v, t]) => <button key={t} type="button" role="radio" aria-checked={onlyMine === v} onClick={() => pickView(v)} data-testid={v ? "fin-fatura-so-minha" : "fin-fatura-banco"} className={`rounded-full px-3 py-1 transition ${onlyMine === v ? "bg-emerald/20 text-emerald" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>)}
+              </div>
+            </div>
+            <p className="mt-1.5 text-[0.7rem] text-muted-foreground">Você paga o valor do banco; a parte dos outros entra como receita a receber.</p>
+          </div>
+        )}
         {inv.lines.length === 0 ? <Empty icon={Receipt} title="Fatura vazia" hint="As compras no crédito deste cartão aparecem aqui." /> : (
-          <ul className="space-y-0.5">{inv.lines.map((l, i) => (
+          <ul className="space-y-0.5">{inv.lines.filter((l) => !(onlyMine && l.shared && l.shared.part >= l.amount)).map((l, i) => (
             <li key={l.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/[0.04]" style={{ animation: `fin-pop .4s ${Math.min(i, 12) * 0.03}s both` }}>
               <CatBadge id={l.category} size={34} />
-              <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}{l.source === "ajuste" && <Pill color="var(--cyan)">a detalhar</Pill>}</p><p className="text-xs text-muted-foreground">{l.source === "ajuste" ? "total do banco menos o que já foi cadastrado" : dateBR(l.date)}</p></div>
+              <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}{l.shared && <Pill color="var(--emerald)">com {l.shared.person} · {l.shared.percent}%</Pill>}{l.source === "ajuste" && <Pill color="var(--cyan)">a detalhar</Pill>}</p><p className="text-xs text-muted-foreground">{l.source === "ajuste" ? "total do banco menos o que já foi cadastrado" : dateBR(l.date)}</p></div>
               {l.source === "ajuste" && <button className={`${btn.ghost} !px-3 !py-1.5 text-xs`} onClick={() => setDetail(true)} data-testid="fin-detalhar-linha">Detalhar</button>}
-              <b className="text-sm tabular-nums">{brl(l.amount)}</b>
+              <b className="text-sm tabular-nums" title={l.shared ? `Valor do banco ${brl(l.amount)}` : undefined}>{brl(onlyMine && l.shared ? l.amount - l.shared.part : l.amount)}</b>
             </li>))}</ul>
         )}
       </Panel>

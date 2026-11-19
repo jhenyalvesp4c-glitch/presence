@@ -3,7 +3,8 @@ import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
 import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
 import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
-import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Tone, Transaction, TxKind } from "@/lib/finance/types";
+import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Shared, Tone, Transaction, TxKind } from "@/lib/finance/types";
+import { useSettlements } from "@/lib/finance/settle-data";
 import { CatIcon, Field, MoneyInput, Pill, Segmented, Select, TextInput, TONE_KEYS, TONES, btn } from "./ui";
 
 const Grid = ({ children }: { children: ReactNode }) => <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
@@ -87,6 +88,34 @@ export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undef
 }
 
 /* ───────────── compra parcelada ───────────── */
+/**
+ * "Dividir com alguém": quem paga junto (marido, amiga, sócio…) e que fatia é dela. O total do banco não muda; a parte dela entra como
+ * receita a receber e dá para ver a fatura só com a sua parte. Nomes sugeridos: das pessoas dos acertos e de divisões anteriores.
+ */
+export function SharePicker({ value, onChange, amount, label = "Dividir com alguém" }: { value: Shared | undefined; onChange: (v: Shared | undefined) => void; amount?: number | undefined; label?: string }) {
+  const { state } = useFinance(), acertos = useSettlements().data ?? [];
+  const names = [...new Set([...acertos.map((a) => a.person), ...state.plans.flatMap((p) => (p.shared ? [p.shared.person] : [])), ...state.transactions.flatMap((t) => (t.shared ? [t.shared.person] : [])), ...state.recurring.flatMap((r) => (r.shared ? [r.shared.person] : []))])];
+  const on = !!value, pct = value?.percent ?? 50, part = amount && value ? Math.round((amount * pct)) / 100 : null;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5" data-testid="fin-dividir">
+      <label className="flex cursor-pointer items-center justify-between gap-3"><span className="text-sm font-medium">{label}</span>
+        <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(on ? undefined : { person: acertos[0]?.person ?? "", percent: 50 })} data-testid="fin-dividir-chave" className={`relative h-6 w-11 rounded-full transition ${on ? "bg-emerald/70" : "bg-white/15"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[1.35rem]" : "left-0.5"}`} /></button></label>
+      {on && value && (
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Com quem?"><TextInput list="fin-dividir-nomes" value={value.person} onChange={(e) => onChange({ ...value, person: e.target.value.slice(0, 80) })} placeholder="Nome da pessoa" data-testid="fin-dividir-pessoa" /><datalist id="fin-dividir-nomes">{names.map((n) => <option key={n} value={n} />)}</datalist></Field>
+            <Field label={`Fatia ${value.person ? `de ${value.person}` : "dela(e)"}`} group>
+              <div className="flex items-center gap-1.5">{[50, 30, 70].map((n) => <button key={n} type="button" onClick={() => onChange({ ...value, percent: n })} className={`rounded-xl border px-2.5 py-2 text-xs transition ${pct === n ? "border-emerald/60 bg-emerald/10 text-emerald" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>{n}%</button>)}
+                <input type="number" min={1} max={100} value={pct} onChange={(e) => onChange({ ...value, percent: Math.min(100, Math.max(1, Math.round(Number(e.target.value) || 1))) })} aria-label="Porcentagem" data-testid="fin-dividir-pct" className="w-16 rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-right text-sm" /><span className="text-xs text-muted-foreground">%</span></div>
+            </Field>
+          </div>
+          <p className="text-xs text-muted-foreground" data-testid="fin-dividir-previa">{amount && part !== null ? <>{value.person || "A outra pessoa"} fica com <b className="text-emerald">{brl(part)}</b> e você com <b className="text-foreground">{brl(Math.round((amount - part) * 100) / 100)}</b>. A parte dela(e) entra como receita a receber.</> : "A parte dela(e) entra como receita a receber; o total do banco não muda."}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial?: Plan | undefined; onSave: (p: Plan) => void; onCancel?: (() => void) | undefined; defaultCardId?: string | undefined }) {
   const { state, today } = useFinance();
   const todayYm = ymOf(today);
@@ -96,7 +125,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const [purchaseYm, setPurchaseYm] = useState(initial?.purchaseYm ?? addMonths(todayYm, -2));
   const [first, setFirst] = useState(initial?.first ?? addMonths(todayYm, -1)), [firstTouched, setFirstTouched] = useState(!!initial);
   const [mode, setMode] = useState<"datas" | "manual">("datas"), [paid, setPaid] = useState(String(initial ? planInfo(initial, state.cards.find((c) => c.id === initial.cardId), today).paid : 3));
-  const [cat, setCat] = useState(initial?.category ?? "compras");
+  const [cat, setCat] = useState(initial?.category ?? "compras"), [share, setShare] = useState<Shared | undefined>(initial?.shared);
   const card = state.cards.find((c) => c.id === cardId);
   const n = Math.max(1, Math.min(60, Math.round(Number(count) || 1)));
   const perV = perTouched && per !== undefined ? per : total ? Math.round((total / n) * 100) / 100 : undefined;
@@ -104,7 +133,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const paidN = Math.max(0, Math.min(n, Math.round(Number(paid) || 0)));
   // "já paguei N": a próxima parcela (N+1) cai na próxima fatura a vencer; o mês da 1ª parcela sai dessa conta
   const firstV = mode === "manual" ? firstFromPaid(card, today, paidN) : firstTouched ? first : card ? invoiceMonthOf(card, `${purchaseYm}-15`) : first;
-  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today) } : null;
+  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today), ...(share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent } } : {}) } : null;
   const info = useMemo(() => (draft ? planInfo(draft, card, today) : null), [draft, card, today]);
   return (
     <div className="space-y-4">
@@ -120,6 +149,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
       <Field group label="Situação atual"><Segmented value={mode} onChange={setMode} options={[{ value: "datas", label: "Calcular pelas datas" }, { value: "manual", label: "Informar parcelas pagas" }]} /></Field>
       {mode === "manual" && <Field label="Quantas parcelas já foram pagas?"><TextInput type="number" min={0} max={n} value={paid} onChange={(e) => setPaid(e.target.value)} /></Field>}
       <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} /></Field>
+      <SharePicker value={share} onChange={setShare} amount={total} label="Dividir esta compra com alguém" />
       {info && draft && (
         <div className="rounded-2xl border border-cyan/25 bg-cyan/[0.06] p-4" data-testid="fin-plano-previa" style={{ animation: "fin-fade .4s both" }}>
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-cyan">Como vai ficar</p>
@@ -185,9 +215,9 @@ export function RecurringForm({ initial, onSave, onCancel, subscription = false 
   const [kind, setKind] = useState<TxKind>(subscription ? "despesa" : initial?.kind ?? "despesa"), [desc, setDesc] = useState(initial?.desc ?? ""), [amount, setAmount] = useState<number | undefined>(initial?.amount), [day, setDay] = useState(String(initial?.day ?? 5));
   const [cat, setCat] = useState(initial?.category ?? (subscription ? "assinaturas" : "moradia")), [method, setMethod] = useState<Method>(initial?.method ?? "debito");
   const [payId, setPayId] = useState(initial?.cardId ?? initial?.accountId ?? ((subscription ? state.cards[0]?.id : undefined) ?? state.accounts[0]?.id ?? ""));
-  const isCard = state.cards.some((c) => c.id === payId);
+  const isCard = state.cards.some((c) => c.id === payId), [share, setShare] = useState<Shared | undefined>(initial?.shared);
   // mantém pausas e a marca de assinatura ao editar
-  const save = () => onSave({ ...initial, id: initial?.id ?? uid("rec-"), kind, desc: desc.trim(), amount: amount ?? 0, day: Math.max(1, Math.min(31, Math.round(Number(day) || 1))), category: cat, method: isCard ? "credito" : method === "credito" ? "debito" : method, accountId: isCard ? undefined : payId || undefined, cardId: isCard ? payId : undefined, startYm: initial?.startYm ?? ymOf(today), subscription: subscription || initial?.subscription || undefined });
+  const save = () => onSave({ ...initial, id: initial?.id ?? uid("rec-"), kind, desc: desc.trim(), amount: amount ?? 0, day: Math.max(1, Math.min(31, Math.round(Number(day) || 1))), category: cat, method: isCard ? "credito" : method === "credito" ? "debito" : method, accountId: isCard ? undefined : payId || undefined, cardId: isCard ? payId : undefined, startYm: initial?.startYm ?? ymOf(today), subscription: subscription || initial?.subscription || undefined, shared: kind === "despesa" && share && share.person.trim() ? { person: share.person.trim(), percent: share.percent } : undefined });
   return (
     <div className="space-y-4">
       {!subscription && <Segmented value={kind} onChange={(k) => { setKind(k); setCat(k === "receita" ? "salario" : "moradia"); }} options={[{ value: "despesa", label: "Despesa fixa" }, { value: "receita", label: "Receita fixa" }]} />}
@@ -203,6 +233,7 @@ export function RecurringForm({ initial, onSave, onCancel, subscription = false 
         </Field>
       </Grid>
       <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} income={kind === "receita"} /></Field>
+      {kind === "despesa" && <SharePicker value={share} onChange={setShare} amount={amount} label="Dividir esta conta com alguém" />}
       <Actions onCancel={onCancel} onSave={save} disabled={!desc.trim() || !amount} />
     </div>
   );
@@ -248,6 +279,7 @@ export function TxForm({ initial, onSave, onCancel, lockMethod, initialMethod, s
   const [method, setMethod] = useState<Method>(lockMethod ?? initial?.method ?? initialMethod ?? "debito"), [date, setDate] = useState(initial?.date ?? isoOf(today));
   const [cat, setCat] = useState(initial?.category ?? "outros"), [catTouched, setCatTouched] = useState(!!initial?.category);
   const [accountId, setAccountId] = useState(initial?.accountId ?? state.accounts[0]?.id ?? ""), [cardId, setCardId] = useState(initial?.cardId ?? state.cards[0]?.id ?? "");
+  const [share, setShare] = useState<Shared | undefined>(initial?.shared);
   const [parcelado, setParcelado] = useState((initial?.installments ?? 1) > 1), [count, setCount] = useState(String(initial?.installments && initial.installments > 1 ? initial.installments : 3));
   const credit = kind === "despesa" && method === "credito";
   const catV = catTouched ? cat : guessCategory(desc, kind === "receita");
@@ -256,7 +288,7 @@ export function TxForm({ initial, onSave, onCancel, lockMethod, initialMethod, s
   const needsPay = credit ? !!cardId : method === "dinheiro" ? true : !!accountId;
   const methods: { value: Method; label: string }[] = kind === "receita" ? [{ value: "pix", label: "Pix" }, { value: "debito", label: "Conta" }, { value: "dinheiro", label: "Dinheiro" }] : [{ value: "debito", label: "Débito" }, { value: "credito", label: "Crédito" }, { value: "dinheiro", label: "Dinheiro" }, { value: "pix", label: "Pix" }];
   const save = () => {
-    const base = { desc: desc.trim(), category: catV };
+    const base = { desc: desc.trim(), category: catV, ...(kind === "despesa" && share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent } } : {}) };
     if (credit && parcelado && amount && card) {
       const first = invoiceMonthOf(card, date), per = Math.round((amount / n) * 100) / 100;
       return onSave({ plan: { id: uid("plan-"), ...base, cardId, total: amount, count: n, per, purchaseYm: ymOf(date), first, createdAt: date } });
@@ -289,6 +321,7 @@ export function TxForm({ initial, onSave, onCancel, lockMethod, initialMethod, s
           )}
         </div>
       )}
+      {kind === "despesa" && <SharePicker value={share} onChange={setShare} amount={amount} />}
       <Field group label="Categoria da despesa"><CategoryPicker value={catV} onChange={(c) => { setCat(c); setCatTouched(true); }} income={kind === "receita"} /></Field>
       <Actions onCancel={onCancel} onSave={save} saveLabel={credit && parcelado ? "Adicionar compra parcelada" : saveLabel} disabled={!desc.trim() || !amount || !needsPay} extra={extraActions} />
     </div>

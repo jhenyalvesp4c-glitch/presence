@@ -58,3 +58,10 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 - "Ler extrato": foto, PDF ou texto → IA devolve as compras (`statement.functions.ts`); a pessoa marca de quem é cada linha antes de lançar. Linhas já lançadas vêm desmarcadas.
 - Saídas: copiar texto (WhatsApp), baixar imagem (PNG) e PDF pela impressão do navegador (`settle-export.ts`).
 - Banco: `fin_settlements` e `fin_settlement_items` (migração `20261126000300_fin_settlements.sql`), RLS só do dono, sem `anon`.
+
+## Gasto dividido com outra pessoa (compra, parcelada ou conta fixa)
+- Em qualquer despesa há "Dividir com alguém": nome da pessoa e a fatia dela (50% por padrão, ou outra). Vale para qualquer pessoa, não só uma.
+- O total do banco NÃO muda (você paga a fatura cheia). A parte dela vira **receita a receber** (`source: "compartilhada"`, mesmo dia do gasto), então "previsto" e "sobra" refletem só a sua metade.
+- Na fatura do cartão: chip "com Fulano · 50%", resumo (banco / a receber / minha parte) e a chave **Valor do banco | Só a minha parte**.
+- Dados: `shared jsonb` em `fin_transactions`, `fin_plans` e `fin_recurring` (`{"person","percent"}`); lógica em `calc.ts` (`sharedPart`, `myPart`, `invoiceFor`.`othersOwe/mine`).
+- Contas da casa (acerto de contas): "Contas da casa" cola as contas cheias e divide pela "divisão padrão" do acerto.

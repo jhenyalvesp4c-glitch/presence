@@ -20,7 +20,8 @@ export function EntryRow({ e, s, onEdit, onDelete, index = 0, showDate = true }:
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium"><span className="truncate">{e.desc}</span>
           {e.parcel && <Pill color="var(--amber)">parcela {e.parcel}</Pill>}
-          {e.source === "recorrente" && <Pill color="var(--violet)"><Repeat size={10} /> fixa</Pill>}</p>
+          {e.source === "recorrente" && <Pill color="var(--violet)"><Repeat size={10} /> fixa</Pill>}
+          {e.source === "compartilhada" && <Pill color="var(--emerald)">a receber de {e.person}</Pill>}</p>
         <p className="truncate text-xs text-muted-foreground">{showDate ? `${dateBR(e.date)} · ` : ""}{catOf(e.category).name} · {payLabel(s, e)}</p>
       </div>
       <p className={`shrink-0 text-sm font-semibold tabular-nums ${income ? "text-emerald" : ""}`}>{income ? "+" : "−"}{brl(e.amount)}</p>
