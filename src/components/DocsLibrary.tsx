@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
 import { matchDossier, parseLogins, prettySlug } from "@/lib/login-import";
+import { readLoginEmails } from "@/lib/login-emails.functions";
+import { readFiles } from "@/components/inbox/files";
 import { OrionPanel } from "@/components/orion/OrionPanel";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -693,6 +695,21 @@ function LoginImporter({ dossiers, existing, onImport, onClose }: { dossiers: st
   const [text, setText] = useState("");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [show, setShow] = useState(false);
+  const [reading, setReading] = useState(false), [note, setNote] = useState("");
+  /** Envia o print para a IA ler só os e-mails; as senhas continuam sendo montadas aqui, pelo padrão. */
+  const fromPicture = async (list: FileList | null) => {
+    if (!list?.length) return;
+    setReading(true); setNote("");
+    try {
+      const { added, rejected } = await readFiles([...list], []);
+      if (!added.length) { setNote(rejected.join(" · ") || "Não consegui ler esse arquivo."); return; }
+      const r = await readLoginEmails({ data: { files: added.map(({ name, mime, size, data }) => ({ name, mime, size, data })) } });
+      if (!r.ok) { setNote(r.error); return; }
+      if (!r.emails.length) { setNote("Não achei e-mails nesse print. Tente um print mais nítido ou cole o texto."); return; }
+      setText((t) => [t.trim(), ...r.emails].filter(Boolean).join("\n"));
+      setNote(`${r.emails.length} e-mail${r.emails.length === 1 ? "" : "s"} lido${r.emails.length === 1 ? "" : "s"} do print — confira abaixo.${r.nota ? ` ${r.nota}` : ""}`);
+    } catch (e) { setNote(e instanceof Error ? e.message : "Não consegui ler o print."); } finally { setReading(false); }
+  };
   const analyze = () => {
     setRows(parseLogins(text).map((p) => {
       const m = matchDossier(p.polo, dossiers), dup = existing.includes(p.email);
@@ -713,6 +730,11 @@ function LoginImporter({ dossiers, existing, onImport, onClose }: { dossiers: st
         </div>
         {!rows ? <>
           <p className="mt-3 text-xs text-muted-foreground">Cole aqui o texto com os e-mails (um por linha, como na lista de acessos do WhatsApp). A senha de cada polo é montada pelo padrão <b>fecaf + nome do polo</b>, que é o trecho do e-mail entre o @ e o .com.br. Você confere tudo antes de cadastrar.</p>
+          <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-violet/50 px-3 py-2 text-xs text-violet transition hover:bg-violet/10">
+            <Paperclip size={13} /> {reading ? "Lendo o print…" : "Ler os e-mails de um print ou PDF"}
+            <input type="file" accept="image/*,application/pdf" className="hidden" disabled={reading} data-testid="importar-print" onChange={(e) => { void fromPicture(e.target.files); e.target.value = ""; }} />
+          </label>
+          {note && <p className="mt-2 text-[0.7rem] text-muted-foreground" data-testid="importar-nota">{note}</p>}
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={10} placeholder={"carla@fecafsinop.com.br\nleo@fecafbarra.com.br\n…"} data-testid="importar-texto" className="mt-3 w-full resize-y rounded-xl border border-border bg-secondary/40 px-3 py-2 font-mono text-xs outline-none focus:border-violet/60" />
           <div className="mt-3 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancelar</button>
