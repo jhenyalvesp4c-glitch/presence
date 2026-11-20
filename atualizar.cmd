@@ -5,7 +5,7 @@ git remote get-url presence >nul 2>&1 || git remote add presence https://github.
 echo Baixando a versao mais recente...
 git checkout -- src/routeTree.gen.ts >nul 2>&1
 git fetch presence claude/busy-planck-p1i0im || goto erro
-git checkout -B claude/busy-planck-p1i0im FETCH_HEAD || goto erro
+git checkout -B claude/busy-planck-p1i0im FETCH_HEAD >nul 2>&1 || (git stash push -m atualizar >nul 2>&1 & git checkout -B claude/busy-planck-p1i0im FETCH_HEAD || goto erro)
 echo Conferindo dependencias...
 call npm install --no-audit --no-fund || goto erro
 echo Iniciando o app. Abra o endereco "Local" que aparecer abaixo (por exemplo http://localhost:8080).
