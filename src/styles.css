@@ -549,10 +549,11 @@ html, body { max-width: 100%; overflow-x: clip; }
 @keyframes idea-flow { to { stroke-dashoffset: -24; } }
 @media (prefers-reduced-motion: reduce) { [data-idea-fx] { animation: none !important; } }
 
-/* Plano final: ao imprimir, só o papel aparece. */
+/* Plano final: ao imprimir, só o plano aparece, em preto sobre branco. */
 @media print {
   body > *:not([data-plano-portal]) { display: none !important; }
-  [data-plano-portal] { position: static !important; overflow: visible !important; background: #fff !important; padding: 0 !important; backdrop-filter: none !important; }
-  [data-plano-portal] [data-print-hide] { display: none !important; }
-  [data-plano-portal] .plano-paper { box-shadow: none !important; border-radius: 0 !important; animation: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  [data-plano-portal] { position: static !important; overflow: visible !important; background: #fff !important; padding: 0 !important; }
+  [data-plano-portal] [data-print-hide], [data-plano-portal] [aria-hidden="true"] { display: none !important; }
+  [data-plano-portal] * { color: #111 !important; background: transparent !important; border-color: #bbb !important; box-shadow: none !important; text-shadow: none !important; animation: none !important; backdrop-filter: none !important; -webkit-background-clip: border-box !important; }
+  [data-plano-portal] section, [data-plano-portal] li { break-inside: avoid; }
 }

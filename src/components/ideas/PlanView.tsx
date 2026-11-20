@@ -2,14 +2,25 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { BookOpen, Loader2, Printer, X } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, Clock, ExternalLink, HelpCircle, ListChecks, Loader2, Printer, Users, Wallet, X } from "lucide-react";
+
+import { Ring } from "@/components/finance/charts";
+import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, Tilt } from "@/components/finance/fx";
 
 import { addEntry, type NewFile } from "@/lib/data/brain";
 import { ideaFileUrls } from "@/lib/data/ideas";
 import { AREAS, statusLabel, type Idea } from "@/lib/ideas";
 
 const dateBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
-const H = ({ children }: { children: React.ReactNode }) => <h3 className="mb-2 mt-6 border-b border-neutral-200 pb-1 text-[0.7rem] font-bold uppercase tracking-[0.18em] text-neutral-500">{children}</h3>;
+const rise = (n: number) => ({ animation: "fin-rise .65s both", animationDelay: `${n * 90}ms` }) as React.CSSProperties;
+const Sec = ({ n, Icon, title, color = "var(--cyan)", children }: { n: number; Icon: typeof Clock; title: string; color?: string; children: React.ReactNode }) => (
+  <section className="glass relative overflow-hidden rounded-3xl p-5 sm:p-6" style={rise(n)}>
+    <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full opacity-20 blur-3xl" style={{ background: color }} />
+    <h3 className="relative mb-4 flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em]"><span className="grid h-8 w-8 place-items-center rounded-xl border" style={{ color, borderColor: `color-mix(in oklab, ${color} 40%, transparent)`, background: `color-mix(in oklab, ${color} 12%, transparent)` }}><Icon size={15} /></span>{title}<span aria-hidden className="ml-1 h-px flex-1 bg-gradient-to-r from-white/20 to-transparent" /></h3>
+    <div className="relative">{children}</div>
+  </section>
+);
+const doneKey = (id: string) => `orion:plano-passos:${id}`;
 
 /** Texto corrido do plano (vai para a documentação). */
 export function planMarkdown(i: Idea): string {
@@ -25,10 +36,13 @@ export function planMarkdown(i: Idea): string {
 }
 
 export function PlanView({ idea, onClose }: { idea: Idea; onClose: () => void }) {
-  const p = idea.plan, [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({}), [saving, setSaving] = useState(false);
+  const p = idea.plan, [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({}), [saving, setSaving] = useState(false), [zoom, setZoom] = useState<string | null>(null);
+  const [done, setDone] = useState<number[]>(() => { try { return JSON.parse(localStorage.getItem(doneKey(idea.id)) ?? "[]") as number[]; } catch { return []; } });
   const imgs = idea.attachments.filter((a) => a.mime.startsWith("image/")), others = idea.attachments.filter((a) => !a.mime.startsWith("image/"));
+  const answered = p ? p.perguntas.filter((q) => q.a.trim()).length : 0, total = p?.perguntas.length ?? 0;
   useEffect(() => { if (idea.attachments.length) void ideaFileUrls(idea.attachments).then(setUrls).catch(() => undefined); }, [idea.attachments]);
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") { if (zoom) setZoom(null); else onClose(); } }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose, zoom]);
+  const tick = (n: number) => setDone((d) => { const next = d.includes(n) ? d.filter((x) => x !== n) : [...d, n]; try { localStorage.setItem(doneKey(idea.id), JSON.stringify(next)); } catch { /* sem armazenamento: vale só nesta tela */ } return next; });
 
   const toDocs = async () => {
     setSaving(true);
@@ -40,41 +54,64 @@ export function PlanView({ idea, onClose }: { idea: Idea; onClose: () => void })
     } catch (e) { toast.error(`Não consegui guardar: ${(e as Error).message}`); }
     setSaving(false);
   };
+  const pill = "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition";
 
   return createPortal(
-    <div data-plano-portal className="fixed inset-0 z-[70] overflow-y-auto bg-black/80 p-3 backdrop-blur-md sm:p-8" onClick={onClose} data-testid="plano-final">
-      <div className="mx-auto w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-        <div data-print-hide className="mb-3 flex flex-wrap items-center justify-end gap-2">
-          <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20" data-testid="plano-imprimir"><Printer size={15} /> Imprimir / salvar PDF</button>
-          <button onClick={() => void toDocs()} disabled={saving} className="inline-flex items-center gap-2 rounded-full border border-cyan/50 bg-cyan/15 px-4 py-2 text-sm text-cyan hover:bg-cyan/25 disabled:opacity-50" data-testid="plano-guardar">{saving ? <Loader2 size={15} className="animate-spin" /> : <BookOpen size={15} />} Guardar na documentação</button>
-          <button onClick={onClose} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/20"><X size={16} /></button>
+    <div data-plano-portal className="plano-root fixed inset-0 z-[70] overflow-y-auto bg-background p-3 sm:p-8" onClick={onClose} data-testid="plano-final">
+      <FinBackdrop />
+      <div className="relative mx-auto w-full max-w-4xl space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div data-print-hide className="flex flex-wrap items-center justify-end gap-2" style={rise(0)}>
+          <button onClick={() => window.print()} className={`${pill} border-white/15 bg-white/[0.06] hover:bg-white/10`} data-testid="plano-imprimir"><Printer size={15} /> Imprimir / salvar PDF</button>
+          <button onClick={() => void toDocs()} disabled={saving} className={`${pill} border-cyan/50 bg-cyan/10 text-cyan hover:bg-cyan/20 disabled:opacity-50`} data-testid="plano-guardar">{saving ? <Loader2 size={15} className="animate-spin" /> : <BookOpen size={15} />} Guardar na documentação</button>
+          <button onClick={onClose} aria-label="Fechar" className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/[0.06] hover:bg-white/10"><X size={16} /></button>
         </div>
 
-        <article className="plano-paper overflow-hidden rounded-2xl bg-white text-neutral-900 shadow-[0_30px_120px_-30px_var(--violet)]" style={{ animation: "fin-rise .5s both" }}>
-          <header className="bg-gradient-to-r from-[oklch(0.45_0.18_295)] via-[oklch(0.5_0.16_250)] to-[oklch(0.62_0.13_210)] px-6 py-6 text-white sm:px-9">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] opacity-80">Plano final · Orion</p>
-            <h2 className="mt-1 font-serif text-3xl leading-tight sm:text-4xl">{idea.title}</h2>
-            <p className="mt-2 flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-white/20 px-2.5 py-0.5">{AREAS.find((a) => a.id === idea.area)?.label}</span><span className="rounded-full bg-white/20 px-2.5 py-0.5">{statusLabel(idea.status)}</span>{idea.tags.map((t) => <span key={t} className="rounded-full bg-white/10 px-2.5 py-0.5">#{t}</span>)}</p>
-          </header>
-
-          <div className="px-6 pb-8 pt-2 text-sm leading-relaxed sm:px-9">
-            {p?.proximoPasso && <p className="mt-5 rounded-xl border-l-4 border-emerald-500 bg-emerald-50 px-4 py-3"><b className="text-emerald-700">Próximo passo:</b> {p.proximoPasso}</p>}
-            {p?.resumo && <><H>Resumo</H><p>{p.resumo}</p></>}
-            {idea.body && <><H>Detalhes</H><p className="whitespace-pre-wrap">{idea.body}</p></>}
-
-            {imgs.length > 0 && <><H>Referências</H>
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="plano-imagens">{imgs.map((a) => <li key={a.path} className="break-inside-avoid overflow-hidden rounded-xl border border-neutral-200">{urls[a.path] ? <a href={urls[a.path]!.view} target="_blank" rel="noreferrer"><img src={urls[a.path]!.view} alt={a.name} className="max-h-64 w-full object-cover" /></a> : <span className="grid h-32 place-items-center text-xs text-neutral-400">carregando…</span>}</li>)}</ul></>}
-            {others.length > 0 && <p className="mt-3 text-xs text-neutral-500">Outros arquivos: {others.map((a) => a.name).join(", ")}</p>}
-
-            {p && p.perguntas.length > 0 && <><H>Perguntas e respostas</H><ul className="space-y-3">{p.perguntas.map((q) => <li key={q.q} className="break-inside-avoid"><p className="font-medium">{q.q}</p><p className={q.a ? "text-neutral-700" : "italic text-neutral-400"}>{q.a || "Sem resposta ainda"}</p></li>)}</ul></>}
-            {p && p.passos.length > 0 && <><H>Primeiros passos</H><ol className="list-decimal space-y-1 pl-5">{p.passos.map((x) => <li key={x}>{x}</li>)}</ol></>}
-            {p && p.riscos.length > 0 && <><H>Riscos</H><ul className="list-disc space-y-1 pl-5">{p.riscos.map((x) => <li key={x}>{x}</li>)}</ul></>}
-            {p && <><H>O que precisa</H><div className="grid gap-3 sm:grid-cols-3">{([["Tempo", p.precisa.tempo], ["Dinheiro", p.precisa.dinheiro], ["Pessoas", p.precisa.pessoas]] as const).map(([k, v]) => <div key={k} className="break-inside-avoid rounded-xl border border-neutral-200 bg-neutral-50 p-3"><p className="text-[0.65rem] font-bold uppercase tracking-wider text-neutral-500">{k}</p><p className="mt-1 text-xs">{v || "—"}</p></div>)}</div></>}
-            {idea.links.length > 0 && <><H>Links</H><ul className="space-y-1">{idea.links.map((l) => <li key={l}><a href={l} target="_blank" rel="noreferrer" className="break-all text-blue-700 underline">{l}</a></li>)}</ul></>}
-            {!p && <p className="mt-6 rounded-xl border border-dashed border-neutral-300 p-4 text-neutral-500">Esta ideia ainda não tem plano. Volte e use "Desenvolver com o Orion" para montar um.</p>}
-            <p className="mt-8 border-t border-neutral-200 pt-3 text-[0.65rem] text-neutral-400">Criada em {dateBR(idea.createdAt)}{p ? ` · plano do Orion de ${dateBR(p.geradoEm)}` : ""} · estimativas do Orion a partir do que você contou: confira antes de decidir.</p>
+        <HeroPanel glow="var(--violet)">
+          <div className="grid items-center gap-6 md:grid-cols-[1.4fr_0.6fr]">
+            <div>
+              <p className="mono-caps flex flex-wrap items-center gap-3">Plano final · Orion <LiveDot color="var(--emerald)" label={idea.status === "fazendo" ? "em andamento" : "plano pronto"} /></p>
+              <h2 className="mt-3 font-serif text-4xl leading-[0.98] tracking-tight sm:text-6xl" style={{ animation: "fin-rise .7s both" }}><span className="text-gradient inline-block pr-3 italic drop-shadow-[0_0_30px_color-mix(in_oklab,var(--violet)_55%,transparent)]">{idea.title}</span></h2>
+              <span aria-hidden className="mt-4 block h-px w-48 bg-gradient-to-r from-cyan via-violet to-transparent" />
+              <p className="mt-4 flex flex-wrap gap-2 text-xs"><span className="rounded-full border border-white/15 px-3 py-1">{AREAS.find((a) => a.id === idea.area)?.label}</span><span className="rounded-full border border-violet/40 bg-violet/10 px-3 py-1 text-violet">{statusLabel(idea.status)}</span>{idea.tags.map((t) => <span key={t} className="rounded-full border border-white/10 px-3 py-1 text-muted-foreground">#{t}</span>)}</p>
+            </div>
+            <div className="mx-auto"><OrbitArt size={190}>{total > 0 ? <Ring pct={(answered / total) * 100} size={96} thickness={8} color="var(--emerald)"><span className="text-center leading-tight"><b className="block text-lg tabular-nums">{answered}/{total}</b><span className="text-[0.55rem] uppercase tracking-wider text-muted-foreground">respondidas</span></span></Ring> : <span className="font-display text-sm text-muted-foreground">sem plano</span>}</OrbitArt></div>
           </div>
-        </article>
+          {p && <div className="mt-5 grid grid-cols-3 gap-3 text-center">{([["Passos", p.passos.length, "var(--cyan)"], ["Riscos", p.riscos.length, "var(--amber)"], ["Referências", idea.attachments.length, "var(--violet)"]] as const).map(([k, v, c]) => <Tilt key={k} max={7} className="rounded-2xl"><div className="glass rounded-2xl px-3 py-3"><p className="font-display text-3xl font-semibold tabular-nums" style={{ color: c, textShadow: `0 0 22px ${c}` }}>{v}</p><p className="text-[0.62rem] uppercase tracking-wider text-muted-foreground">{k}</p></div></Tilt>)}</div>}
+        </HeroPanel>
+
+        {p?.proximoPasso && <div className="shine relative overflow-hidden rounded-3xl border border-emerald/40 bg-emerald/10 p-5" style={rise(1)}><span aria-hidden className="absolute inset-0 bg-gradient-to-r from-emerald/10 via-transparent to-transparent" /><p className="relative flex items-start gap-3 text-sm"><span className="relative mt-1 grid h-3 w-3 shrink-0 place-items-center"><span className="absolute h-3 w-3 rounded-full bg-emerald" style={{ animation: "fin-pulse 1.8s ease-out infinite" }} /><span className="h-2 w-2 rounded-full bg-emerald" /></span><span><b className="text-emerald">Próximo passo (24 a 48 h):</b> {p.proximoPasso}</span></p></div>}
+
+        {(p?.resumo || idea.body) && <Sec n={2} Icon={ListChecks} title="A ideia" color="var(--violet)">{p?.resumo && <p className="text-base leading-relaxed">{p.resumo}</p>}{idea.body && <p className={`whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground ${p?.resumo ? "mt-3 border-t border-white/10 pt-3" : ""}`}>{idea.body}</p>}</Sec>}
+
+        {imgs.length > 0 && <Sec n={3} Icon={ListChecks} title="Referências" color="var(--pink)">
+          <ul className="columns-2 gap-3 sm:columns-3" data-testid="plano-imagens">{imgs.map((a, n) => <li key={a.path} className="mb-3 break-inside-avoid" style={rise(n)}><Tilt max={6} className="rounded-2xl">{urls[a.path] ? <button type="button" onClick={() => setZoom(urls[a.path]!.view)} className="block w-full overflow-hidden rounded-2xl border border-white/10 shadow-[0_18px_50px_-24px_var(--violet)]"><img src={urls[a.path]!.view} alt={a.name} className="w-full transition duration-500 hover:scale-105" /></button> : <span className="grid h-32 place-items-center rounded-2xl border border-white/10 text-xs text-muted-foreground">carregando…</span>}</Tilt></li>)}</ul>
+          {others.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Outros arquivos: {others.map((a) => a.name).join(", ")}</p>}
+        </Sec>}
+
+        {p && p.perguntas.length > 0 && <Sec n={4} Icon={HelpCircle} title="Perguntas e respostas" color="var(--cyan)"><ul className="grid gap-3 sm:grid-cols-2">{p.perguntas.map((q, n) => <li key={q.q} className={`rounded-2xl border p-4 ${q.a.trim() ? "border-cyan/25 bg-cyan/[0.05]" : "border-dashed border-amber/40 bg-amber/[0.04]"}`} style={rise(n)}><p className="text-sm font-medium">{q.q}</p><p className={`mt-1.5 flex items-start gap-2 text-sm ${q.a.trim() ? "text-foreground/85" : "italic text-amber"}`}>{q.a.trim() ? <Check size={14} className="mt-0.5 shrink-0 text-emerald" /> : null}{q.a.trim() || "Ainda sem resposta"}</p></li>)}</ul></Sec>}
+
+        {p && p.passos.length > 0 && <Sec n={5} Icon={ListChecks} title="Primeiros passos" color="var(--emerald)">
+          <ol className="relative space-y-3 pl-2" data-testid="plano-passos">
+            <span aria-hidden className="absolute bottom-3 left-[1.15rem] top-3 w-px bg-gradient-to-b from-emerald via-cyan to-violet opacity-60" />
+            {p.passos.map((x, n) => { const ok = done.includes(n); return <li key={x} className="relative flex items-start gap-3" style={rise(n)}>
+              <button type="button" onClick={() => tick(n)} aria-pressed={ok} aria-label={`Passo ${n + 1}: ${ok ? "desmarcar" : "marcar como feito"}`} className={`relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs font-bold transition ${ok ? "border-emerald bg-emerald/25 text-emerald shadow-[0_0_18px_var(--emerald)]" : "border-white/20 bg-background text-muted-foreground hover:border-emerald/60"}`}>{ok ? <Check size={14} /> : n + 1}</button>
+              <p className={`flex-1 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm transition ${ok ? "text-muted-foreground line-through decoration-emerald/60" : ""}`}>{x}</p>
+            </li>; })}
+          </ol>
+          <p className="mt-3 text-[0.65rem] text-muted-foreground/70">Toque no número para marcar o passo como feito (fica salvo neste aparelho).</p>
+        </Sec>}
+
+        {p && p.riscos.length > 0 && <Sec n={6} Icon={AlertTriangle} title="Riscos" color="var(--amber)"><ul className="grid gap-3 sm:grid-cols-2">{p.riscos.map((x, n) => <li key={x} className="flex items-start gap-3 rounded-2xl border border-amber/30 bg-amber/[0.06] p-4 text-sm" style={rise(n)}><AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber" />{x}</li>)}</ul></Sec>}
+
+        {p && <Sec n={7} Icon={Wallet} title="O que precisa" color="var(--violet)"><div className="grid gap-3 sm:grid-cols-3">{([["Tempo", p.precisa.tempo, Clock, "var(--cyan)"], ["Dinheiro", p.precisa.dinheiro, Wallet, "var(--emerald)"], ["Pessoas", p.precisa.pessoas, Users, "var(--pink)"]] as const).map(([k, v, I, c], n) => <Tilt key={k} max={8} className="rounded-2xl"><div className="glass h-full rounded-2xl p-4" style={{ ...rise(n), boxShadow: `0 20px 60px -34px ${c}` }}><span className="grid h-9 w-9 place-items-center rounded-xl border" style={{ color: c, borderColor: `color-mix(in oklab, ${c} 40%, transparent)`, background: `color-mix(in oklab, ${c} 12%, transparent)` }}><I size={16} /></span><p className="mt-3 text-[0.65rem] uppercase tracking-wider text-muted-foreground">{k}</p><p className="mt-1 text-sm">{v || "—"}</p></div></Tilt>)}</div></Sec>}
+
+        {idea.links.length > 0 && <Sec n={8} Icon={ExternalLink} title="Links" color="var(--cyan)"><ul className="space-y-1.5">{idea.links.map((l) => <li key={l}><a href={l} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 break-all text-sm text-cyan hover:underline"><ExternalLink size={12} />{l}</a></li>)}</ul></Sec>}
+
+        {!p && <Sec n={2} Icon={HelpCircle} title="Sem plano ainda" color="var(--amber)"><p className="text-sm text-muted-foreground">Esta ideia ainda não tem plano. Volte e use "Desenvolver com o Orion" para montar um.</p></Sec>}
+
+        <p className="px-2 pb-6 text-center text-[0.65rem] text-muted-foreground/70">Criada em {dateBR(idea.createdAt)}{p ? ` · plano do Orion de ${dateBR(p.geradoEm)}` : ""} · estimativas do Orion a partir do que você contou: confira antes de decidir.</p>
       </div>
+
+      {zoom && <div className="fixed inset-0 z-[80] grid place-items-center bg-black/90 p-4 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setZoom(null); }} role="dialog" aria-label="Imagem ampliada"><img src={zoom} alt="" className="max-h-full max-w-full rounded-xl shadow-[0_0_80px_-10px_var(--violet)]" style={{ animation: "fin-pop .35s both" }} /></div>}
     </div>, document.body);
 }
