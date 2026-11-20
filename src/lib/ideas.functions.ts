@@ -5,7 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { cleanLinks, cleanPlan, cleanTags, linksIn, type IdeaArea, type IdeaKind, type IdeaPlan } from "./ideas";
+import { cleanBudget, cleanLinks, cleanPlan, cleanTags, linksIn, type BudgetItem, type IdeaArea, type IdeaKind, type IdeaPlan } from "./ideas";
 
 const file = z.object({ name: z.string().min(1).max(200), mime: z.string().min(1).max(100), size: z.number().int().min(0), data: z.string().max(4_000_000) });
 
@@ -94,5 +94,44 @@ export const developIdea = createServerFn({ method: "POST" })
       if (error instanceof OpenAIError) return { ok: false, error: explain(error, process.env["OPENAI_MODEL"] ?? "o modelo") };
       if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return { ok: false, error: "A IA demorou demais. Tente de novo." };
       return { ok: false, error: "Não consegui desenvolver a ideia agora. Tente de novo." };
+    }
+  });
+
+const BUDGET_SYSTEM = `Você ajuda a montar o ORÇAMENTO de uma ideia da pessoa: tudo o que ela vai precisar COMPRAR ou PAGAR para tirar a ideia do papel, em português do Brasil.
+Chame a ferramenta com a lista "itens". Regras:
+- Inclua só o que envolve dinheiro (compras, serviços, taxas, materiais). Não inclua tarefas sem custo.
+- Use EXATAMENTE os nomes, quantidades, valores e links que a pessoa deu. Se ela disse que já tem algo ("já tenho as tintas"), coloque status "tenho" (não conta no total) e valor vazio.
+- Quando ela não deu valor, deixe "valor" vazio (null) para ela preencher, OU dê uma estimativa realista de UMA unidade em reais com "estimado": true. Prefira deixar vazio se não tiver noção razoável. Nunca invente links.
+- Se ela citou decorações/peças, uma linha para cada uma. Se faltar algo óbvio que ela vai precisar (ex.: parafusos e buchas para a prateleira), inclua com "nota" explicando e valor vazio ou estimado.
+- Se já houver itens do orçamento, NÃO repita os que já existem; devolva só os que faltam adicionar.
+- "qtd" é a quantidade (mínimo 1). "nota" curta e opcional.`;
+
+export type BudgetResult = { ok: true; itens: BudgetItem[] } | { ok: false; error: string };
+
+export const suggestBudget = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ texto: z.string().min(2).max(14000) }).parse(d))
+  .handler(async ({ data }): Promise<BudgetResult> => {
+    if (!process.env["OPENAI_API_KEY"]) return { ok: false, error: "A IA ainda não está ligada (falta OPENAI_API_KEY no servidor), então não consigo montar o orçamento agora." };
+    try {
+      const { makeCreate, OpenAIError, explain } = await import("./mcp/openai");
+      const { DEFAULT_MODEL } = await import("./mcp/interpret");
+      const model = process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
+      const item = { type: "object", properties: { nome: { type: "string" }, qtd: { type: "number" }, valor: { type: ["number", "null"] }, estimado: { type: "boolean" }, status: { type: "string", enum: ["comprar", "tenho"] }, link: { type: "string" }, nota: { type: "string" } }, required: ["nome", "qtd", "valor", "estimado", "status", "link", "nota"] };
+      const res = await makeCreate()({
+        model, instructions: BUDGET_SYSTEM,
+        input: [{ role: "user", content: [{ type: "input_text", text: `IDEIA E CONVERSA:\n${data.texto}` }] }],
+        tools: [{ type: "function", name: "montar_orcamento", description: "Devolve os itens do orçamento.", parameters: { type: "object", properties: { itens: { type: "array", items: item } }, required: ["itens"] }, strict: false }],
+        tool_choice: { type: "function", name: "montar_orcamento" }, max_output_tokens: 3000, reasoning: { effort: "low" }, store: false,
+      });
+      const call = res.output.find((o) => o.type === "function_call" && o["name"] === "montar_orcamento");
+      if (!call) return { ok: false, error: "A IA não devolveu a lista. Tente de novo." };
+      const itens = cleanBudget((JSON.parse(String(call["arguments"])) as { itens?: unknown }).itens);
+      if (!itens.length) return { ok: false, error: "Não encontrei nada que envolva gasto nessa ideia. Conte mais (o que você vai comprar) e tente de novo." };
+      return { ok: true, itens };
+    } catch (error) {
+      const { OpenAIError, explain } = await import("./mcp/openai");
+      if (error instanceof OpenAIError) return { ok: false, error: explain(error, process.env["OPENAI_MODEL"] ?? "o modelo") };
+      if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return { ok: false, error: "A IA demorou demais. Tente de novo." };
+      return { ok: false, error: "Não consegui montar o orçamento agora. Tente de novo." };
     }
   });

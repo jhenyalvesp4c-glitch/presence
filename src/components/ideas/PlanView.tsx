@@ -9,7 +9,8 @@ import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, Tilt } from "@/components/fi
 
 import { addEntry, type NewFile } from "@/lib/data/brain";
 import { ideaFileUrls } from "@/lib/data/ideas";
-import { AREAS, statusLabel, type Idea } from "@/lib/ideas";
+import { brl } from "@/lib/finance/settle";
+import { AREAS, budgetLines, budgetTotals, statusLabel, type Idea } from "@/lib/ideas";
 
 const dateBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 const rise = (n: number) => ({ animation: "fin-rise .65s both", animationDelay: `${n * 90}ms` }) as React.CSSProperties;
@@ -31,6 +32,7 @@ export function planMarkdown(i: Idea): string {
     p?.perguntas.length ? `\nPerguntas e respostas:\n${p.perguntas.map((q) => `- ${q.q}\n  → ${q.a || "(sem resposta)"}`).join("\n")}` : "",
     p ? L("Riscos", p.riscos) : "", p ? L("Primeiros passos", p.passos.map((x, n) => `${n + 1}. ${x}`)) : "",
     p ? `\nO que precisa: tempo — ${p.precisa.tempo || "—"}; dinheiro — ${p.precisa.dinheiro || "—"}; pessoas — ${p.precisa.pessoas || "—"}` : "",
+    i.budget.length ? `\nOrçamento (total ${budgetTotals(i.budget).total.toFixed(2).replace(".", ",")} reais; já gasto ${budgetTotals(i.budget).comprado.toFixed(2).replace(".", ",")}):\n${budgetLines(i.budget).map((x) => `- ${x}`).join("\n")}` : "",
     i.links.length ? L("Links", i.links) : "",
   ].filter(Boolean).join("\n");
 }
@@ -105,7 +107,18 @@ export function PlanView({ idea, onClose }: { idea: Idea; onClose: () => void })
 
         {p && <Sec n={7} Icon={Wallet} title="O que precisa" color="var(--violet)"><div className="grid gap-3 sm:grid-cols-3">{([["Tempo", p.precisa.tempo, Clock, "var(--cyan)"], ["Dinheiro", p.precisa.dinheiro, Wallet, "var(--emerald)"], ["Pessoas", p.precisa.pessoas, Users, "var(--pink)"]] as const).map(([k, v, I, c], n) => <Tilt key={k} max={8} className="rounded-2xl"><div className="glass h-full rounded-2xl p-4" style={{ ...rise(n), boxShadow: `0 20px 60px -34px ${c}` }}><span className="grid h-9 w-9 place-items-center rounded-xl border" style={{ color: c, borderColor: `color-mix(in oklab, ${c} 40%, transparent)`, background: `color-mix(in oklab, ${c} 12%, transparent)` }}><I size={16} /></span><p className="mt-3 text-[0.65rem] uppercase tracking-wider text-muted-foreground">{k}</p><p className="mt-1 text-sm">{v || "—"}</p></div></Tilt>)}</div></Sec>}
 
-        {idea.links.length > 0 && <Sec n={8} Icon={ExternalLink} title="Links" color="var(--cyan)"><ul className="space-y-1.5">{idea.links.map((l) => <li key={l}><a href={l} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 break-all text-sm text-cyan hover:underline"><ExternalLink size={12} />{l}</a></li>)}</ul></Sec>}
+        {idea.budget.length > 0 && (() => { const t = budgetTotals(idea.budget); return <Sec n={8} Icon={Wallet} title="Orçamento" color="var(--emerald)">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3" data-testid="plano-orcamento"><div><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">Total do projeto</p><p className="font-display text-4xl font-semibold tabular-nums text-emerald" style={{ textShadow: "0 0 24px var(--emerald)" }}>{brl(t.total)}</p></div><div className="flex gap-5 text-right text-xs"><div><p className="text-muted-foreground">Já gasto</p><p className="font-medium tabular-nums">{brl(t.comprado)}</p></div><div><p className="text-muted-foreground">Falta gastar</p><p className="font-medium tabular-nums text-amber">{brl(t.falta)}</p></div></div></div>
+          <ul className="space-y-2">{idea.budget.map((b, n) => <li key={b.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border px-4 py-2.5 text-sm ${b.status === "tenho" ? "border-cyan/25 text-muted-foreground" : b.status === "comprado" ? "border-emerald/30" : "border-white/10"} bg-white/[0.03]`} style={rise(n)}>
+            <span className={`rounded-full border px-2 py-0.5 text-[0.65rem] ${b.status === "comprado" ? "border-emerald/40 text-emerald" : b.status === "tenho" ? "border-cyan/40 text-cyan" : "border-amber/40 text-amber"}`}>{b.status === "comprado" ? "comprado" : b.status === "tenho" ? "já tenho" : "a comprar"}</span>
+            <span className="min-w-0 flex-1 font-medium">{b.nome}{b.qtd > 1 ? ` ×${b.qtd}` : ""}{b.nota ? <span className="ml-2 text-xs font-normal text-muted-foreground">{b.nota}</span> : null}</span>
+            {b.link && <a href={b.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-cyan hover:underline"><ExternalLink size={11} />link</a>}
+            <span className="min-w-24 text-right tabular-nums">{b.status === "tenho" ? "—" : b.valor === null ? "sem valor" : `${b.estimado ? "~" : ""}${brl(b.valor * b.qtd)}`}</span>
+          </li>)}</ul>
+          {(t.semValor > 0 || t.estimados > 0) && <p className="mt-3 text-[0.7rem] text-amber">{t.semValor > 0 && `${t.semValor} ${t.semValor === 1 ? "item sem valor" : "itens sem valor"} (fora da soma). `}{t.estimados > 0 && `${t.estimados} ${t.estimados === 1 ? "valor estimado" : "valores estimados"}.`}</p>}
+        </Sec>; })()}
+
+        {idea.links.length > 0 && <Sec n={9} Icon={ExternalLink} title="Links" color="var(--cyan)"><ul className="space-y-1.5">{idea.links.map((l) => <li key={l}><a href={l} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 break-all text-sm text-cyan hover:underline"><ExternalLink size={12} />{l}</a></li>)}</ul></Sec>}
 
         {!p && <Sec n={2} Icon={HelpCircle} title="Sem plano ainda" color="var(--amber)"><p className="text-sm text-muted-foreground">Esta ideia ainda não tem plano. Volte e use "Desenvolver com o Orion" para montar um.</p></Sec>}
 

@@ -2,16 +2,16 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { cleanLinks, cleanPlan, cleanTags, demandsFromPlan, ideaText, type Conversion, type Idea, type IdeaArea, type IdeaFile, type IdeaKind, type IdeaPlan, type IdeaSource, type IdeaStatus } from "../ideas";
+import { cleanBudget, cleanLinks, cleanPlan, cleanTags, demandsFromPlan, ideaText, type BudgetItem, type Conversion, type Idea, type IdeaArea, type IdeaFile, type IdeaKind, type IdeaPlan, type IdeaSource, type IdeaStatus } from "../ideas";
 import { addEntry, signedUrls, uploadFiles, BUCKET, type NewFile } from "./brain";
 import { must, supabase } from "./db";
 import { saveDemands, saveProjects } from "./project-data";
 import { createTaskRow } from "./tasks";
 
 const KEY = ["ideas"] as const;
-type Row = { id: string; title: string; body: string; kind: IdeaKind; area: IdeaArea; status: IdeaStatus; tags: string[] | null; links: string[] | null; attachments: IdeaFile[] | null; plan: unknown; converted: Conversion[] | null; source: IdeaSource; touched_at: string; created_at: string };
-const COLS = "id, title, body, kind, area, status, tags, links, attachments, plan, converted, source, touched_at, created_at";
-const toIdea = (r: Row): Idea => ({ id: r.id, title: r.title, body: r.body, kind: r.kind, area: r.area, status: r.status, tags: r.tags ?? [], links: r.links ?? [], attachments: r.attachments ?? [], plan: cleanPlan(r.plan), converted: r.converted ?? [], source: r.source, touchedAt: r.touched_at, createdAt: r.created_at });
+type Row = { id: string; title: string; body: string; kind: IdeaKind; area: IdeaArea; status: IdeaStatus; tags: string[] | null; links: string[] | null; attachments: IdeaFile[] | null; plan: unknown; budget: unknown; converted: Conversion[] | null; source: IdeaSource; touched_at: string; created_at: string };
+const COLS = "id, title, body, kind, area, status, tags, links, attachments, plan, budget, converted, source, touched_at, created_at";
+const toIdea = (r: Row): Idea => ({ id: r.id, title: r.title, body: r.body, kind: r.kind, area: r.area, status: r.status, tags: r.tags ?? [], links: r.links ?? [], attachments: r.attachments ?? [], plan: cleanPlan(r.plan), budget: cleanBudget(r.budget), converted: r.converted ?? [], source: r.source, touchedAt: r.touched_at, createdAt: r.created_at });
 
 export type NewIdea = { title: string; body?: string; kind?: IdeaKind; area?: IdeaArea; tags?: string[]; links?: string[]; source?: IdeaSource; files?: NewFile[]; status?: IdeaStatus };
 
@@ -31,14 +31,14 @@ export async function createIdea(n: NewIdea): Promise<Idea> {
   } catch (e) { if (attachments.length) await supabase.storage.from(BUCKET).remove(attachments.map((a) => a.path)); throw e; }
 }
 
-export type IdeaPatch = Partial<Pick<Idea, "title" | "body" | "kind" | "area" | "status" | "tags" | "links">> & { plan?: IdeaPlan | null; converted?: Conversion[]; touch?: boolean };
+export type IdeaPatch = Partial<Pick<Idea, "title" | "body" | "kind" | "area" | "status" | "tags" | "links">> & { plan?: IdeaPlan | null; budget?: BudgetItem[]; converted?: Conversion[]; touch?: boolean };
 export async function updateIdea(id: string, p: IdeaPatch): Promise<void> {
   const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (p.title !== undefined) row["title"] = p.title.trim().slice(0, 200) || "Nova ideia";
   if (p.body !== undefined) row["body"] = p.body.slice(0, 8000);
   if (p.kind) row["kind"] = p.kind; if (p.area) row["area"] = p.area; if (p.status) row["status"] = p.status;
   if (p.tags) row["tags"] = cleanTags(p.tags); if (p.links) row["links"] = cleanLinks(p.links);
-  if (p.plan !== undefined) row["plan"] = p.plan; if (p.converted) row["converted"] = p.converted;
+  if (p.plan !== undefined) row["plan"] = p.plan; if (p.budget) row["budget"] = cleanBudget(p.budget); if (p.converted) row["converted"] = p.converted;
   // mexer na ideia (editar, mudar de estado, desenvolver, "continuar") zera o relógio das "paradas"
   row["touched_at"] = new Date().toISOString();
   must(await supabase.from("ideas").update(row).eq("id", id).select("id"));

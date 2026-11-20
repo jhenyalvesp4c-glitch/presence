@@ -6,6 +6,7 @@
 import { accountBalance, brl, dateBR, isoOf, isPaused, isSubscription, monthName, monthSummary, openInvoice, recurringActiveIn, round2, totalBalance, ymOf } from "./finance/calc";
 import { balance, fromCents, type SettleItem } from "./finance/settle";
 import type { FinanceState } from "./finance/types";
+import { budgetLines, budgetTotals, cleanBudget } from "./ideas";
 import type { OrionDoc } from "./orion";
 
 const day = (ts: string | null | undefined) => (ts ? ts.slice(0, 10) : undefined);
@@ -23,7 +24,7 @@ export type ExtraRaw = {
   lists: { id: string; title: string; updated_at: string }[];
   listItems: { list_id: string; section: string | null; label: string; done: boolean }[];
   schedule: { plan_date: string; time: string; title: string; done: boolean; kind: string | null }[];
-  ideas: { id: string; title: string; body: string; kind: string; area: string; status: string; tags: string[] | null; links: string[] | null; plan: { resumo?: string; passos?: string[]; riscos?: string[]; perguntas?: { q: string; a?: string }[] } | null; touched_at: string }[];
+  ideas: { id: string; title: string; body: string; kind: string; area: string; status: string; tags: string[] | null; links: string[] | null; plan: { resumo?: string; passos?: string[]; riscos?: string[]; perguntas?: { q: string; a?: string }[] } | null; budget?: unknown; touched_at: string }[];
   settlements: { id: string; person: string; closed: boolean; default_share: number | null }[];
   settleItems: { settlement_id: string; kind: "compra" | "pagamento"; item_date: string | null; description: string; amount: number | string; payer: "eu" | "outro"; other_share: number; installment: string }[];
 };
@@ -70,7 +71,7 @@ export function extraDocs(raw: ExtraRaw, finance: FinanceState | null, today: Da
 
   for (const i of raw.ideas ?? []) {
     const p = i.plan, ref = i.kind === "referencia";
-    const text = [i.body, `${ref ? "Referência do mural" : "Ideia"} · estado ${i.status} · ${i.area === "negocios" ? "negócios" : "pessoal"}${(i.tags ?? []).length ? ` · #${(i.tags ?? []).join(" #")}` : ""}`, (i.links ?? []).join(" "), p?.resumo ? `Plano: ${p.resumo}` : "", p?.passos?.length ? `Passos: ${p.passos.join("; ")}` : "", p?.riscos?.length ? `Riscos: ${p.riscos.join("; ")}` : "", ...(p?.perguntas ?? []).filter((q) => q.a).map((q) => `${q.q} → ${q.a}`)].filter(Boolean).join("\n");
+    const text = [i.body, `${ref ? "Referência do mural" : "Ideia"} · estado ${i.status} · ${i.area === "negocios" ? "negócios" : "pessoal"}${(i.tags ?? []).length ? ` · #${(i.tags ?? []).join(" #")}` : ""}`, (i.links ?? []).join(" "), p?.resumo ? `Plano: ${p.resumo}` : "", p?.passos?.length ? `Passos: ${p.passos.join("; ")}` : "", p?.riscos?.length ? `Riscos: ${p.riscos.join("; ")}` : "", ...(p?.perguntas ?? []).filter((q) => q.a).map((q) => `${q.q} → ${q.a}`), ...(cleanBudget(i.budget).length ? [`Orçamento (total R$ ${budgetTotals(cleanBudget(i.budget)).total.toFixed(2).replace(".", ",")}):`, ...budgetLines(cleanBudget(i.budget))] : [])].filter(Boolean).join("\n");
     docs.push({ id: `ideia:${i.id}`, kind: "ideia", title: `${ref ? "Referência" : "Ideia"}: ${i.title}`, text, date: day(i.touched_at), link: "/ideias" });
   }
 

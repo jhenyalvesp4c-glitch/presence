@@ -4,12 +4,13 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AlertTriangle, FileText, ImagePlus, Paperclip, BellRing, BookOpen, CheckSquare, ExternalLink, FolderKanban, HelpCircle, Loader2, Sparkles, Trash2, X } from "lucide-react";
 
+import { Budget } from "@/components/ideas/Budget";
 import { PlanView } from "@/components/ideas/PlanView";
 import { Burst, Thinking } from "@/components/ideas/fx";
 import { backdropProps } from "@/lib/backdrop";
 import { ideaFileUrls, useIdeaActions } from "@/lib/data/ideas";
-import { developIdea } from "@/lib/ideas.functions";
-import { AREAS, STATUSES, cleanLinks, cleanTags, ideaText, type Conversion, type Idea, type IdeaPlan, type IdeaStatus } from "@/lib/ideas";
+import { developIdea, suggestBudget } from "@/lib/ideas.functions";
+import { AREAS, STATUSES, cleanLinks, cleanTags, ideaText, type BudgetItem, type Conversion, type Idea, type IdeaPlan, type IdeaStatus } from "@/lib/ideas";
 
 const field = "mt-1 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none transition focus:border-violet/60";
 const btn = "inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm transition hover:border-white/25 hover:bg-white/[0.08] disabled:pointer-events-none disabled:opacity-45";
@@ -21,7 +22,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
   const acts = useIdeaActions(), navigate = useNavigate();
   const [title, setTitle] = useState(idea.title), [body, setBody] = useState(idea.body), [tags, setTags] = useState(idea.tags.join(", ")), [links, setLinks] = useState(idea.links.join("\n"));
   const [plan, setPlan] = useState<IdeaPlan | null>(idea.plan), [answers, setAnswers] = useState<string[]>(idea.plan?.perguntas.map((p) => p.a) ?? []);
-  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [burst, setBurst] = useState(0), [drag, setDrag] = useState(false), [showPlan, setShowPlan] = useState(false), pick = useRef<HTMLInputElement>(null), [date, setDate] = useState(today()), [time, setTime] = useState("");
+  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [burst, setBurst] = useState(0), [drag, setDrag] = useState(false), [showPlan, setShowPlan] = useState(false), [seed, setSeed] = useState<{ k: number; items: BudgetItem[] } | null>(null), pick = useRef<HTMLInputElement>(null), [date, setDate] = useState(today()), [time, setTime] = useState("");
   const [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({});
   useEffect(() => { if (idea.attachments.length) void ideaFileUrls(idea.attachments).then(setUrls).catch(() => undefined); }, [idea.attachments]);
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
@@ -39,6 +40,11 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
       if (!r.ok) { toast.error(r.error); return; }
       setPlan(r.plano); setAnswers(r.plano.perguntas.map((p) => p.a));
       await acts.update.mutateAsync({ id: idea.id, plan: r.plano, ...(idea.status === "solta" ? { status: "explorando" as const } : {}) });
+      // se a ideia envolve gasto e ainda não tem orçamento, o Orion já monta as caixinhas de compras
+      if (!idea.budget.length && !seed) {
+        const b = await suggestBudget({ data: { texto: ideaText({ ...draft, plan: r.plano }) } }).catch(() => null);
+        if (b?.ok && b.itens.length) { await acts.update.mutateAsync({ id: idea.id, budget: b.itens }); setSeed({ k: Date.now(), items: b.itens }); toast.success("O Orion montou o orçamento", { description: "Preencha os valores e links dos itens." }); }
+      }
     } catch (e) { toast.error(`Não consegui desenvolver: ${(e as Error).message}`); }
     setBusy("");
   };
@@ -134,6 +140,8 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
             <p className="text-[0.65rem] text-muted-foreground">Estimativas do Orion a partir do que você contou: confira antes de decidir.</p>
           </div>}
         </section>}
+
+        {!isRef && <Budget key={seed?.k ?? 0} idea={idea} seed={seed?.items} />}
 
         <section className="mt-5">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isRef ? "Usar esta referência" : "Fazer acontecer"}</h3>

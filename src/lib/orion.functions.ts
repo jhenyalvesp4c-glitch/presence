@@ -139,7 +139,7 @@ export async function loadCorpus() {
       supabase.from("checklists").select("id, title, updated_at").limit(40), supabase.from("checklist_items").select("list_id, section, label, done").limit(1500),
       supabase.from("schedule_items").select("plan_date, time, title, done, kind").gte("plan_date", from).lte("plan_date", new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)).limit(600),
       supabase.from("fin_settlements").select("id, person, closed, default_share"), supabase.from("fin_settlement_items").select("settlement_id, kind, item_date, description, amount, payer, other_share, installment").limit(2000),
-      supabase.from("ideas").select("id, title, body, kind, area, status, tags, links, plan, touched_at").limit(500),
+      supabase.from("ideas").select("id, title, body, kind, area, status, tags, links, plan, budget, touched_at").limit(500),
       cloudFinanceRepo.readCloud().catch(() => null),
     ]);
     docs.push(...extraDocs({

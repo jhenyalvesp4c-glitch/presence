@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { cleanLinks, cleanPlan, cleanTags, daysSince, demandsFromPlan, digest, ideaText, linksIn, staleIdeas, type Idea } from "@/lib/ideas";
+import { budgetTotals, cleanBudget, cleanLinks, cleanPlan, cleanTags, daysSince, demandsFromPlan, digest, ideaText, linksIn, staleIdeas, type Idea } from "@/lib/ideas";
 
 const now = new Date("2026-11-20T12:00:00Z");
 const day = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString();
-const idea = (p: Partial<Idea> & { id: string }): Idea => ({ title: "x", body: "", kind: "ideia", area: "pessoal", status: "solta", tags: [], links: [], attachments: [], plan: null, converted: [], source: "texto", touchedAt: day(1), createdAt: day(1), ...p });
+const idea = (p: Partial<Idea> & { id: string }): Idea => ({ title: "x", body: "", kind: "ideia", area: "pessoal", status: "solta", tags: [], links: [], attachments: [], plan: null, budget: [], converted: [], source: "texto", touchedAt: day(1), createdAt: day(1), ...p });
 
 describe("Caixa de ideias", () => {
   it("ideias paradas: só as em aberto e sem mexer há 30 dias ou mais", () => {
@@ -35,5 +35,26 @@ describe("Caixa de ideias", () => {
     expect(ds.map((d) => [d.id, d.title, d.priority])).toEqual([["#G040", "Pesquisar", "alta"], ["#G041", "Catálogo", "media"], ["#G042", "Site", "media"]]);
     expect(ds[0]!.desc).toContain("Ligar para 5 clientes");
     expect(demandsFromPlan({ title: "Loja", plan: null }, (n) => `#G${n}`)[0]!.title).toBe("Começar: Loja");
+  });
+
+  it("orçamento: soma por unidade x quantidade, ignora o que já tem e conta o que falta valor", () => {
+    const items = cleanBudget([
+      { nome: "Prateleira 120cm", qtd: 1, valor: 189.9, status: "comprado" },
+      { nome: "Planta", qtd: 2, valor: "45", status: "comprar" },
+      { nome: "Tinta", status: "tenho", valor: 300 },
+      { nome: "Quadros", qtd: 3 },
+      { nome: "Bucha", valor: 12.5, estimado: true },
+      { nome: "   " }, { valor: 5 },
+    ]);
+    expect(items.map((i) => i.nome)).toEqual(["Prateleira 120cm", "Planta", "Tinta", "Quadros", "Bucha"]);
+    const t = budgetTotals(items);
+    expect(t).toMatchObject({ comprado: 189.9, falta: 102.5, total: 292.4, semValor: 1, estimados: 1, itens: 4 });
+  });
+
+  it("orçamento: limpa valores e links inválidos", () => {
+    const [a] = cleanBudget([{ nome: "X", qtd: 0, valor: -3, link: "javascript:alert(1)", status: "qualquer" }]);
+    expect(a).toMatchObject({ qtd: 1, valor: null, link: "", status: "comprar" });
+    expect(cleanBudget("nada")).toEqual([]);
+    expect(cleanBudget([{ nome: "Y", link: "https://loja.com/p/1" }])[0]!.link).toBe("https://loja.com/p/1");
   });
 });

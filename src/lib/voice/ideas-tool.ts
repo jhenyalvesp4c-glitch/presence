@@ -1,7 +1,7 @@
 /** Ferramenta de voz/chat "ideias": guarda, lista, resume, move, desenvolve e transforma ideias da caixa. */
 import { createIdea, deleteIdea, ideaToDoc, ideaToProject, ideaToReminder, ideaToTask, listIdeas, updateIdea } from "../data/ideas";
 import { developIdea } from "../ideas.functions";
-import { STATUSES, digest, ideaText, linksIn, statusLabel, type Idea, type IdeaStatus } from "../ideas";
+import { STATUSES, budgetLines, budgetTotals, cleanBudget, digest, ideaText, linksIn, statusLabel, type Idea, type IdeaStatus } from "../ideas";
 import type { Panel } from "./agent";
 
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
@@ -44,6 +44,21 @@ export async function runIdeasTool(args: Record<string, unknown>): Promise<{ res
   const hit = find(all, str("item") || str("titulo"));
   if ("erro" in hit) return { result: { ok: false, erro: hit.erro } };
 
+  if (acao === "orcamento") {
+    const nome = str("compra");
+    let items = hit.budget;
+    if (nome) {
+      const norm1 = norm(nome), at = items.findIndex((b) => norm(b.nome) === norm1 || norm(b.nome).includes(norm1) || norm1.includes(norm(b.nome)));
+      const st = /comprad/.test(norm(str("status"))) ? "comprado" : /tenho|ja tem/.test(norm(str("status"))) ? "tenho" : "comprar";
+      const v = args["valor"] === undefined || args["valor"] === null || args["valor"] === "" ? undefined : Number(args["valor"]), q = args["quantidade"] ? Number(args["quantidade"]) : undefined, link = str("link");
+      const base = at >= 0 ? items[at]! : { id: crypto.randomUUID(), nome, qtd: 1, valor: null, link: "", status: "comprar" as const, nota: "", estimado: false };
+      const next = { ...base, ...(v !== undefined && Number.isFinite(v) ? { valor: v, estimado: false } : {}), ...(q ? { qtd: q } : {}), ...(link ? { link } : {}), ...(str("status") ? { status: st } : {}) };
+      items = cleanBudget(at >= 0 ? items.map((b, n) => (n === at ? next : b)) : [...items, next]);
+      await updateIdea(hit.id, { budget: items });
+    }
+    const tt = budgetTotals(items);
+    return { result: { ok: true, ideia: hit.title, total: tt.total, ja_gasto: tt.comprado, falta_gastar: tt.falta, itens_sem_valor: tt.semValor, itens: budgetLines(items).slice(0, 25), dica: "Diga o total em reais e quantos itens estão sem valor." }, panel: { titulo: `Orçamento: ${hit.title}`, secoes: [{ titulo: `Total R$ ${tt.total.toFixed(2).replace(".", ",")}`, itens: items.slice(0, 15).map((b) => ({ rotulo: `${b.nome}${b.qtd > 1 ? ` x${b.qtd}` : ""}`, detalhe: b.status === "tenho" ? "já tenho" : b.valor === null ? "sem valor" : `R$ ${(b.valor * b.qtd).toFixed(2).replace(".", ",")}${b.status === "comprado" ? " · comprado" : ""}`, ...(b.link ? { link: b.link } : {}) })) }], abrir: { rotulo: "Abrir a ideia", para: "/ideias" } } };
+  }
   if (acao === "estado") {
     const st = STATUS_WORDS.find(([re]) => re.test(norm(str("status"))))?.[1];
     if (!st || !STATUSES.some((s) => s.id === st)) return { result: { ok: false, erro: "Para qual estado? Solta, explorando, validando, fazendo ou arquivada." } };
