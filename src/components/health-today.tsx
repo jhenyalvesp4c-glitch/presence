@@ -6,6 +6,7 @@ import { HealthSheetTabs } from "@/components/health-sheet-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { HealthLoading } from "@/components/health-loading";
 import { Button } from "@/components/ui/button";
+import { BodyPanel } from "@/components/health-body";
 import { ProgramTodayPanel, todaySummary, useProgramBundle } from "@/components/program/ProgramHub";
 import { measurementLabels, workoutsForDate } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
@@ -38,7 +39,7 @@ function PanelHead({ icon: Icon, title, to, label }: { icon: typeof Sun; title: 
 }
 
 export function HealthToday() {
-  const { workout, diet, measurements, ready, doneKeys: done, toggleDone: toggle } = useHealthPreview();
+  const { workout, diet, measurements, measurementHistory, ready, doneKeys: done, toggleDone: toggle } = useHealthPreview();
   const { bundle: prog } = useProgramBundle(), ps = prog ? todaySummary(prog) : null;
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
@@ -141,11 +142,9 @@ export function HealthToday() {
         {/* Body */}
         <Panel>
           <PanelHead icon={ScanLine} title="Corpo & medidas" to="/medidas/nova" label="Registrar" />
-          <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-card/40">
-            <img src={bodyAsset} alt="Desenho feminino holográfico de corpo inteiro" width={768} height={1024} loading="lazy" className="aspect-[3/4] w-full object-contain" />
-            <div className="pointer-events-none absolute inset-x-0 h-16 bg-gradient-to-b from-transparent via-primary/25 to-transparent motion-safe:animate-[health-scan_4s_ease-in-out_infinite]" />
-            <div className="absolute left-4 right-4 top-4 flex items-start justify-between"><div><p className="font-mono text-[9px] uppercase text-primary">Peso atual</p><p className="font-display-h text-3xl">{measurements?.peso || "—"}<span className="ml-1 text-xs text-muted-foreground">kg</span></p></div><Activity className="h-5 w-5 text-primary motion-safe:animate-pulse" /></div>
-            <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] text-muted-foreground"><span>{measurements?.altura ? `${measurements.altura} m` : "Altura não informada"}</span><span>{measurements?.data ? measurements.data.split("-").reverse().join("/") : "Sem medição"}</span></div>
+          <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-card/40 p-3" data-testid="hoje-corpo">
+            <div className="flex items-start justify-between px-2 pt-1"><div><p className="font-mono text-[9px] uppercase text-primary">Peso atual</p><p className="font-display-h text-3xl">{measurements?.peso || "—"}<span className="ml-1 text-sm text-muted-foreground">kg</span></p></div><p className="text-right text-[10px] text-muted-foreground">{measurements?.altura ? `${measurements.altura} m` : "Altura não informada"}<br />{measurements?.data ? measurements.data.split("-").reverse().join("/") : ""}</p></div>
+            <BodyPanel history={measurementHistory} compact />
           </div>
           <dl className="mt-4 grid grid-cols-2 gap-2">{Object.entries(measurementLabels).map(([key, label]) => <div key={key} className="flex justify-between gap-2 rounded-lg border border-border bg-card/30 px-3 py-2"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="text-xs font-medium">{measurements?.valores[key] || "—"}<span className="ml-1 text-muted-foreground">cm</span></dd></div>)}</dl>
         </Panel>

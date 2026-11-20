@@ -6,6 +6,7 @@ import { HealthTabs } from "@/components/health-tabs";
 import { HealthSheetTabs } from "@/components/health-sheet-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { HealthLoading } from "@/components/health-loading";
+import { BodyPanel } from "@/components/health-body";
 import { PROGRESS_TABS, ProgramHeader, ProgramProgressView, SubTabs, useProgramBundle, type ProgressView } from "@/components/program/ProgramHub";
 import { measurementLabels, toNumber, formatDate, type MeasurementSheet } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
@@ -125,6 +126,7 @@ export function HealthProgress({ tab = "saude" }: { tab?: "saude" | "analise" } 
   const series: Series[] = keys.filter(k => active.includes(k)).map(k => ({ key: k, label: measurementLabels[k]!, color: colorOf(k), values: history.map(h => toNumber(h.valores[k])) }));
 
   return <Shell tab={tab}>{progBar}
+    <Panel title="Mapa do corpo" icon={ScanLine} color="var(--cyan)" className="mb-6"><BodyPanel history={history} /></Panel>
     <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[
         { icon: Scale, color: "var(--cyan)", label: "Peso atual", value: last.peso || "—", unit: "kg", sub: `início ${first.peso || "—"} kg`, spark: pesos },

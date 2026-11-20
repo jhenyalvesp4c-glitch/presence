@@ -567,3 +567,9 @@ html, body { max-width: 100%; overflow-x: clip; }
   &::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--foreground) 20%, transparent); border-radius: 999px; }
   &:hover::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--cyan) 60%, transparent); }
 }
+
+/* Corpo holográfico: feixe de varredura e anel de plataforma. */
+@keyframes body-scan { 0%,100% { transform: translateY(-70px); } 50% { transform: translateY(540px); } }
+@keyframes body-ring { to { stroke-dashoffset: -60; } }
+@keyframes body-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) { [data-body-fx] { animation: none !important; } }
