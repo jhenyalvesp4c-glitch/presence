@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ChevronRight, Heart, Dumbbell, Utensils, UserRound,
 } from "lucide-react";
@@ -66,6 +66,12 @@ function Index() {
             <p className="mt-1 text-sm text-muted-foreground">Cuide do seu corpo, evolua seus hábitos, alcance seus objetivos.</p>
           </div>
         </header>
+
+        <Link to="/programa" data-testid="ir-programa" className="glass-h group relative mb-6 flex items-center gap-4 overflow-hidden rounded-[2rem] p-5 transition hover:-translate-y-0.5 md:p-6">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-primary shadow-glow"><Dumbbell className="h-6 w-6 text-primary-foreground" /></span>
+          <span className="min-w-0 flex-1"><span className="block font-mono text-[11px] uppercase tracking-normal text-primary">Novo · Programa de treino</span><span className="block font-display-h text-xl font-semibold md:text-2xl">Seu programa de 12 semanas, do treino de hoje à evolução</span><span className="block text-sm text-muted-foreground">Cargas, progressão, avaliação semanal, medidas, fotos e relatório para o nutricionista.</span></span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-primary" />
+        </Link>
 
         <section className="glass-h relative rounded-[2rem] p-6 md:p-10">
           <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">

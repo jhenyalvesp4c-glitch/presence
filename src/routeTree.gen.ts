@@ -24,6 +24,7 @@ import { Route as IdeiasRouteImport } from './routes/ideias'
 import { Route as ListasRouteImport } from './routes/listas'
 import { Route as OrganizarRouteImport } from './routes/organizar'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
+import { Route as ProgramaRouteImport } from './routes/programa'
 import { Route as ProgressoRouteImport } from './routes/progresso'
 import { Route as ProjetosRouteImport } from './routes/projetos'
 import { Route as ResumoRouteImport } from './routes/resumo'
@@ -118,6 +119,11 @@ const OrganizarRoute = OrganizarRouteImport.update({
 const PlanejamentoRoute = PlanejamentoRouteImport.update({
   id: '/planejamento',
   path: '/planejamento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgramaRoute = ProgramaRouteImport.update({
+  id: '/programa',
+  path: '/programa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgressoRoute = ProgressoRouteImport.update({
@@ -237,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/listas': typeof ListasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/programa': typeof ProgramaRoute
   '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
   '/resumo': typeof ResumoRoute
@@ -274,6 +281,7 @@ export interface FileRoutesByTo {
   '/listas': typeof ListasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/programa': typeof ProgramaRoute
   '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
   '/resumo': typeof ResumoRoute
@@ -312,6 +320,7 @@ export interface FileRoutesById {
   '/listas': typeof ListasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/programa': typeof ProgramaRoute
   '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
   '/resumo': typeof ResumoRoute
@@ -351,6 +360,7 @@ export interface FileRouteTypes {
     | '/listas'
     | '/organizar'
     | '/planejamento'
+    | '/programa'
     | '/progresso'
     | '/projetos'
     | '/resumo'
@@ -388,6 +398,7 @@ export interface FileRouteTypes {
     | '/listas'
     | '/organizar'
     | '/planejamento'
+    | '/programa'
     | '/progresso'
     | '/projetos'
     | '/resumo'
@@ -425,6 +436,7 @@ export interface FileRouteTypes {
     | '/listas'
     | '/organizar'
     | '/planejamento'
+    | '/programa'
     | '/progresso'
     | '/projetos'
     | '/resumo'
@@ -463,6 +475,7 @@ export interface RootRouteChildren {
   ListasRoute: typeof ListasRoute
   OrganizarRoute: typeof OrganizarRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
+  ProgramaRoute: typeof ProgramaRoute
   ProgressoRoute: typeof ProgressoRoute
   ProjetosRoute: typeof ProjetosRoute
   ResumoRoute: typeof ResumoRoute
@@ -589,6 +602,13 @@ declare module '@tanstack/react-router' {
       path: '/planejamento'
       fullPath: '/planejamento'
       preLoaderRoute: typeof PlanejamentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/programa': {
+      id: '/programa'
+      path: '/programa'
+      fullPath: '/programa'
+      preLoaderRoute: typeof ProgramaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/progresso': {
@@ -761,6 +781,7 @@ const rootRouteChildren: RootRouteChildren = {
   ListasRoute: ListasRoute,
   OrganizarRoute: OrganizarRoute,
   PlanejamentoRoute: PlanejamentoRoute,
+  ProgramaRoute: ProgramaRoute,
   ProgressoRoute: ProgressoRoute,
   ProjetosRoute: ProjetosRoute,
   ResumoRoute: ResumoRoute,

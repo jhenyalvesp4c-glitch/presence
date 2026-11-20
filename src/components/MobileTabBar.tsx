@@ -10,7 +10,7 @@ const items = [
   { Icon: ListChecks, label: "Tarefas", to: "/tarefas", match: ["/tarefas", "/calendario", "/planejamento"], c: "cyan" },
   { Icon: ClipboardList, label: "Demandas", to: "/projetos", match: ["/projetos", "/demandas"], c: "violet" },
   { Icon: Wallet, label: "Finanças", to: "/financeiro", match: ["/financeiro"], c: "emerald" },
-  { Icon: Heart, label: "Saúde", to: "/saude", badgeOf: "/habitos", match: ["/saude", "/hoje", "/habitos", "/dieta", "/medidas", "/treino"], c: "emerald" },
+  { Icon: Heart, label: "Saúde", to: "/saude", badgeOf: "/habitos", match: ["/saude", "/hoje", "/habitos", "/dieta", "/medidas", "/treino", "/programa"], c: "emerald" },
   { Icon: Brain, label: "Orion", to: "/cerebro", match: ["/cerebro"], c: "violet" },
 ] as const;
 
