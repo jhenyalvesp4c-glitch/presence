@@ -20,6 +20,7 @@ import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as HabitosRouteImport } from './routes/habitos'
 import { Route as HojeRouteImport } from './routes/hoje'
+import { Route as IdeiasRouteImport } from './routes/ideias'
 import { Route as ListasRouteImport } from './routes/listas'
 import { Route as OrganizarRouteImport } from './routes/organizar'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
@@ -97,6 +98,11 @@ const HabitosRoute = HabitosRouteImport.update({
 const HojeRoute = HojeRouteImport.update({
   id: '/hoje',
   path: '/hoje',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IdeiasRoute = IdeiasRouteImport.update({
+  id: '/ideias',
+  path: '/ideias',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ListasRoute = ListasRouteImport.update({
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
+  '/ideias': typeof IdeiasRoute
   '/listas': typeof ListasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
+  '/ideias': typeof IdeiasRoute
   '/listas': typeof ListasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
@@ -300,6 +308,7 @@ export interface FileRoutesById {
   '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
+  '/ideias': typeof IdeiasRoute
   '/listas': typeof ListasRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
@@ -338,6 +347,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/habitos'
     | '/hoje'
+    | '/ideias'
     | '/listas'
     | '/organizar'
     | '/planejamento'
@@ -374,6 +384,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/habitos'
     | '/hoje'
+    | '/ideias'
     | '/listas'
     | '/organizar'
     | '/planejamento'
@@ -410,6 +421,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/habitos'
     | '/hoje'
+    | '/ideias'
     | '/listas'
     | '/organizar'
     | '/planejamento'
@@ -447,6 +459,7 @@ export interface RootRouteChildren {
   FinanceiroRoute: typeof FinanceiroRoute
   HabitosRoute: typeof HabitosRoute
   HojeRoute: typeof HojeRoute
+  IdeiasRoute: typeof IdeiasRoute
   ListasRoute: typeof ListasRoute
   OrganizarRoute: typeof OrganizarRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
@@ -548,6 +561,13 @@ declare module '@tanstack/react-router' {
       path: '/hoje'
       fullPath: '/hoje'
       preLoaderRoute: typeof HojeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ideias': {
+      id: '/ideias'
+      path: '/ideias'
+      fullPath: '/ideias'
+      preLoaderRoute: typeof IdeiasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/listas': {
@@ -737,6 +757,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceiroRoute: FinanceiroRoute,
   HabitosRoute: HabitosRoute,
   HojeRoute: HojeRoute,
+  IdeiasRoute: IdeiasRoute,
   ListasRoute: ListasRoute,
   OrganizarRoute: OrganizarRoute,
   PlanejamentoRoute: PlanejamentoRoute,

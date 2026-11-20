@@ -57,7 +57,7 @@ const cards = [
   { img: imgSaude, Icon: Heart, t: "Saúde e bem-estar", d: ["Treino, dieta, hábitos", "e evolução"], c: "emerald", to: "/saude" as const },
   { img: imgFoco, Icon: Layers, t: "Foco e produtividade", d: ["Organize seus projetos", "e prioridades"], c: "cyan", to: "/projetos" as const },
   { img: imgFin, Icon: BarChart3, t: "Controle financeiro", d: ["Acompanhe seus gastos", "e metas"], c: "cyan", to: "/financeiro" as const },
-  { img: imgProj, Icon: Lightbulb, t: "Projetos e ideias", d: ["Registre e desenvolva", "suas ideias"], c: "violet" },
+  { img: imgProj, Icon: Lightbulb, t: "Projetos e ideias", d: ["Registre e desenvolva", "suas ideias"], c: "violet", to: "/ideias" as const },
 ];
 
 function Assistente() {

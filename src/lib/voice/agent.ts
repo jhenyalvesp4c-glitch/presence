@@ -39,7 +39,7 @@ export type VoiceEvent =
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", ideias: "Mexendo na sua caixa de ideias…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -49,7 +49,7 @@ export type Resume = { estado: Record<string, unknown>[]; resultados: { id: stri
 export const PAGES: Record<string, string> = {
   inicio: "/assistente", demandas: "/demandas", projetos: "/projetos", tarefas: "/tarefas", calendario: "/calendario", planejamento: "/planejamento",
   saude: "/saude", treino: "/saude/treino", dieta: "/saude/dieta", habitos: "/habitos", progresso: "/progresso", cerebro: "/cerebro",
-  organizar: "/organizar", financeiro: "/financeiro", listas: "/tarefas?aba=listas", analise: "/analise", resumo: "/resumo",
+  organizar: "/organizar", financeiro: "/financeiro", listas: "/tarefas?aba=listas", analise: "/analise", resumo: "/resumo", ideias: "/ideias",
 };
 
 /* ───────────── contexto (com cache curto, para responder rápido) ───────────── */
@@ -85,6 +85,7 @@ Regras de fala:
 - QUANDO NÃO CONSEGUE: se ela pedir algo que nenhuma ferramenta sua faz (função nova, editar algo que o sistema ainda não deixa, ou uma ferramenta devolveu que não é possível), não pare em "não consigo". Diga em uma frase que no momento não consegue e use pedir_melhoria com um título curto, o pedido dela e os detalhes de como deve ficar. A pessoa confere e confirma na tela; só então vai para o Claude. Nunca prometa que já está sendo feito: diga que o pedido segue para o Claude depois da confirmação. Se ela perguntar do andamento dos pedidos, use pedir_melhoria com acao listar.
 - UM SÓ SISTEMA: você, o Perguntar/Documentar do Orion e o chat usam a MESMA memória. O que ela documentou ou anotou lá, você acha com buscar_no_orion (que também enxerga memórias, hábitos, saúde, listas, plano do dia, financeiro e acertos de contas); o que você documenta aqui aparece lá, e o que ela disser a você fica no histórico que o Perguntar pesquisa. Para o que mudou há pouco (financeiro, plano, listas) prefira a ferramenta específica; para "o que eu anotei/disse sobre X" use buscar_no_orion.
 - ACERTO DE CONTAS: quando ela dividir gastos com outra pessoa (compras no cartão de um e do outro, contas da casa, parcelada dividida), use a ferramenta acerto (e financeiro/dividir para dividir uma compra ou parcelada do cartão dela). Se ela mandar print/foto/PDF de extrato, fatura ou conta, LEIA as linhas e lance (acao lancar com todas as linhas de uma vez; ou contas_da_casa para contas cheias a dividir), usando a explicação que ela escreveu junto. Descubra com ela só o que faltar: de quem é o cartão do print e de quem é cada compra; NUNCA adivinhe de quem é uma compra nem lance linhas que ela disse que não entram. Confirme em uma frase com o saldo final ("Ana paga R$ 270 a você"). EXCLUIR sempre pede confirmação (confirmado=true só depois do sim). Você também edita, quita e gera o extrato para enviar (acao extrato: entregue o texto pronto).
+- IDEIAS: "tive uma ideia…", "anota essa ideia", "guarda esse link de referência" → ideias (guardar; referencia=true se for inspiração/print/link, não ideia). "como estão minhas ideias", "tem ideia parada" → ideias (resumo/listar). "desenvolve a ideia X" → ideias (desenvolver) e leia só a próxima ação e as perguntas principais. "vira projeto/tarefa/lembrete/documentação" → ideias (virar). Ideia pequena costuma virar tarefa; só conhecimento, documentação. Estimativas de tempo e dinheiro são do Orion: diga que são estimativas.
 - ANÁLISE CORPORAL: para "como está minha evolução", "quanto emagreci", "como está meu peso/cintura/gordura", "qual minha meta" use analise_corporal (acao resumo). Responda em 1 ou 2 frases com poucos números. A gordura e a massa magra costumam ser ESTIMATIVAS pela altura e cintura (diga "estimada" quando for o caso; nunca como exame). "Minha meta de peso é 70" → acao meta, tipo peso, valor 70 (cintura: tipo cintura). "Medi 28 de gordura" → acao gordura, valor 28. Nunca invente números nem dê diagnóstico.
 - PLANEJAMENTO: para o plano do dia ("o que tenho hoje", "monta meu dia", "adiciona X às 15h", "move X para 16h", "adia X", "conclui X", "como está amanhã") use a ferramenta planejamento. Ela usa os dados reais (compromissos, tarefas, hábitos, treino, contas). Responda em uma ou duas frases. Remover pede confirmação (precisa_confirmar → pergunte e repita com confirmado=true). Sem horário numa adição, pergunte só isso. "fontes" liga/desliga o que entra no plano; "aprendizado" conta o que você percebeu do ritmo dela.
 - FINANCEIRO: para dinheiro ("quanto gastei", "quanto tenho", "como está minha fatura", "o que falta pagar", "minhas assinaturas", "gastei 50 no mercado") use a ferramenta financeiro. Ela traz os números reais; nunca invente valores. Responda em uma ou duas frases, com poucos números (valor falado como "mil duzentos e cinquenta reais"). Para registrar um gasto ou ganho, use acao lancar com a frase dela exatamente como foi dita; se faltar conta ou cartão, pergunte só isso. Compra parcelada não se lança por voz.
@@ -106,7 +107,7 @@ const schemaOf = (z_: z.ZodType) => { const { $schema: _s, ...rest } = z.toJSONS
 
 export const TOOLS = [
   fn("abrir_pagina", "Abre uma tela do Orion para a pessoa.", { type: "object", properties: {
-    pagina: { type: "string", enum: Object.keys(PAGES), description: "inicio, demandas, projetos, tarefas, calendario, planejamento, saude, treino, dieta, habitos, progresso, cerebro (segundo cérebro/Orion), organizar, analise, resumo" },
+    pagina: { type: "string", enum: Object.keys(PAGES), description: "inicio, demandas, projetos, tarefas, calendario, planejamento, saude, treino, dieta, habitos, progresso, cerebro (segundo cérebro/Orion), organizar, analise, resumo, ideias" },
     projeto: { type: "string", description: "Só para demandas: nome do projeto, se ela pedir um específico." },
   }, required: ["pagina"] }),
   fn("registrar", "Cria registros reais no Orion (demanda, tarefa, compromisso, lembrete, rotina, anotação). Use os nomes EXATOS de projetos e polos do contexto. Datas em AAAA-MM-DD, horas em HH:MM.", schemaOf(z.object({
@@ -146,6 +147,12 @@ export const TOOLS = [
     periodo: { type: "string", description: "Período do resumo, em palavras." },
     tipo: { type: "string", enum: ["peso", "cintura"], description: "Qual meta (acao meta)." },
     valor: { type: "number", description: "Meta em kg/cm (acao meta) ou % de gordura medido (acao gordura)." },
+  }, required: ["acao"] }),
+  fn("ideias", "CAIXA DE IDEIAS da pessoa (Projetos e ideias). Ações: guardar (titulo + texto; area 'pessoal' ou 'negocios'; referencia=true para print/link de inspiração), listar (status opcional), resumo (quantas há e quais estão paradas há mais de 30 dias), estado (item + status: solta, explorando, validando, fazendo, arquivada), desenvolver (item: monta perguntas que faltam, riscos, primeiros passos e o que precisa; são estimativas), virar (item + tipo: projeto, tarefa, lembrete com data/hora, ou documentacao), excluir (pede confirmação).", { type: "object", properties: {
+    acao: { type: "string", enum: ["guardar", "listar", "resumo", "estado", "desenvolver", "virar", "excluir"] },
+    titulo: { type: "string" }, texto: { type: "string", description: "Detalhes da ideia." }, area: { type: "string", enum: ["pessoal", "negocios"] }, referencia: { type: "boolean" },
+    item: { type: "string", description: "Nome (aproximado) da ideia existente." }, status: { type: "string" }, tipo: { type: "string", enum: ["projeto", "tarefa", "lembrete", "documentacao"] },
+    data: { type: "string", description: "lembrete: AAAA-MM-DD." }, hora: { type: "string" }, confirmado: { type: "boolean", description: "true SÓ depois do sim a uma exclusão." },
   }, required: ["acao"] }),
   fn("planejamento", "Vê e ajusta o PLANO DO DIA real da pessoa. Ações: ver (plano salvo ou prévia de hoje/amanhã/data), gerar (monta o plano com os dados reais), adicionar (titulo + hora + duracao_min), mover (titulo + hora nova), concluir, adiar (passa para o dia seguinte), remover (pede confirmação), fontes (lista ou liga/desliga uma fonte: calendário, tarefas, hábitos, saúde, financeiro, demandas, rotina), aprendizado (o que o Orion percebeu do ritmo dela).", { type: "object", properties: {
     acao: { type: "string", enum: ["ver", "gerar", "adicionar", "mover", "concluir", "adiar", "remover", "fontes", "aprendizado"] },
@@ -359,6 +366,13 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
     case "analise_corporal": {
       const { runAnalysisTool } = await import("./analysis-tool");
       const out = await runAnalysisTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined; navegar?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui olhar a sua evolução." } }));
+      if (out.panel) emit({ t: "painel", p: out.panel });
+      return out.result;
+    }
+
+    case "ideias": {
+      const { runIdeasTool } = await import("./ideas-tool");
+      const out = await runIdeasTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer nas ideias." } }));
       if (out.panel) emit({ t: "painel", p: out.panel });
       return out.result;
     }

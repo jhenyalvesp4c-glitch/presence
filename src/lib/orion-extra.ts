@@ -23,6 +23,7 @@ export type ExtraRaw = {
   lists: { id: string; title: string; updated_at: string }[];
   listItems: { list_id: string; section: string | null; label: string; done: boolean }[];
   schedule: { plan_date: string; time: string; title: string; done: boolean; kind: string | null }[];
+  ideas: { id: string; title: string; body: string; kind: string; area: string; status: string; tags: string[] | null; links: string[] | null; plan: { resumo?: string; passos?: string[]; riscos?: string[]; perguntas?: { q: string; a?: string }[] } | null; touched_at: string }[];
   settlements: { id: string; person: string; closed: boolean; default_share: number | null }[];
   settleItems: { settlement_id: string; kind: "compra" | "pagamento"; item_date: string | null; description: string; amount: number | string; payer: "eu" | "outro"; other_share: number; installment: string }[];
 };
@@ -66,6 +67,12 @@ export function extraDocs(raw: ExtraRaw, finance: FinanceState | null, today: Da
   const byDate = new Map<string, ExtraRaw["schedule"]>();
   for (const s of raw.schedule) (byDate.get(s.plan_date) ?? byDate.set(s.plan_date, []).get(s.plan_date)!).push(s);
   for (const [d, list] of byDate) docs.push({ id: `plano:${d}`, kind: "plano", title: `Plano do dia ${dateBR(d)}`, text: [...list].sort((a, b) => a.time.localeCompare(b.time)).map((s) => `${s.time.slice(0, 5)} ${s.title}${s.done ? " (feito)" : ""}`).join("\n"), date: d, link: "/planejamento/dia" });
+
+  for (const i of raw.ideas ?? []) {
+    const p = i.plan, ref = i.kind === "referencia";
+    const text = [i.body, `${ref ? "Referência do mural" : "Ideia"} · estado ${i.status} · ${i.area === "negocios" ? "negócios" : "pessoal"}${(i.tags ?? []).length ? ` · #${(i.tags ?? []).join(" #")}` : ""}`, (i.links ?? []).join(" "), p?.resumo ? `Plano: ${p.resumo}` : "", p?.passos?.length ? `Passos: ${p.passos.join("; ")}` : "", p?.riscos?.length ? `Riscos: ${p.riscos.join("; ")}` : "", ...(p?.perguntas ?? []).filter((q) => q.a).map((q) => `${q.q} → ${q.a}`)].filter(Boolean).join("\n");
+    docs.push({ id: `ideia:${i.id}`, kind: "ideia", title: `${ref ? "Referência" : "Ideia"}: ${i.title}`, text, date: day(i.touched_at), link: "/ideias" });
+  }
 
   for (const s of raw.settlements) {
     const items: SettleItem[] = raw.settleItems.filter((i) => i.settlement_id === s.id).map((i, n) => ({ id: String(n), kind: i.kind, date: i.item_date, description: i.description, amount: Number(i.amount), payer: i.payer, otherShare: i.other_share, installment: i.installment }));

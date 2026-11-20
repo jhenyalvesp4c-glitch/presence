@@ -15,6 +15,7 @@ const raw: ExtraRaw = {
   lists: [{ id: "l1", title: "Mercado", updated_at: "2026-11-19T10:00:00Z" }],
   listItems: [{ list_id: "l1", section: null, label: "Leite", done: true }, { list_id: "l1", section: null, label: "Pão", done: false }],
   schedule: [{ plan_date: "2026-11-20", time: "09:00:00", title: "Reunião Itanhaém", done: false, kind: "compromisso" }],
+  ideas: [{ id: "i1", title: "Cafeteria de bairro", body: "Abrir uma cafeteria pequena com cowork", kind: "ideia", area: "negocios", status: "explorando", tags: ["cafe"], links: [], plan: { resumo: "Validar demanda local", passos: ["Pesquisar aluguel"], riscos: ["Custo fixo alto"], perguntas: [{ q: "Qual bairro?", a: "Vila Madalena" }] }, touched_at: "2026-11-15T10:00:00Z" }],
   settlements: [{ id: "s1", person: "Ana", closed: false, default_share: 50 }],
   settleItems: [{ settlement_id: "s1", kind: "compra", item_date: "2026-11-10", description: "Mercado", amount: 200, payer: "eu", other_share: 100, installment: "" }, { settlement_id: "s1", kind: "compra", item_date: "2026-11-12", description: "Farmácia", amount: 60, payer: "outro", other_share: 0, installment: "" }],
 };
@@ -45,6 +46,13 @@ describe("O Orion enxerga o sistema todo", () => {
     expect(find("como estão meus hábitos de leitura")).toContain("habito:resumo");
     expect(find("o que eu prefiro nas reuniões")).toContain("memoria:m1");
   });
+  it("a caixa de ideias entra na busca do Orion", () => {
+    const docs = extraDocs(raw, null, hoje), d = docs.find((x) => x.kind === "ideia");
+    expect(d?.link).toBe("/ideias");
+    expect(find("qual era minha ideia da cafeteria")).toContain("ideia:i1");
+    expect(find("o que respondi sobre o bairro da cafeteria")).toContain("ideia:i1");
+  });
+
   it("sem dados financeiros não inventa documento", () => {
     expect(extraDocs({ ...raw, settlements: [], settleItems: [] }, null, hoje).some((d) => d.kind === "financeiro")).toBe(false);
   });
