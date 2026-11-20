@@ -1,7 +1,7 @@
 // Saúde → Análise: painel futurista da evolução corporal (peso, medidas, composição, indicadores, fotos e frases).
 // Lê as medições reais; sem nenhuma medição, mostra um exemplo marcado como tal.
 
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity, ArrowDownRight, ArrowUpRight, BrainCircuit, CalendarDays, Camera, CheckCircle2, Droplet, Dumbbell, Gauge, HeartPulse,
@@ -165,7 +165,9 @@ export function AnalysisPage() {
   const setHidden = (f: (h: string[]) => string[]) => update({ hidden: f(hidden) });
   const [spot, setSpot] = useState<string | null>(null);
 
-  const { bundle: prog } = useProgramBundle(), [view, setView] = useState<"analise" | ProgressView>("analise");
+  const { bundle: prog } = useProgramBundle(), [view, setView] = useState<"analise" | ProgressView>("analise"), { aba } = useSearch({ strict: false }) as { aba?: ProgressView };
+  // links como "Registrar" (Hoje) abrem direto na aba pedida
+  useEffect(() => { if (aba) setView(aba); }, [aba]);
   const today = todayIso();
   const demo = ready && measurementHistory.length === 0;
   const source: MeasurementSheet[] = useMemo(() => (demo ? demoHistory(today) : measurementHistory), [demo, measurementHistory, today]);

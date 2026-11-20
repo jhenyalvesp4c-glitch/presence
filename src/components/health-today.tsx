@@ -31,10 +31,10 @@ function Panel({ children, className = "" }: { children: ReactNode; className?: 
   </section>;
 }
 
-function PanelHead({ icon: Icon, title, to, label }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/analise" | "/medidas/nova" | "/saude/treino"; label: string }) {
+function PanelHead({ icon: Icon, title, to, label, search }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/analise" | "/medidas/nova" | "/saude/treino"; label: string; search?: { aba: "medidas" } }) {
   return <div className="mb-5 flex items-center justify-between gap-2">
     <h2 className="flex items-center gap-3 font-display-h text-lg"><span className="grid h-9 w-9 place-items-center rounded-xl border border-primary/30 bg-primary/10"><Icon className="h-4 w-4 text-primary" /></span>{title}</h2>
-    <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-muted-foreground"><Link to={to}>{label}<ArrowUpRight /></Link></Button>
+    <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-muted-foreground"><Link to={to} {...(search ? { search: search as never } : {})}>{label}<ArrowUpRight /></Link></Button>
   </div>;
 }
 
@@ -141,7 +141,7 @@ export function HealthToday() {
 
         {/* Body */}
         <Panel>
-          <PanelHead icon={ScanLine} title="Corpo & medidas" to="/medidas/nova" label="Registrar" />
+          <PanelHead icon={ScanLine} title="Corpo & medidas" to={prog ? "/analise" : "/medidas/nova"} {...(prog ? { search: { aba: "medidas" as const } } : {})} label="Registrar" />
           <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-card/40 p-3" data-testid="hoje-corpo">
             <div className="flex items-start justify-between px-2 pt-1"><div><p className="font-mono text-[9px] uppercase text-primary">Peso atual</p><p className="font-display-h text-3xl">{measurements?.peso || "—"}<span className="ml-1 text-sm text-muted-foreground">kg</span></p></div><p className="text-right text-[10px] text-muted-foreground">{measurements?.altura ? `${measurements.altura} m` : "Altura não informada"}<br />{measurements?.data ? measurements.data.split("-").reverse().join("/") : ""}</p></div>
             <BodyPanel history={measurementHistory} compact />

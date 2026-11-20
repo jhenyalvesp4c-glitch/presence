@@ -1,4 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useProgram } from "@/lib/data/program";
 import { MedidasScreen } from "@/components/health-measurement-checkin";
 import cover from "@/assets/medidas-hero.jpg";
 
@@ -15,5 +17,13 @@ export const Route = createFileRoute("/medidas/nova")({
       { name: "twitter:image", content: cover },
     ],
   }),
-  component: () => <MedidasScreen />,
+  component: Page,
 });
+
+// Com programa de treino, o cadastro de medidas é a aba "Medidas e fotos" da Análise (tela única).
+function Page() {
+  const { data: program, isLoading } = useProgram(), navigate = useNavigate();
+  useEffect(() => { if (program) void navigate({ to: "/analise", search: { aba: "medidas" }, replace: true }); }, [program, navigate]);
+  if (isLoading || program) return <main className="grid min-h-[60vh] place-items-center"><span className="mono-caps animate-pulse">Abrindo as medidas…</span></main>;
+  return <MedidasScreen />;
+}
