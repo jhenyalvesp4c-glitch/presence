@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { AlertTriangle, BookOpen, Check, Clock, ExternalLink, HelpCircle, ListChecks, Loader2, Printer, Users, Wallet, X } from "lucide-react";
+import { AlertTriangle, BookOpen, Pencil, Check, Clock, ExternalLink, HelpCircle, ListChecks, Loader2, Printer, Users, Wallet, X } from "lucide-react";
 
 import { Ring } from "@/components/finance/charts";
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, Tilt } from "@/components/finance/fx";
@@ -37,7 +37,7 @@ export function planMarkdown(i: Idea): string {
   ].filter(Boolean).join("\n");
 }
 
-export function PlanView({ idea, onClose }: { idea: Idea; onClose: () => void }) {
+export function PlanView({ idea, onClose, onEdit }: { idea: Idea; onClose: () => void; onEdit?: () => void }) {
   const p = idea.plan, [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({}), [saving, setSaving] = useState(false), [zoom, setZoom] = useState<string | null>(null);
   const [done, setDone] = useState<number[]>(() => { try { return JSON.parse(localStorage.getItem(doneKey(idea.id)) ?? "[]") as number[]; } catch { return []; } });
   const imgs = idea.attachments.filter((a) => a.mime.startsWith("image/")), others = idea.attachments.filter((a) => !a.mime.startsWith("image/"));
@@ -63,6 +63,7 @@ export function PlanView({ idea, onClose }: { idea: Idea; onClose: () => void })
       <FinBackdrop />
       <div className="relative mx-auto w-full max-w-4xl space-y-4" onClick={(e) => e.stopPropagation()}>
         <div data-print-hide className="flex flex-wrap items-center justify-end gap-2" style={rise(0)}>
+          {onEdit && <button onClick={onEdit} className={`${pill} border-violet/50 bg-violet/15 text-violet hover:bg-violet/25`} data-testid="plano-editar"><Pencil size={15} /> Editar</button>}
           <button onClick={() => window.print()} className={`${pill} border-white/15 bg-white/[0.06] hover:bg-white/10`} data-testid="plano-imprimir"><Printer size={15} /> Imprimir / salvar PDF</button>
           <button onClick={() => void toDocs()} disabled={saving} className={`${pill} border-cyan/50 bg-cyan/10 text-cyan hover:bg-cyan/20 disabled:opacity-50`} data-testid="plano-guardar">{saving ? <Loader2 size={15} className="animate-spin" /> : <BookOpen size={15} />} Guardar na documentação</button>
           <button onClick={onClose} aria-label="Fechar" className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/[0.06] hover:bg-white/10"><X size={16} /></button>

@@ -8,6 +8,7 @@ import { Donut, Ring, Sparkline } from "@/components/finance/charts";
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, Tilt } from "@/components/finance/fx";
 import { Capture } from "@/components/ideas/Capture";
 import { IdeaDetail } from "@/components/ideas/IdeaDetail";
+import { PlanView } from "@/components/ideas/PlanView";
 import { useIdeaActions, useIdeas } from "@/lib/data/ideas";
 import { STATUSES, daysSince, digest, type Idea, type IdeaStatus } from "@/lib/ideas";
 
@@ -41,13 +42,14 @@ const perWeek = (list: Idea[], now: Date) => Array.from({ length: 8 }, (_, k) =>
 
 export function IdeasPage() {
   const { data: all = [], isLoading } = useIdeas(), acts = useIdeaActions();
-  const [tab, setTab] = useState<Tab>("ideias"), [area, setArea] = useState<Area>("todas"), [q, setQ] = useState(""), [openId, setOpenId] = useState<string | null>(null), [showArch, setShowArch] = useState(false);
+  const [tab, setTab] = useState<Tab>("ideias"), [area, setArea] = useState<Area>("todas"), [q, setQ] = useState(""), [openId, setOpenId] = useState<string | null>(null), [mode, setMode] = useState<"plano" | "editar">("editar"), [showArch, setShowArch] = useState(false);
   const now = useMemo(() => new Date(), [all]);
   const ideas = useMemo(() => all.filter((i) => i.kind === "ideia"), [all]), refs = useMemo(() => all.filter((i) => i.kind === "referencia"), [all]);
   const dg = useMemo(() => digest(all, now), [all, now]);
   const term = q.trim().toLowerCase();
   const match = (i: Idea) => (area === "todas" || i.area === area) && (!term || `${i.title} ${i.body} ${i.tags.join(" ")}`.toLowerCase().includes(term));
   const open = all.find((i) => i.id === openId) ?? null;
+  const show = (i: Idea, m?: "plano" | "editar") => { setMode(m ?? (i.kind === "ideia" && i.plan ? "plano" : "editar")); setOpenId(i.id); };
   const setStatus = (i: Idea, s: IdeaStatus, msg: string) => acts.update.mutate({ id: i.id, status: s }, { onSuccess: () => toast.success(msg), onError: (e) => toast.error(e.message) });
   const touch = (i: Idea) => acts.update.mutate({ id: i.id, touch: true }, { onSuccess: () => toast.success("Ok, a ideia segue viva") });
   const cols = STATUSES.filter((s) => s.id !== "arquivada");
@@ -77,17 +79,17 @@ export function IdeasPage() {
         </div>
       </HeroPanel>
 
-      <div className="animate-rise" style={{ animationDelay: "120ms" }}><Capture onCreated={(i) => { if (i.kind === "ideia") setOpenId(i.id); }} /></div>
+      <div className="animate-rise" style={{ animationDelay: "120ms" }}><Capture onCreated={(i) => { if (i.kind === "ideia") show(i, "editar"); }} /></div>
 
       {dg.total > 0 && <Panel>
         <div className="flex items-center gap-2"><Sparkles size={15} className="text-violet" /><h2 className="font-display text-base font-semibold">Resumo da semana</h2></div>
         <p className="mt-1 text-sm text-muted-foreground" data-testid="ideias-resumo">{dg.texto}</p>
         {dg.paradas.length > 0 && <ul className="mt-3 space-y-2">{dg.paradas.slice(0, 5).map((i) => (
           <li key={i.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-amber/25 bg-amber/[0.05] px-3 py-2 text-sm" data-testid="ideia-parada">
-            <button onClick={() => setOpenId(i.id)} className="mr-auto min-w-0 truncate text-left hover:underline">{i.title} <span className="text-xs text-muted-foreground">· parada há {daysSince(i.touchedAt, now)} dias</span></button>
+            <button onClick={() => show(i)} className="mr-auto min-w-0 truncate text-left hover:underline">{i.title} <span className="text-xs text-muted-foreground">· parada há {daysSince(i.touchedAt, now)} dias</span></button>
             <button onClick={() => touch(i)} className={chip(false)}>Continuar</button>
             <button onClick={() => setStatus(i, "arquivada", "Arquivada")} className={`${chip(false)} inline-flex items-center gap-1`}><Archive size={11} /> Arquivar</button>
-            <button onClick={() => setOpenId(i.id)} className={`${chip(true)} inline-flex items-center gap-1`}><FolderKanban size={11} /> Virar projeto</button>
+            <button onClick={() => show(i, "editar")} className={`${chip(true)} inline-flex items-center gap-1`}><FolderKanban size={11} /> Virar projeto</button>
           </li>))}</ul>}
       </Panel>}
 
@@ -106,26 +108,27 @@ export function IdeasPage() {
               const list = ideas.filter((i) => i.status === c.id && match(i));
               return <div key={c.id} style={{ "--tone": `var(--${c.color})`, animationDelay: `${cols.indexOf(c) * 90}ms` } as React.CSSProperties} className="glass column-tone animate-rise w-[82%] shrink-0 snap-start rounded-3xl p-3 md:w-auto" data-testid={`coluna-${c.id}`}>
                 <div className="mb-2 flex items-center justify-between px-1"><div><h3 className="flex items-center gap-2 font-display text-sm font-semibold" style={{ color: `var(--${c.color})` }}><span className="tone-dot" />{c.label}</h3><p className="text-[0.65rem] text-muted-foreground">{c.hint}</p></div><span className="grid h-6 min-w-6 place-items-center rounded-full border border-white/10 bg-black/25 px-2 font-mono text-[0.65rem] text-muted-foreground">{list.length}</span></div>
-                <div className="space-y-2">{list.map((i, n) => <Card key={i.id} index={n} idea={i} now={now} onOpen={() => setOpenId(i.id)} />)}{list.length === 0 && <p className="px-1 py-3 text-xs text-muted-foreground/70">Nada aqui.</p>}</div>
+                <div className="space-y-2">{list.map((i, n) => <Card key={i.id} index={n} idea={i} now={now} onOpen={() => show(i)} />)}{list.length === 0 && <p className="px-1 py-3 text-xs text-muted-foreground/70">Nada aqui.</p>}</div>
               </div>;
             })}</div>
             {dg.porStatus.arquivada > 0 && <div>
               <button onClick={() => setShowArch((v) => !v)} className={chip(showArch)}>{showArch ? "Esconder" : "Ver"} arquivadas ({dg.porStatus.arquivada})</button>
-              {showArch && <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">{ideas.filter((i) => i.status === "arquivada" && match(i)).map((i) => <Card key={i.id} idea={i} now={now} onOpen={() => setOpenId(i.id)} />)}</div>}
+              {showArch && <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">{ideas.filter((i) => i.status === "arquivada" && match(i)).map((i) => <Card key={i.id} idea={i} now={now} onOpen={() => show(i)} />)}</div>}
             </div>}
           </>)
       ) : (
         refs.length === 0 ? <Panel><p className="py-6 text-center text-sm text-muted-foreground">O mural guarda prints e links de referência (inspiração, exemplos). Para mandar algo para cá, abra uma ideia e use "Mandar para o mural".</p></Panel> : (
           <div className="columns-1 gap-4 sm:columns-2 xl:columns-3" data-testid="mural">{refs.filter(match).map((i) => (
             <div key={i.id} className="mb-4 break-inside-avoid rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-              <button onClick={() => setOpenId(i.id)} className="text-left text-sm font-medium hover:underline">{i.title}</button>
+              <button onClick={() => show(i)} className="text-left text-sm font-medium hover:underline">{i.title}</button>
               {i.body && <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{i.body}</p>}
               {i.links.map((l) => <a key={l} href={l} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-1.5 text-xs text-cyan hover:underline"><Link2 size={11} />{host(l)}<ExternalLink size={10} /></a>)}
               {i.attachments.length > 0 && <p className="mt-2 text-[0.65rem] text-muted-foreground">{i.attachments.length} anexo(s)</p>}
-              <button onClick={() => setOpenId(i.id)} className="mt-2 inline-flex items-center gap-1 text-[0.7rem] text-muted-foreground hover:text-foreground">Abrir <ArrowRight size={11} /></button>
+              <button onClick={() => show(i)} className="mt-2 inline-flex items-center gap-1 text-[0.7rem] text-muted-foreground hover:text-foreground">Abrir <ArrowRight size={11} /></button>
             </div>))}</div>)
       )}
-      {open && <IdeaDetail key={open.id} idea={open} onClose={() => setOpenId(null)} />}
+      {open && mode === "plano" && <PlanView key={`p-${open.id}`} idea={open} onClose={() => setOpenId(null)} onEdit={() => setMode("editar")} />}
+      {open && mode === "editar" && <IdeaDetail key={`e-${open.id}`} idea={open} onClose={() => (open.kind === "ideia" && open.plan ? setMode("plano") : setOpenId(null))} />}
     </PlanShell>
   );
 }
