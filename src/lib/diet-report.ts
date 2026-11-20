@@ -1,5 +1,5 @@
 /** Relatório da alimentação para o nutricionista: dias (calorias e macros, refeições, água, como foi), alimentos registrados, avaliações semanais e comparação das opções. */
-import { compareOptions, daySummary, type DayLog, type DietPlan, type DietWeekly, type Extra, type OptionStats } from "./diet-plan";
+import { compareOptions, customMealName, daySummary, type DayLog, type DietPlan, type DietWeekly, type Extra, type OptionStats } from "./diet-plan";
 
 export type ReportDay = { date: string; opcao: string; kcal: number; p: number; c: number; f: number; refeicoes: string; aguaMl: number | null; fullness: number | null; difficulty: number | null; energy: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string; alimentos: { refeicao: string; itens: Extra[] }[] };
 export type DietReport = { titulo: string; periodo: { de: string; ate: string; emitido: string; dias: number; registrados: number }; perfil: string[]; media: { kcal: number; p: number; c: number; f: number; aguaMl: number | null; refeicoes: number } | null; dias: ReportDay[]; semanais: DietWeekly[]; opcoes: OptionStats[]; observacoes: string[]; meta: string };
@@ -11,7 +11,7 @@ export function buildDietReport(plan: DietPlan, from: string, to: string, today:
   const inRange = logs.filter((l) => l.date >= from && l.date <= to).sort((a, b) => a.date.localeCompare(b.date));
   const dias: ReportDay[] = inRange.map((l) => {
     const s = daySummary(plan, l), names = new Map(s.opt.refeicoes.map((m) => [m.id, m.nome]));
-    const groups = new Map<string, Extra[]>(); for (const e of l.extras) { const k = names.get(e.meal ?? "") ?? "Outros"; groups.set(k, [...(groups.get(k) ?? []), e]); }
+    const groups = new Map<string, Extra[]>(); for (const e of l.extras) { const k = names.get(e.meal ?? "") ?? customMealName(e.meal) ?? "Outros"; groups.set(k, [...(groups.get(k) ?? []), e]); }
     return { date: l.date, opcao: s.opt.nome, kcal: Math.round(s.macros.kcal), p: Math.round(s.macros.p), c: Math.round(s.macros.c), f: Math.round(s.macros.f), refeicoes: `${s.done}/${s.total}`, aguaMl: l.waterMl, fullness: l.fullness, difficulty: l.difficulty, energy: l.energy, training: l.training, discomfort: l.discomfort, bowel: l.bowel, notes: l.notes.trim(), alimentos: [...groups].map(([refeicao, itens]) => ({ refeicao, itens })) };
   });
   const full = dias.filter((d) => d.kcal > 0), water = dias.filter((d) => d.aguaMl !== null).map((d) => d.aguaMl!);

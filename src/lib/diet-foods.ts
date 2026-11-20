@@ -26,11 +26,11 @@ export const UNITS_G = { nome: "g", g: 1 };
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** Busca por nome (e apelidos); sem texto devolve os mais comuns. */
-export function findFoods(q: string, limit = 8): Food[] {
+export function findFoods(q: string, limit = 8, pool: Food[] = FOODS): Food[] {
   const t = norm(q.trim());
   if (t.length < 2) return [];
   const words = t.split(/\s+/);
-  return FOODS.map((fd) => { const n = norm(`${fd.nome} ${fd.alias ?? ""}`); const hit = words.every((w) => n.includes(w)); return { fd, score: hit ? (norm(fd.nome).startsWith(words[0]!) ? 0 : 1) : 9 }; }).filter((x) => x.score < 9).sort((a, b) => a.score - b.score).slice(0, limit).map((x) => x.fd);
+  return pool.map((fd) => { const n = norm(`${fd.nome} ${fd.alias ?? ""}`); const hit = words.every((w) => n.includes(w)); return { fd, score: hit ? (norm(fd.nome).startsWith(words[0]!) ? 0 : 1) : 9 }; }).filter((x) => x.score < 9).sort((a, b) => a.score - b.score).slice(0, limit).map((x) => x.fd);
 }
 /** Alimento da base que corresponde a um item do plano ("Carne moída magra ou frango" → carne moída). */
 export function foodForPlanItem(alimento: string): Food | null { return findFoods(alimento.split(/ ou | \(/i)[0]!, 1)[0] ?? findFoods(alimento.split(" ")[0]!, 1)[0] ?? null; }
@@ -41,3 +41,9 @@ export function foodMacros(food: Food, qty: number, unit: string): Macros {
   return { kcal: food.per100.kcal * k, p: food.per100.p * k, c: food.per100.c * k, f: food.per100.f * k };
 }
 export const qtyLabel = (qty: number, unit: string) => `${String(Math.round(qty * 10) / 10).replace(".", ",")} ${unit === "g" ? "g" : unit}`;
+
+/** Alimento do usuário a partir dos macros digitados: por 100 g, ou por porção (com gramas opcionais). */
+export function customFood(v: { nome: string; kcal: number; p: number; c: number; f: number; base: "100g" | "porcao"; unidade: string; gramas: number }): Food {
+  const unidade = v.unidade.trim() || "porção", k = v.base === "100g" ? 1 : 100 / (v.gramas > 0 ? v.gramas : 100);
+  return { id: `meu-${v.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, nome: v.nome.trim(), per100: { kcal: v.kcal * k, p: v.p * k, c: v.c * k, f: v.f * k }, medidas: v.base === "porcao" ? [{ nome: unidade, g: v.gramas > 0 ? v.gramas : 100 }] : [], alias: "meu" };
+}

@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { cleanDietPlan, type DayLog, type Extra, type Swap, type DietPlan, type DietWeekly } from "../diet-plan";
+import type { Food } from "../diet-foods";
 import { must, supabase } from "./db";
 
 export type DietRow = { id: string; name: string; startDate: string; plan: DietPlan };
@@ -54,6 +55,28 @@ export function useDietActions(planId: string | undefined) {
     saveWeekly: useMutation({
       mutationFn: async (w: DietWeekly) => { must(await supabase.from("diet_weekly").upsert({ plan_id: planId!, week_no: w.week, logged_on: w.date, weight_kg: w.weight, waist_cm: w.waist, abdomen_cm: w.abdomen, hip_cm: w.hip, bowel_count: w.bowelCount, water_l: w.waterL, energy: w.energy, training: w.training, difficulty: w.difficulty, digestive: w.digestive, satiety: w.satiety, notes: w.notes, updated_at: new Date().toISOString() }, { onConflict: "user_id,plan_id,week_no" }).select("id")); },
       onSuccess: () => void (planId && qc.invalidateQueries({ queryKey: weeklyKey(planId) })),
+    }),
+  };
+}
+
+/** Meus alimentos (macros que eu cadastrei), para reusar nas refeições. */
+const FOODS_KEY = ["diet-foods"] as const;
+type FoodRow = { id: string; nome: string; kcal: number | string; p: number | string; c: number | string; f: number | string; medidas: { nome: string; g: number }[] | null };
+export const useMyFoods = () => useQuery({
+  queryKey: FOODS_KEY,
+  queryFn: async (): Promise<Food[]> => (must(await supabase.from("diet_foods").select("id, nome, kcal, p, c, f, medidas").order("created_at", { ascending: false }).limit(300)) as FoodRow[])
+    .map((r) => ({ id: `meu-${r.id}`, nome: r.nome, per100: { kcal: Number(r.kcal), p: Number(r.p), c: Number(r.c), f: Number(r.f) }, medidas: r.medidas ?? [], alias: "meu" })),
+});
+export function useMyFoodActions() {
+  const qc = useQueryClient();
+  return {
+    save: useMutation({
+      mutationFn: async (fd: Food) => { must(await supabase.from("diet_foods").upsert({ nome: fd.nome, kcal: Math.round(fd.per100.kcal * 100) / 100, p: Math.round(fd.per100.p * 100) / 100, c: Math.round(fd.per100.c * 100) / 100, f: Math.round(fd.per100.f * 100) / 100, medidas: fd.medidas }, { onConflict: "user_id,nome" }).select("id")); },
+      onSuccess: () => void qc.invalidateQueries({ queryKey: FOODS_KEY }),
+    }),
+    remove: useMutation({
+      mutationFn: async (id: string) => { must(await supabase.from("diet_foods").delete().eq("id", id.replace(/^meu-/, "")).select("id")); },
+      onSuccess: () => void qc.invalidateQueries({ queryKey: FOODS_KEY }),
     }),
   };
 }

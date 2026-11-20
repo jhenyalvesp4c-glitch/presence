@@ -30,6 +30,8 @@ export type DietPlan = {
 export type Macros = { kcal: number; p: number; c: number; f: number };
 /** Troca feita no dia: o item `${refeição}|${posição}` virou outro alimento do grupo. */
 export type Swap = { alimento: string; porcao: string; grupo: string };
+/** Nome da refeição de um registro: `c:Nome` é uma refeição criada pelo usuário. */
+export const customMealName = (id: string | undefined) => (id?.startsWith("c:") ? id.slice(2) : null);
 /** Alimento registrado no diário: `meal` é o id da refeição do plano (ou "outros"). */
 export type Extra = { id: string; nome: string; kcal: number; p: number; c: number; f: number; qtd?: string; meal?: string };
 export type DayLog = { swaps: Record<string, Swap>; extras: Extra[]; date: string; optionId: string | null; mealsDone: string[]; extraProteinG: number | null; waterMl: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };

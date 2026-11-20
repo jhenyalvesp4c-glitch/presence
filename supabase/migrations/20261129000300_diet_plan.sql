@@ -41,3 +41,16 @@ end $$;
 
 -- Trocas feitas no dia (por refeição/item) e alimentos extras com macros.
 alter table presence_app.diet_day_logs add column if not exists swaps jsonb not null default '{}'::jsonb, add column if not exists extras jsonb not null default '[]'::jsonb;
+
+-- Meus alimentos: macros cadastrados por mim (por 100 g + medidas caseiras), para reusar nas refeições.
+create table if not exists presence_app.diet_foods (
+  id uuid primary key default gen_random_uuid(), user_id uuid not null default presence_app.owner_id(),
+  nome text not null check (char_length(nome) between 1 and 80),
+  kcal numeric(8,2) not null default 0 check (kcal between 0 and 2000), p numeric(8,2) not null default 0 check (p between 0 and 200), c numeric(8,2) not null default 0 check (c between 0 and 200), f numeric(8,2) not null default 0 check (f between 0 and 200),
+  medidas jsonb not null default '[]'::jsonb, created_at timestamptz not null default now(), unique (user_id, nome)
+);
+alter table presence_app.diet_foods enable row level security;
+drop policy if exists "dono: linhas próprias" on presence_app.diet_foods;
+create policy "dono: linhas próprias" on presence_app.diet_foods for all to authenticated using (user_id = (select presence_app.owner_id())) with check (user_id = (select presence_app.owner_id()));
+revoke all on presence_app.diet_foods from anon;
+grant select, insert, update, delete on presence_app.diet_foods to authenticated;

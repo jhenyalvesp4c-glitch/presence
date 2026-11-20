@@ -47,3 +47,14 @@ describe("diet diary + report", () => {
     const t = dietReportText(r); expect(t).toMatch(/RELATÓRIO DE ALIMENTAÇÃO/); expect(t).toMatch(/Ovo \(2 unidade\)/);
   });
 });
+
+import { customFood } from "./diet-foods";
+describe("custom foods", () => {
+  it("per-portion macros scale to the portion", () => {
+    const fd = customFood({ nome: "Barra X", kcal: 200, p: 15, c: 18, f: 7, base: "porcao", unidade: "barra", gramas: 50 });
+    const m = foodMacros(fd, 2, "barra"); expect(Math.round(m.kcal)).toBe(400); expect(Math.round(m.p)).toBe(30);
+    const g = foodMacros(fd, 100, "g"); expect(Math.round(g.kcal)).toBe(400);
+  });
+  it("portion without grams counts 1 unit as the typed values", () => { const fd = customFood({ nome: "Doce", kcal: 90, p: 1, c: 15, f: 3, base: "porcao", unidade: "unidade", gramas: 0 }); expect(Math.round(foodMacros(fd, 1, "unidade").kcal)).toBe(90); });
+  it("per-100g keeps values", () => { const fd = customFood({ nome: "Pão", kcal: 250, p: 8, c: 50, f: 2, base: "100g", unidade: "", gramas: 0 }); expect(Math.round(foodMacros(fd, 40, "g").kcal)).toBe(100); });
+});
