@@ -15,11 +15,12 @@ const SRC_ICON = { voz: Mic, print: Camera, texto: Lightbulb, orion: Sparkles } 
 const chip = (on: boolean) => `rounded-full border px-3 py-1 text-xs transition ${on ? "border-violet/60 bg-violet/15 text-violet" : "border-white/10 text-muted-foreground hover:text-foreground"}`;
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 
-function Card({ idea, now, onOpen }: { idea: Idea; now: Date; onOpen: () => void }) {
+function Card({ idea, now, onOpen, index = 0 }: { idea: Idea; now: Date; onOpen: () => void; index?: number }) {
+  const tone = `var(--${STATUSES.find((s) => s.id === idea.status)?.color ?? "violet"})`;
   const Icon = SRC_ICON[idea.source] ?? Lightbulb, age = daysSince(idea.touchedAt, now);
   return (
-    <button onClick={onOpen} data-testid="ideia-card" className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-violet/40 hover:bg-white/[0.06]">
-      <div className="flex items-start gap-2"><Icon size={13} className="mt-1 shrink-0 text-muted-foreground" /><p className="min-w-0 flex-1 text-sm font-medium leading-snug">{idea.title}</p></div>
+    <button onClick={onOpen} data-testid="ideia-card" className="card-premium w-full animate-rise rounded-2xl p-3.5 text-left" style={{ "--tone": tone, animationDelay: `${index * 60}ms` } as React.CSSProperties}>
+      <div className="flex items-start gap-2"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg border border-white/10 bg-black/20" style={{ color: tone }}><Icon size={12} /></span><p className="min-w-0 flex-1 text-sm font-medium leading-snug">{idea.title}</p></div>
       {idea.body && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{idea.body}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.65rem] text-muted-foreground">
         <span className="rounded-full border border-white/10 px-2 py-0.5">{idea.area === "negocios" ? "Negócios" : "Pessoal"}</span>
@@ -49,11 +50,11 @@ export function IdeasPage() {
     <PlanShell active={3}>
       <section className="animate-rise">
         <p className="mono-caps">Projetos e ideias</p>
-        <h1 className="mt-2 font-serif text-5xl leading-none md:text-6xl">Caixa de <span className="text-gradient italic">ideias</span></h1>
+        <h1 className="mt-3 font-serif text-5xl leading-[0.95] tracking-tight md:text-7xl">Caixa de <span className="text-gradient italic">ideias</span></h1>
         <p className="mt-3 max-w-xl text-sm text-muted-foreground">Jogue aqui qualquer ideia, por texto, voz ou print. Depois desenvolva com o Orion e transforme em projeto, tarefa, lembrete ou documentação.</p>
       </section>
 
-      <Capture onCreated={(i) => { if (i.kind === "ideia") setOpenId(i.id); }} />
+      <div className="animate-rise" style={{ animationDelay: "120ms" }}><Capture onCreated={(i) => { if (i.kind === "ideia") setOpenId(i.id); }} /></div>
 
       {dg.total > 0 && <Panel>
         <div className="flex items-center gap-2"><Sparkles size={15} className="text-violet" /><h2 className="font-display text-base font-semibold">Resumo da semana</h2></div>
@@ -78,11 +79,11 @@ export function IdeasPage() {
       {isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p> : tab === "ideias" ? (
         ideas.length === 0 ? <Panel><p className="py-6 text-center text-sm text-muted-foreground">Sua caixa está vazia. Escreva a primeira ideia lá em cima, ou fale no microfone.</p></Panel> : (
           <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{cols.map((c) => {
+            <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-4">{cols.map((c) => {
               const list = ideas.filter((i) => i.status === c.id && match(i));
-              return <div key={c.id} className="rounded-3xl border border-white/10 bg-white/[0.02] p-3" data-testid={`coluna-${c.id}`}>
-                <div className="mb-2 flex items-center justify-between px-1"><div><h3 className="text-sm font-semibold" style={{ color: `var(--${c.color})` }}>{c.label}</h3><p className="text-[0.65rem] text-muted-foreground">{c.hint}</p></div><span className="text-xs text-muted-foreground">{list.length}</span></div>
-                <div className="space-y-2">{list.map((i) => <Card key={i.id} idea={i} now={now} onOpen={() => setOpenId(i.id)} />)}{list.length === 0 && <p className="px-1 py-3 text-xs text-muted-foreground/70">Nada aqui.</p>}</div>
+              return <div key={c.id} style={{ "--tone": `var(--${c.color})` } as React.CSSProperties} className="glass column-tone w-[82%] shrink-0 snap-start rounded-3xl p-3 md:w-auto" data-testid={`coluna-${c.id}`}>
+                <div className="mb-2 flex items-center justify-between px-1"><div><h3 className="flex items-center gap-2 font-display text-sm font-semibold" style={{ color: `var(--${c.color})` }}><span className="tone-dot" />{c.label}</h3><p className="text-[0.65rem] text-muted-foreground">{c.hint}</p></div><span className="grid h-6 min-w-6 place-items-center rounded-full border border-white/10 bg-black/25 px-2 font-mono text-[0.65rem] text-muted-foreground">{list.length}</span></div>
+                <div className="space-y-2">{list.map((i, n) => <Card key={i.id} index={n} idea={i} now={now} onOpen={() => setOpenId(i.id)} />)}{list.length === 0 && <p className="px-1 py-3 text-xs text-muted-foreground/70">Nada aqui.</p>}</div>
               </div>;
             })}</div>
             {dg.porStatus.arquivada > 0 && <div>

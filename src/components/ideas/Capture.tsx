@@ -54,7 +54,7 @@ export function Capture({ onCreated }: { onCreated: (i: Idea) => void }) {
 
   return (
     <div className="space-y-3" data-testid="ideia-captura">
-      <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-black/20 p-2.5 transition focus-within:border-violet/60">
+      <div className="flex items-end gap-2 capture-glow rounded-2xl bg-background/60 p-2.5 transition">
         <button type="button" onClick={() => pick.current?.click()} aria-label="Anexar print ou foto" data-testid="ideia-anexar" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:text-violet"><Camera size={17} /></button>
         <input ref={pick} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
         <textarea ref={area} value={text} onChange={(e) => setText(e.target.value)} rows={1} placeholder="Jogue uma ideia aqui… ou cole um link, um print, uma frase solta" data-testid="ideia-texto"

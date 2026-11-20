@@ -58,7 +58,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background/80 p-3 backdrop-blur-md sm:p-6" {...backdropProps(onClose)} data-testid="ideia-detalhe">
-      <div onClick={(e) => e.stopPropagation()} className="glass mx-auto w-full max-w-3xl rounded-3xl p-5 animate-rise sm:p-6" style={{ "--glow": "var(--violet)" } as React.CSSProperties}>
+      <div onClick={(e) => e.stopPropagation()} className="glass capture-glow mx-auto w-full max-w-3xl rounded-3xl bg-background/70 p-5 animate-rise sm:p-7" style={{ "--glow": "var(--violet)" } as React.CSSProperties}>
         <div className="flex items-start gap-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} aria-label="Título" data-testid="ideia-titulo" className="min-w-0 flex-1 bg-transparent font-display text-2xl font-semibold outline-none" />
           <button onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
@@ -81,7 +81,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
         {idea.attachments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{idea.attachments.map((a) => { const u = urls[a.path]; return a.mime.startsWith("image/") ? <a key={a.path} href={u?.view} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-white/10">{u ? <img src={u.view} alt={a.name} className="h-24 w-24 object-cover" /> : <span className="grid h-24 w-24 place-items-center text-xs text-muted-foreground">…</span>}</a> : <a key={a.path} href={u?.download} className="rounded-xl border border-white/10 px-3 py-2 text-xs">{a.name}</a>; })}</div>}
         {dirty && <div className="mt-3 flex justify-end"><button onClick={() => void save()} className={`${btn} !border-violet/50 text-violet`} data-testid="ideia-salvar">Salvar alterações</button></div>}
 
-        {!isRef && <section className="mt-6 rounded-2xl border border-violet/25 bg-violet/[0.05] p-4" data-testid="ideia-plano">
+        {!isRef && <section className="card-premium mt-6 rounded-2xl !border-violet/30 p-4" data-testid="ideia-plano">
           <div className="flex flex-wrap items-center gap-3">
             <span className="grid h-9 w-9 place-items-center rounded-xl border border-violet/40 bg-violet/10 text-violet"><Sparkles size={16} /></span>
             <div className="mr-auto"><h3 className="font-display text-base font-semibold">Desenvolver com o Orion</h3><p className="text-xs text-muted-foreground">Perguntas que faltam, riscos, primeiros passos e o que seria preciso.</p></div>

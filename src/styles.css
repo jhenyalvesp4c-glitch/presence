@@ -518,3 +518,26 @@ html, body { max-width: 100%; overflow-x: clip; }
   .rail-pad > .health-area, .rail-pad > .rail-bleed { margin-left: -4rem; padding-left: 4rem; }
   .rail-pad > .rail-bleed-p3 { margin-left: -4rem; padding-left: calc(4rem + 0.75rem); }
 }
+
+/* Página de ideias: cartão com brilho na cor do estado, coluna com topo colorido, ponto de cor e caixa de captura com halo. */
+@utility card-premium {
+  position: relative;
+  border: 1px solid color-mix(in oklab, var(--tone, var(--violet)) 22%, transparent);
+  background: linear-gradient(160deg, color-mix(in oklab, var(--tone, var(--violet)) 9%, transparent), rgba(255,255,255,0.025));
+  transition: transform .25s cubic-bezier(.2,.7,.2,1), border-color .25s, box-shadow .25s;
+  &:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--tone, var(--violet)) 55%, transparent); box-shadow: 0 10px 30px -14px color-mix(in oklab, var(--tone, var(--violet)) 60%, transparent); }
+}
+@utility column-tone {
+  border-top: 2px solid color-mix(in oklab, var(--tone, var(--violet)) 70%, transparent);
+  background-image: linear-gradient(to bottom, color-mix(in oklab, var(--tone, var(--violet)) 8%, transparent), transparent 40%);
+}
+@utility tone-dot {
+  display: inline-block; width: .5rem; height: .5rem; border-radius: 9999px; background: var(--tone, var(--violet));
+  box-shadow: 0 0 10px var(--tone, var(--violet));
+}
+@utility capture-glow {
+  border: 1px solid color-mix(in oklab, var(--glow, var(--cyan)) 25%, transparent);
+  box-shadow: 0 0 0 0 transparent, 0 0 40px -18px var(--glow, var(--cyan));
+  transition: border-color .25s, box-shadow .25s;
+  &:focus-within { border-color: color-mix(in oklab, var(--glow, var(--cyan)) 60%, transparent); box-shadow: 0 0 34px -10px var(--glow, var(--cyan)); }
+}
