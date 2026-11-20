@@ -4,6 +4,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AlertTriangle, BellRing, BookOpen, CheckSquare, ExternalLink, FolderKanban, HelpCircle, Loader2, Sparkles, Trash2, X } from "lucide-react";
 
+import { Burst, Thinking } from "@/components/ideas/fx";
 import { backdropProps } from "@/lib/backdrop";
 import { ideaFileUrls, useIdeaActions } from "@/lib/data/ideas";
 import { developIdea } from "@/lib/ideas.functions";
@@ -19,7 +20,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
   const acts = useIdeaActions(), navigate = useNavigate();
   const [title, setTitle] = useState(idea.title), [body, setBody] = useState(idea.body), [tags, setTags] = useState(idea.tags.join(", ")), [links, setLinks] = useState(idea.links.join("\n"));
   const [plan, setPlan] = useState<IdeaPlan | null>(idea.plan), [answers, setAnswers] = useState<string[]>(idea.plan?.perguntas.map((p) => p.a) ?? []);
-  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [date, setDate] = useState(today()), [time, setTime] = useState("");
+  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [burst, setBurst] = useState(0), [date, setDate] = useState(today()), [time, setTime] = useState("");
   const [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({});
   useEffect(() => { if (idea.attachments.length) void ideaFileUrls(idea.attachments).then(setUrls).catch(() => undefined); }, [idea.attachments]);
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
@@ -46,7 +47,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
     if (dirty) await save();
     setBusy(kind);
     try {
-      if (kind === "projeto") { const r = await acts.toProject.mutateAsync({ ...draft }); toast.success("Projeto criado", { description: "Com os primeiros passos como demandas.", action: { label: "Abrir", onClick: () => void navigate({ to: "/demandas", search: { projeto: r.id } as never }) } }); onClose(); }
+      if (kind === "projeto") { const r = await acts.toProject.mutateAsync({ ...draft }); setBurst(Date.now()); toast.success("Projeto criado", { description: "Com os primeiros passos como demandas.", action: { label: "Abrir", onClick: () => void navigate({ to: "/demandas", search: { projeto: r.id } as never }) } }); setTimeout(onClose, 900); }
       else if (kind === "tarefa") { await acts.toTask.mutateAsync({ ...draft }); toast.success("Virou tarefa", { description: "Está em Tarefas." }); }
       else if (kind === "lembrete") { await acts.toReminder.mutateAsync({ idea: { ...draft }, date, time: time || null }); toast.success("Lembrete criado"); setRem(false); }
       else { await acts.toDoc.mutateAsync({ ...draft }); toast.success("Guardado como documentação", { description: "Está no segundo cérebro; a ideia foi arquivada." }); }
@@ -58,7 +59,8 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background/80 p-3 backdrop-blur-md sm:p-6" {...backdropProps(onClose)} data-testid="ideia-detalhe">
-      <div onClick={(e) => e.stopPropagation()} className="glass capture-glow mx-auto w-full max-w-3xl rounded-3xl bg-background/70 p-5 animate-rise sm:p-7" style={{ "--glow": "var(--violet)" } as React.CSSProperties}>
+      {burst > 0 && <Burst key={burst} />}
+      <div onClick={(e) => e.stopPropagation()} className="fin-frame glass capture-glow relative mx-auto w-full max-w-3xl rounded-3xl bg-background/70 p-5 animate-rise sm:p-7" style={{ "--glow": "var(--violet)" } as React.CSSProperties}>
         <div className="flex items-start gap-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} aria-label="Título" data-testid="ideia-titulo" className="min-w-0 flex-1 bg-transparent font-display text-2xl font-semibold outline-none" />
           <button onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
@@ -87,7 +89,8 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
             <div className="mr-auto"><h3 className="font-display text-base font-semibold">Desenvolver com o Orion</h3><p className="text-xs text-muted-foreground">Perguntas que faltam, riscos, primeiros passos e o que seria preciso.</p></div>
             <button onClick={() => void develop(false)} disabled={busy !== ""} className={`${btn} !border-violet/50 text-violet`} data-testid="ideia-desenvolver">{busy === "plano" ? <><Loader2 size={15} className="animate-spin" /> Pensando…</> : plan ? "Refazer o plano" : "Desenvolver"}</button>
           </div>
-          {plan && <div className="mt-4 space-y-4 text-sm">
+          {busy === "plano" && <Thinking />}
+          {plan && busy !== "plano" && <div className="mt-4 space-y-4 text-sm [&>*]:[animation:fin-rise_.6s_both] [&>*:nth-child(2)]:[animation-delay:.08s] [&>*:nth-child(3)]:[animation-delay:.16s] [&>*:nth-child(4)]:[animation-delay:.24s] [&>*:nth-child(5)]:[animation-delay:.32s] [&>*:nth-child(6)]:[animation-delay:.4s]">
             {plan.resumo && <p>{plan.resumo}</p>}
             {plan.proximoPasso && <p className="rounded-xl border border-emerald/30 bg-emerald/10 px-3 py-2"><b className="text-emerald">Próximo passo (24 a 48 h):</b> {plan.proximoPasso}</p>}
             {plan.perguntas.length > 0 && <div><h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"><HelpCircle size={13} /> Perguntas que faltam</h4>

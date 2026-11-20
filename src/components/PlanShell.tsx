@@ -21,9 +21,10 @@ const nav = [
   { Icon: Heart, t: "Saúde" }, { Icon: ActivityIcon, t: "Análise" },
 ];
 
-export function PlanShell({ children }: { children: ReactNode; active?: number }) {
+export function PlanShell({ children, backdrop }: { children: ReactNode; active?: number; backdrop?: ReactNode }) {
   return (
-    <div className="rail-bleed-p3 min-h-screen p-3 [background:radial-gradient(60%_50%_at_50%_20%,color-mix(in_oklab,var(--violet)_7%,transparent),transparent_70%),var(--background)]">
+    <div className={`rail-bleed-p3 min-h-screen p-3 ${backdrop ? "relative isolate " : ""}[background:radial-gradient(60%_50%_at_50%_20%,color-mix(in_oklab,var(--violet)_7%,transparent),transparent_70%),var(--background)]`}>
+      {backdrop}
       <div className="mx-auto flex w-full max-w-[1680px] items-stretch gap-4">
 
         <main className="flex min-w-0 flex-1 flex-col gap-5 pb-4">

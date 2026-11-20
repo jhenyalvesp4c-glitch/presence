@@ -5,6 +5,7 @@ import { Camera, Loader2, Mic, Send, Square, X } from "lucide-react";
 
 import { readFiles, type LocalFile } from "@/components/inbox/files";
 import { transcribeAudio } from "@/lib/audio.functions";
+import { VoiceWave } from "@/components/ideas/fx";
 import { useIdeaActions } from "@/lib/data/ideas";
 import { captureIdea, manualCapture } from "@/lib/ideas.functions";
 import { useRecorder } from "@/lib/use-recorder";
@@ -54,7 +55,7 @@ export function Capture({ onCreated }: { onCreated: (i: Idea) => void }) {
 
   return (
     <div className="space-y-3" data-testid="ideia-captura">
-      <div className="flex items-end gap-2 capture-glow rounded-2xl bg-background/60 p-2.5 transition">
+      <div className="fin-frame glass relative flex items-end gap-2 capture-glow rounded-2xl bg-background/60 p-2.5 transition">
         <button type="button" onClick={() => pick.current?.click()} aria-label="Anexar print ou foto" data-testid="ideia-anexar" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:text-violet"><Camera size={17} /></button>
         <input ref={pick} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
         <textarea ref={area} value={text} onChange={(e) => setText(e.target.value)} rows={1} placeholder="Jogue uma ideia aqui… ou cole um link, um print, uma frase solta" data-testid="ideia-texto"
@@ -66,7 +67,7 @@ export function Capture({ onCreated }: { onCreated: (i: Idea) => void }) {
         <button type="button" onClick={() => void save()} disabled={busy || (!text.trim() && !files.length)} aria-label="Guardar ideia" data-testid="ideia-guardar"
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-brand text-primary-foreground shadow-[0_0_20px_-6px_var(--cyan)] transition enabled:hover:scale-105 disabled:opacity-40">{busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}</button>
       </div>
-      {recording && <p className="text-xs text-destructive">Gravando… {rec.seconds}s. Toque no quadrado para parar.</p>}
+      {recording && <p className="flex items-center gap-3 text-xs text-destructive" role="status"><VoiceWave />Gravando… {rec.seconds}s. Toque no quadrado para parar.</p>}
       {files.length > 0 && <div className="flex flex-wrap gap-2">{files.map((f) => <span key={f.name + f.size} className="inline-flex items-center gap-1.5 rounded-full border border-violet/40 bg-violet/10 px-2.5 py-1 text-xs text-violet">{f.preview && <img src={f.preview} alt="" className="h-5 w-5 rounded object-cover" />}{f.name}<button type="button" aria-label={`Tirar ${f.name}`} onClick={() => setFiles((l) => l.filter((x) => x !== f))}><X size={12} /></button></span>)}</div>}
       {note && <p className="text-xs text-amber" data-testid="ideia-aviso">{note}</p>}
     </div>

@@ -541,3 +541,10 @@ html, body { max-width: 100%; overflow-x: clip; }
   transition: border-color .25s, box-shadow .25s;
   &:focus-within { border-color: color-mix(in oklab, var(--glow, var(--cyan)) 60%, transparent); box-shadow: 0 0 34px -10px var(--glow, var(--cyan)); }
 }
+
+/* Ideias: onda da gravação, varredura do "pensando" e confete ao virar projeto. */
+@keyframes idea-wave { 0%,100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+@keyframes idea-sweep { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+@keyframes idea-burst { 0% { transform: translate(0,0) scale(1) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(.4) rotate(var(--rot)); opacity: 0; } }
+@keyframes idea-flow { to { stroke-dashoffset: -24; } }
+@media (prefers-reduced-motion: reduce) { [data-idea-fx] { animation: none !important; } }

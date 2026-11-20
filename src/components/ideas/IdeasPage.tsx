@@ -4,6 +4,8 @@ import { Archive, ArrowRight, ExternalLink, FolderKanban, Lightbulb, Link2, Mic,
 import { toast } from "sonner";
 
 import { PlanShell, Panel } from "@/components/PlanShell";
+import { Donut, Ring, Sparkline } from "@/components/finance/charts";
+import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, Tilt } from "@/components/finance/fx";
 import { Capture } from "@/components/ideas/Capture";
 import { IdeaDetail } from "@/components/ideas/IdeaDetail";
 import { useIdeaActions, useIdeas } from "@/lib/data/ideas";
@@ -19,7 +21,7 @@ function Card({ idea, now, onOpen, index = 0 }: { idea: Idea; now: Date; onOpen:
   const tone = `var(--${STATUSES.find((s) => s.id === idea.status)?.color ?? "violet"})`;
   const Icon = SRC_ICON[idea.source] ?? Lightbulb, age = daysSince(idea.touchedAt, now);
   return (
-    <button onClick={onOpen} data-testid="ideia-card" className="card-premium w-full animate-rise rounded-2xl p-3.5 text-left" style={{ "--tone": tone, animationDelay: `${index * 60}ms` } as React.CSSProperties}>
+    <Tilt max={7} className="rounded-2xl"><button onClick={onOpen} data-testid="ideia-card" className="card-premium w-full animate-rise rounded-2xl p-3.5 text-left" style={{ "--tone": tone, animationDelay: `${index * 60}ms` } as React.CSSProperties}>
       <div className="flex items-start gap-2"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg border border-white/10 bg-black/20" style={{ color: tone }}><Icon size={12} /></span><p className="min-w-0 flex-1 text-sm font-medium leading-snug">{idea.title}</p></div>
       {idea.body && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{idea.body}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.65rem] text-muted-foreground">
@@ -29,9 +31,13 @@ function Card({ idea, now, onOpen, index = 0 }: { idea: Idea; now: Date; onOpen:
         {idea.tags.slice(0, 3).map((t) => <span key={t}>#{t}</span>)}
         <span className="ml-auto">{age === 0 ? "hoje" : `${age}d`}</span>
       </div>
-    </button>
+    </button></Tilt>
   );
 }
+
+const WEEK = 7 * 86_400_000;
+/** Ideias criadas por semana nas últimas 8 semanas (a mais antiga primeiro). */
+const perWeek = (list: Idea[], now: Date) => Array.from({ length: 8 }, (_, k) => list.filter((i) => { const a = now.getTime() - new Date(i.createdAt).getTime(); return a >= (7 - k) * WEEK && a < (8 - k) * WEEK; }).length);
 
 export function IdeasPage() {
   const { data: all = [], isLoading } = useIdeas(), acts = useIdeaActions();
@@ -45,14 +51,31 @@ export function IdeasPage() {
   const setStatus = (i: Idea, s: IdeaStatus, msg: string) => acts.update.mutate({ id: i.id, status: s }, { onSuccess: () => toast.success(msg), onError: (e) => toast.error(e.message) });
   const touch = (i: Idea) => acts.update.mutate({ id: i.id, touch: true }, { onSuccess: () => toast.success("Ok, a ideia segue viva") });
   const cols = STATUSES.filter((s) => s.id !== "arquivada");
+  const weekly = useMemo(() => perWeek(ideas, now), [ideas, now]);
+  const donut = STATUSES.filter((s) => dg.porStatus[s.id] > 0).map((s) => ({ id: s.id, name: s.label, color: `var(--${s.color})`, value: dg.porStatus[s.id] }));
 
   return (
-    <PlanShell active={3}>
-      <section className="animate-rise">
-        <p className="mono-caps">Projetos e ideias</p>
-        <h1 className="mt-3 font-serif text-5xl leading-[0.95] tracking-tight md:text-7xl">Caixa de <span className="text-gradient italic">ideias</span></h1>
-        <p className="mt-3 max-w-xl text-sm text-muted-foreground">Jogue aqui qualquer ideia, por texto, voz ou print. Depois desenvolva com o Orion e transforme em projeto, tarefa, lembrete ou documentação.</p>
-      </section>
+    <PlanShell active={3} backdrop={<FinBackdrop />}>
+      <HeroPanel glow="var(--violet)" data-testid="ideias-hero">
+        <div className="grid items-center gap-6 lg:grid-cols-[1.25fr_0.75fr]">
+          <div>
+            <p className="mono-caps flex items-center gap-3">Projetos e ideias <LiveDot color="var(--violet)" label="Orion ouvindo" /></p>
+            <h1 className="mt-3 font-serif text-5xl leading-[0.95] tracking-tight md:text-7xl" style={{ animation: "fin-rise .7s both" }}>Caixa de <span className="text-gradient italic drop-shadow-[0_0_30px_color-mix(in_oklab,var(--violet)_55%,transparent)]">ideias</span></h1>
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground">Jogue aqui qualquer ideia, por texto, voz ou print. Depois desenvolva com o Orion e transforme em projeto, tarefa, lembrete ou documentação.</p>
+            <span aria-hidden className="mt-4 block h-px w-48 bg-gradient-to-r from-cyan via-violet to-transparent" />
+            <div className="mt-5 flex flex-wrap items-center gap-3" data-testid="ideias-numeros">
+              <Tilt max={8} className="rounded-2xl"><div className="glass flex items-center gap-3 rounded-2xl px-4 py-3"><Ring pct={dg.total ? (dg.porStatus.fazendo / dg.total) * 100 : 0} color="var(--emerald)" size={58} thickness={6} /><div><p className="font-display text-xl font-semibold tabular-nums">{dg.porStatus.fazendo}</p><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">viraram ação</p></div></div></Tilt>
+              <Tilt max={8} className="rounded-2xl"><div className="glass rounded-2xl px-4 py-3"><p className="font-display text-xl font-semibold tabular-nums">{dg.novasNaSemana}</p><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">novas na semana</p><div className="mt-1"><Sparkline values={weekly} color="var(--cyan)" width={110} height={26} /></div></div></Tilt>
+              <Tilt max={8} className="rounded-2xl"><div className="glass rounded-2xl px-4 py-3"><p className="font-display text-xl font-semibold tabular-nums text-amber">{dg.paradas.length}</p><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">paradas +30 dias</p></div></Tilt>
+            </div>
+          </div>
+          <div className="mx-auto flex flex-col items-center gap-3">
+            {dg.total > 0 ? <Donut size={210} thickness={20} data={donut} center={<div className="text-center"><p className="font-display text-4xl font-semibold tabular-nums">{dg.total}</p><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">ideias</p></div>} />
+              : <OrbitArt size={210}><Lightbulb size={34} className="text-violet drop-shadow-[0_0_14px_var(--violet)]" /></OrbitArt>}
+            {dg.total > 0 && <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[0.65rem] text-muted-foreground">{STATUSES.filter((s) => dg.porStatus[s.id] > 0).map((s) => <li key={s.id} className="flex items-center gap-1.5"><span className="tone-dot" style={{ "--tone": `var(--${s.color})` } as React.CSSProperties} />{s.label} {dg.porStatus[s.id]}</li>)}</ul>}
+          </div>
+        </div>
+      </HeroPanel>
 
       <div className="animate-rise" style={{ animationDelay: "120ms" }}><Capture onCreated={(i) => { if (i.kind === "ideia") setOpenId(i.id); }} /></div>
 
@@ -81,7 +104,7 @@ export function IdeasPage() {
           <>
             <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-4">{cols.map((c) => {
               const list = ideas.filter((i) => i.status === c.id && match(i));
-              return <div key={c.id} style={{ "--tone": `var(--${c.color})` } as React.CSSProperties} className="glass column-tone w-[82%] shrink-0 snap-start rounded-3xl p-3 md:w-auto" data-testid={`coluna-${c.id}`}>
+              return <div key={c.id} style={{ "--tone": `var(--${c.color})`, animationDelay: `${cols.indexOf(c) * 90}ms` } as React.CSSProperties} className="glass column-tone animate-rise w-[82%] shrink-0 snap-start rounded-3xl p-3 md:w-auto" data-testid={`coluna-${c.id}`}>
                 <div className="mb-2 flex items-center justify-between px-1"><div><h3 className="flex items-center gap-2 font-display text-sm font-semibold" style={{ color: `var(--${c.color})` }}><span className="tone-dot" />{c.label}</h3><p className="text-[0.65rem] text-muted-foreground">{c.hint}</p></div><span className="grid h-6 min-w-6 place-items-center rounded-full border border-white/10 bg-black/25 px-2 font-mono text-[0.65rem] text-muted-foreground">{list.length}</span></div>
                 <div className="space-y-2">{list.map((i, n) => <Card key={i.id} index={n} idea={i} now={now} onOpen={() => setOpenId(i.id)} />)}{list.length === 0 && <p className="px-1 py-3 text-xs text-muted-foreground/70">Nada aqui.</p>}</div>
               </div>;
