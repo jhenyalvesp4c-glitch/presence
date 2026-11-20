@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { LayoutGrid, CalendarDays, ChartNoAxesColumn, Heart, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHealthPreview } from "@/components/health-preview-provider";
+import { useProgram } from "@/lib/data/program";
 
 
 const tabs = [
@@ -15,7 +16,7 @@ const tabs = [
 export type HealthTabKey = (typeof tabs)[number]["key"];
 
 export function HealthTabs({ active }: { active: HealthTabKey }) {
-  const { workout, diet, measurements } = useHealthPreview();
+  const { workout, diet, measurements } = useHealthPreview(), { data: program } = useProgram();
   return (
     <div className="mb-9 flex w-full justify-center sm:mb-10">
     <nav aria-label="Navegação principal" className="glass-h flex w-full max-w-full items-center gap-1 rounded-full p-1 sm:w-auto">
@@ -29,7 +30,7 @@ export function HealthTabs({ active }: { active: HealthTabKey }) {
                 : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
             }`}>
           <Link
-            to={t.key === "saude" && (workout || diet || measurements) ? "/hoje" : t.to}
+            to={t.key === "saude" && (workout || diet || measurements || program) ? "/hoje" : t.to}
             aria-current={isActive ? "page" : undefined}
           >
             {isActive && <span className="health-shine absolute inset-0" />}

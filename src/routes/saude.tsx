@@ -8,6 +8,9 @@ import dietaAsset from "@/assets/dieta.jpg";
 import medidasAsset from "@/assets/medidas.jpg";
 import { HealthTabs } from "@/components/health-tabs";
 import { useState } from "react";
+import { useProgram } from "@/lib/data/program";
+import { useHealthPreview } from "@/components/health-preview-provider";
+import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { NovaFichaTreino } from "@/components/health-workout-builder";
 import { DietBuilder } from "@/components/health-diet-builder";
@@ -44,7 +47,11 @@ const cards = [
 ] as const;
 
 function Index() {
-  const [ficha, setFicha] = useState<Ficha | null>(null);
+  const [ficha, setFicha] = useState<Ficha | null>(null), navigate = useNavigate(), { workout, diet, measurements } = useHealthPreview(), { data: program } = useProgram();
+  // cada ficha: já montada → entra na tela única de Saúde; ainda não → montar
+  const state: Record<Ficha, { has: boolean; cta: string; to: "/hoje" | "/saude/dieta" | "/progresso" }> = {
+    treino: { has: !!program || !!workout, cta: "Ver meu plano", to: "/hoje" }, dieta: { has: !!diet, cta: "Ver minha dieta", to: "/saude/dieta" }, medidas: { has: !!measurements, cta: "Ver minhas medidas", to: "/progresso" },
+  };
   return (
     <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
       <div className="aurora pointer-events-none absolute inset-0" />
@@ -67,12 +74,6 @@ function Index() {
           </div>
         </header>
 
-        <Link to="/programa" data-testid="ir-programa" className="glass-h group relative mb-6 flex items-center gap-4 overflow-hidden rounded-[2rem] p-5 transition hover:-translate-y-0.5 md:p-6">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-primary shadow-glow"><Dumbbell className="h-6 w-6 text-primary-foreground" /></span>
-          <span className="min-w-0 flex-1"><span className="block font-mono text-[11px] uppercase tracking-normal text-primary">Novo · Programa de treino</span><span className="block font-display-h text-xl font-semibold md:text-2xl">Seu programa de 12 semanas, do treino de hoje à evolução</span><span className="block text-sm text-muted-foreground">Cargas, progressão, avaliação semanal, medidas, fotos e relatório para o nutricionista.</span></span>
-          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-primary" />
-        </Link>
-
         <section className="glass-h relative rounded-[2rem] p-6 md:p-10">
           <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
@@ -91,8 +92,8 @@ function Index() {
            <div className="grid gap-5 lg:grid-cols-3">
             {cards.map((c) => (
               <Button variant="unstyled" size="unstyled" type="button" key={c.title} data-tone={c.tone}
-                onClick={() => setFicha(c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino")}
-                aria-label={c.cta}
+                onClick={() => { const f: Ficha = c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"; if (state[f].has) void navigate({ to: state[f].to }); else setFicha(f); }}
+                aria-label={state[c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"].has ? state[c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"].cta : c.cta}
                 className="health-sheet-card tone group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card/60 transition-all duration-500 hover:-translate-y-1.5 hover:border-[var(--tone)] hover:shadow-[0_30px_80px_-30px_var(--tone)] focus-visible:outline-2 focus-visible:outline-primary">
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <img src={c.img} alt={c.title} width={1024} height={768} loading="lazy"
@@ -111,10 +112,12 @@ function Index() {
                     <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-1" />
                   </div>
                   <p className="flex-1 text-sm leading-relaxed text-muted-foreground">{c.desc}</p>
+                  <span className="mt-4 inline-flex w-fit items-center gap-2 rounded-full border border-[var(--tone)]/40 bg-[var(--tone)]/10 px-4 py-1.5 text-sm font-medium text-[var(--tone)]" data-testid={`cta-${c.tone}`}>{state[c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"].has ? state[c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"].cta : "Montar ficha"}<ChevronRight className="h-4 w-4" /></span>
                 </div>
               </Button>
             ))}
           </div>
+        {!program && <p className="mt-6 text-center text-sm text-muted-foreground">Já tem uma ficha de treino pronta (prints, PDF ou a de 12 semanas)? <Link to="/programa" className="font-medium text-primary underline-offset-2 hover:underline" data-testid="enviar-ficha-pronta">Enviar a minha ficha</Link></p>}
         </section>
       </main>
 

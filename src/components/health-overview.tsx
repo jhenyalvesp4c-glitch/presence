@@ -6,6 +6,7 @@ import { HealthSheetTabs, type SheetTab } from "@/components/health-sheet-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { HealthLoading } from "@/components/health-loading";
 import { Button } from "@/components/ui/button";
+import { ProgramTreino, useProgramBundle } from "@/components/program/ProgramHub";
 import { measurementLabels, workoutsForDate } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
 import workoutImageAsset from "@/assets/treino.jpg";
@@ -18,6 +19,7 @@ function Action({ to, children }: { to: "/treino/nova" | "/treino/exercicios" | 
 }
 export function HealthOverview({ tab }: { tab: SheetTab }) {
   const { workout, diet, measurements, ready, doneKeys: done, toggleDone: toggle } = useHealthPreview();
+  const { bundle: prog } = useProgramBundle();
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); }, []);
   const todayWorkouts = now ? workoutsForDate(workout, now) : [];
@@ -36,10 +38,10 @@ export function HealthOverview({ tab }: { tab: SheetTab }) {
         <p className="font-mono text-xs capitalize text-muted-foreground">{now?.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) ?? "Sua rotina de bem-estar"}</p>
       </header>
       <section aria-label="Resumo do dia" className="mb-8 grid grid-cols-3 border-y border-border py-6">
-        {[{ label: "Treino de hoje", value: workout ? todayWorkouts.map(s => s.nome).join(" + ") || "Descanso" : "—", unit: "", icon: Dumbbell }, { label: "Meta diária", value: diet?.macros.calories || "—", unit: "kcal", icon: Flame }, { label: "Peso atual", value: measurements?.peso || "—", unit: "kg", icon: Ruler }].map(stat => <div key={stat.label} className="min-w-0 px-2 first:pl-0 sm:px-6"><p className="mb-3 flex items-center gap-2 text-[10px] text-muted-foreground sm:text-xs"><stat.icon className="hidden h-3.5 w-3.5 text-primary sm:block" />{stat.label}</p><p className="break-words font-display-h text-lg font-medium sm:text-3xl">{stat.value}<span className="ml-1 text-xs text-muted-foreground">{stat.unit}</span></p></div>)}
+        {[{ label: "Treino de hoje", value: prog ? (prog.day?.titulo ?? "Descanso") : workout ? todayWorkouts.map(s => s.nome).join(" + ") || "Descanso" : "—", unit: "", icon: Dumbbell }, { label: "Meta diária", value: diet?.macros.calories || "—", unit: "kcal", icon: Flame }, { label: "Peso atual", value: measurements?.peso || "—", unit: "kg", icon: Ruler }].map(stat => <div key={stat.label} className="min-w-0 px-2 first:pl-0 sm:px-6"><p className="mb-3 flex items-center gap-2 text-[10px] text-muted-foreground sm:text-xs"><stat.icon className="hidden h-3.5 w-3.5 text-primary sm:block" />{stat.label}</p><p className="break-words font-display-h text-lg font-medium sm:text-3xl">{stat.value}<span className="ml-1 text-xs text-muted-foreground">{stat.unit}</span></p></div>)}
       </section>
       <HealthSheetTabs active={tab} />
-      <div className={`grid items-start gap-6 ${tab === "hoje" ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,.9fr)]" : "lg:grid-cols-2"}`}>
+      {tab === "treino" && prog ? <ProgramTreino b={prog} /> : <div className={`grid items-start gap-6 ${tab === "hoje" ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,.9fr)]" : "lg:grid-cols-2"}`}>
         {showWorkout && <section className="min-w-0" aria-label="Treino de hoje">
           <div className="mb-5 flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 font-display-h text-lg"><Dumbbell className="h-4 w-4 text-primary" />{tab === "hoje" ? "Treino de hoje" : "Ficha de treino"}</h2><Action to={workout ? "/treino/exercicios" : "/treino/nova"}>{workout ? "Editar" : "Criar ficha"}</Action></div>
           <div className="group relative mb-5 overflow-hidden rounded-lg border border-border"><img src={workoutImage} alt="Halteres em uma plataforma futurista" width={1024} height={768} className="aspect-[16/10] w-full object-cover transition-transform duration-700 motion-safe:group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" /><div className="absolute bottom-5 left-5 right-5"><p className="mb-1 font-mono text-[10px] uppercase text-primary">Performance</p><p className="break-words font-display-h text-2xl">{workout?.nome || "Seu próximo treino"}</p></div></div>
@@ -55,7 +57,7 @@ export function HealthOverview({ tab }: { tab: SheetTab }) {
           <dl className="mt-4 grid grid-cols-2 gap-x-4">{Object.entries(measurementLabels).map(([key,label]) => <div key={key} className="flex justify-between gap-2 border-b border-border py-3"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="text-xs font-medium">{measurements?.valores[key] || "—"}<span className="ml-1 text-muted-foreground">cm</span></dd></div>)}</dl>
           {tab === "progresso" && measurements && <><p className="mt-5 break-words text-sm text-muted-foreground">{measurements.obs}</p><div className="mt-5 grid grid-cols-2 gap-3">{Object.entries(measurements.fotos).map(([label,src]) => <figure key={label}><img src={src} alt={label} className="aspect-[3/4] w-full rounded-lg object-cover" /><figcaption className="mt-2 text-xs text-muted-foreground">{label}</figcaption></figure>)}</div></>}
         </section>}
-      </div>
+      </div>}
       <footer className="mt-10 flex items-center justify-between border-t border-border pt-5"><span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-primary motion-safe:animate-pulse" />Sua rotina, em equilíbrio.</span><Button asChild variant="ghost" size="sm" className="text-muted-foreground"><Link to="/saude"><Pencil />Fichas</Link></Button></footer>
     </main>
   </div>;

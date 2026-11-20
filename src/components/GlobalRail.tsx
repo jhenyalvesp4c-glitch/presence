@@ -2,7 +2,7 @@ import { useShownPath } from "@/lib/shown-path";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { Brain, CalendarCheck, Calendar, ClipboardList, Dumbbell, Heart, Home, Lightbulb, ListChecks, Settings, Sprout, Wallet } from "lucide-react";
+import { Brain, CalendarCheck, Calendar, ClipboardList, Heart, Home, Lightbulb, ListChecks, Settings, Sprout, Wallet } from "lucide-react";
 import { NavBadge } from "@/components/NavBadge";
 import { useNavBadges } from "@/lib/data/nav-badges";
 
@@ -18,7 +18,6 @@ const items = [
   { Icon: Calendar, label: "Calendário", c: "cyan", to: "/calendario" },
   { Icon: Sprout, label: "Hábitos", c: "emerald", to: "/habitos" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" },
-  { Icon: Dumbbell, label: "Programa de treino", c: "violet", to: "/programa" },
   { Icon: Lightbulb, label: "Ideias", c: "violet", to: "/ideias" },
   { Icon: Brain, label: "Segundo cérebro", c: "violet", to: "/cerebro" },
   { Icon: Settings, label: "Configurações", c: "cyan", to: "/configuracoes" },

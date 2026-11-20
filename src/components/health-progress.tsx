@@ -6,6 +6,7 @@ import { HealthTabs } from "@/components/health-tabs";
 import { HealthSheetTabs } from "@/components/health-sheet-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { HealthLoading } from "@/components/health-loading";
+import { PROGRESS_TABS, ProgramHeader, ProgramProgressView, SubTabs, useProgramBundle, type ProgressView } from "@/components/program/ProgramHub";
 import { measurementLabels, toNumber, formatDate, type MeasurementSheet } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
 import heroAsset from "@/assets/medidas-hero.jpg";
@@ -98,11 +99,14 @@ function Panel({ title, icon: Icon, color = "var(--cyan)", children, className =
 
 export function HealthProgress({ tab = "saude" }: { tab?: "saude" | "analise" } = {}) {
   const { measurementHistory: history, ready } = useHealthPreview();
+  const { bundle: prog } = useProgramBundle(), [view, setView] = useState<"corpo" | ProgressView>("corpo");
   const [active, setActive] = useState<string[]>(["cintura", "quadril", "braco"]);
   const first = history[0], last = history[history.length - 1];
 
   if (!ready) return <HealthLoading />;
-  if (!first || !last) return <Shell tab={tab}><div style={glow("var(--violet)")} className="accent-card mx-auto max-w-2xl p-8 text-center"><img src={heroAsset} alt="Análise corporal futurista" className="holo-float mx-auto mb-6 aspect-[4/3] w-full max-w-sm rounded-2xl object-cover" /><h2 className="font-display-h text-2xl">Comece sua <span className="text-gradient">evolução</span></h2><p className="mt-2 text-sm text-muted-foreground">Crie sua ficha de peso e medidas para ver gráficos do seu progresso.</p><Button asChild className="mt-6 rounded-full bg-gradient-brand text-primary-foreground"><Link to="/medidas/nova"><Plus />Criar ficha de medidas</Link></Button></div></Shell>;
+  const progBar = prog ? <><ProgramHeader b={prog} onMeasures={() => setView("medidas")} /><SubTabs testId="progresso-abas" value={view} onChange={setView} tabs={[{ id: "corpo" as const, label: "Corpo e medidas", Icon: Sparkles }, ...PROGRESS_TABS(prog)]} /></> : null;
+  if (prog && view !== "corpo") return <Shell tab={tab}>{progBar}<ProgramProgressView b={prog} view={view} /></Shell>;
+  if (!first || !last) return <Shell tab={tab}>{progBar}<div style={glow("var(--violet)")} className="accent-card mx-auto max-w-2xl p-8 text-center"><img src={heroAsset} alt="Análise corporal futurista" className="holo-float mx-auto mb-6 aspect-[4/3] w-full max-w-sm rounded-2xl object-cover" /><h2 className="font-display-h text-2xl">Comece sua <span className="text-gradient">evolução</span></h2><p className="mt-2 text-sm text-muted-foreground">Crie sua ficha de peso e medidas para ver gráficos do seu progresso.</p><Button asChild className="mt-6 rounded-full bg-gradient-brand text-primary-foreground"><Link to="/medidas/nova"><Plus />Criar ficha de medidas</Link></Button></div></Shell>;
 
   const dates = history.map(h => h.data);
   const pesos = history.map(h => toNumber(h.peso));
@@ -120,7 +124,7 @@ export function HealthProgress({ tab = "saude" }: { tab?: "saude" | "analise" } 
   const photoFirst = history.find(h => Object.keys(h.fotos).length), photoLast = [...history].reverse().find(h => Object.keys(h.fotos).length);
   const series: Series[] = keys.filter(k => active.includes(k)).map(k => ({ key: k, label: measurementLabels[k]!, color: colorOf(k), values: history.map(h => toNumber(h.valores[k])) }));
 
-  return <Shell tab={tab}>
+  return <Shell tab={tab}>{progBar}
     <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[
         { icon: Scale, color: "var(--cyan)", label: "Peso atual", value: last.peso || "—", unit: "kg", sub: `início ${first.peso || "—"} kg`, spark: pesos },

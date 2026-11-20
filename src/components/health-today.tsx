@@ -6,6 +6,7 @@ import { HealthSheetTabs } from "@/components/health-sheet-tabs";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { HealthLoading } from "@/components/health-loading";
 import { Button } from "@/components/ui/button";
+import { ProgramTodayPanel, todaySummary, useProgramBundle } from "@/components/program/ProgramHub";
 import { measurementLabels, workoutsForDate } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
 import workoutImageAsset from "@/assets/treino.jpg";
@@ -29,7 +30,7 @@ function Panel({ children, className = "" }: { children: ReactNode; className?: 
   </section>;
 }
 
-function PanelHead({ icon: Icon, title, to, label }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/progresso" | "/medidas/nova"; label: string }) {
+function PanelHead({ icon: Icon, title, to, label }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/progresso" | "/medidas/nova" | "/saude/treino"; label: string }) {
   return <div className="mb-5 flex items-center justify-between gap-2">
     <h2 className="flex items-center gap-3 font-display-h text-lg"><span className="grid h-9 w-9 place-items-center rounded-xl border border-primary/30 bg-primary/10"><Icon className="h-4 w-4 text-primary" /></span>{title}</h2>
     <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-muted-foreground"><Link to={to}>{label}<ArrowUpRight /></Link></Button>
@@ -38,14 +39,15 @@ function PanelHead({ icon: Icon, title, to, label }: { icon: typeof Sun; title: 
 
 export function HealthToday() {
   const { workout, diet, measurements, ready, doneKeys: done, toggleDone: toggle } = useHealthPreview();
+  const { bundle: prog } = useProgramBundle(), ps = prog ? todaySummary(prog) : null;
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
 
   const sessions = now ? workoutsForDate(workout, now) : [];
-  const exKeys = sessions.flatMap(s => s.exercicios.map((_, i) => `ex-${s.id}-${i}`));
+  const exKeys = ps ? Array.from({ length: ps.total }, (_, i) => `prog-${i}`) : sessions.flatMap(s => s.exercicios.map((_, i) => `ex-${s.id}-${i}`));
   const meals = diet ? [...diet.meals].sort((a, b) => a.time.localeCompare(b.time)) : [];
   const mealKeys = meals.map(m => `meal-${m.id}`);
-  const exDone = exKeys.filter(k => done.includes(k)).length;
+  const exDone = ps ? ps.done : exKeys.filter(k => done.includes(k)).length;
   const mealDone = mealKeys.filter(k => done.includes(k)).length;
   const total = exKeys.length + mealKeys.length;
   const dayProgress = total ? (exDone + mealDone) / total : 0;
@@ -79,7 +81,7 @@ export function HealthToday() {
             <div>
               <p className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary motion-safe:animate-pulse" />{now?.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) ?? "Sua rotina"}</p>
               <h1 className="font-display-h text-4xl font-semibold sm:text-5xl">{greeting}<span className="text-primary">.</span></h1>
-              <p className="mt-1 text-sm text-muted-foreground">{total ? `${exDone + mealDone} de ${total} metas concluídas hoje` : "Crie suas fichas para acompanhar o dia."}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{prog ? `Semana ${prog.wk} de ${prog.p.semanas}${ps?.fase ? ` · ${ps.fase.objetivo}` : ""}${total ? ` · ${exDone + mealDone} de ${total} metas hoje` : ""}` : total ? `${exDone + mealDone} de ${total} metas concluídas hoje` : "Crie suas fichas para acompanhar o dia."}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-6">
@@ -96,7 +98,7 @@ export function HealthToday() {
       {/* Stats */}
       <section aria-label="Resumo do dia" className="mb-6 grid gap-4 sm:grid-cols-3">
         {[
-          { icon: Dumbbell, label: "Treino de hoje", value: workout ? sessions.map(s => s.nome).join(" + ") || "Descanso" : "—", unit: "", bar: exKeys.length ? exDone / exKeys.length : 0 },
+          { icon: Dumbbell, label: "Treino de hoje", value: ps ? (ps.day?.titulo ?? "Descanso") : workout ? sessions.map(s => s.nome).join(" + ") || "Descanso" : "—", unit: "", bar: exKeys.length ? exDone / exKeys.length : 0 },
           { icon: Flame, label: "Meta diária", value: diet?.macros.calories || "—", unit: "kcal", bar: mealKeys.length ? mealDone / mealKeys.length : 0 },
           { icon: Ruler, label: "Peso atual", value: measurements?.peso || "—", unit: "kg", bar: imc ? Math.min(1, imc / 40) : 0, extra: imc ? `IMC ${imc.toFixed(1)}` : "" },
         ].map(s => <Panel key={s.label} className="p-5">
@@ -109,12 +111,14 @@ export function HealthToday() {
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,.85fr)]">
         {/* Workout */}
         <Panel>
-          <PanelHead icon={Dumbbell} title="Treino de hoje" to={workout ? "/treino/exercicios" : "/treino/nova"} label={workout ? "Editar" : "Criar ficha"} />
+          <PanelHead icon={Dumbbell} title="Treino de hoje" to={prog ? "/saude/treino" : workout ? "/treino/exercicios" : "/treino/nova"} label={prog ? "Abrir" : workout ? "Editar" : "Criar ficha"} />
+          {prog ? <ProgramTodayPanel b={prog} /> : <>
           <div className="relative mb-5 overflow-hidden rounded-2xl border border-border"><img src={workoutImageAsset} alt="Halteres em uma plataforma futurista" width={1024} height={768} className="aspect-[16/9] w-full object-cover transition-transform duration-700 motion-safe:group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" /><div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3"><div className="min-w-0"><p className="mb-1 font-mono text-[10px] uppercase text-primary">Performance</p><p className="truncate font-display-h text-2xl">{workout?.nome || "Seu próximo treino"}</p></div>{exKeys.length > 0 && <Ring value={exDone / exKeys.length} size={56} stroke={5}><span className="text-[10px] font-medium">{exDone}/{exKeys.length}</span></Ring>}</div></div>
           {sessions.length ? sessions.map(session => <div key={session.id} className="mb-4">
             <div className="mb-2 flex items-center justify-between"><h3 className="font-display-h text-lg">{session.nome}</h3><span className="text-xs text-muted-foreground">{session.exercicios.length} exercícios</span></div>
             <ul className="space-y-2">{session.exercicios.map((exercise, index) => { const k = `ex-${session.id}-${index}`, on = done.includes(k); return <li key={exercise.nome + index} className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition-all duration-300 ${on ? "border-primary/40 bg-primary/10" : "border-border bg-card/30 hover:border-primary/30"}`}><span className="font-mono text-xs text-primary/70">{String(index + 1).padStart(2, "0")}</span><div className="min-w-0 flex-1"><p className={`break-words text-sm ${on ? "text-muted-foreground line-through" : ""}`}>{exercise.nome}</p><p className="text-xs text-muted-foreground">{exercise.grupo}</p></div><Button variant="outline" size="icon" className={`shrink-0 rounded-full ${on ? "border-primary bg-primary/20 shadow-glow" : "bg-card/40"}`} aria-label={`Concluir ${exercise.nome}`} aria-pressed={on} onClick={() => toggle(k)}><Check className={on ? "text-primary" : "text-muted-foreground/30"} /></Button></li>; })}</ul>
           </div>) : <div className="rounded-2xl border border-dashed border-border p-6 text-center"><Moon className="mx-auto mb-3 h-6 w-6 text-primary" /><h3 className="font-display-h text-xl">{workout ? "Dia de descanso" : "Nenhum treino definido"}</h3><p className="mt-2 text-sm text-muted-foreground">{workout ? "Não há sessão marcada para hoje." : "Sua ficha de treino aparecerá aqui."}</p></div>}
+          </>}
         </Panel>
 
         {/* Diet */}
