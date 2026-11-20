@@ -10,6 +10,8 @@ export type FoodGroup = { id: string; nome: string; referencia: string; itens: S
 export type DietPlan = {
   nome: string; objetivo: string;
   perfil: { idade: number | null; sexo: string; pesoKg: number | null; alturaM: number | null; imc: number | null; treino: string; duracaoTreino: string; medicacao: string; preferencia: string; horarios: string; hidratacao: string };
+  /** metas do dia definidas pela pessoa (kcal e macros); a proteína cai na faixa da ficha se vazia */
+  metas: { kcal: number | null; p: number | null; c: number | null; f: number | null };
   atencao: string; estrategia: string[];
   proteina: { min: number | null; max: number | null; nota: string };
   tmb: number | null; semMeta: string;
@@ -34,7 +36,7 @@ export type Swap = { alimento: string; porcao: string; grupo: string };
 export const customMealName = (id: string | undefined) => (id?.startsWith("c:") ? id.slice(2) : null);
 /** Alimento registrado no diário: `meal` é o id da refeição do plano (ou "outros"). */
 export type Extra = { id: string; nome: string; kcal: number; p: number; c: number; f: number; qtd?: string; meal?: string };
-export type DayLog = { swaps: Record<string, Swap>; extras: Extra[]; date: string; optionId: string | null; mealsDone: string[]; extraProteinG: number | null; waterMl: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
+export type DayLog = { customMeals: string[]; swaps: Record<string, Swap>; extras: Extra[]; date: string; optionId: string | null; mealsDone: string[]; extraProteinG: number | null; waterMl: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
 export type DietWeekly = { week: number; date: string; weight: number | null; waist: number | null; abdomen: number | null; hip: number | null; bowelCount: number | null; waterL: number | null; energy: number | null; training: number | null; difficulty: number | null; digestive: number | null; satiety: number | null; notes: string };
 
 /* ───────────── limpeza (plano vindo da IA ou do banco) ───────────── */
@@ -63,7 +65,7 @@ export function cleanDietPlan(raw: unknown): DietPlan | null {
   return {
     nome: str(o["nome"], 160) || "Meu plano alimentar", objetivo: str(o["objetivo"], 300),
     perfil: { idade: num(perfil["idade"]), sexo: str(perfil["sexo"], 30), pesoKg: num(perfil["pesoKg"]), alturaM: num(perfil["alturaM"]), imc: num(perfil["imc"]), treino: str(perfil["treino"], 160), duracaoTreino: str(perfil["duracaoTreino"], 80), medicacao: str(perfil["medicacao"], 200), preferencia: str(perfil["preferencia"], 200), horarios: str(perfil["horarios"], 200), hidratacao: str(perfil["hidratacao"], 120) },
-    atencao: str(o["atencao"], 800), estrategia: strs(o["estrategia"], 12), proteina: { min: num(prot["min"]), max: num(prot["max"]), nota: str(prot["nota"], 600) },
+    metas: { kcal: num(obj("metas")["kcal"]), p: num(obj("metas")["p"]), c: num(obj("metas")["c"]), f: num(obj("metas")["f"]) }, atencao: str(o["atencao"], 800), estrategia: strs(o["estrategia"], 12), proteina: { min: num(prot["min"]), max: num(prot["max"]), nota: str(prot["nota"], 600) },
     tmb: num(o["tmb"]), semMeta: str(o["semMeta"], 500), opcoes,
     trocasProteina: pairs(o["trocasProteina"], "alimento", "porcao", 20) as unknown as Substitution[], trocasProteinaNota: str(o["trocasProteinaNota"], 500), trocasCarbo: pairs(o["trocasCarbo"], "alimento", "porcao", 20) as unknown as Substitution[], trocasCarboNota: str(o["trocasCarboNota"], 400),
     frutas: strs(o["frutas"], 30, 60), frutasNota: str(o["frutasNota"], 500), whey: { dose: str(whey["dose"], 200), notas: strs(whey["notas"], 12) }, treinoNota: strs(o["treinoNota"], 12),

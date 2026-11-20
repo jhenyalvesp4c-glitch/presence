@@ -9,6 +9,7 @@ export function DIET_RECOMP(): DietPlan {
     nome: "Recomposição corporal — plano alimentar inicial",
     objetivo: "Perder gordura preservando e ganhando massa magra, com treino 5×/semana e Mounjaro sob acompanhamento médico.",
     perfil: { idade: 28, sexo: "Feminino", pesoKg: 71.5, alturaM: 1.7, imc: 24.7, treino: "5×/semana, à noite", duracaoTreino: "60–90 min", medicacao: "Mounjaro 2,5 mg semanal (acompanhamento médico)", preferencia: "2 ou 3 refeições por dia", horarios: "1ª refeição 12h30 · última ~19h30", hidratacao: "menos de 1 L/dia" },
+    metas: { kcal: null, p: null, c: null, f: null },
     atencao: "Esta é uma proposta inicial educativa. Antes de seguir, valide com seu nutricionista e com o médico que acompanha o uso do Mounjaro.",
     estrategia: ["Proteína em todas as refeições", "Prato simples e repetível", "Treino bem alimentado (carboidrato em volta do treino)", "Hidratação subindo aos poucos", "Cuidar do intestino", "Sem contar calorias: foco em constância", "Comparar as opções 2 × 3 refeições pelo que você sente"],
     proteina: { min: 115, max: 130, nota: "Meta diária de proteína (≈1,6–1,8 g/kg). Prefira distribuir entre as refeições." },

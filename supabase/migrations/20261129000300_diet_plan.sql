@@ -54,3 +54,6 @@ drop policy if exists "dono: linhas próprias" on presence_app.diet_foods;
 create policy "dono: linhas próprias" on presence_app.diet_foods for all to authenticated using (user_id = (select presence_app.owner_id())) with check (user_id = (select presence_app.owner_id()));
 revoke all on presence_app.diet_foods from anon;
 grant select, insert, update, delete on presence_app.diet_foods to authenticated;
+
+-- Refeições criadas pelo usuário naquele dia (mesmo sem alimentos ainda).
+alter table presence_app.diet_day_logs add column if not exists custom_meals text[] not null default '{}';

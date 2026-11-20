@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cleanDietPlan, mealMacros, macrosFor, groupKcal, compareOptions, daySummary, optionProtein, swapsFor, weekOfPlan, type DayLog } from "./diet-plan";
 import { DIET_RECOMP } from "./diet-recomp";
 
-const log = (o: Partial<DayLog>): DayLog => ({ swaps: {}, extras: [], date: "2026-11-20", optionId: "A", mealsDone: [], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "", ...o });
+const log = (o: Partial<DayLog>): DayLog => ({ customMeals: [], swaps: {}, extras: [], date: "2026-11-20", optionId: "A", mealsDone: [], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "", ...o });
 
 describe("diet macros", () => {
   const plan = DIET_RECOMP();
@@ -36,12 +36,12 @@ describe("diet diary + report", () => {
     expect(foodForPlanItem("Carne moída magra ou frango")?.nome).toBe("Carne moída magra"); expect(FOODS.length).toBeGreaterThan(50);
   });
   it("logged meal replaces the planned portion", () => {
-    const mk = (extras: DayLog["extras"]) => ({ swaps: {}, extras, date: "2026-11-20", optionId: "A", mealsDone: ["a-almoco"], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "" } as DayLog);
+    const mk = (extras: DayLog["extras"]) => ({ customMeals: [], swaps: {}, extras, date: "2026-11-20", optionId: "A", mealsDone: ["a-almoco"], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "" } as DayLog);
     const planned = daySummary(plan, mk([])).macros.kcal, logged = daySummary(plan, mk([{ id: "1", nome: "Ovo", kcal: 100, p: 8, c: 1, f: 7, meal: "a-almoco" }])).macros.kcal;
     expect(planned).toBeGreaterThan(500); expect(logged).toBe(100);
   });
   it("report sums days and renders text", () => {
-    const l = { swaps: {}, extras: [{ id: "1", nome: "Ovo", qtd: "2 unidade", kcal: 145, p: 12, c: 1, f: 10, meal: "outros" }], date: "2026-11-20", optionId: "B", mealsDone: [], extraProteinG: null, waterMl: 1500, energy: 4, fullness: 2, difficulty: null, training: null, discomfort: null, bowel: true, notes: "ok" } as DayLog;
+    const l = { customMeals: [], swaps: {}, extras: [{ id: "1", nome: "Ovo", qtd: "2 unidade", kcal: 145, p: 12, c: 1, f: 10, meal: "outros" }], date: "2026-11-20", optionId: "B", mealsDone: [], extraProteinG: null, waterMl: 1500, energy: 4, fullness: 2, difficulty: null, training: null, discomfort: null, bowel: true, notes: "ok" } as DayLog;
     const r = buildDietReport(plan, "2026-11-14", "2026-11-20", "2026-11-20", [l], []);
     expect(r.dias[0]?.kcal).toBe(145); expect(r.media?.p).toBe(12);
     const t = dietReportText(r); expect(t).toMatch(/RELATÓRIO DE ALIMENTAÇÃO/); expect(t).toMatch(/Ovo \(2 unidade\)/);

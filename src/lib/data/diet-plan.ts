@@ -18,11 +18,11 @@ export async function loadDiet(): Promise<DietRow | null> {
 export const useDiet = () => useQuery({ queryKey: KEY, queryFn: loadDiet });
 
 const n = (v: number | string | null) => (v === null || v === undefined ? null : Number(v));
-type DayRow = { swaps: Record<string, Swap> | null; extras: Extra[] | null; log_date: string; option_id: string | null; meals_done: string[] | null; extra_protein_g: number | string | null; water_ml: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
+type DayRow = { custom_meals: string[] | null; swaps: Record<string, Swap> | null; extras: Extra[] | null; log_date: string; option_id: string | null; meals_done: string[] | null; extra_protein_g: number | string | null; water_ml: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
 export const useDietLogs = (planId: string | undefined) => useQuery({
   queryKey: logsKey(planId ?? ""), enabled: !!planId,
-  queryFn: async (): Promise<DayLog[]> => (must(await supabase.from("diet_day_logs").select("swaps, extras, log_date, option_id, meals_done, extra_protein_g, water_ml, energy, fullness, difficulty, training, discomfort, bowel, notes").eq("plan_id", planId!).order("log_date").limit(800)) as DayRow[])
-    .map((r) => ({ swaps: r.swaps ?? {}, extras: r.extras ?? [], date: r.log_date, optionId: r.option_id, mealsDone: r.meals_done ?? [], extraProteinG: n(r.extra_protein_g), waterMl: r.water_ml, energy: r.energy, fullness: r.fullness, difficulty: r.difficulty, training: r.training, discomfort: r.discomfort, bowel: r.bowel, notes: r.notes })),
+  queryFn: async (): Promise<DayLog[]> => (must(await supabase.from("diet_day_logs").select("custom_meals, swaps, extras, log_date, option_id, meals_done, extra_protein_g, water_ml, energy, fullness, difficulty, training, discomfort, bowel, notes").eq("plan_id", planId!).order("log_date").limit(800)) as DayRow[])
+    .map((r) => ({ customMeals: r.custom_meals ?? [], swaps: r.swaps ?? {}, extras: r.extras ?? [], date: r.log_date, optionId: r.option_id, mealsDone: r.meals_done ?? [], extraProteinG: n(r.extra_protein_g), waterMl: r.water_ml, energy: r.energy, fullness: r.fullness, difficulty: r.difficulty, training: r.training, discomfort: r.discomfort, bowel: r.bowel, notes: r.notes })),
 });
 type WeeklyRow = { week_no: number; logged_on: string; weight_kg: number | string | null; waist_cm: number | string | null; abdomen_cm: number | string | null; hip_cm: number | string | null; bowel_count: number | null; water_l: number | string | null; energy: number | null; training: number | null; difficulty: number | null; digestive: number | null; satiety: number | null; notes: string };
 export const useDietWeeklies = (planId: string | undefined) => useQuery({
@@ -49,8 +49,15 @@ export function useDietActions(planId: string | undefined) {
         return { prev };
       },
       onError: (_e, _v, ctx) => { if (ctx?.prev) qc.setQueryData(logsKey(planId ?? ""), ctx.prev); },
-      mutationFn: async (l: DayLog) => { must(await supabase.from("diet_day_logs").upsert({ plan_id: planId!, swaps: l.swaps, extras: l.extras, log_date: l.date, option_id: l.optionId, meals_done: l.mealsDone, extra_protein_g: l.extraProteinG, water_ml: l.waterMl, energy: l.energy, fullness: l.fullness, difficulty: l.difficulty, training: l.training, discomfort: l.discomfort, bowel: l.bowel, notes: l.notes, updated_at: new Date().toISOString() }, { onConflict: "user_id,plan_id,log_date" }).select("id")); },
+      mutationFn: async (l: DayLog) => { must(await supabase.from("diet_day_logs").upsert({ plan_id: planId!, custom_meals: l.customMeals, swaps: l.swaps, extras: l.extras, log_date: l.date, option_id: l.optionId, meals_done: l.mealsDone, extra_protein_g: l.extraProteinG, water_ml: l.waterMl, energy: l.energy, fullness: l.fullness, difficulty: l.difficulty, training: l.training, discomfort: l.discomfort, bowel: l.bowel, notes: l.notes, updated_at: new Date().toISOString() }, { onConflict: "user_id,plan_id,log_date" }).select("id")); },
       onSettled: () => void (planId && qc.invalidateQueries({ queryKey: logsKey(planId) })),
+    }),
+    /** Salva o plano inteiro (ex.: metas do dia); mostra na hora e volta atrás se falhar. */
+    savePlan: useMutation({
+      onMutate: async (v: { plan: DietPlan }) => { await qc.cancelQueries({ queryKey: KEY }); const prev = qc.getQueryData<DietRow | null>(KEY); if (prev) qc.setQueryData(KEY, { ...prev, plan: v.plan } as DietRow); return { prev }; },
+      onError: (_e, _v, ctx) => { if (ctx?.prev) qc.setQueryData(KEY, ctx.prev); },
+      mutationFn: async (v: { plan: DietPlan }) => { must(await supabase.from("diet_plans").update({ name: v.plan.nome, data: v.plan, updated_at: new Date().toISOString() }).eq("id", planId!).select("id")); },
+      onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
     }),
     saveWeekly: useMutation({
       mutationFn: async (w: DietWeekly) => { must(await supabase.from("diet_weekly").upsert({ plan_id: planId!, week_no: w.week, logged_on: w.date, weight_kg: w.weight, waist_cm: w.waist, abdomen_cm: w.abdomen, hip_cm: w.hip, bowel_count: w.bowelCount, water_l: w.waterL, energy: w.energy, training: w.training, difficulty: w.difficulty, digestive: w.digestive, satiety: w.satiety, notes: w.notes, updated_at: new Date().toISOString() }, { onConflict: "user_id,plan_id,week_no" }).select("id")); },

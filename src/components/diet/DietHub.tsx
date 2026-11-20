@@ -17,7 +17,7 @@ import { useDiet, useDietActions, useDietLogs, useDietWeeklies } from "@/lib/dat
 import { daySummary, weekOfPlan, type DayLog } from "@/lib/diet-plan";
 import { isoOf } from "@/lib/program";
 
-export const emptyDay = (date: string, optionId: string | null): DayLog => ({ swaps: {}, extras: [], date, optionId, mealsDone: [], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "" });
+export const emptyDay = (date: string, optionId: string | null): DayLog => ({ customMeals: [], swaps: {}, extras: [], date, optionId, mealsDone: [], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "" });
 
 /** Tudo da dieta ativa (ou `null` se não há dieta). */
 export function useDietBundle() {
