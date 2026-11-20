@@ -27,7 +27,11 @@ export type DietPlan = {
   versaoPratica: { refeicao: string; principal: string; alternativas: string }[];
 };
 
-export type DayLog = { date: string; optionId: string | null; mealsDone: string[]; extraProteinG: number | null; waterMl: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
+export type Macros = { kcal: number; p: number; c: number; f: number };
+/** Troca feita no dia: o item `${refeição}|${posição}` virou outro alimento do grupo. */
+export type Swap = { alimento: string; porcao: string; grupo: string };
+export type Extra = { id: string; nome: string; kcal: number; p: number; c: number; f: number };
+export type DayLog = { swaps: Record<string, Swap>; extras: Extra[]; date: string; optionId: string | null; mealsDone: string[]; extraProteinG: number | null; waterMl: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
 export type DietWeekly = { week: number; date: string; weight: number | null; waist: number | null; abdomen: number | null; hip: number | null; bowelCount: number | null; waterL: number | null; energy: number | null; training: number | null; difficulty: number | null; digestive: number | null; satiety: number | null; notes: string };
 
 /* ───────────── limpeza (plano vindo da IA ou do banco) ───────────── */
@@ -87,15 +91,48 @@ export function itemProtein(it: DietItem): number {
   const per = PER100.find(([re]) => re.test(it.alimento))?.[1];
   return g !== null && per !== undefined ? (g * per) / 100 : 0;
 }
+/* ───────────── macros estimados (por 100 g, preparado) ───────────── */
+const M100: [RegExp, Macros][] = [
+  [/whey/i, { kcal: 120, p: 24.5, c: 3, f: 1.5 }], [/frango|peito|sobrecoxa|peru/i, { kcal: 165, p: 31, c: 0, f: 3.6 }], [/carne|bife|lombo|hamb[uú]rguer/i, { kcal: 215, p: 27, c: 0, f: 11 }], [/peixe|til[aá]pia|salm[aã]o|atum/i, { kcal: 130, p: 25, c: 0, f: 3 }],
+  [/ovo/i, { kcal: 145, p: 12.5, c: 1, f: 10 }], [/batata-doce/i, { kcal: 90, p: 1.6, c: 21, f: 0.1 }], [/batata|pur[eê]/i, { kcal: 87, p: 2, c: 20, f: 0.1 }], [/mandioca/i, { kcal: 125, p: 1, c: 30, f: 0.3 }], [/arroz/i, { kcal: 130, p: 2.5, c: 28, f: 0.3 }],
+  [/feij[aã]o/i, { kcal: 77, p: 5, c: 14, f: 0.5 }], [/lentilha/i, { kcal: 115, p: 9, c: 20, f: 0.4 }], [/gr[aã]o-de-bico/i, { kcal: 165, p: 9, c: 27, f: 2.6 }], [/macarr[aã]o|polenta/i, { kcal: 150, p: 5, c: 30, f: 1 }], [/milho/i, { kcal: 100, p: 3, c: 21, f: 1 }],
+  [/azeite|manteiga|maionese/i, { kcal: 800, p: 0, c: 0, f: 90 }], [/iogurte/i, { kcal: 60, p: 4, c: 6, f: 2 }], [/cottage|ricota/i, { kcal: 100, p: 11, c: 3, f: 4.5 }], [/queijo|requeij[aã]o/i, { kcal: 300, p: 22, c: 2, f: 22 }], [/leite/i, { kcal: 45, p: 3.4, c: 5, f: 1.5 }],
+  [/banana/i, { kcal: 90, p: 1, c: 23, f: 0.3 }], [/morango/i, { kcal: 32, p: 0.7, c: 7.7, f: 0.3 }], [/mam[aã]o/i, { kcal: 43, p: 0.5, c: 11, f: 0.1 }], [/fruta|laranja|mexerica|goiaba|manga|uva|abacaxi|ma[cç][aã]|kiwi|mel[aã]o/i, { kcal: 55, p: 0.7, c: 14, f: 0.2 }],
+  [/salada|alface|tomate|pepino|repolho|cenoura|cebola/i, { kcal: 20, p: 1.2, c: 3.5, f: 0.2 }],
+];
+const ZERO: Macros = { kcal: 0, p: 0, c: 0, f: 0 };
+const gramsOf = (it: { g?: number | null; qtd: string }) => it.g ?? (it.qtd.match(/(\d+(?:[.,]\d+)?)\s*g\b/i) ? Number(it.qtd.match(/(\d+(?:[.,]\d+)?)\s*g\b/i)![1]!.replace(",", ".")) : /un\./i.test(it.qtd) ? 100 : 0);
+/** Macros aproximados de um alimento em `g` gramas (estimativa; o rótulo manda). */
+export function macrosFor(alimento: string, g: number): Macros {
+  const m = M100.find(([re]) => re.test(alimento))?.[1];
+  if (!m) return ZERO;
+  const k = /whey/i.test(alimento) ? 1 : g / 100;
+  return { kcal: m.kcal * k, p: m.p * k, c: m.c * k, f: m.f * k };
+}
+const add = (a: Macros, b: Macros): Macros => ({ kcal: a.kcal + b.kcal, p: a.p + b.p, c: a.c + b.c, f: a.f + b.f });
+/** Macros de um item; se a proteína veio na ficha (protG) ela vale mais que a tabela. */
+export function itemMacros(it: DietItem): Macros {
+  const m = macrosFor(it.alimento, gramsOf(it));
+  return it.protG !== null && it.protG !== undefined ? { ...m, p: it.protG, kcal: m.kcal + (it.protG - m.p) * 4 } : m;
+}
+/** Macros da refeição, já com as trocas do dia (o item trocado mantém a quantidade original). */
+export function mealMacros(m: DietMeal, swaps: Record<string, Swap> = {}): Macros {
+  return m.itens.reduce((a, it, i) => { const sw = swaps[`${m.id}|${i}`]; return add(a, sw ? macrosFor(sw.alimento, gramsOf(it)) : itemMacros(it)); }, ZERO);
+}
+export const sumMacros = (xs: Macros[]) => xs.reduce(add, ZERO);
+/** Primeira cifra de kcal de uma referência de grupo ("≈ 100–120 kcal" → 110). */
+export const groupKcal = (ref: string) => { const m = ref.match(/(\d+)(?:\s*[–-]\s*(\d+))?\s*kcal/i); return m ? (Number(m[1]) + Number(m[2] ?? m[1])) / 2 : null; };
+
 export const mealProtein = (m: DietMeal) => Math.round(m.itens.reduce((a, i) => a + itemProtein(i), 0) * 10) / 10;
 export const optionProtein = (o: DietOption) => Math.round(o.refeicoes.reduce((a, m) => a + mealProtein(m), 0));
 
 /* ───────────── resumo do dia e comparação ───────────── */
 export const optionOf = (p: DietPlan, id: string | null | undefined): DietOption => p.opcoes.find((o) => o.id === id) ?? p.opcoes.find((o) => o.recomendada) ?? p.opcoes[0]!;
 export function daySummary(p: DietPlan, log: DayLog | null) {
-  const opt = optionOf(p, log?.optionId), done = log?.mealsDone ?? [], eaten = opt.refeicoes.filter((m) => done.includes(m.id));
-  const protein = Math.round(eaten.reduce((a, m) => a + mealProtein(m), 0) + (log?.extraProteinG ?? 0));
-  return { opt, done: eaten.length, total: opt.refeicoes.length, protein, plannedProtein: optionProtein(opt), pct: opt.refeicoes.length ? eaten.length / opt.refeicoes.length : 0 };
+  const opt = optionOf(p, log?.optionId), done = log?.mealsDone ?? [], eaten = opt.refeicoes.filter((m) => done.includes(m.id)), swaps = log?.swaps ?? {}, extras = log?.extras ?? [];
+  const macros = sumMacros([...eaten.map((m) => mealMacros(m, swaps)), ...extras.map((e) => ({ kcal: e.kcal, p: e.p, c: e.c, f: e.f })), { kcal: (log?.extraProteinG ?? 0) * 4, p: log?.extraProteinG ?? 0, c: 0, f: 0 }]);
+  const protein = Math.round(macros.p);
+  return { opt, done: eaten.length, total: opt.refeicoes.length, protein, macros, plannedProtein: optionProtein(opt), pct: opt.refeicoes.length ? eaten.length / opt.refeicoes.length : 0 };
 }
 export type OptionStats = { id: string; nome: string; dias: number; fullness: number | null; difficulty: number | null; energy: number | null; training: number | null; discomfort: number | null; adherence: number; protein: number | null };
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x !== null); return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null; };
@@ -118,10 +155,12 @@ export function waterTrend(logs: DayLog[], todayIso: string, days = 7) {
 export const weekOfPlan = (startIso: string, dateIso: string) => (dateIso < startIso ? 0 : Math.floor((new Date(dateIso + "T12:00:00").getTime() - new Date(startIso + "T12:00:00").getTime()) / (7 * 86_400_000)) + 1);
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const HINTS: [RegExp, string][] = [[/salada|alface|tomate|pepino/, "regulador"], [/frango|carne|bife|peixe|ovo/, "construtor"], [/feij|lentilha/, "gra"], [/arroz|batata|mandioca|macarr/, "energetico"], [/mamao|banana|morango|fruta|laranja/, "fruta"], [/azeite|manteiga/, "gordura"], [/iogurte|leite|queijo/, "leite"]];
 /** Trocas possíveis para um alimento do prato: a tabela prática da ficha e o grupo em que ele aparece. */
 export function swapsFor(p: DietPlan, alimento: string): { tabela: string[]; grupo: { nome: string; opcoes: Substitution[] } | null } {
   const a = norm(alimento), words = a.split(/\s+/).filter((w) => w.length > 3);
   const tabela = p.trocas.filter((t) => { const s = norm(t.se); return words.some((w) => s.includes(w)) || a.includes(s); }).map((t) => t.escolha);
-  const grupo = p.grupos.find((g) => g.itens.some((i) => { const n = norm(i.alimento); return words.some((w) => n.includes(w)); })) ?? null;
+  const byName = p.grupos.find((g) => g.itens.some((i) => { const n = norm(i.alimento); return words.some((w) => n.includes(w)); }));
+  const hint = HINTS.find(([re]) => re.test(a))?.[1], grupo = byName ?? (hint ? p.grupos.find((g) => norm(g.nome).startsWith(hint)) : undefined) ?? null;
   return { tabela, grupo: grupo ? { nome: grupo.nome, opcoes: grupo.itens } : null };
 }

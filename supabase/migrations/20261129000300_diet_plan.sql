@@ -38,3 +38,6 @@ do $$ declare t text; begin
     execute format('grant select, insert, update, delete on presence_app.%I to authenticated', t);
   end loop;
 end $$;
+
+-- Trocas feitas no dia (por refeição/item) e alimentos extras com macros.
+alter table presence_app.diet_day_logs add column if not exists swaps jsonb not null default '{}'::jsonb, add column if not exists extras jsonb not null default '[]'::jsonb;

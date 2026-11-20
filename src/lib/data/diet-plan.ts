@@ -1,7 +1,7 @@
 /** Plano alimentar na nuvem: o plano (documento), o registro de cada dia e o acompanhamento semanal. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { cleanDietPlan, type DayLog, type DietPlan, type DietWeekly } from "../diet-plan";
+import { cleanDietPlan, type DayLog, type Extra, type Swap, type DietPlan, type DietWeekly } from "../diet-plan";
 import { must, supabase } from "./db";
 
 export type DietRow = { id: string; name: string; startDate: string; plan: DietPlan };
@@ -17,11 +17,11 @@ export async function loadDiet(): Promise<DietRow | null> {
 export const useDiet = () => useQuery({ queryKey: KEY, queryFn: loadDiet });
 
 const n = (v: number | string | null) => (v === null || v === undefined ? null : Number(v));
-type DayRow = { log_date: string; option_id: string | null; meals_done: string[] | null; extra_protein_g: number | string | null; water_ml: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
+type DayRow = { swaps: Record<string, Swap> | null; extras: Extra[] | null; log_date: string; option_id: string | null; meals_done: string[] | null; extra_protein_g: number | string | null; water_ml: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
 export const useDietLogs = (planId: string | undefined) => useQuery({
   queryKey: logsKey(planId ?? ""), enabled: !!planId,
-  queryFn: async (): Promise<DayLog[]> => (must(await supabase.from("diet_day_logs").select("log_date, option_id, meals_done, extra_protein_g, water_ml, energy, fullness, difficulty, training, discomfort, bowel, notes").eq("plan_id", planId!).order("log_date").limit(800)) as DayRow[])
-    .map((r) => ({ date: r.log_date, optionId: r.option_id, mealsDone: r.meals_done ?? [], extraProteinG: n(r.extra_protein_g), waterMl: r.water_ml, energy: r.energy, fullness: r.fullness, difficulty: r.difficulty, training: r.training, discomfort: r.discomfort, bowel: r.bowel, notes: r.notes })),
+  queryFn: async (): Promise<DayLog[]> => (must(await supabase.from("diet_day_logs").select("swaps, extras, log_date, option_id, meals_done, extra_protein_g, water_ml, energy, fullness, difficulty, training, discomfort, bowel, notes").eq("plan_id", planId!).order("log_date").limit(800)) as DayRow[])
+    .map((r) => ({ swaps: r.swaps ?? {}, extras: r.extras ?? [], date: r.log_date, optionId: r.option_id, mealsDone: r.meals_done ?? [], extraProteinG: n(r.extra_protein_g), waterMl: r.water_ml, energy: r.energy, fullness: r.fullness, difficulty: r.difficulty, training: r.training, discomfort: r.discomfort, bowel: r.bowel, notes: r.notes })),
 });
 type WeeklyRow = { week_no: number; logged_on: string; weight_kg: number | string | null; waist_cm: number | string | null; abdomen_cm: number | string | null; hip_cm: number | string | null; bowel_count: number | null; water_l: number | string | null; energy: number | null; training: number | null; difficulty: number | null; digestive: number | null; satiety: number | null; notes: string };
 export const useDietWeeklies = (planId: string | undefined) => useQuery({
@@ -48,7 +48,7 @@ export function useDietActions(planId: string | undefined) {
         return { prev };
       },
       onError: (_e, _v, ctx) => { if (ctx?.prev) qc.setQueryData(logsKey(planId ?? ""), ctx.prev); },
-      mutationFn: async (l: DayLog) => { must(await supabase.from("diet_day_logs").upsert({ plan_id: planId!, log_date: l.date, option_id: l.optionId, meals_done: l.mealsDone, extra_protein_g: l.extraProteinG, water_ml: l.waterMl, energy: l.energy, fullness: l.fullness, difficulty: l.difficulty, training: l.training, discomfort: l.discomfort, bowel: l.bowel, notes: l.notes, updated_at: new Date().toISOString() }, { onConflict: "user_id,plan_id,log_date" }).select("id")); },
+      mutationFn: async (l: DayLog) => { must(await supabase.from("diet_day_logs").upsert({ plan_id: planId!, swaps: l.swaps, extras: l.extras, log_date: l.date, option_id: l.optionId, meals_done: l.mealsDone, extra_protein_g: l.extraProteinG, water_ml: l.waterMl, energy: l.energy, fullness: l.fullness, difficulty: l.difficulty, training: l.training, discomfort: l.discomfort, bowel: l.bowel, notes: l.notes, updated_at: new Date().toISOString() }, { onConflict: "user_id,plan_id,log_date" }).select("id")); },
       onSettled: () => void (planId && qc.invalidateQueries({ queryKey: logsKey(planId) })),
     }),
     saveWeekly: useMutation({

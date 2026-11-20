@@ -16,7 +16,7 @@ import { useDiet, useDietActions, useDietLogs, useDietWeeklies } from "@/lib/dat
 import { daySummary, weekOfPlan, type DayLog } from "@/lib/diet-plan";
 import { isoOf } from "@/lib/program";
 
-export const emptyDay = (date: string, optionId: string | null): DayLog => ({ date, optionId, mealsDone: [], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "" });
+export const emptyDay = (date: string, optionId: string | null): DayLog => ({ swaps: {}, extras: [], date, optionId, mealsDone: [], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "" });
 
 /** Tudo da dieta ativa (ou `null` se não há dieta). */
 export function useDietBundle() {
@@ -75,7 +75,7 @@ export function DietTodayPanel({ b }: { b: DietBundle }) {
   const { sum, plan } = b, pmax = plan.proteina.max ?? sum.plannedProtein;
   return (
     <div data-testid="hoje-dieta">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-display-h text-xl">{sum.opt.nome}</h3><p className="text-xs text-muted-foreground">Proteína {sum.protein}/{pmax} g · {sum.done}/{sum.total} refeições</p></div></div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-display-h text-xl">{sum.opt.nome}</h3><p className="text-xs text-muted-foreground">{Math.round(sum.macros.kcal)} kcal · P {sum.protein}/{pmax} g · C {Math.round(sum.macros.c)} · G {Math.round(sum.macros.f)} · {sum.done}/{sum.total} refeições</p></div></div>
       <ul className="space-y-2">{sum.opt.refeicoes.map((m) => { const done = b.todayLog?.mealsDone.includes(m.id) ?? false; return (
         <li key={m.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm ${done ? "border-emerald/40 bg-emerald/10" : "border-border bg-card/20"}`}>
           <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${done ? "border-emerald bg-emerald text-[#04121a]" : "border-border"}`}>{done ? "✓" : ""}</span>
