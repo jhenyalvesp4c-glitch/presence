@@ -13,8 +13,8 @@ type Urls = Record<string, { view: string; download: string }>;
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as React.CSSProperties;
 const br = (iso: string) => iso.split("-").reverse().join("/");
-const COLOR: Record<OrionKind, string> = { registro: "violet", documentacao: "amber", demanda: "cyan", tarefa: "amber", nota: "emerald", conversa: "pink", treinamento: "emerald" };
-const ICON: Record<OrionKind, typeof FileText> = { registro: Sparkles, documentacao: BookOpen, demanda: ClipboardList, tarefa: CheckCircle2, nota: StickyNote, conversa: MessageSquare, treinamento: GraduationCap };
+const COLOR: Record<OrionKind, string> = { registro: "violet", documentacao: "amber", demanda: "cyan", tarefa: "amber", nota: "emerald", conversa: "pink", treinamento: "emerald", memoria: "violet", habito: "emerald", saude: "emerald", lista: "cyan", plano: "cyan", financeiro: "amber" };
+const ICON: Record<OrionKind, typeof FileText> = { registro: Sparkles, documentacao: BookOpen, demanda: ClipboardList, tarefa: CheckCircle2, nota: StickyNote, conversa: MessageSquare, treinamento: GraduationCap, memoria: Brain, habito: CheckCircle2, saude: ShieldCheck, lista: ClipboardList, plano: CalendarDays, financeiro: FileText };
 const isImg = (f: FileRef) => f.mime.startsWith("image/");
 const sizeLabel = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1).replace(".", ",")} MB`);
 const fkey = (f: FileRef) => `${f.bucket}/${f.path}`;

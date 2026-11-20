@@ -2,7 +2,7 @@
  * Orion (segundo cérebro): funções puras para montar o "acervo" pesquisável e ordenar por relevância.
  * Sem acesso ao banco aqui; quem lê as tabelas é orion.functions.ts.
  */
-export type OrionKind = "registro" | "documentacao" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento";
+export type OrionKind = "registro" | "documentacao" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento" | "memoria" | "habito" | "saude" | "lista" | "plano" | "financeiro";
 
 /** Arquivo guardado no Orion (print, PDF, anexo de demanda…) que acompanha um documento. */
 export type FileRef = { bucket: string; path: string; name: string; mime: string; size: number };
@@ -23,7 +23,7 @@ export type OrionDoc = {
 export type OrionSource = { n: number; id: string; kind: OrionKind; title: string; snippet: string; date?: string | undefined; where?: string | undefined; link: string; files: FileRef[] };
 
 export const KIND_LABEL: Record<OrionKind, string> = {
-  registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com o assistente", treinamento: "Treinamento",
+  registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com o assistente", treinamento: "Treinamento", memoria: "Memória", habito: "Hábitos", saude: "Saúde", lista: "Lista", plano: "Plano do dia", financeiro: "Financeiro",
 };
 
 export const normalize = (s: string) =>
@@ -144,7 +144,7 @@ export function mentionedDossiers(text: string, names: string[]): string[] {
   return [...new Set(names.filter((n) => n.trim() && t.includes(hay(n))))];
 }
 
-export const SYSTEM = `Você é o Orion, o "segundo cérebro" da pessoa: ele responde com base nas FONTES que o Orion reúne (anotações que ela documentou, demandas e seu histórico, tarefas e compromissos, notas de projeto, conversas com o assistente).
+export const SYSTEM = `Você é o Orion, o "segundo cérebro" da pessoa: ele responde com base nas FONTES que o Orion reúne (anotações que ela documentou, demandas e seu histórico, tarefas e compromissos, notas de projeto, conversas com o assistente, memórias sobre a pessoa, hábitos, saúde, listas, plano do dia, financeiro e acertos de contas).
 Regras:
 - Responda SOMENTE com o que está nas fontes. Se não houver informação suficiente, diga isso com clareza e sugira o que ela poderia documentar; nunca invente.
 - Cite as fontes pelo número entre colchetes, ex.: [2]. Datas sempre no formato dia/mês/ano.

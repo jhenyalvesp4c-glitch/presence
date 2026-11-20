@@ -124,6 +124,28 @@ export async function loadCorpus() {
       docs.push({ id: `treinamento:exemplo:${lib.project_id}:${ex.id}`, kind: "treinamento", title: `Exemplo: ${ex.title ?? ex.id}`, text: [ex.cat ? `Categoria: ${ex.cat}` : "", ex.situation ? `Situação: ${ex.situation}` : "", ex.text ?? ""].filter(Boolean).join("\n"), date: day(lib.updated_at), where: proj, link: "/demandas" });
     }
   }
+  // o resto do sistema (memórias, hábitos, saúde, listas, plano, financeiro, acertos): cada parte falha sozinha, sem derrubar a busca
+  try {
+    const { extraDocs } = await import("./orion-extra");
+    const { cloudFinanceRepo } = await import("./finance/cloud-repo");
+    const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()), from = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const ok = <T>(r: { data: T[] | null; error: unknown }): T[] => (r.error ? [] : (r.data ?? []));
+    const [memories, habits, completions, measurements, diet, meals, workoutSplit, lists, listItems, schedule, settlements, settleItems, finance] = await Promise.all([
+      supabase.from("user_memories").select("id, text, kind, created_at").order("created_at", { ascending: false }).limit(60),
+      supabase.from("habits").select("id, name, active"), supabase.from("habit_completions").select("habit_id, completed_on").gte("completed_on", new Date(Date.now() - 31 * 86_400_000).toISOString().slice(0, 10)).limit(3000),
+      supabase.from("body_measurements").select("id, name, measured_on, height_m, weight_kg, values, notes").order("measured_on", { ascending: false }).limit(60),
+      supabase.from("diet_sheets").select("id, name, goal, calories, protein, carbs, fat, notes, active"), supabase.from("diet_meals").select("sheet_id, name, meal_time, foods").order("position").limit(100),
+      supabase.from("workout_split").select("weekday, title"),
+      supabase.from("checklists").select("id, title, updated_at").limit(40), supabase.from("checklist_items").select("list_id, section, label, done").limit(1500),
+      supabase.from("schedule_items").select("plan_date, time, title, done, kind").gte("plan_date", from).lte("plan_date", new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)).limit(600),
+      supabase.from("fin_settlements").select("id, person, closed, default_share"), supabase.from("fin_settlement_items").select("settlement_id, kind, item_date, description, amount, payer, other_share, installment").limit(2000),
+      cloudFinanceRepo.readCloud().catch(() => null),
+    ]);
+    docs.push(...extraDocs({
+      memories: ok(memories as never), habits: ok(habits as never), completions: ok(completions as never), measurements: ok(measurements as never), diet: ok(diet as never), meals: ok(meals as never),
+      workoutSplit: ok(workoutSplit as never), lists: ok(lists as never), listItems: ok(listItems as never), schedule: ok(schedule as never), settlements: ok(settlements as never), settleItems: ok(settleItems as never),
+    }, finance, new Date(`${todayIso}T12:00:00`)));
+  } catch { /* o resto continua funcionando */ }
   return docs;
 }
 

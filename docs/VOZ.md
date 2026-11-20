@@ -88,3 +88,8 @@ Configurações → "Velocidade da conversa" mostra, para as últimas 8 resposta
 - **Texto** (`wake.ts`): aceita as variações de escrita (Orion, Órion, Orian, Aurion, "o Ryan", "ori on"…), mas só **no começo da fala** (até 3 palavras antes: "ei", "bom dia"), e descarta falas com 3 ou mais "Orion" (é a IA repetindo a dica). Citar o nome no meio de uma conversa não ativa. Frases fantasma do modelo ("Obrigado.", "Legendas pela comunidade Amara.org") são ignoradas.
 - Testes: `wake.test.ts` (texto) e `wake-segmenter.test.ts` (sons sintéticos: silêncio, palma, palavra, ruído constante, fala longa).
 - **Diagnóstico na tela:** Configurações → "Chamar por voz" mostra o volume do microfone ao vivo e o mínimo para contar como fala (`MIN_THRESHOLD`), além de "Última coisa que ouvi". Microfone baixo demais para o app (barra nunca passa da marca) é a causa mais comum de "não ativa".
+
+## Um sistema só (orbe, Perguntar, Documentar e chat)
+- O orbe, o chat e o Perguntar/Documentar usam as mesmas tabelas e a mesma busca (`loadCorpus` em `orion.functions.ts`). O que se documenta em qualquer um aparece nos outros.
+- A busca (Perguntar e `buscar_no_orion`) enxerga anotações, demandas, tarefas, notas, conversas, treinamentos **e** memórias, hábitos, saúde (peso/medidas, dieta, treino), listas, plano do dia, financeiro (saldos, faturas, assinaturas) e acertos de contas (`orion-extra.ts`).
+- Para ações (lançar, editar, excluir) o orbe/chat usam as ferramentas específicas; o Perguntar só responde.
