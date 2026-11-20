@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarClock, CreditCard, Pause, Pencil, Play, Plus, Repeat, Trash2, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { brl, dateBR, isPaused, isSubscription, monthLabel, nextCharge, pauseRecurring, pausedSince, resumeRecurring, ymOf } from "@/lib/finance/calc";
+import { brl, dateBR, isPaused, isSubscription, monthLabel, nextCharge, pauseNotice, pauseRecurring, pausedSince, resumeRecurring, ymOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Recurring, Tone } from "@/lib/finance/types";
@@ -41,7 +41,7 @@ function SubCard({ r, index, onToggle, onEdit, onDelete }: { r: Recurring; index
         <p className="relative mt-3 flex items-baseline gap-1.5"><span className={`font-display text-3xl font-semibold tabular-nums ${paused ? "text-muted-foreground line-through decoration-1" : ""}`}>{brl(r.amount)}</span><span className="text-xs text-muted-foreground">por mês</span></p>
         <p className="relative mt-4 flex items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-muted-foreground">
           <CalendarClock size={13} className="shrink-0" />
-          <span>{paused ? "Não aparece nas faturas, despesas e movimentações enquanto estiver pausada." : next ? <>Próxima cobrança em <b className="text-foreground">{dateBR(next)}</b> · {brl(r.amount * 12)} por ano</> : "Sem cobrança prevista."}</span>
+          <span>{paused ? (future ? pauseNotice(r, today).texto : "Não aparece nas faturas, despesas e movimentações enquanto estiver pausada.") : next ? <>Próxima cobrança em <b className="text-foreground">{dateBR(next)}</b> · {brl(r.amount * 12)} por ano</> : "Sem cobrança prevista."}</span>
         </p>
         <div className="relative mt-3 flex items-center justify-between gap-2">
           {paused
@@ -68,7 +68,7 @@ export function SubscriptionsView() {
   const slices = ativas.map((r) => ({ id: r.id, name: r.desc, color: TONES[toneOf(r.desc)].glow, value: r.amount })), on = slices.find((x) => x.id === active);
   const toggle = (r: Recurring) => {
     if (isPaused(r)) { f.upsertRecurring(resumeRecurring(r, today)); toast.success(`${r.desc} reativada`, { description: "Volta a aparecer nas faturas e movimentações a partir da próxima cobrança." }); }
-    else { f.upsertRecurring(pauseRecurring(r, today)); toast(`${r.desc} pausada`, { description: "Não aparece mais nas faturas e despesas até você reativar." }); }
+    else { const next = pauseRecurring(r, today), n = pauseNotice(next, today); f.upsertRecurring(next); toast.info(`${r.desc} pausada · ${n.titulo}`, { description: n.texto, duration: 14000 }); }
   };
   return (
     <div className="space-y-5" data-testid="fin-assinaturas">

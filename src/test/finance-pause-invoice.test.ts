@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { invoiceFor, pauseRecurring, subscriptionForInvoice } from "@/lib/finance/calc";
+import { invoiceFor, pauseNotice, pauseRecurring, subscriptionForInvoice } from "@/lib/finance/calc";
 import { EMPTY_STATE, type Card, type FinanceState, type Recurring } from "@/lib/finance/types";
 
 // cartão que fecha dia 3 e vence dia 10: uma cobrança do dia 17 de novembro entra na fatura que FECHA em 3/12 (vence 10/12)
@@ -37,5 +37,12 @@ describe("Pausar assinatura no cartão", () => {
     expect(r.startYm).toBe("2026-11"); // 17/11 cai na fatura que vence em dezembro
     expect(invoiceFor(st([r]), card, "2026-12").lines.map((l) => l.desc)).toEqual(["Netflix"]);
     expect(invoiceFor(st([r]), card, "2026-11").lines).toHaveLength(0); // antes da 1ª cobrança
+  });
+  it("aviso ao pausar: depois da renovação × antes da renovação", () => {
+    const depois = pauseNotice(chat, hoje), antes = pauseNotice(cilios, hoje);
+    expect(depois.jaCobrada).toBe(true); expect(depois.texto).toContain("continua na fatura em que caiu"); expect(depois.texto).toContain("dez/26");
+    expect(antes.jaCobrada).toBe(false); expect(antes.texto).toContain("já sai da fatura em que cairia"); expect(antes.texto).toContain("ainda não foi cobrada");
+    const conta = pauseNotice(pauseRecurring({ ...sub("d", "Academia", 5, 100), cardId: undefined, accountId: "a1", method: "debito" }, hoje), hoje);
+    expect(conta.texto).toContain("despesas"); expect(conta.texto).not.toContain("fatura");
   });
 });

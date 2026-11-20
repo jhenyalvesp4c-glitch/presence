@@ -4,7 +4,7 @@
  */
 import {
   addMonths, brl, cardAvailable, cardUsed, accountBalance, dateBR, dayIn, dueYmOfClosing, firstFromPaid, invoiceFor, invoiceMonthOf, isoOf, isSubscription, monthName, nextCharge,
-  pauseRecurring, planForInvoice, planInfo, resumeRecurring, round2, sharedPart, subscriptionForInvoice, withDeclaredTotal, ymOf, closingYmOf,
+  pauseNotice, pauseRecurring, planForInvoice, planInfo, resumeRecurring, round2, sharedPart, subscriptionForInvoice, withDeclaredTotal, ymOf, closingYmOf,
 } from "../finance/calc";
 import { catOf, guessCategory } from "../finance/categories";
 import type { Account, Card, FinanceState, Goal, Plan, Recurring, Shared, Transaction } from "../finance/types";
@@ -137,7 +137,7 @@ export function applyWrite(s: FinanceState, args: Record<string, unknown>, today
     const next = acao === "pausar" ? pauseRecurring(r, today) : resumeRecurring(r, today);
     if (next === r) return fail(acao === "pausar" ? `${r.desc} já está pausada.` : `${r.desc} não está pausada.`);
     const quando = nextCharge(next, today);
-    return { state: { ...s, recurring: upsertList(s.recurring, next) }, result: { ok: true, acao: acao === "pausar" ? "pausada" : "reativada", nome: r.desc, valor: r.amount, proxima_cobranca: acao === "reativar" && quando ? dateBR(quando) : null, dica: acao === "pausar" ? "Ela some das faturas e das projeções a partir da próxima cobrança." : undefined },
+    return { state: { ...s, recurring: upsertList(s.recurring, next) }, result: { ok: true, acao: acao === "pausar" ? "pausada" : "reativada", nome: r.desc, valor: r.amount, proxima_cobranca: acao === "reativar" && quando ? dateBR(quando) : null, dica: acao === "pausar" ? pauseNotice(next, today).texto : undefined },
       panel: panel(acao === "pausar" ? "Assinatura pausada" : "Assinatura reativada", [item(r.desc, brl(r.amount))], "/financeiro?aba=assinaturas", "Abrir assinaturas") };
   }
 

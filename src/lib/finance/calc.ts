@@ -93,6 +93,13 @@ export function pauseRecurring(r: Recurring, today: Date): Recurring {
   const cur = ymOf(today), from = dayIn(cur, r.day) > isoOf(today) ? cur : addMonths(cur, 1);
   return { ...r, pauses: [...(r.pauses ?? []), { from: from < r.startYm ? r.startYm : from }] };
 }
+/** Aviso para mostrar ao pausar: o que acontece com a cobrança deste mês e com as próximas. `r` é a recorrente JÁ pausada (resultado de `pauseRecurring`). */
+export function pauseNotice(r: Recurring, today: Date): { jaCobrada: boolean; titulo: string; texto: string } {
+  const cur = ymOf(today), since = pausedSince(r) ?? cur, jaCobrada = since > cur, onde = r.cardId ? "fatura" : "despesas";
+  return jaCobrada
+    ? { jaCobrada, titulo: "Cobrança deste mês já aconteceu", texto: `Ela foi cobrada no dia ${r.day}: continua ${r.cardId ? "na fatura em que caiu" : "nas despesas deste mês"} e só some das próximas ${r.cardId ? "faturas" : "despesas"}, a partir de ${monthLabel(since)}.` }
+    : { jaCobrada, titulo: "Cobrança deste mês ainda não aconteceu", texto: `Ela só seria cobrada no dia ${r.day}: já sai ${r.cardId ? "da fatura em que cairia" : "das despesas deste mês"} e de todas as próximas ${onde === "fatura" ? "faturas" : "despesas"}, porque ainda não foi cobrada.` };
+}
 /** Reativa a partir da próxima cobrança (a de hoje conta). Se nenhum mês chegou a ficar pausado, a pausa some. */
 export function resumeRecurring(r: Recurring, today: Date): Recurring {
   if (!isPaused(r)) return r;
