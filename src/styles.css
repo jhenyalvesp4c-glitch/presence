@@ -574,3 +574,8 @@ html, body { max-width: 100%; overflow-x: clip; }
 @keyframes body-ring { to { stroke-dashoffset: -60; } }
 @keyframes body-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 @media (prefers-reduced-motion: reduce) { [data-body-fx] { animation: none !important; } }
+
+/* Entrada de dados: linha de varredura dos campos de foto e cantos de "mira". */
+@keyframes slot-scan { 0%,100% { top: 10%; opacity: .2; } 50% { top: 86%; opacity: 1; } }
+@keyframes field-pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes tx-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
