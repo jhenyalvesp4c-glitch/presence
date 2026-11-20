@@ -93,7 +93,7 @@ function Index() {
            <div className="grid gap-5 lg:grid-cols-3">
             {cards.map((c) => (
               <Button variant="unstyled" size="unstyled" type="button" key={c.title} data-tone={c.tone}
-                onClick={() => { const f: Ficha = c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"; if (state[f].has) void navigate({ to: state[f].to }); else setFicha(f); }}
+                onClick={() => { const f: Ficha = c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"; if (state[f].has) void navigate({ to: state[f].to }); else if (f === "dieta") void navigate({ to: "/dieta" }); else setFicha(f); }}
                 aria-label={state[c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"].has ? state[c.tone === "emerald" ? "dieta" : c.tone === "cyan" ? "medidas" : "treino"].cta : c.cta}
                 className="health-sheet-card tone group relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card/60 transition-all duration-500 hover:-translate-y-1.5 hover:border-[var(--tone)] hover:shadow-[0_30px_80px_-30px_var(--tone)] focus-visible:outline-2 focus-visible:outline-primary">
                 <div className="relative aspect-[4/3] overflow-hidden">
