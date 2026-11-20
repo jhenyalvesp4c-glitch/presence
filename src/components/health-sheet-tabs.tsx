@@ -6,7 +6,7 @@ const tabs = [
   { key: "hoje", label: "Hoje", to: "/hoje", icon: Sun },
   { key: "treino", label: "Treino", to: "/saude/treino", icon: Dumbbell },
   { key: "dieta", label: "Dieta", to: "/saude/dieta", icon: Utensils },
-  { key: "progresso", label: "Progresso", to: "/progresso", icon: TrendingUp },
+  { key: "progresso", label: "Progresso", to: "/analise", icon: TrendingUp },
 ] as const;
 export type SheetTab = (typeof tabs)[number]["key"];
 export function HealthSheetTabs({ active }: { active: SheetTab }) {

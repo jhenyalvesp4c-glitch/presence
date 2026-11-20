@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HealthTabs } from "@/components/health-tabs";
 import { HealthLoading } from "@/components/health-loading";
+import { HealthSheetTabs } from "@/components/health-sheet-tabs";
+import { BodyPanel } from "@/components/health-body";
+import { PROGRESS_TABS, ProgramHeader, ProgramProgressView, SubTabs, useProgramBundle, type ProgressView } from "@/components/program/ProgramHub";
+import { DeltaBars, Radar } from "./extras";
+import type { Program } from "@/lib/program";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { todayIso } from "@/lib/dates";
 import { useAnalysisPrefs } from "@/lib/data/analysis";
@@ -87,8 +92,10 @@ function Hologram({ active, onHover, measures }: { active: string | null; onHove
   </div>;
 }
 
-function TrainingDiet({ workout, diet, demo }: { workout: WorkoutSheet | null; diet: DietSheet | null; demo: boolean }) {
+function TrainingDiet({ workout: legacy, diet, demo, program }: { workout: WorkoutSheet | null; diet: DietSheet | null; demo: boolean; program: Program | null }) {
   const days = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  // com programa de treino, o resumo vem dele (dias e exercícios reais); senão, da ficha antiga
+  const workout: WorkoutSheet | null = program ? { nome: program.nome, sessoes: program.dias.filter((d) => d.tipo !== "descanso").map((d, i) => ({ id: i + 1, nome: d.titulo, dias: [days[d.dia]!], exercicios: d.exercicios.map((e) => ({ nome: e.nome, grupo: e.grupo })) })) } : legacy;
   const w = workout ?? (demo ? { nome: "Exemplo", sessoes: [{ id: 1, nome: "A", dias: ["seg", "qui"], exercicios: Array(6).fill({ nome: "", grupo: "" }) }, { id: 2, nome: "B", dias: ["ter", "sex"], exercicios: Array(5).fill({ nome: "", grupo: "" }) }, { id: 3, nome: "C", dias: ["qua"], exercicios: Array(6).fill({ nome: "", grupo: "" }) }] } : null);
   const d = diet ?? (demo ? { name: "Exemplo", goal: "", notes: "", macros: { calories: "1650", protein: "120", carbs: "170", fat: "55" }, meals: Array.from({ length: 5 }, (_, i) => ({ id: i, name: "", time: "", foods: [] })) } : null);
   const trainDays = new Set(w?.sessoes.flatMap((s) => s.dias) ?? []);
@@ -158,6 +165,7 @@ export function AnalysisPage() {
   const setHidden = (f: (h: string[]) => string[]) => update({ hidden: f(hidden) });
   const [spot, setSpot] = useState<string | null>(null);
 
+  const { bundle: prog } = useProgramBundle(), [view, setView] = useState<"analise" | ProgressView>("analise");
   const today = todayIso();
   const demo = ready && measurementHistory.length === 0;
   const source: MeasurementSheet[] = useMemo(() => (demo ? demoHistory(today) : measurementHistory), [demo, measurementHistory, today]);
@@ -210,6 +218,10 @@ export function AnalysisPage() {
         <Button asChild size="sm" variant="outline" className="relative rounded-full border-violet/50 text-violet"><Link to="/medidas/nova"><Ruler />Registrar minha primeira medição</Link></Button>
       </div>}
 
+      <HealthSheetTabs active="progresso" />
+      {prog && <ProgramHeader b={prog} onMeasures={() => setView("medidas")} />}
+      {prog && <SubTabs testId="analise-abas" value={view} onChange={setView} tabs={[{ id: "analise" as const, label: "Análise corporal", Icon: Activity }, ...PROGRESS_TABS(prog)]} />}
+      {prog && view !== "analise" ? <ProgramProgressView b={prog} view={view} /> : <>
       <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icon={Scale} label="Peso atual" value={last.weight} unit="kg" delta={delta.weight} deltaUnit="kg" goodWhen="down" spark={entries.map((e) => e.weight)} color={C.emerald} delay={0} />
         <Kpi icon={Ruler} label="Cintura" value={last.waist} unit="cm" decimals={last.waist !== null && Number.isInteger(last.waist) ? 0 : 1} delta={delta.waist} deltaUnit="cm" goodWhen="down" spark={entries.map((e) => e.waist)} color={C.cyan} delay={80} />
@@ -293,7 +305,7 @@ export function AnalysisPage() {
         </Panel>
 
         <Panel title="Resumo do treino e dieta" icon={Target} color={C.cyan} className="xl:col-span-4" delay={460}>
-          <TrainingDiet workout={workout} diet={diet} demo={demo} />
+          <TrainingDiet workout={workout} diet={diet} demo={demo} program={prog?.p ?? null} />
         </Panel>
 
         <Panel title="Análise inteligente" icon={Sparkles} color={C.violet} className="xl:col-span-4" delay={520}
@@ -312,6 +324,11 @@ export function AnalysisPage() {
           </div>
         </Panel>
 
+        {!demo && <Panel title="Mapa do corpo" icon={ScanLine} color={C.cyan} className={source.length > 1 ? "xl:col-span-7" : "xl:col-span-12"} delay={540}><BodyPanel history={source} /></Panel>}
+        {!demo && source.length > 1 && <div className="space-y-6 xl:col-span-5">
+          <Panel title="Antes × agora" icon={ScanLine} color={C.violet} delay={560} right={<span className="flex gap-3 text-[10px] text-muted-foreground"><span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet" />{shortDate(source[0]!.data)}</span><span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-cyan shadow-glow" />{shortDate(source.at(-1)!.data)}</span></span>}><Radar first={source[0]!} last={source.at(-1)!} /></Panel>
+          <Panel title="Variação por medida" icon={Ruler} color={C.violet} delay={580}><DeltaBars history={source} /></Panel>
+        </div>}
         <Panel title="Linha do tempo das medições" icon={CalendarDays} color={C.emerald} className="xl:col-span-12" delay={580}
           right={<span className="tag" style={glow(C.emerald)}>{entries.length} registro{entries.length === 1 ? "" : "s"}</span>}>
           <div className="scroll-neon -mx-2 overflow-x-auto px-2 pb-2">
@@ -331,6 +348,7 @@ export function AnalysisPage() {
           </div>
         </Panel>
       </div>
+      </>}
     </main>
   </div>;
 }

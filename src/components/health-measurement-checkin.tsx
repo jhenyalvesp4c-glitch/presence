@@ -41,7 +41,7 @@ export function MeasurementCheckIn({ embedded = false, onCancel }: { embedded?: 
   const save = () => {
     setMeasurements({ nome: last.nome, altura: last.altura, data, peso: peso || last.peso, valores: { ...Object.fromEntries(Object.keys(measurementLabels).map(k => [k, valores[k]?.trim() || ""])), gordura_pct: gordura.trim() }, obs, fotos });
     if (onCancel) onCancel();
-    navigate({ to: "/progresso" });
+    navigate({ to: "/analise" });
   };
   const onFoto = (slot: string, file?: File) => { if (file) setFotos(p => ({ ...p, [slot]: URL.createObjectURL(file) })); };
 
@@ -54,7 +54,7 @@ export function MeasurementCheckIn({ embedded = false, onCancel }: { embedded?: 
           <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-primary shadow-glow"><Scale className="h-7 w-7 text-primary-foreground" /><span className="absolute inset-0 animate-ping rounded-2xl bg-primary/20 [animation-duration:3s]" /></div>
           <div><p className="font-mono text-[11px] uppercase text-primary">{last.nome || "Peso e medidas"} · Registro nº {measurementHistory.length + 1}</p><h1 className="font-display-h text-3xl font-semibold md:text-4xl">Nova medição<span className="text-primary">.</span></h1><p className="mt-1 text-sm text-muted-foreground">Último registro em {formatDate(last.data)} · compare em tempo real.</p></div>
         </div>
-        <div className="flex gap-2"><Button asChild variant="outline" className="rounded-full bg-card/40"><Link to="/progresso"><TrendingUp />Ver progresso</Link></Button></div>
+        <div className="flex gap-2"><Button asChild variant="outline" className="rounded-full bg-card/40"><Link to="/analise"><TrendingUp />Ver progresso</Link></Button></div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
@@ -101,7 +101,7 @@ export function MeasurementCheckIn({ embedded = false, onCancel }: { embedded?: 
           </section>
 
           <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-            <Button variant="outline" className="h-auto rounded-2xl bg-card/60 px-8 py-4" onClick={() => onCancel ? onCancel() : navigate({ to: "/progresso" })}><X />Cancelar</Button>
+            <Button variant="outline" className="h-auto rounded-2xl bg-card/60 px-8 py-4" onClick={() => onCancel ? onCancel() : navigate({ to: "/analise" })}><X />Cancelar</Button>
             <Button variant="unstyled" size="unstyled" disabled={!data} onClick={save} className="relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-primary px-8 py-4 text-sm font-semibold text-primary-foreground shadow-glow transition hover:brightness-110 disabled:opacity-50"><span className="health-shine absolute inset-0" /><span className="relative">Salvar medição</span><ArrowRight className="relative h-4 w-4" /></Button>
           </div>
         </div>

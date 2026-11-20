@@ -48,7 +48,7 @@ export type Resume = { estado: Record<string, unknown>[]; resultados: { id: stri
 
 export const PAGES: Record<string, string> = {
   inicio: "/assistente", demandas: "/demandas", projetos: "/projetos", tarefas: "/tarefas", calendario: "/calendario", planejamento: "/planejamento",
-  saude: "/saude", treino: "/saude/treino", dieta: "/saude/dieta", habitos: "/habitos", progresso: "/progresso", cerebro: "/cerebro",
+  saude: "/saude", treino: "/saude/treino", dieta: "/saude/dieta", habitos: "/habitos", progresso: "/analise", cerebro: "/cerebro",
   organizar: "/organizar", financeiro: "/financeiro", listas: "/tarefas?aba=listas", analise: "/analise", resumo: "/resumo", ideias: "/ideias",
 };
 

@@ -31,7 +31,7 @@ function Panel({ children, className = "" }: { children: ReactNode; className?: 
   </section>;
 }
 
-function PanelHead({ icon: Icon, title, to, label }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/progresso" | "/medidas/nova" | "/saude/treino"; label: string }) {
+function PanelHead({ icon: Icon, title, to, label }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/analise" | "/medidas/nova" | "/saude/treino"; label: string }) {
   return <div className="mb-5 flex items-center justify-between gap-2">
     <h2 className="flex items-center gap-3 font-display-h text-lg"><span className="grid h-9 w-9 place-items-center rounded-xl border border-primary/30 bg-primary/10"><Icon className="h-4 w-4 text-primary" /></span>{title}</h2>
     <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-muted-foreground"><Link to={to}>{label}<ArrowUpRight /></Link></Button>

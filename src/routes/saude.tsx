@@ -49,8 +49,8 @@ const cards = [
 function Index() {
   const [ficha, setFicha] = useState<Ficha | null>(null), navigate = useNavigate(), { workout, diet, measurements } = useHealthPreview(), { data: program } = useProgram();
   // cada ficha: já montada → entra na tela única de Saúde; ainda não → montar
-  const state: Record<Ficha, { has: boolean; cta: string; to: "/hoje" | "/saude/dieta" | "/progresso" }> = {
-    treino: { has: !!program || !!workout, cta: "Ver meu plano", to: "/hoje" }, dieta: { has: !!diet, cta: "Ver minha dieta", to: "/saude/dieta" }, medidas: { has: !!measurements, cta: "Ver minhas medidas", to: "/progresso" },
+  const state: Record<Ficha, { has: boolean; cta: string; to: "/hoje" | "/saude/dieta" | "/analise" }> = {
+    treino: { has: !!program || !!workout, cta: "Ver meu plano", to: "/hoje" }, dieta: { has: !!diet, cta: "Ver minha dieta", to: "/saude/dieta" }, medidas: { has: !!measurements, cta: "Ver minhas medidas", to: "/analise" },
   };
   return (
     <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
