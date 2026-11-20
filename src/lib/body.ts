@@ -2,20 +2,20 @@
 import type { MeasurementSheet } from "./health-preview";
 
 export type SpotKey = "peito" | "braco_d" | "braco_e" | "cintura" | "abdomen" | "quadril" | "gluteo" | "coxa_d" | "coxa_e" | "panturrilha_d" | "panturrilha_e";
-export type Spot = { key: SpotKey; label: string; short: string; /** posição no desenho (viewBox 400 × 480) */ x: number; y: number; side: "l" | "r"; labelY: number; /** +1: subir é bom · −1: descer é bom · 0: neutro */ good: -1 | 0 | 1 };
+export type Spot = { key: SpotKey; label: string; short: string; /** posição na imagem do corpo (768 × 1024) */ x: number; y: number; side: "l" | "r"; labelY: number; /** +1: subir é bom · −1: descer é bom · 0: neutro */ good: -1 | 0 | 1 };
 
 export const SPOTS: Spot[] = [
-  { key: "peito", label: "Peito", short: "Peito", x: 200, y: 108, side: "r", labelY: 96, good: 0 },
-  { key: "braco_d", label: "Braço direito", short: "Braço D", x: 143, y: 142, side: "l", labelY: 140, good: 1 },
-  { key: "braco_e", label: "Braço esquerdo", short: "Braço E", x: 257, y: 142, side: "r", labelY: 140, good: 1 },
-  { key: "cintura", label: "Cintura", short: "Cintura", x: 200, y: 166, side: "r", labelY: 184, good: -1 },
-  { key: "abdomen", label: "Abdômen", short: "Abdômen", x: 200, y: 188, side: "l", labelY: 192, good: -1 },
-  { key: "quadril", label: "Quadril", short: "Quadril", x: 200, y: 212, side: "r", labelY: 228, good: 0 },
-  { key: "gluteo", label: "Glúteos", short: "Glúteos", x: 176, y: 232, side: "l", labelY: 240, good: 1 },
-  { key: "coxa_d", label: "Coxa direita", short: "Coxa D", x: 182, y: 300, side: "l", labelY: 304, good: 1 },
-  { key: "coxa_e", label: "Coxa esquerda", short: "Coxa E", x: 218, y: 300, side: "r", labelY: 304, good: 1 },
-  { key: "panturrilha_d", label: "Panturrilha direita", short: "Pant. D", x: 184, y: 402, side: "l", labelY: 404, good: 1 },
-  { key: "panturrilha_e", label: "Panturrilha esquerda", short: "Pant. E", x: 216, y: 402, side: "r", labelY: 404, good: 1 },
+  { key: "peito", label: "Peito", short: "Peito", x: 384, y: 262, side: "r", labelY: 238, good: 0 },
+  { key: "braco_d", label: "Braço direito", short: "Braço D", x: 283, y: 318, side: "l", labelY: 300, good: 1 },
+  { key: "braco_e", label: "Braço esquerdo", short: "Braço E", x: 485, y: 318, side: "r", labelY: 318, good: 1 },
+  { key: "cintura", label: "Cintura", short: "Cintura", x: 384, y: 352, side: "r", labelY: 398, good: -1 },
+  { key: "abdomen", label: "Abdômen", short: "Abdômen", x: 384, y: 404, side: "l", labelY: 410, good: -1 },
+  { key: "quadril", label: "Quadril", short: "Quadril", x: 384, y: 462, side: "r", labelY: 500, good: 0 },
+  { key: "gluteo", label: "Glúteos", short: "Glúteos", x: 318, y: 496, side: "l", labelY: 526, good: 1 },
+  { key: "coxa_d", label: "Coxa direita", short: "Coxa D", x: 338, y: 600, side: "l", labelY: 636, good: 1 },
+  { key: "coxa_e", label: "Coxa esquerda", short: "Coxa E", x: 432, y: 600, side: "r", labelY: 636, good: 1 },
+  { key: "panturrilha_d", label: "Panturrilha direita", short: "Pant. D", x: 340, y: 790, side: "l", labelY: 800, good: 1 },
+  { key: "panturrilha_e", label: "Panturrilha esquerda", short: "Pant. E", x: 428, y: 790, side: "r", labelY: 800, good: 1 },
 ];
 const LEGACY: Partial<Record<SpotKey, string>> = { braco_d: "braco", braco_e: "braco", coxa_d: "coxa", coxa_e: "coxa" };
 
