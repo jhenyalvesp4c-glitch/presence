@@ -61,10 +61,11 @@ export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undef
   const [closing, setClosing] = useState(String(initial?.closingDay ?? 25)), [due, setDue] = useState(String(initial?.dueDay ?? 5));
   const openYm = invoiceMonthOf({ closingDay: Number(closing) || 25, dueDay: Number(due) || 5 }, isoOf(today));
   const [extra, setExtra] = useState<number | undefined>(initial?.declared?.[openYm]);
+  const [payWhen, setPayWhen] = useState<"vencimento" | "fechamento">(initial?.payAfterClose === undefined ? "vencimento" : "fechamento"), [payDays, setPayDays] = useState(String(initial?.payAfterClose ?? 1));
   const day = (v: string) => Math.max(1, Math.min(31, Math.round(Number(v) || 1)));
   const ok = name.trim() && limit && limit > 0 && avail !== undefined && avail <= (limit ?? 0);
   const save = () => {
-    const base: Card = { id: initial?.id ?? uid("card-"), name: name.trim(), brand, last4: last4.replace(/\D/g, "").padStart(4, "0").slice(-4), tone, limit: limit ?? 0, availableBase: avail ?? 0, baseDate: initial && avail === initial.availableBase ? initial.baseDate : isoOf(today), closingDay: day(closing), dueDay: day(due), adjustments: initial?.adjustments ?? {}, declared: initial?.declared };
+    const base: Card = { id: initial?.id ?? uid("card-"), name: name.trim(), brand, last4: last4.replace(/\D/g, "").padStart(4, "0").slice(-4), tone, limit: limit ?? 0, availableBase: avail ?? 0, baseDate: initial && avail === initial.availableBase ? initial.baseDate : isoOf(today), closingDay: day(closing), dueDay: day(due), adjustments: initial?.adjustments ?? {}, declared: initial?.declared, payAfterClose: payWhen === "fechamento" ? Math.max(0, Math.min(10, Math.round(Number(payDays) || 0))) : undefined };
     onSave(withDeclaredTotal(base, openYm, extra));
   };
   return (
@@ -80,6 +81,10 @@ export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undef
         <Field label="Dia de fechamento da fatura"><TextInput type="number" min={1} max={31} value={closing} onChange={(e) => setClosing(e.target.value)} /></Field>
         <Field label="Dia de vencimento da fatura"><TextInput type="number" min={1} max={31} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
       </Grid>
+      <Field group label="Quando você paga a fatura?" hint={payWhen === "fechamento" ? `Nas projeções, o dinheiro sai ${Number(payDays) > 0 ? `${Math.round(Number(payDays))} dia(s) depois de fechar` : "no dia do fechamento"} (dia ${Math.min(31, day(closing) + Math.max(0, Math.round(Number(payDays) || 0)))}), nunca na virada do mês.` : "Nas projeções, o dinheiro sai no dia do vencimento."}>
+        <div className="flex flex-wrap items-center gap-3"><Segmented value={payWhen} onChange={setPayWhen} options={[{ value: "vencimento", label: "No vencimento" }, { value: "fechamento", label: "No fechamento" }]} />
+          {payWhen === "fechamento" && <label className="flex items-center gap-2 text-xs text-muted-foreground">dias depois de fechar<TextInput type="number" min={0} max={10} value={payDays} onChange={(e) => setPayDays(e.target.value)} className="!w-20" data-testid="fin-cartao-dias-pagamento" /></label>}</div>
+      </Field>
       <Field label={`Valor atual da fatura (${invoiceLabel({ closingDay: day(closing), dueDay: day(due) }, openYm)})`} hint="Opcional. O total como aparece no app do banco. As compras e parcelas que você cadastrar abatem desse valor, sem duplicar."><MoneyInput value={extra} onChange={setExtra} /></Field>
       <Field group label="Cor"><TonePicker value={tone} onChange={setTone} /></Field>
       <Actions onCancel={onCancel} onSave={save} disabled={!ok} />

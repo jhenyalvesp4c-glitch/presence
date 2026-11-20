@@ -85,7 +85,7 @@ export function MonthsView() {
       <div className="space-y-2.5">
         {plan.map((m, i) => <MonthCard key={m.ym} m={m} first={i === 0} open={openYm === m.ym} onToggle={() => setOpenYm((c) => (c === m.ym ? null : m.ym))} />)}
       </div>
-      <p className="text-xs text-muted-foreground">As faturas entram no mês em que <b>vencem</b> (é quando o dinheiro sai da conta). Compras, parcelas e assinaturas no cartão já estão dentro das faturas, por isso não são somadas de novo. Para ver a fatura de cada cartão por mês de fechamento, abra Contas e cartões.</p>
+      <p className="text-xs text-muted-foreground">As faturas entram no mês em que o dinheiro <b>sai da conta</b>: no vencimento ou, nos cartões que você marcou para pagar no fechamento, logo depois de fechar (dia 28/29, nunca na virada do mês). Compras, parcelas e assinaturas no cartão já estão dentro das faturas, por isso não são somadas de novo. Para ver a fatura de cada cartão por mês de fechamento, abra Contas e cartões.</p>
     </div>
   );
 }

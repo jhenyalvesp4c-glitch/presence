@@ -20,6 +20,8 @@ export type Card = {
   adjustments: Record<string, number>;
   /** Total da fatura como o banco mostra (mês de vencimento "aaaa-mm" → valor). Os itens cadastrados abatem desse total; o que falta aparece como "ainda não detalhado". */
   declared?: Record<string, number> | undefined;
+  /** Quando a pessoa PAGA a fatura: sem valor = no vencimento; N = N dias depois do fechamento (0 = no dia do fechamento). Quem paga no fechamento conta o dinheiro saindo nessa data, nunca na virada do mês. */
+  payAfterClose?: number | undefined;
 };
 export type Transaction = {
   id: string; kind: TxKind; desc: string; amount: number; date: string; method: Method;

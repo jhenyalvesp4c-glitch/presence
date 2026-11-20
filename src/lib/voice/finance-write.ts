@@ -13,6 +13,7 @@ import type { Panel, PanelItem } from "./agent";
 
 export type Outcome = { state?: FinanceState; result: Record<string, unknown>; panel?: Panel; navegar?: string };
 export const WRITE_ACTIONS = new Set(["pausar", "reativar", "fatura_total", "detalhar", "editar", "excluir", "cadastrar_parcelada", "cadastrar_fixa", "dividir"]);
+const strip0 = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 export const READ_ACTIONS_V2 = new Set(["fixas", "parcela_detalhe", "metas", "abrir"]);
 
 const num = (v: unknown): number | undefined => { if (v === undefined || v === null || v === "") return undefined; const n = typeof v === "number" ? v : Number(String(v).replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : undefined; };
@@ -246,11 +247,12 @@ function edit(s: FinanceState, args: Record<string, unknown>, today: Date): Outc
     return done({ ...s, accounts: upsertList(s.accounts, { ...a, balanceBase: base, ...(desc ? { name: desc } : {}) }) }, a.name, { saldo_anterior: brl(accountBalance(s, a, today)), saldo_agora: saldo !== undefined ? brl(saldo) : undefined } as Record<string, unknown>, "/financeiro?aba=contas");
   }
   if (loc.tipo === "cartao") {
-    const c = s.cards.find((x) => x.id === loc.id)!, disp = num(args["disponivel"]) ?? v, lim = num(args["limite"]), fe = num(args["fechamento"]), ve = num(args["vencimento"]);
-    const n: Card = { ...c, ...(desc ? { name: desc } : {}), ...(lim !== undefined ? { limit: lim } : {}), ...(fe !== undefined && fe >= 1 && fe <= 31 ? { closingDay: Math.round(fe) } : {}), ...(ve !== undefined && ve >= 1 && ve <= 31 ? { dueDay: Math.round(ve) } : {}) };
+    const c = s.cards.find((x) => x.id === loc.id)!, disp = num(args["disponivel"]) ?? v, lim = num(args["limite"]), fe = num(args["fechamento"]), ve = num(args["vencimento"]), pg = strip0(String(args["pagamento"] ?? "")), dias = num(args["dias_apos_fechamento"]);
+    const pay: Partial<Card> = /fecha/.test(pg) ? { payAfterClose: Math.max(0, Math.min(10, Math.round(dias ?? 1))) } : /vencim/.test(pg) ? { payAfterClose: undefined } : {};
+    const n: Card = { ...c, ...pay, ...(desc ? { name: desc } : {}), ...(lim !== undefined ? { limit: lim } : {}), ...(fe !== undefined && fe >= 1 && fe <= 31 ? { closingDay: Math.round(fe) } : {}), ...(ve !== undefined && ve >= 1 && ve <= 31 ? { dueDay: Math.round(ve) } : {}) };
     const withBase = disp !== undefined ? { ...n, availableBase: round2(disp + cardUsed(s, n)) } : n;
-    if (JSON.stringify(withBase) === JSON.stringify(c)) return fail("Diga o que mudar: limite disponível, limite total, fechamento ou vencimento.");
-    return done({ ...s, cards: upsertList(s.cards, withBase) }, c.name, { disponivel_anterior: brl(cardAvailable(s, c)), disponivel_agora: brl(cardAvailable({ ...s, cards: upsertList(s.cards, withBase) }, withBase)), fecha_dia: withBase.closingDay, vence_dia: withBase.dueDay }, `/financeiro?aba=contas&item=card:${c.id}`);
+    if (JSON.stringify(withBase) === JSON.stringify(c)) return fail("Diga o que mudar: limite disponível, limite total, fechamento, vencimento ou quando você paga a fatura (no fechamento ou no vencimento).");
+    return done({ ...s, cards: upsertList(s.cards, withBase) }, c.name, { disponivel_anterior: brl(cardAvailable(s, c)), disponivel_agora: brl(cardAvailable({ ...s, cards: upsertList(s.cards, withBase) }, withBase)), fecha_dia: withBase.closingDay, vence_dia: withBase.dueDay, paga: withBase.payAfterClose === undefined ? "no vencimento" : `${withBase.payAfterClose === 0 ? "no dia do fechamento" : `${withBase.payAfterClose} dia(s) depois do fechamento`}` }, `/financeiro?aba=contas&item=card:${c.id}`);
   }
   if (loc.tipo === "meta") {
     const g = s.goals.find((x) => x.id === loc.id)!, alvo = num(args["objetivo"]);

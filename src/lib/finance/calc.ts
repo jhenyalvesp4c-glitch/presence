@@ -329,6 +329,19 @@ export function subscriptionForInvoice(card: Card, ym: string, o: { id: string; 
 export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);
 /** "fecha 28/11 · vence 05/12": sempre as duas datas, para não confundir mês de fechamento com mês de vencimento. */
 export const invoiceLabel = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => `fecha ${dateBR(closingDateOf(card, dueYm)).slice(0, 5)} · vence ${dateBR(dueDateOf(card, dueYm)).slice(0, 5)}`;
+/**
+ * Data em que o dinheiro da fatura (que vence em `dueYm`) SAI de verdade. Quem paga no fechamento (`payAfterClose`) paga N dias depois de fechar,
+ * sempre dentro do mês do fechamento (nunca na virada do mês); os demais pagam no vencimento.
+ */
+export function payDateOf(card: Pick<Card, "closingDay" | "dueDay" | "payAfterClose">, dueYm: string): string {
+  if (card.payAfterClose === undefined) return dueDateOf(card, dueYm);
+  const closeYm = closingYmOf(card, dueYm);
+  return dayIn(closeYm, Math.min(card.closingDay + Math.max(0, card.payAfterClose), daysIn(closeYm)));
+}
+/** Mês de vencimento da fatura cujo pagamento cai no mês de calendário `ym`. */
+export const dueYmPaidIn = (card: Pick<Card, "closingDay" | "dueDay" | "payAfterClose">, ym: string): string => (card.payAfterClose === undefined ? ym : dueYmOfClosing(card, ym));
+/** "fecha 28/11 · vence 05/12" e, se a pessoa paga antes, "você paga 29/11". */
+export const invoiceLabelPay = (card: Pick<Card, "closingDay" | "dueDay" | "payAfterClose">, dueYm: string): string => `${invoiceLabel(card, dueYm)}${card.payAfterClose === undefined ? "" : ` · você paga ${dateBR(payDateOf(card, dueYm)).slice(0, 5)}`}`;
 /** A fatura aberta agora (a do ciclo em que hoje está). */
 export const openInvoice = (s: FinanceState, card: Card, today: Date): Invoice => invoiceFor(s, card, invoiceMonthOf(card, isoOf(today)));
 export const upcomingInvoices = (s: FinanceState, card: Card, today: Date, n = 4): Invoice[] => { const m = invoiceMonthOf(card, isoOf(today)); return Array.from({ length: n }, (_, i) => invoiceFor(s, card, addMonths(m, i))); };
@@ -413,11 +426,11 @@ export function monthPlan(s: FinanceState, today: Date, months = 12): MonthPlan[
     }
     let parcelas = 0, assinCartao = 0;
     for (const c of s.cards) {
-      const inv = invoiceFor(s, c, ym);
-      if (inv.total <= 0 || !future(inv.due)) continue;
+      const dueYm = dueYmPaidIn(c, ym), inv = invoiceFor(s, c, dueYm), pay = payDateOf(c, dueYm);
+      if (inv.total <= 0 || !future(pay)) continue;
       parcelas += sum(inv.lines.filter((l) => l.source === "parcela").map((l) => l.amount));
       for (const l of inv.lines) if (l.source === "recorrente") { const r = s.recurring.find((x) => x.id === l.id.slice(0, l.id.lastIndexOf(":"))); if (r && isSubscription(r)) assinCartao += l.amount; }
-      items.push({ id: `fat:${c.id}:${ym}`, group: "faturas", label: `Fatura ${c.name}`, amount: inv.total, date: inv.due, cardId: c.id, detail: invoiceLabel(c, ym), lines: inv.lines });
+      items.push({ id: `fat:${c.id}:${dueYm}`, group: "faturas", label: `Fatura ${c.name}`, amount: inv.total, date: pay, cardId: c.id, detail: invoiceLabelPay(c, dueYm), lines: inv.lines });
     }
     items.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
     const g = (id: PlanItem["group"]) => sum(items.filter((x) => x.group === id).map((x) => x.amount));
@@ -446,7 +459,7 @@ export function cashflow(s: FinanceState, today: Date, days = 60): Cashflow {
       if (d > todayIso && d <= end) raw.push({ id: `${r.id}:${ym}`, date: d, label: r.desc, amount: r.kind === "receita" ? r.amount : -r.amount, kind: r.kind });
     }
   }
-  for (const c of s.cards) for (const inv of upcomingInvoices(s, c, today, 4)) if (inv.total > 0 && inv.due > todayIso && inv.due <= end) raw.push({ id: `fat:${c.id}:${inv.ym}`, date: inv.due, label: `Fatura ${c.name}`, amount: -inv.total, kind: "fatura", cardId: c.id });
+  for (const c of s.cards) for (const inv of upcomingInvoices(s, c, today, 4)) { const pay = payDateOf(c, inv.ym); if (inv.total > 0 && pay > todayIso && pay <= end) raw.push({ id: `fat:${c.id}:${inv.ym}`, date: pay, label: `Fatura ${c.name}`, amount: -inv.total, kind: "fatura", cardId: c.id }); }
   raw.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount); // no mesmo dia, o que entra vem antes do que sai
   const start = totalBalance(s, today);
   let bal = start, min = start;
@@ -507,3 +520,26 @@ const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" 
 export const brl = (n: number) => BRL.format(n);
 export const brlShort = (n: number) => (Math.abs(n) >= 1000 ? `R$ ${(n / 1000).toFixed(Math.abs(n) >= 10000 ? 0 : 1).replace(".", ",")} mil` : `R$ ${Math.round(n)}`);
 export const dateBR = (iso: string) => iso.split("-").reverse().join("/");
+
+
+/* ───────────── "e se eu comprar?" ───────────── */
+export type SimRow = { ym: string; label: string; fatura: number; faturaDepois: number; sobra: number; sobraDepois: number; saldoFim: number; saldoFimDepois: number; pagaEm: string | null };
+export type Simulation = { card: Card; closeYm: string; dueYm: string; parcelas: number; porParcela: number; total: number; rows: SimRow[]; pagaEm: string; faturaAntes: number; faturaDepois: number; primeiroNegativo: { ym: string; saldo: number } | null };
+/**
+ * Simula uma compra no crédito sem gravar nada. `closeYm` é o mês em que a fatura FECHA (a "fatura de janeiro" fecha em janeiro);
+ * parcelada, cada parcela cai numa fatura seguinte. Compara os próximos meses antes e depois: fatura, sobra do mês e saldo no fim
+ * (as faturas saem do caixa na data em que a pessoa paga, no vencimento ou logo após o fechamento).
+ */
+export function simulatePurchase(s: FinanceState, today: Date, o: { cardId: string; amount: number; closeYm: string; parcelas?: number; desc?: string }, months = 8): Simulation | null {
+  const card = s.cards.find((c) => c.id === o.cardId);
+  if (!card || !(o.amount > 0)) return null;
+  const n = Math.max(1, Math.min(48, Math.round(o.parcelas ?? 1))), per = round2(o.amount / n), dueYm = dueYmOfClosing(card, o.closeYm);
+  const plan = planForInvoice(card, dueYm, { id: "sim", desc: o.desc ?? "Compra simulada", per, n, x: 1, category: "outros", todayIso: isoOf(today) });
+  const before = monthPlan(s, today, months), after = monthPlan({ ...s, plans: [...s.plans, { ...plan, total: round2(o.amount) }] }, today, months);
+  const rows = before.map((m, i): SimRow => {
+    const a = after[i]!;
+    return { ym: m.ym, label: m.label, fatura: m.faturas, faturaDepois: a.faturas, sobra: m.resultado, sobraDepois: a.resultado, saldoFim: m.saldoFinal, saldoFimDepois: a.saldoFinal, pagaEm: a.items.find((x) => x.cardId === card.id)?.date ?? null };
+  });
+  const neg = after.find((m) => m.saldoFinal < 0 && !(before.find((b) => b.ym === m.ym)!.saldoFinal < 0));
+  return { card, closeYm: o.closeYm, dueYm, parcelas: n, porParcela: per, total: round2(o.amount), rows, pagaEm: payDateOf(card, dueYm), faturaAntes: invoiceFor(s, card, dueYm).total, faturaDepois: invoiceFor({ ...s, plans: [...s.plans, { ...plan, total: round2(o.amount) }] }, card, dueYm).total, primeiroNegativo: neg ? { ym: neg.ym, saldo: neg.saldoFinal } : null };
+}

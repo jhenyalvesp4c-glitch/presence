@@ -1,5 +1,6 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
 import { addMonths, alertsFor, brl, cashBreakdown, cashflow, categoryTotals, dateBR, dueYmOfClosing, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthPlan, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
+import { dayIn, dueDateOf, monthsBetween, payDateOf, simulatePurchase } from "../finance/calc";
 import { cloudFinanceRepo, persistChange } from "../finance/cloud-repo";
 import { READ_ACTIONS_V2, WRITE_ACTIONS, applyWrite, readMore, shareProp } from "./finance-write";
 import { catOf } from "../finance/categories";
@@ -44,6 +45,25 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
     const b = cashBreakdown(s, today), c = monthClose(s, today);
     return { result: { ok: true, resultado: c.sobra, situacao: c.sobra >= 0 ? "sobra" : "falta", tem_na_conta: c.saldo, ainda_entra: c.aReceber, ainda_sai: b.expenses, onde_vai: b.groups.map((g) => ({ grupo: g.label, valor: g.total })), maiores: b.biggest.map((e) => ({ item: e.desc, valor: e.amount })), dica: "Explique em 2 ou 3 frases: o que tem, o que entra, o que mais pesa (normalmente as faturas) e quanto falta ou sobra." },
       panel: panel(c.sobra >= 0 ? "Por que sobra" : "Por que falta", [{ titulo: "A conta", itens: [item("Tem hoje", brl(c.saldo)), item("Ainda entra", brl(c.aReceber)), ...b.groups.map((g) => item(g.label, `− ${brl(g.total)}`)), item(c.sobra >= 0 ? "Sobra" : "Falta", brl(Math.abs(c.sobra)))] }]) };
+  }
+
+  if (acao === "simular") {
+    const valor = Number(args["valor"]), q = String(args["cartao"] ?? "").trim(), cards = q ? find(s.cards, q) : s.cards;
+    if (!(valor > 0)) return { result: { ok: false, erro: "Qual é o valor da compra?" } };
+    if (!cards.length) return { result: { ok: false, erro: q ? `Não achei o cartão "${q}".` : "Nenhum cartão cadastrado.", cartoes: s.cards.map((c) => c.name) } };
+    if (cards.length > 1) return { result: { ok: false, erro: "Em qual cartão seria a compra?", cartoes: cards.map((c) => c.name) } };
+    // "janeiro" dito agora, em novembro, é o próximo janeiro; mês pedido é o do FECHAMENTO da fatura
+    let closeYm = resolveMonth(args["mes"], today);
+    if (closeYm < ymOf(today) && !/\d{4}/.test(String(args["mes"] ?? ""))) closeYm = addMonths(closeYm, 12);
+    const n = Math.max(1, Math.round(Number(args["parcelas_total"]) || 1)), card = cards[0]!, dueYm = dueYmOfClosing(card, closeYm);
+    const span = Math.max(8, Math.min(30, monthsBetween(ymOf(today), ymOf(payDateOf(card, dueYm))) + n + 2));
+    const sim = simulatePurchase(s, today, { cardId: card.id, amount: valor, closeYm, parcelas: n, desc: String(args["descricao"] ?? "") || "Compra simulada" }, span);
+    if (!sim) return { result: { ok: false, erro: "Não consegui simular essa compra." } };
+    const payYm = ymOf(sim.pagaEm), rows = sim.rows.filter((r) => r.ym >= payYm).slice(0, Math.max(2, Math.min(6, n)));
+    const entradas = s.recurring.filter((r) => r.kind === "receita").map((r) => ({ descricao: r.desc, valor: r.amount, dia: r.day }));
+    const meses = rows.map((r) => ({ mes: monthName(r.ym), fatura_que_sai_nesse_mes: { antes: r.fatura, depois: r.faturaDepois }, sobra_do_mes: { antes: r.sobra, depois: r.sobraDepois }, saldo_no_fim_do_mes: { antes: r.saldoFim, depois: r.saldoFimDepois } }));
+    return { result: { ok: true, compra: { valor, parcelas: n, por_parcela: sim.porParcela, cartao: card.name }, fatura_que_fecha_em: monthName(closeYm), fecha_em: dateBR(dayIn(closeYm, card.closingDay)), vence_em: dateBR(dueDateOf(card, dueYm)), voce_paga_em: dateBR(sim.pagaEm), paga_no: card.payAfterClose === undefined ? "vencimento" : "fechamento", fatura_antes: sim.faturaAntes, fatura_depois: sim.faturaDepois, meses, entradas_fixas: entradas, fica_negativo: sim.primeiroNegativo ? { mes: monthName(sim.primeiroNegativo.ym), saldo: sim.primeiroNegativo.saldo } : null, dica: "Diga em 2 ou 3 frases: a fatura daquele mês (antes e depois), quanto sobra do dinheiro daquele mês e o saldo no fim; avise se o saldo fica negativo. Nada foi gravado: é só uma simulação. Se o cartão paga no vencimento e ela costuma pagar no fechamento, ofereça mudar (editar o cartão com pagamento=fechamento)." },
+      panel: panel(`E se eu comprar ${brl(valor)}${n > 1 ? ` em ${n}x` : ""}?`, [{ titulo: `${card.name} · você paga ${dateBR(sim.pagaEm)}`, itens: [item("Fatura sem a compra", brl(sim.faturaAntes)), item("Fatura com a compra", brl(sim.faturaDepois))] }, ...rows.map((r) => ({ titulo: monthName(r.ym), itens: [item("Faturas que saem", `${brl(r.fatura)} → ${brl(r.faturaDepois)}`), item(r.sobraDepois >= 0 ? "Sobra do mês" : "Falta no mês", `${brl(r.sobra)} → ${brl(r.sobraDepois)}`), item("Saldo no fim", `${brl(r.saldoFim)} → ${brl(r.saldoFimDepois)}`)] }))], "/financeiro?aba=meses") };
   }
 
   if (acao === "meses") {
