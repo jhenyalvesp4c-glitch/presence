@@ -1,8 +1,8 @@
 /** Uma ideia por inteiro: editar, desenvolver com o Orion (perguntas, riscos, passos, o que precisa) e transformar em projeto, tarefa, lembrete ou documentação. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { AlertTriangle, BellRing, BookOpen, CheckSquare, ExternalLink, FolderKanban, HelpCircle, Loader2, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, ImagePlus, Paperclip, BellRing, BookOpen, CheckSquare, ExternalLink, FolderKanban, HelpCircle, Loader2, Sparkles, Trash2, X } from "lucide-react";
 
 import { Burst, Thinking } from "@/components/ideas/fx";
 import { backdropProps } from "@/lib/backdrop";
@@ -20,7 +20,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
   const acts = useIdeaActions(), navigate = useNavigate();
   const [title, setTitle] = useState(idea.title), [body, setBody] = useState(idea.body), [tags, setTags] = useState(idea.tags.join(", ")), [links, setLinks] = useState(idea.links.join("\n"));
   const [plan, setPlan] = useState<IdeaPlan | null>(idea.plan), [answers, setAnswers] = useState<string[]>(idea.plan?.perguntas.map((p) => p.a) ?? []);
-  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [burst, setBurst] = useState(0), [date, setDate] = useState(today()), [time, setTime] = useState("");
+  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [burst, setBurst] = useState(0), [drag, setDrag] = useState(false), pick = useRef<HTMLInputElement>(null), [date, setDate] = useState(today()), [time, setTime] = useState("");
   const [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({});
   useEffect(() => { if (idea.attachments.length) void ideaFileUrls(idea.attachments).then(setUrls).catch(() => undefined); }, [idea.attachments]);
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
@@ -56,11 +56,26 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
   };
   const remove = () => { if (window.confirm(`Excluir "${idea.title}"? Não dá para desfazer.`)) acts.remove.mutate(idea, { onSuccess: onClose, onError: (e) => toast.error(e.message) }); };
   const isRef = idea.kind === "referencia";
+  const attach = async (list: File[]) => {
+    if (!list.length) return;
+    try {
+      const r = await acts.addFiles.mutateAsync({ idea, files: list });
+      if (r.added) toast.success(r.added === 1 ? "Referência anexada" : `${r.added} referências anexadas`);
+      if (r.rejected.length) toast.error(`Não anexei: ${r.rejected.join(", ")}`);
+    } catch (e) { toast.error(`Não consegui anexar: ${(e as Error).message}`); }
+  };
+  // colar um print (Ctrl/Cmd+V) em qualquer lugar da ideia, exceto dentro de campos de texto com texto colado
+  const onPaste = (e: React.ClipboardEvent) => {
+    const imgs = [...(e.clipboardData?.files ?? [])];
+    if (!imgs.length) return;
+    e.preventDefault();
+    void attach(imgs.map((f, n) => (f.name && f.name !== "image.png" ? f : new File([f], `print-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}${imgs.length > 1 ? `-${n + 1}` : ""}.${(f.type.split("/")[1] ?? "png").replace("jpeg", "jpg")}`, { type: f.type }))));
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background/80 p-3 backdrop-blur-md sm:p-6" {...backdropProps(onClose)} data-testid="ideia-detalhe">
       {burst > 0 && <Burst key={burst} />}
-      <div onClick={(e) => e.stopPropagation()} className="fin-frame glass capture-glow relative mx-auto w-full max-w-3xl rounded-3xl bg-background/70 p-5 animate-rise sm:p-7" style={{ "--glow": "var(--violet)" } as React.CSSProperties}>
+      <div onClick={(e) => e.stopPropagation()} onPaste={onPaste} onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDrag(true); } }} onDragLeave={() => setDrag(false)} onDrop={(e) => { e.preventDefault(); setDrag(false); void attach([...e.dataTransfer.files]); }} className="fin-frame glass capture-glow relative mx-auto w-full max-w-3xl rounded-3xl bg-background/70 p-5 animate-rise sm:p-7" style={{ "--glow": "var(--violet)" } as React.CSSProperties}>
         <div className="flex items-start gap-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} aria-label="Título" data-testid="ideia-titulo" className="min-w-0 flex-1 bg-transparent font-display text-2xl font-semibold outline-none" />
           <button onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
@@ -80,7 +95,22 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
           <label className="block text-xs text-muted-foreground">Etiquetas (separadas por vírgula)<input value={tags} onChange={(e) => setTags(e.target.value)} className={field} placeholder="viagem, casa" /></label>
           <label className="block text-xs text-muted-foreground">Links (um por linha)<textarea value={links} onChange={(e) => setLinks(e.target.value)} rows={2} className={`${field} resize-none font-mono text-xs`} /></label>
         </div>
-        {idea.attachments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{idea.attachments.map((a) => { const u = urls[a.path]; return a.mime.startsWith("image/") ? <a key={a.path} href={u?.view} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-white/10">{u ? <img src={u.view} alt={a.name} className="h-24 w-24 object-cover" /> : <span className="grid h-24 w-24 place-items-center text-xs text-muted-foreground">…</span>}</a> : <a key={a.path} href={u?.download} className="rounded-xl border border-white/10 px-3 py-2 text-xs">{a.name}</a>; })}</div>}
+        <section className={`mt-4 rounded-2xl border border-dashed p-3 transition ${drag ? "border-cyan/70 bg-cyan/10" : "border-white/15 bg-black/15"}`} data-testid="ideia-referencias">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="mr-auto flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"><Paperclip size={13} /> Referências e arquivos {idea.attachments.length > 0 && <span className="rounded-full border border-white/10 px-2 py-0.5 normal-case tracking-normal">{idea.attachments.length}</span>}</h3>
+            <button type="button" onClick={() => pick.current?.click()} disabled={acts.addFiles.isPending} className={btn} data-testid="ideia-anexar-arquivo">{acts.addFiles.isPending ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />} Adicionar</button>
+            <input ref={pick} type="file" multiple className="hidden" data-testid="ideia-arquivo-input" onChange={(e) => { void attach([...(e.target.files ?? [])]); e.target.value = ""; }} />
+          </div>
+          <p className="mt-1 text-[0.7rem] text-muted-foreground/80">{drag ? "Solte aqui para anexar" : "Cole um print (Ctrl+V), arraste arquivos para cá ou use Adicionar. Ficam guardados nesta ideia."}</p>
+          {idea.attachments.length > 0 && <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{idea.attachments.map((a) => { const u = urls[a.path], img = a.mime.startsWith("image/"); return (
+            <li key={a.path} className="group relative overflow-hidden rounded-xl border border-white/10 bg-black/25" data-testid="ideia-anexo">
+              <a href={img ? u?.view : u?.download} target="_blank" rel="noreferrer" className="block">
+                {img ? (u ? <img src={u.view} alt={a.name} className="h-24 w-full object-cover transition group-hover:scale-105" /> : <span className="grid h-24 w-full place-items-center text-xs text-muted-foreground">…</span>)
+                  : <span className="grid h-24 w-full place-items-center px-2 text-center text-[0.7rem] text-muted-foreground"><Paperclip size={18} className="mb-1" />{a.name}</span>}
+              </a>
+              <button type="button" onClick={() => { if (window.confirm(`Remover "${a.name}" desta ideia?`)) acts.removeFile.mutate({ idea, path: a.path }, { onError: (e) => toast.error(e.message) }); }} aria-label={`Remover ${a.name}`} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/70 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100 focus:opacity-100"><X size={12} /></button>
+            </li>); })}</ul>}
+        </section>
         {dirty && <div className="mt-3 flex justify-end"><button onClick={() => void save()} className={`${btn} !border-violet/50 text-violet`} data-testid="ideia-salvar">Salvar alterações</button></div>}
 
         {!isRef && <section className="card-premium mt-6 rounded-2xl !border-violet/30 p-4" data-testid="ideia-plano">

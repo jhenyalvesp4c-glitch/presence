@@ -43,6 +43,25 @@ export async function updateIdea(id: string, p: IdeaPatch): Promise<void> {
   row["touched_at"] = new Date().toISOString();
   must(await supabase.from("ideas").update(row).eq("id", id).select("id"));
 }
+export const MAX_IDEA_FILES = 24, MAX_IDEA_FILE_BYTES = 15 * 1024 * 1024;
+/** Anexa imagens/arquivos (referências) a uma ideia que já existe. Devolve quantos entraram e o que foi recusado. */
+export async function addIdeaFiles(i: Idea, files: File[]): Promise<{ added: number; rejected: string[] }> {
+  const rejected: string[] = [], ok: NewFile[] = [], room = Math.max(0, MAX_IDEA_FILES - i.attachments.length);
+  for (const f of files) {
+    if (f.size > MAX_IDEA_FILE_BYTES) rejected.push(`${f.name} (passa de 15 MB)`);
+    else if (ok.length >= room) rejected.push(`${f.name} (limite de ${MAX_IDEA_FILES} arquivos)`);
+    else ok.push({ name: f.name, mime: f.type || "application/octet-stream", blob: f });
+  }
+  if (!ok.length) return { added: 0, rejected };
+  const sent = await uploadFiles(`ideias/${i.id}`, ok);
+  try { must(await supabase.from("ideas").update({ attachments: [...i.attachments, ...sent], touched_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", i.id).select("id")); }
+  catch (e) { await supabase.storage.from(BUCKET).remove(sent.map((a) => a.path)); throw e; }
+  return { added: sent.length, rejected };
+}
+export async function removeIdeaFile(i: Idea, path: string): Promise<void> {
+  must(await supabase.from("ideas").update({ attachments: i.attachments.filter((a) => a.path !== path), touched_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", i.id).select("id"));
+  await supabase.storage.from(BUCKET).remove([path]).catch(() => undefined);
+}
 export async function deleteIdea(i: Idea): Promise<void> {
   must(await supabase.from("ideas").delete().eq("id", i.id).select("id"));
   if (i.attachments.length) await supabase.storage.from(BUCKET).remove(i.attachments.map((a) => a.path)).catch(() => undefined);
@@ -88,6 +107,8 @@ export function useIdeaActions() {
     create: useMutation({ mutationFn: createIdea, ...after }),
     update: useMutation({ mutationFn: (v: { id: string } & IdeaPatch) => { const { id, ...p } = v; return updateIdea(id, p); }, ...after }),
     remove: useMutation({ mutationFn: deleteIdea, ...after }),
+    addFiles: useMutation({ mutationFn: (v: { idea: Idea; files: File[] }) => addIdeaFiles(v.idea, v.files), ...after }),
+    removeFile: useMutation({ mutationFn: (v: { idea: Idea; path: string }) => removeIdeaFile(v.idea, v.path), ...after }),
     toTask: useMutation({ mutationFn: ideaToTask, onSuccess: () => { void refresh(); void qc.invalidateQueries({ queryKey: ["tasks"] }); } }),
     toReminder: useMutation({ mutationFn: (v: { idea: Idea; date: string; time: string | null }) => ideaToReminder(v.idea, v.date, v.time), onSuccess: () => { void refresh(); void qc.invalidateQueries({ queryKey: ["tasks"] }); } }),
     toDoc: useMutation({ mutationFn: ideaToDoc, ...after }),
