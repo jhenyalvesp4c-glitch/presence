@@ -7,6 +7,7 @@ import { useHealthPreview } from "@/components/health-preview-provider";
 import { HealthLoading } from "@/components/health-loading";
 import { Button } from "@/components/ui/button";
 import { BodyPanel } from "@/components/health-body";
+import { DietTodayPanel, useDietBundle } from "@/components/diet/DietHub";
 import { ProgramTodayPanel, todaySummary, useProgramBundle } from "@/components/program/ProgramHub";
 import { measurementLabels, workoutsForDate } from "@/lib/health-preview";
 import bodyAsset from "@/assets/hoje-corpo.jpg";
@@ -31,7 +32,7 @@ function Panel({ children, className = "" }: { children: ReactNode; className?: 
   </section>;
 }
 
-function PanelHead({ icon: Icon, title, to, label, search }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/analise" | "/medidas/nova" | "/saude/treino"; label: string; search?: { aba: "medidas" } }) {
+function PanelHead({ icon: Icon, title, to, label, search }: { icon: typeof Sun; title: string; to: "/treino/nova" | "/treino/exercicios" | "/dieta/nova" | "/analise" | "/medidas/nova" | "/saude/treino" | "/saude/dieta"; label: string; search?: { aba: "medidas" } }) {
   return <div className="mb-5 flex items-center justify-between gap-2">
     <h2 className="flex items-center gap-3 font-display-h text-lg"><span className="grid h-9 w-9 place-items-center rounded-xl border border-primary/30 bg-primary/10"><Icon className="h-4 w-4 text-primary" /></span>{title}</h2>
     <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full text-muted-foreground"><Link to={to} {...(search ? { search: search as never } : {})}>{label}<ArrowUpRight /></Link></Button>
@@ -40,7 +41,7 @@ function PanelHead({ icon: Icon, title, to, label, search }: { icon: typeof Sun;
 
 export function HealthToday() {
   const { workout, diet, measurements, measurementHistory, ready, doneKeys: done, toggleDone: toggle } = useHealthPreview();
-  const { bundle: prog } = useProgramBundle(), ps = prog ? todaySummary(prog) : null;
+  const { bundle: dietB } = useDietBundle(), { bundle: prog } = useProgramBundle(), ps = prog ? todaySummary(prog) : null;
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
 
@@ -124,6 +125,7 @@ export function HealthToday() {
 
         {/* Diet */}
         <Panel>
+          {dietB ? <><PanelHead icon={Utensils} title="Alimentação de hoje" to="/saude/dieta" label="Abrir dieta" /><DietTodayPanel b={dietB} /></> : <>
           <PanelHead icon={Utensils} title="Alimentação de hoje" to="/dieta/nova" label={diet ? "Editar" : "Criar ficha"} />
           <div className="mb-5 flex items-center gap-5 rounded-2xl border border-border bg-card/30 p-4">
             <Ring value={mealKeys.length ? mealDone / mealKeys.length : 0} size={104} stroke={8}><div><Flame className="mx-auto h-4 w-4 text-primary" /><p className="font-display-h text-xl">{diet?.macros.calories || "—"}</p><p className="text-[9px] text-muted-foreground">kcal</p></div></Ring>
@@ -137,6 +139,7 @@ export function HealthToday() {
             <article className={`flex gap-3 rounded-xl border p-3 transition-all ${on ? "border-primary/40 bg-primary/10" : next ? "border-primary/40 bg-card/40" : "border-border bg-card/20"}`}><div className="min-w-0 flex-1"><p className="font-mono text-[10px] text-primary">{meal.time}{next && " · próxima"}</p><h3 className={`break-words text-sm font-semibold ${on ? "line-through text-muted-foreground" : ""}`}>{meal.name}</h3><p className="mt-1 break-words text-xs text-muted-foreground">{meal.foods.join(" · ") || "Nenhum alimento adicionado"}</p></div><Button variant="outline" size="icon" className={`shrink-0 rounded-full ${on ? "border-primary bg-primary/20 shadow-glow" : "bg-card/40"}`} aria-label={`Concluir ${meal.name}`} aria-pressed={on} onClick={() => toggle(k)}><Check className={on ? "text-primary" : "text-muted-foreground/30"} /></Button></article>
           </li>; })}</ol> : <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Nenhuma refeição definida.</p>}
           {diet?.notes && <p className="mt-4 break-words text-xs text-muted-foreground">{diet.notes}</p>}
+          </>}
         </Panel>
 
         {/* Body */}

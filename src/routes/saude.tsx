@@ -9,6 +9,7 @@ import medidasAsset from "@/assets/medidas.jpg";
 import { HealthTabs } from "@/components/health-tabs";
 import { useState } from "react";
 import { useProgram } from "@/lib/data/program";
+import { useDiet } from "@/lib/data/diet-plan";
 import { useHealthPreview } from "@/components/health-preview-provider";
 import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -47,10 +48,10 @@ const cards = [
 ] as const;
 
 function Index() {
-  const [ficha, setFicha] = useState<Ficha | null>(null), navigate = useNavigate(), { workout, diet, measurements } = useHealthPreview(), { data: program } = useProgram();
+  const [ficha, setFicha] = useState<Ficha | null>(null), navigate = useNavigate(), { workout, diet, measurements } = useHealthPreview(), { data: program } = useProgram(), { data: dietPlan } = useDiet();
   // cada ficha: já montada → entra na tela única de Saúde; ainda não → montar
   const state: Record<Ficha, { has: boolean; cta: string; to: "/hoje" | "/saude/dieta" | "/analise" }> = {
-    treino: { has: !!program || !!workout, cta: "Ver meu plano", to: "/hoje" }, dieta: { has: !!diet, cta: "Ver minha dieta", to: "/saude/dieta" }, medidas: { has: !!measurements, cta: "Ver minhas medidas", to: "/analise" },
+    treino: { has: !!program || !!workout, cta: "Ver meu plano", to: "/hoje" }, dieta: { has: !!dietPlan || !!diet, cta: "Ver minha dieta", to: "/saude/dieta" }, medidas: { has: !!measurements, cta: "Ver minhas medidas", to: "/analise" },
   };
   return (
     <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
@@ -117,6 +118,7 @@ function Index() {
               </Button>
             ))}
           </div>
+        {!dietPlan && <p className="mt-6 text-center text-sm text-muted-foreground">Já tem a ficha de dieta pronta? <Link to="/dieta" className="font-medium text-primary underline-offset-2 hover:underline" data-testid="enviar-dieta-pronta">Enviar a minha ficha de dieta</Link></p>}
         {!program && <p className="mt-6 text-center text-sm text-muted-foreground">Já tem uma ficha de treino pronta (prints, PDF ou a de 12 semanas)? <Link to="/programa" className="font-medium text-primary underline-offset-2 hover:underline" data-testid="enviar-ficha-pronta">Enviar a minha ficha</Link></p>}
         </section>
       </main>

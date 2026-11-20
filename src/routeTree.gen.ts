@@ -17,6 +17,7 @@ import { Route as CerebroRouteImport } from './routes/cerebro'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as DemandasRouteImport } from './routes/demandas'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
+import { Route as DietaRouteImport } from './routes/dieta'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as HabitosRouteImport } from './routes/habitos'
 import { Route as HojeRouteImport } from './routes/hoje'
@@ -85,6 +86,11 @@ const DemandasRoute = DemandasRouteImport.update({
 const DiagnosticoRoute = DiagnosticoRouteImport.update({
   id: '/diagnostico',
   path: '/diagnostico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DietaRoute = DietaRouteImport.update({
+  id: '/dieta',
+  path: '/dieta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
@@ -183,9 +189,9 @@ const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const DietaNovaRoute = DietaNovaRouteImport.update({
-  id: '/dieta/nova',
-  path: '/dieta/nova',
-  getParentRoute: () => rootRouteImport,
+  id: '/nova',
+  path: '/nova',
+  getParentRoute: () => DietaRoute,
 } as any)
 const MedidasNovaRoute = MedidasNovaRouteImport.update({
   id: '/medidas/nova',
@@ -242,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/dieta': typeof DietaRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
@@ -281,6 +288,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/dieta': typeof DietaRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
@@ -321,6 +329,7 @@ export interface FileRoutesById {
   '/configuracoes': typeof ConfiguracoesRoute
   '/demandas': typeof DemandasRoute
   '/diagnostico': typeof DiagnosticoRoute
+  '/dieta': typeof DietaRouteWithChildren
   '/financeiro': typeof FinanceiroRoute
   '/habitos': typeof HabitosRoute
   '/hoje': typeof HojeRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
+    | '/dieta'
     | '/financeiro'
     | '/habitos'
     | '/hoje'
@@ -401,6 +411,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
+    | '/dieta'
     | '/financeiro'
     | '/habitos'
     | '/hoje'
@@ -440,6 +451,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/demandas'
     | '/diagnostico'
+    | '/dieta'
     | '/financeiro'
     | '/habitos'
     | '/hoje'
@@ -480,6 +492,7 @@ export interface RootRouteChildren {
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   DemandasRoute: typeof DemandasRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
+  DietaRoute: typeof DietaRouteWithChildren
   FinanceiroRoute: typeof FinanceiroRoute
   HabitosRoute: typeof HabitosRoute
   HojeRoute: typeof HojeRoute
@@ -499,7 +512,6 @@ export interface RootRouteChildren {
   ApiVersaoRoute: typeof ApiVersaoRoute
   ApiVozRoute: typeof ApiVozRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
-  DietaNovaRoute: typeof DietaNovaRoute
   MedidasNovaRoute: typeof MedidasNovaRoute
   OrganizarProntoRoute: typeof OrganizarProntoRoute
   PlanejamentoDiaRoute: typeof PlanejamentoDiaRoute
@@ -566,6 +578,13 @@ declare module '@tanstack/react-router' {
       path: '/diagnostico'
       fullPath: '/diagnostico'
       preLoaderRoute: typeof DiagnosticoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dieta': {
+      id: '/dieta'
+      path: '/dieta'
+      fullPath: '/dieta'
+      preLoaderRoute: typeof DietaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/financeiro': {
@@ -703,10 +722,10 @@ declare module '@tanstack/react-router' {
     }
     '/dieta/nova': {
       id: '/dieta/nova'
-      path: '/dieta/nova'
+      path: '/nova'
       fullPath: '/dieta/nova'
       preLoaderRoute: typeof DietaNovaRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof DietaRoute
     }
     '/medidas/nova': {
       id: '/medidas/nova'
@@ -774,6 +793,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DietaRouteChildren {
+  DietaNovaRoute: typeof DietaNovaRoute
+}
+
+const DietaRouteChildren: DietaRouteChildren = {
+  DietaNovaRoute: DietaNovaRoute,
+}
+
+const DietaRouteWithChildren = DietaRoute._addFileChildren(DietaRouteChildren)
+
 interface ApiMcpRouteChildren {
   ApiMcpTokenRoute: typeof ApiMcpTokenRoute
 }
@@ -794,6 +823,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfiguracoesRoute: ConfiguracoesRoute,
   DemandasRoute: DemandasRoute,
   DiagnosticoRoute: DiagnosticoRoute,
+  DietaRoute: DietaRouteWithChildren,
   FinanceiroRoute: FinanceiroRoute,
   HabitosRoute: HabitosRoute,
   HojeRoute: HojeRoute,
@@ -813,7 +843,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVersaoRoute: ApiVersaoRoute,
   ApiVozRoute: ApiVozRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
-  DietaNovaRoute: DietaNovaRoute,
   MedidasNovaRoute: MedidasNovaRoute,
   OrganizarProntoRoute: OrganizarProntoRoute,
   PlanejamentoDiaRoute: PlanejamentoDiaRoute,
