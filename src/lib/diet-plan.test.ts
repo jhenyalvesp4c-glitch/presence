@@ -25,3 +25,25 @@ describe("diet plan", () => {
   it("finds swaps", () => { const s = swapsFor(plan, "Arroz"); expect(s.tabela.join()).toMatch(/batata/); expect(s.grupo?.nome).toBe("Energéticos"); });
   it("week of plan", () => { expect(weekOfPlan("2026-11-16", "2026-11-16")).toBe(1); expect(weekOfPlan("2026-11-16", "2026-11-23")).toBe(2); expect(weekOfPlan("2026-11-16", "2026-11-10")).toBe(0); });
 });
+
+import { buildDietReport, dietReportText } from "./diet-report";
+import { findFoods, foodForPlanItem, foodMacros, FOODS } from "./diet-foods";
+describe("diet diary + report", () => {
+  const plan = DIET_RECOMP();
+  it("food search and macros by measure", () => {
+    const arroz = findFoods("arroz")[0]!; expect(arroz.nome).toBe("Arroz branco");
+    const m = foodMacros(arroz, 4, "col. sopa"); expect(Math.round(m.kcal)).toBe(130); // 100 g
+    expect(foodForPlanItem("Carne moída magra ou frango")?.nome).toBe("Carne moída magra"); expect(FOODS.length).toBeGreaterThan(50);
+  });
+  it("logged meal replaces the planned portion", () => {
+    const mk = (extras: DayLog["extras"]) => ({ swaps: {}, extras, date: "2026-11-20", optionId: "A", mealsDone: ["a-almoco"], extraProteinG: null, waterMl: null, energy: null, fullness: null, difficulty: null, training: null, discomfort: null, bowel: null, notes: "" } as DayLog);
+    const planned = daySummary(plan, mk([])).macros.kcal, logged = daySummary(plan, mk([{ id: "1", nome: "Ovo", kcal: 100, p: 8, c: 1, f: 7, meal: "a-almoco" }])).macros.kcal;
+    expect(planned).toBeGreaterThan(500); expect(logged).toBe(100);
+  });
+  it("report sums days and renders text", () => {
+    const l = { swaps: {}, extras: [{ id: "1", nome: "Ovo", qtd: "2 unidade", kcal: 145, p: 12, c: 1, f: 10, meal: "outros" }], date: "2026-11-20", optionId: "B", mealsDone: [], extraProteinG: null, waterMl: 1500, energy: 4, fullness: 2, difficulty: null, training: null, discomfort: null, bowel: true, notes: "ok" } as DayLog;
+    const r = buildDietReport(plan, "2026-11-14", "2026-11-20", "2026-11-20", [l], []);
+    expect(r.dias[0]?.kcal).toBe(145); expect(r.media?.p).toBe(12);
+    const t = dietReportText(r); expect(t).toMatch(/RELATÓRIO DE ALIMENTAÇÃO/); expect(t).toMatch(/Ovo \(2 unidade\)/);
+  });
+});

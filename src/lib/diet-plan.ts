@@ -30,7 +30,8 @@ export type DietPlan = {
 export type Macros = { kcal: number; p: number; c: number; f: number };
 /** Troca feita no dia: o item `${refeição}|${posição}` virou outro alimento do grupo. */
 export type Swap = { alimento: string; porcao: string; grupo: string };
-export type Extra = { id: string; nome: string; kcal: number; p: number; c: number; f: number };
+/** Alimento registrado no diário: `meal` é o id da refeição do plano (ou "outros"). */
+export type Extra = { id: string; nome: string; kcal: number; p: number; c: number; f: number; qtd?: string; meal?: string };
 export type DayLog = { swaps: Record<string, Swap>; extras: Extra[]; date: string; optionId: string | null; mealsDone: string[]; extraProteinG: number | null; waterMl: number | null; energy: number | null; fullness: number | null; difficulty: number | null; training: number | null; discomfort: number | null; bowel: boolean | null; notes: string };
 export type DietWeekly = { week: number; date: string; weight: number | null; waist: number | null; abdomen: number | null; hip: number | null; bowelCount: number | null; waterL: number | null; energy: number | null; training: number | null; difficulty: number | null; digestive: number | null; satiety: number | null; notes: string };
 
@@ -129,10 +130,12 @@ export const optionProtein = (o: DietOption) => Math.round(o.refeicoes.reduce((a
 /* ───────────── resumo do dia e comparação ───────────── */
 export const optionOf = (p: DietPlan, id: string | null | undefined): DietOption => p.opcoes.find((o) => o.id === id) ?? p.opcoes.find((o) => o.recomendada) ?? p.opcoes[0]!;
 export function daySummary(p: DietPlan, log: DayLog | null) {
-  const opt = optionOf(p, log?.optionId), done = log?.mealsDone ?? [], eaten = opt.refeicoes.filter((m) => done.includes(m.id)), swaps = log?.swaps ?? {}, extras = log?.extras ?? [];
-  const macros = sumMacros([...eaten.map((m) => mealMacros(m, swaps)), ...extras.map((e) => ({ kcal: e.kcal, p: e.p, c: e.c, f: e.f })), { kcal: (log?.extraProteinG ?? 0) * 4, p: log?.extraProteinG ?? 0, c: 0, f: 0 }]);
-  const protein = Math.round(macros.p);
-  return { opt, done: eaten.length, total: opt.refeicoes.length, protein, macros, plannedProtein: optionProtein(opt), pct: opt.refeicoes.length ? eaten.length / opt.refeicoes.length : 0 };
+  const opt = optionOf(p, log?.optionId), done = log?.mealsDone ?? [], swaps = log?.swaps ?? {}, extras = log?.extras ?? [];
+  // refeição com alimentos registrados vale pelo que foi registrado; sem registro, vale a porção do plano se estiver marcada
+  const logged = (id: string) => extras.some((e) => e.meal === id), counted = opt.refeicoes.filter((m) => done.includes(m.id) || logged(m.id));
+  const parts: Macros[] = [...counted.filter((m) => !logged(m.id)).map((m) => mealMacros(m, swaps)), ...extras.map((e) => ({ kcal: e.kcal, p: e.p, c: e.c, f: e.f })), { kcal: (log?.extraProteinG ?? 0) * 4, p: log?.extraProteinG ?? 0, c: 0, f: 0 }];
+  const macros = sumMacros(parts), protein = Math.round(macros.p);
+  return { opt, done: counted.length, total: opt.refeicoes.length, protein, macros, plannedProtein: optionProtein(opt), pct: opt.refeicoes.length ? counted.length / opt.refeicoes.length : 0 };
 }
 export type OptionStats = { id: string; nome: string; dias: number; fullness: number | null; difficulty: number | null; energy: number | null; training: number | null; discomfort: number | null; adherence: number; protein: number | null };
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x !== null); return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null; };

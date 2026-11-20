@@ -5,6 +5,7 @@ import { Check, Droplets, Flame, Minus, Plus, Repeat, Undo2, X } from "lucide-re
 
 import { Meter } from "@/components/finance/charts";
 import { Burst } from "@/components/ideas/fx";
+import { DietDiary } from "@/components/diet/DietDiary";
 import { emptyDay, type DietBundle } from "@/components/diet/DietHub";
 import { groupKcal, mealMacros, swapsFor, type DayLog, type DietMeal, type Extra, type Swap } from "@/lib/diet-plan";
 
@@ -40,26 +41,15 @@ function MealCard({ m, done, onToggle, plan, delay, swaps, onSwap }: { m: DietMe
 const MC = { p: "var(--emerald)", c: "var(--cyan)", f: "var(--amber)" };
 const r1 = (n: number) => Math.round(n * 10) / 10;
 /** Macros do dia: calorias, proteína/carbo/gordura e o cadastro de alimentos extras. */
-function MacrosPanel({ b, cur, write }: { b: DietBundle; cur: DayLog; write: (p: Partial<DayLog>) => void }) {
-  const { plan, sum } = b, m = sum.macros, [open, setOpen] = useState(false), [q, setQ] = useState(""), [f, setF] = useState({ nome: "", kcal: "", p: "", c: "", f: "" });
+function MacrosPanel({ b }: { b: DietBundle }) {
+  const { plan, sum } = b, m = sum.macros;
   const kcalFromMacros = m.p * 4 + m.c * 4 + m.f * 9, tot = kcalFromMacros || 1, pmin = plan.proteina.min ?? 0, pmax = plan.proteina.max ?? sum.plannedProtein;
-  const n = (v: string) => { const x = Number(v.replace(",", ".")); return Number.isFinite(x) && x >= 0 ? x : 0; };
-  const nq = q.trim().toLowerCase(), found = nq.length >= 2 ? plan.grupos.flatMap((g) => g.itens.filter((i) => i.alimento.toLowerCase().includes(nq)).map((i) => ({ ...i, kcal: groupKcal(g.referencia) }))).slice(0, 6) : [];
-  const addExtra = (e: Omit<Extra, "id">) => { if (!e.nome.trim()) { toast.error("Dê um nome ao alimento."); return; } write({ extras: [...cur.extras, { ...e, id: `${Date.now()}` }] }); setF({ nome: "", kcal: "", p: "", c: "", f: "" }); setQ(""); };
   return (
     <section className="glass relative overflow-hidden rounded-3xl p-5" data-testid="dieta-macros"><span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-amber opacity-10 blur-3xl" />
       <div className="relative flex items-baseline justify-between"><h3 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.16em]"><Flame size={15} className="text-amber" />Macros do dia</h3><span className="font-display text-2xl font-semibold tabular-nums text-amber" data-testid="macros-kcal">{Math.round(m.kcal)}<span className="text-sm text-muted-foreground"> kcal</span></span></div>
       <div className="relative mt-3 flex h-2.5 overflow-hidden rounded-full bg-white/8" aria-hidden>{([["p", m.p * 4], ["c", m.c * 4], ["f", m.f * 9]] as const).map(([k, v]) => <span key={k} style={{ width: `${(v / tot) * 100}%`, background: MC[k], transition: "width .8s" }} />)}</div>
       <div className="relative mt-3 grid grid-cols-3 gap-2 text-center">{([["Proteína", m.p, MC.p, pmin ? `meta ${pmin}–${pmax}` : ""], ["Carboidrato", m.c, MC.c, ""], ["Gordura", m.f, MC.f, ""]] as const).map(([l, v, c, meta]) => <div key={l} className="rounded-2xl border border-white/10 bg-black/25 p-2.5"><b className="block font-display text-xl tabular-nums" style={{ color: c }}>{Math.round(v)}<span className="text-xs text-muted-foreground"> g</span></b><span className="text-[0.62rem] uppercase tracking-wider text-muted-foreground">{l}</span>{meta && <span className="block text-[0.6rem] text-muted-foreground">{meta}</span>}</div>)}</div>
       <p className="relative mt-2 text-[0.65rem] text-muted-foreground">Estimativa pelas porções marcadas, trocas e alimentos extras. Sem meta calórica na ficha: use como acompanhamento.</p>
-      {cur.extras.length > 0 && <ul className="relative mt-3 space-y-1.5">{cur.extras.map((e) => <li key={e.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-xs"><span className="min-w-0 flex-1 truncate">{e.nome}</span><span className="font-mono text-muted-foreground">{Math.round(e.kcal)} kcal · P{r1(e.p)} C{r1(e.c)} G{r1(e.f)}</span><button type="button" aria-label={`Remover ${e.nome}`} onClick={() => write({ extras: cur.extras.filter((x) => x.id !== e.id) })} className="text-muted-foreground hover:text-foreground"><X size={13} /></button></li>)}</ul>}
-      <button type="button" onClick={() => setOpen((o) => !o)} className="relative mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber/40 bg-amber/10 px-3.5 py-1.5 text-xs font-medium text-amber transition hover:bg-amber/20 active:scale-95" data-testid="extra-abrir"><Plus size={13} /> {open ? "Fechar" : "Adicionar alimento fora do plano"}</button>
-      {open && <div className="relative mt-3 space-y-3 rounded-2xl border border-white/10 bg-black/20 p-3" data-testid="extra-form">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nas trocas da ficha (ex.: banana, pudim)…" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs outline-none focus:border-amber/60" data-testid="extra-busca" />
-        {found.length > 0 && <div className="flex flex-wrap gap-1.5">{found.map((i) => <button key={i.alimento} type="button" onClick={() => setF((x) => ({ ...x, nome: `${i.alimento} (${i.porcao})`, kcal: i.kcal ? String(i.kcal) : x.kcal }))} className="rounded-full border border-white/10 px-2.5 py-1 text-[0.7rem] hover:border-amber/50">{i.alimento} <span className="opacity-60">· {i.porcao}{i.kcal ? ` · ≈${i.kcal} kcal` : ""}</span></button>)}</div>}
-        <input value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} maxLength={80} placeholder="Nome (ex.: barra de proteína)" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-amber/60" data-testid="extra-nome" />
-        <div className="grid grid-cols-4 gap-2">{([["kcal", "kcal"], ["p", "Prot. g"], ["c", "Carbo g"], ["f", "Gord. g"]] as const).map(([k, l]) => <label key={k} className="rounded-xl border border-white/10 bg-black/25 p-2 text-[0.6rem] uppercase tracking-wider text-muted-foreground">{l}<input inputMode="decimal" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value.replace(/[^\d.,]/g, "") })} data-testid={`extra-${k}`} className="mt-0.5 block w-full bg-transparent text-center font-display text-lg font-semibold normal-case tabular-nums text-foreground outline-none" placeholder="0" /></label>)}</div>
-        <button type="button" onClick={() => addExtra({ nome: f.nome.trim(), kcal: n(f.kcal) || n(f.p) * 4 + n(f.c) * 4 + n(f.f) * 9, p: n(f.p), c: n(f.c), f: n(f.f) })} className="rounded-full border border-emerald/50 bg-emerald/15 px-4 py-1.5 text-xs font-medium text-emerald hover:bg-emerald/25 active:scale-95" data-testid="extra-salvar">Adicionar ao dia</button></div>}
     </section>
   );
 }
@@ -84,7 +74,7 @@ export function DietToday({ b }: { b: DietBundle }) {
           {burst > 0 && <span key={burst} className="pointer-events-none absolute right-6 top-2"><Burst /></span>}</div>
       </div>
       <div className="space-y-4">
-        <MacrosPanel b={b} cur={cur} write={write} />
+        <MacrosPanel b={b} /><DietDiary b={b} cur={cur} write={write} />
         <section className="glass rounded-3xl p-5" data-testid="dieta-proteina"><div className="flex items-baseline justify-between"><h3 className="font-display text-sm font-semibold uppercase tracking-[0.16em]">Proteína do dia</h3><span className="font-display text-2xl font-semibold tabular-nums text-emerald">{sum.protein}<span className="text-sm text-muted-foreground"> / {pmin ? `${pmin}–${pmax}` : pmax} g</span></span></div>
           <div className="mt-3"><Meter pct={(sum.protein / (ptarget || 1)) * 100} color="var(--emerald)" warn={false} /></div>
           <p className="mt-2 text-xs text-muted-foreground">Estimativa pelas porções marcadas{sum.protein < ptarget && sum.done > 0 ? ` · faltam ≈ ${Math.max(0, ptarget - sum.protein)} g (um whey cobre ~25 g)` : ""}.</p>

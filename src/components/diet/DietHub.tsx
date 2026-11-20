@@ -2,9 +2,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowUpRight, BookOpen, CalendarCheck, Droplets, FileUp, Repeat, Utensils, ClipboardList } from "lucide-react";
+import { ArrowUpRight, BookOpen, CalendarCheck, Droplets, FileUp, Repeat, Utensils, ClipboardList, FileText } from "lucide-react";
 
 import { DietGuide, DietSwaps } from "@/components/diet/DietGuide";
+import { DietReportTab } from "@/components/diet/DietReport";
 import { DietImport } from "@/components/diet/DietImport";
 import { DietPlanView } from "@/components/diet/DietPlanView";
 import { DietToday } from "@/components/diet/DietToday";
@@ -56,15 +57,15 @@ export function DietHeader({ b }: { b: DietBundle }) {
   );
 }
 
-type View = "hoje" | "plano" | "trocas" | "guia" | "semana";
+type View = "hoje" | "plano" | "trocas" | "guia" | "semana" | "relatorio";
 /** Aba Dieta da tela de Saúde. */
 export function DietView({ b }: { b: DietBundle }) {
   const [view, setView] = useState<View>("hoje");
   return (
     <div data-testid="dieta-hub"><DietHeader b={b} />
-      <SubTabs testId="dieta-abas" value={view} onChange={setView} tabs={[{ id: "hoje", label: "Hoje", Icon: Utensils }, { id: "plano", label: "Meu plano", Icon: ClipboardList }, { id: "trocas", label: "Trocas", Icon: Repeat }, { id: "guia", label: "Guia", Icon: BookOpen }, { id: "semana", label: "Semana e comparação", Icon: CalendarCheck }]} />
+      <SubTabs testId="dieta-abas" value={view} onChange={setView} tabs={[{ id: "hoje", label: "Hoje", Icon: Utensils }, { id: "plano", label: "Meu plano", Icon: ClipboardList }, { id: "trocas", label: "Trocas", Icon: Repeat }, { id: "guia", label: "Guia", Icon: BookOpen }, { id: "semana", label: "Semana e comparação", Icon: CalendarCheck }, { id: "relatorio", label: "Relatório", Icon: FileText }]} />
       <div key={view} style={{ animation: "fin-rise .5s both" }}>
-        {view === "hoje" && <DietToday b={b} />}{view === "plano" && <DietPlanView b={b} />}{view === "trocas" && <DietSwaps plan={b.plan} />}{view === "guia" && <DietGuide plan={b.plan} />}{view === "semana" && <DietWeek b={b} />}
+        {view === "hoje" && <DietToday b={b} />}{view === "plano" && <DietPlanView b={b} />}{view === "trocas" && <DietSwaps plan={b.plan} />}{view === "guia" && <DietGuide plan={b.plan} />}{view === "semana" && <DietWeek b={b} />}{view === "relatorio" && <DietReportTab b={b} />}
       </div>
     </div>
   );
