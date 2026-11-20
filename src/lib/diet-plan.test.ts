@@ -58,3 +58,23 @@ describe("custom foods", () => {
   it("portion without grams counts 1 unit as the typed values", () => { const fd = customFood({ nome: "Doce", kcal: 90, p: 1, c: 15, f: 3, base: "porcao", unidade: "unidade", gramas: 0 }); expect(Math.round(foodMacros(fd, 1, "unidade").kcal)).toBe(90); });
   it("per-100g keeps values", () => { const fd = customFood({ nome: "Pão", kcal: 250, p: 8, c: 50, f: 2, base: "100g", unidade: "", gramas: 0 }); expect(Math.round(foodMacros(fd, 40, "g").kcal)).toBe(100); });
 });
+
+import { cleanInterpretation, mealTarget, toEntries, totalOf } from "./diet-ai";
+describe("diet ai", () => {
+  const plan = DIET_RECOMP().opcoes[1]!.refeicoes;
+  it("cleans the AI answer and computes kcal when missing", () => {
+    const r = cleanInterpretation({ refeicoes: [{ refeicao: "Almoço", itens: [{ nome: "Arroz", qtd: "3 col. sopa", gramas: 75, kcal: 0, p: 1.9, c: 21, f: 0.2 }, { nome: "", qtd: "x" }] }, { refeicao: "Vazia", itens: [] }], aviso: "ok" })!;
+    expect(r.refeicoes).toHaveLength(1); expect(r.refeicoes[0]!.itens).toHaveLength(1); expect(Math.round(r.refeicoes[0]!.itens[0]!.kcal)).toBe(93);
+    expect(cleanInterpretation({ refeicoes: [] })).toBeNull(); expect(cleanInterpretation(null)).toBeNull();
+  });
+  it("maps meal names to plan meals, custom meals or new ones", () => {
+    expect(mealTarget("Almoço", plan, []).id).toBe("b-almoco"); expect(mealTarget("lanche", plan, []).id).toBe("b-lanche"); expect(mealTarget("Jantar pós-treino", plan, []).id).toBe("b-jantar");
+    expect(mealTarget("Café da manhã", plan, ["Café da manhã"])).toEqual({ id: "c:Café da manhã", nome: "Café da manhã", novo: false });
+    expect(mealTarget("Ceia", plan, [])).toEqual({ id: "c:Ceia", nome: "Ceia", novo: true });
+  });
+  it("builds diary entries and totals", () => {
+    const r = cleanInterpretation({ refeicoes: [{ refeicao: "Almoço", itens: [{ nome: "Arroz", qtd: "3 col.", kcal: 100, p: 2, c: 20, f: 0 }] }, { refeicao: "Ceia", itens: [{ nome: "Iogurte", qtd: "1", kcal: 60, p: 4, c: 6, f: 2 }] }] })!;
+    let n = 0; const { extras, novas } = toEntries(r, plan, [], () => `id${n++}`);
+    expect(extras.map((e) => e.meal)).toEqual(["b-almoco", "c:Ceia"]); expect(novas).toEqual(["Ceia"]); expect(totalOf(r).kcal).toBe(160);
+  });
+});

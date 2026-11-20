@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Check, ChevronLeft, ChevronRight, Droplets, Minus, MoreVertical, Plus, Repeat, Target, Undo2, X } from "lucide-react";
 
+import { DietAiBox } from "@/components/diet/DietAiBox";
 import { AddFoodSheet, type NewEntry } from "@/components/diet/AddFoodSheet";
 import { emptyDay, type DietBundle } from "@/components/diet/DietHub";
 import { Meter, Ring } from "@/components/finance/charts";
@@ -116,6 +117,7 @@ export function DietToday({ b }: { b: DietBundle }) {
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="relative space-y-4" data-testid="dieta-refeicoes">
+          <DietAiBox plan={opt.refeicoes} customNames={customNames} cur={cur} write={write} defaultMeal={opt.refeicoes.find((x) => !cur.mealsDone.includes(x.id) && !cur.extras.some((e) => e.meal === x.id))?.nome ?? "Outros"} />
           {cards.map((c, i) => <MealCard key={c.id} meal={c} cur={cur} b={b} delay={i * 70} onAdd={() => setAdding(c.id)} onWrite={write} />)}
           {burst > 0 && <span key={burst} className="pointer-events-none absolute right-6 top-2"><Burst /></span>}
           {naming === null ? <button type="button" onClick={() => setNaming("")} className="flex w-full items-center justify-center gap-2 rounded-3xl border border-dashed border-amber/40 py-4 text-sm font-medium text-amber transition hover:bg-amber/10 active:scale-[0.99]" data-testid="nova-refeicao"><Plus size={16} /> Nova refeição</button>
