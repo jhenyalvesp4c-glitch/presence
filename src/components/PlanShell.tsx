@@ -2,10 +2,14 @@ import { Link } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
 import {
   BarChart3, Book, Brain, Calendar, CalendarCheck, ClipboardList, Coffee, Dumbbell, Heart, Home, Laptop, Layers, ListChecks, Moon,
-  Settings, ShowerHead, Sprout, Star, Sun, Utensils, LayoutGrid, Activity as ActivityIcon,
+  Settings, ShowerHead, Sprout, Star, Sun, Utensils, Lightbulb, Wallet, Activity as ActivityIcon,
 } from "lucide-react";
 import type { IconKey } from "@/lib/plan-data";
 import { AccountMenu } from "@/components/auth/AccountMenu";
+import { NavBadge } from "@/components/NavBadge";
+import { useNavBadges } from "@/lib/data/nav-badges";
+import { useShownPath } from "@/lib/shown-path";
+import type { Badge } from "@/lib/nav-badges";
 
 export const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 export const colorVar = (c: string) => (c === "amber" ? "oklch(0.8 0.15 75)" : c === "rose" ? "oklch(0.7 0.18 10)" : `var(--${c})`);
@@ -16,12 +20,15 @@ export const icons: Record<IconKey, typeof Home> = {
 };
 
 
+/** Atalhos do topo: levam às páginas e mostram, quando houver, um indicador do que está pedindo atenção. */
 const nav = [
-  { Icon: LayoutGrid, t: "Resumo" }, { Icon: Calendar, t: "Calendário" }, { Icon: BarChart3, t: "Hábitos" },
-  { Icon: Heart, t: "Saúde" }, { Icon: ActivityIcon, t: "Análise" },
-];
+  { Icon: ListChecks, t: "Tarefas", to: "/tarefas" }, { Icon: Calendar, t: "Calendário", to: "/calendario" }, { Icon: Wallet, t: "Financeiro", to: "/financeiro" },
+  { Icon: BarChart3, t: "Hábitos", to: "/habitos" }, { Icon: Heart, t: "Saúde", to: "/saude" }, { Icon: Lightbulb, t: "Ideias", to: "/ideias" },
+  { Icon: ActivityIcon, t: "Análise", to: "/analise" },
+] as const;
 
 export function PlanShell({ children, backdrop }: { children: ReactNode; active?: number; backdrop?: ReactNode }) {
+  const path = useShownPath(), badges = useNavBadges() as Record<string, Badge | undefined>;
   return (
     <div className={`rail-bleed-p3 min-h-screen p-3 ${backdrop ? "relative isolate " : ""}[background:radial-gradient(60%_50%_at_50%_20%,color-mix(in_oklab,var(--violet)_7%,transparent),transparent_70%),var(--background)]`}>
       {backdrop}
@@ -35,11 +42,16 @@ export function PlanShell({ children, backdrop }: { children: ReactNode; active?
               <span className="tag hidden !px-4 !py-1.5 sm:inline" style={tint("violet")}>Assistente pessoal</span>
             </Link>
             <nav className="hidden items-center gap-1 rounded-full border border-border px-2 py-1 xl:flex">
-              {nav.map(({ Icon, t }) => (
-                <span key={t} className="flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground transition hover:bg-secondary/60 hover:text-foreground">
-                  <Icon size={15} /> {t}
-                </span>
-              ))}
+              {nav.map(({ Icon, t, to }) => {
+                const on = path === to || path.startsWith(`${to}/`);
+                return (
+                  <Link key={t} to={to} aria-current={on ? "page" : undefined} data-testid={`topo-${to.slice(1)}`}
+                    className={`relative flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm transition ${on ? "bg-secondary/70 text-foreground" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`}>
+                    <Icon size={15} /> {t}
+                    <NavBadge badge={badges[to]} className="-right-0.5 -top-1" />
+                  </Link>
+                );
+              })}
             </nav>
             <span className="flex items-center gap-3 text-sm">
               <span className="h-8 w-8 rounded-full bg-gradient-brand shadow-[0_0_18px_-2px_var(--cyan)]" />
