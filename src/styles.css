@@ -548,3 +548,11 @@ html, body { max-width: 100%; overflow-x: clip; }
 @keyframes idea-burst { 0% { transform: translate(0,0) scale(1) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(.4) rotate(var(--rot)); opacity: 0; } }
 @keyframes idea-flow { to { stroke-dashoffset: -24; } }
 @media (prefers-reduced-motion: reduce) { [data-idea-fx] { animation: none !important; } }
+
+/* Plano final: ao imprimir, só o papel aparece. */
+@media print {
+  body > *:not([data-plano-portal]) { display: none !important; }
+  [data-plano-portal] { position: static !important; overflow: visible !important; background: #fff !important; padding: 0 !important; backdrop-filter: none !important; }
+  [data-plano-portal] [data-print-hide] { display: none !important; }
+  [data-plano-portal] .plano-paper { box-shadow: none !important; border-radius: 0 !important; animation: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

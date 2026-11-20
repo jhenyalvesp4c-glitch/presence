@@ -2,8 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { AlertTriangle, ImagePlus, Paperclip, BellRing, BookOpen, CheckSquare, ExternalLink, FolderKanban, HelpCircle, Loader2, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, FileText, ImagePlus, Paperclip, BellRing, BookOpen, CheckSquare, ExternalLink, FolderKanban, HelpCircle, Loader2, Sparkles, Trash2, X } from "lucide-react";
 
+import { PlanView } from "@/components/ideas/PlanView";
 import { Burst, Thinking } from "@/components/ideas/fx";
 import { backdropProps } from "@/lib/backdrop";
 import { ideaFileUrls, useIdeaActions } from "@/lib/data/ideas";
@@ -20,7 +21,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
   const acts = useIdeaActions(), navigate = useNavigate();
   const [title, setTitle] = useState(idea.title), [body, setBody] = useState(idea.body), [tags, setTags] = useState(idea.tags.join(", ")), [links, setLinks] = useState(idea.links.join("\n"));
   const [plan, setPlan] = useState<IdeaPlan | null>(idea.plan), [answers, setAnswers] = useState<string[]>(idea.plan?.perguntas.map((p) => p.a) ?? []);
-  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [burst, setBurst] = useState(0), [drag, setDrag] = useState(false), pick = useRef<HTMLInputElement>(null), [date, setDate] = useState(today()), [time, setTime] = useState("");
+  const [busy, setBusy] = useState<"" | "plano" | "projeto" | "tarefa" | "lembrete" | "doc">(""), [rem, setRem] = useState(false), [burst, setBurst] = useState(0), [drag, setDrag] = useState(false), [showPlan, setShowPlan] = useState(false), pick = useRef<HTMLInputElement>(null), [date, setDate] = useState(today()), [time, setTime] = useState("");
   const [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({});
   useEffect(() => { if (idea.attachments.length) void ideaFileUrls(idea.attachments).then(setUrls).catch(() => undefined); }, [idea.attachments]);
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
@@ -75,6 +76,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background/80 p-3 backdrop-blur-md sm:p-6" {...backdropProps(onClose)} data-testid="ideia-detalhe">
       {burst > 0 && <Burst key={burst} />}
+      {showPlan && <PlanView idea={{ ...idea, ...draft }} onClose={() => setShowPlan(false)} />}
       <div onClick={(e) => e.stopPropagation()} onPaste={onPaste} onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDrag(true); } }} onDragLeave={() => setDrag(false)} onDrop={(e) => { e.preventDefault(); setDrag(false); void attach([...e.dataTransfer.files]); }} className="fin-frame glass capture-glow relative mx-auto w-full max-w-3xl rounded-3xl bg-background/70 p-5 animate-rise sm:p-7" style={{ "--glow": "var(--violet)" } as React.CSSProperties}>
         <div className="flex items-start gap-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} aria-label="Título" data-testid="ideia-titulo" className="min-w-0 flex-1 bg-transparent font-display text-2xl font-semibold outline-none" />
@@ -136,6 +138,7 @@ export function IdeaDetail({ idea, onClose }: { idea: Idea; onClose: () => void 
         <section className="mt-5">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isRef ? "Usar esta referência" : "Fazer acontecer"}</h3>
           <div className="flex flex-wrap gap-2">
+            {!isRef && <button onClick={() => { if (dirty) void save(); setShowPlan(true); }} className={`${btn} !border-violet/50 bg-violet/10 text-violet`} data-testid="ideia-plano-final"><FileText size={15} /> Ver plano final</button>}
             {!isRef && <button onClick={() => void run("projeto")} disabled={busy !== ""} className={`${btn} !border-cyan/40 text-cyan`} data-testid="ideia-virar-projeto">{busy === "projeto" ? <Loader2 size={15} className="animate-spin" /> : <FolderKanban size={15} />} Virar projeto</button>}
             <button onClick={() => void run("tarefa")} disabled={busy !== ""} className={btn} data-testid="ideia-virar-tarefa"><CheckSquare size={15} /> Virar tarefa</button>
             <button onClick={() => setRem((v) => !v)} disabled={busy !== ""} className={btn} data-testid="ideia-virar-lembrete"><BellRing size={15} /> Virar lembrete</button>
