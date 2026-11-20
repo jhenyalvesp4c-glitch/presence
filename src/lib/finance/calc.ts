@@ -256,7 +256,12 @@ export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice 
   const lines: InvoiceLine[] = [];
   for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx", ...shareOf(t.amount, t.shared) });
   for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...shareOf(parcelAmount(p, n), p.shared) });
-  for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa" && recurringActiveIn(r, dueYm)) lines.push({ id: `${r.id}:${dueYm}`, desc: r.desc, amount: r.amount, date: dayIn(dueYm, r.day), category: r.category, source: "recorrente", ...shareOf(r.amount, r.shared) });
+  // cobrança fixa no cartão: cada cobrança (mês do calendário `m`) cai na fatura que contém a data dela. Assim, pausar depois do dia da renovação
+  // mantém a cobrança já feita na fatura certa e só tira as próximas; pausar antes do dia tira também a que ainda não aconteceu.
+  for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa") for (let k = -3; k <= 1; k++) {
+    const m = addMonths(dueYm, k), date = dayIn(m, r.day);
+    if (recurringActiveIn(r, m) && invoiceMonthOf(card, date) === dueYm) lines.push({ id: `${r.id}:${m}`, desc: r.desc, amount: r.amount, date, category: r.category, source: "recorrente", ...shareOf(r.amount, r.shared) });
+  }
   const items = sum(lines.map((l) => l.amount)), declared = card.declared?.[dueYm];
   // com total informado, o que ainda não foi detalhado é "total − itens" (nunca negativo): detalhar não muda o total
   const adjustment = declared !== undefined ? round2(Math.max(0, declared - items)) : (card.adjustments[dueYm] ?? 0);
@@ -308,7 +313,10 @@ export function planForInvoice(card: Card, ym: string, o: { id: string; desc: st
  * que se repete todo mês até ser pausada (aba Assinaturas).
  */
 export function subscriptionForInvoice(card: Card, ym: string, o: { id: string; desc: string; amount: number; day: number }): Recurring {
-  return { id: o.id, kind: "despesa", desc: o.desc, amount: o.amount, day: Math.max(1, Math.min(31, Math.round(o.day) || 1)), category: "assinaturas", method: "credito", cardId: card.id, startYm: ym, subscription: true };
+  const day = Math.max(1, Math.min(31, Math.round(o.day) || 1));
+  // 1ª cobrança = o mês do calendário cuja data cai nesta fatura
+  const startYm = [-2, -1, 0, 1].map((k) => addMonths(ym, k)).find((m) => invoiceMonthOf(card, dayIn(m, day)) === ym) ?? ym;
+  return { id: o.id, kind: "despesa", desc: o.desc, amount: o.amount, day, category: "assinaturas", method: "credito", cardId: card.id, startYm, subscription: true };
 }
 
 export const closingDateOf = (card: Pick<Card, "closingDay" | "dueDay">, dueYm: string): string => dayIn(card.dueDay > card.closingDay ? dueYm : addMonths(dueYm, -1), card.closingDay);
