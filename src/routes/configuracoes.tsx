@@ -1,6 +1,7 @@
+import { refreshApp } from "@/lib/refresh-app";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, Mic, Pause, Play, Settings, ShieldCheck, Sparkles, Trash2, Unplug, Volume2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, Mic, Pause, Play, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Unplug, Volume2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
 import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
@@ -228,6 +229,12 @@ function Configuracoes() {
         <span className="grid h-11 w-11 place-items-center rounded-2xl bg-cyan/10 text-cyan"><Settings size={20} /></span>
         <div><h1 className="font-display text-2xl font-semibold">Configurações</h1><p className="text-xs text-muted-foreground">Conta, jeito do Orion e integrações.</p></div>
       </header>
+
+      <section className={card}>
+        <h2 className="font-display text-lg font-semibold">Atualizar o aplicativo</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Se algo novo não apareceu, toque aqui: o Orion esquece a cópia antiga e carrega a versão mais recente (é o mesmo que Ctrl+Shift+R). Ele também avisa sozinho quando sai uma versão nova.</p>
+        <div className="mt-4"><button className={btn} onClick={() => void refreshApp()} data-testid="cfg-atualizar"><RefreshCw size={14} /> Atualizar agora</button></div>
+      </section>
 
       <section className={card}>
         <h2 className="font-display text-lg font-semibold">Conta e personalização</h2>

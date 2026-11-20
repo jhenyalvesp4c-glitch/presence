@@ -33,6 +33,7 @@ import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as TreinoRouteImport } from './routes/treino'
 import { Route as ApiMcpRouteImport } from './routes/api.mcp'
 import { Route as ApiTtsRouteImport } from './routes/api.tts'
+import { Route as ApiVersaoRouteImport } from './routes/api.versao'
 import { Route as ApiVozRouteImport } from './routes/api.voz'
 import { Route as ApiWhatsappRouteImport } from './routes/api.whatsapp'
 import { Route as DietaNovaRouteImport } from './routes/dieta.nova'
@@ -166,6 +167,11 @@ const ApiTtsRoute = ApiTtsRouteImport.update({
   path: '/api/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVersaoRoute = ApiVersaoRouteImport.update({
+  id: '/api/versao',
+  path: '/api/versao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiVozRoute = ApiVozRouteImport.update({
   id: '/api/voz',
   path: '/api/voz',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
+  '/api/versao': typeof ApiVersaoRoute
   '/api/voz': typeof ApiVozRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/dieta/nova': typeof DietaNovaRoute
@@ -290,6 +297,7 @@ export interface FileRoutesByTo {
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
+  '/api/versao': typeof ApiVersaoRoute
   '/api/voz': typeof ApiVozRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/dieta/nova': typeof DietaNovaRoute
@@ -329,6 +337,7 @@ export interface FileRoutesById {
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
+  '/api/versao': typeof ApiVersaoRoute
   '/api/voz': typeof ApiVozRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/dieta/nova': typeof DietaNovaRoute
@@ -369,6 +378,7 @@ export interface FileRouteTypes {
     | '/treino'
     | '/api/mcp'
     | '/api/tts'
+    | '/api/versao'
     | '/api/voz'
     | '/api/whatsapp'
     | '/dieta/nova'
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/treino'
     | '/api/mcp'
     | '/api/tts'
+    | '/api/versao'
     | '/api/voz'
     | '/api/whatsapp'
     | '/dieta/nova'
@@ -445,6 +456,7 @@ export interface FileRouteTypes {
     | '/treino'
     | '/api/mcp'
     | '/api/tts'
+    | '/api/versao'
     | '/api/voz'
     | '/api/whatsapp'
     | '/dieta/nova'
@@ -484,6 +496,7 @@ export interface RootRouteChildren {
   TreinoRoute: typeof TreinoRoute
   ApiMcpRoute: typeof ApiMcpRouteWithChildren
   ApiTtsRoute: typeof ApiTtsRoute
+  ApiVersaoRoute: typeof ApiVersaoRoute
   ApiVozRoute: typeof ApiVozRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
   DietaNovaRoute: typeof DietaNovaRoute
@@ -667,6 +680,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/versao': {
+      id: '/api/versao'
+      path: '/api/versao'
+      fullPath: '/api/versao'
+      preLoaderRoute: typeof ApiVersaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/voz': {
       id: '/api/voz'
       path: '/api/voz'
@@ -790,6 +810,7 @@ const rootRouteChildren: RootRouteChildren = {
   TreinoRoute: TreinoRoute,
   ApiMcpRoute: ApiMcpRouteWithChildren,
   ApiTtsRoute: ApiTtsRoute,
+  ApiVersaoRoute: ApiVersaoRoute,
   ApiVozRoute: ApiVozRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
   DietaNovaRoute: DietaNovaRoute,
