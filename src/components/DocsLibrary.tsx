@@ -12,7 +12,7 @@ import {
   Sparkles, Star, Trash2, User, Users, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil, ClipboardCopy,
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
-import { ClientsPreview } from "@/components/ClientsPreview";
+import { ClientsView } from "@/components/ClientsView";
 import { matchDossier, parseLogins, prettySlug } from "@/lib/login-import";
 import { readLoginEmails } from "@/lib/login-emails.functions";
 import { readFiles } from "@/components/inbox/files";
@@ -143,14 +143,14 @@ export function DocsLibrary({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-4">
       <div className="glass inline-flex rounded-2xl p-1 animate-rise">
-        {([["lib", "Biblioteca", BookOpen, "cyan"], ["tre", "Treinamentos", GraduationCap, "pink"], ["cli", "Clientes (exemplo)", Users, "violet"]] as const).map(([k, l, I, c]) => (
+        {([["lib", "Biblioteca", BookOpen, "cyan"], ["tre", "Treinamentos", GraduationCap, "pink"], ["cli", "Clientes", Users, "violet"]] as const).map(([k, l, I, c]) => (
           <button key={k} onClick={() => setSection(k)} style={tint(c)}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition ${section === k ? "bg-[color-mix(in_oklab,var(--glow)_15%,transparent)] text-[var(--glow)] shadow-[0_0_20px_-8px_var(--glow)]" : "text-muted-foreground hover:text-foreground"}`}>
             <I size={15} /> {l}
           </button>
         ))}
       </div>
-      {section === "lib" ? <Library projectId={projectId} /> : section === "tre" ? <TrainingScripts projectId={projectId} /> : <ClientsPreview />}
+      {section === "lib" ? <Library projectId={projectId} /> : section === "tre" ? <TrainingScripts projectId={projectId} /> : <ClientsView projectId={projectId} />}
     </div>
   );
 }

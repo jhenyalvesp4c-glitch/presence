@@ -24,7 +24,7 @@ const rows = <T>(r: Rows<T>, what: string): T[] => {
 /** Reúne o que há no sistema como documentos pesquisáveis. */
 export async function loadCorpus() {
   const { supabase } = await import("./data/db");
-  const [entries, projects, demands, hist, notes, execs, tasks, pnotes, msgs, trains, scripts, dfiles] = await Promise.all([
+  const [entries, projects, demands, hist, notes, execs, tasks, pnotes, msgs, trains, scripts, dfiles, cls, cdocs, clog] = await Promise.all([
     supabase.from("brain_entries").select("id, title, text, entry_date, project_id, dossier_names, source, ai_summary, attachments").order("entry_date", { ascending: false }).limit(1500),
     supabase.from("projects").select("id, name"),
     supabase.from("project_demands").select("project_id, code, type, title, description, priority, status, deadline, dossier_name, updated_at").limit(2000),
@@ -37,6 +37,9 @@ export async function loadCorpus() {
     supabase.from("training_sessions").select("id, group_name, people, script_title, notes, created_at").limit(500),
     supabase.from("training_library").select("project_id, scripts, examples, updated_at").limit(50),
     supabase.from("demand_files").select("project_id, code, name, mime_type, size_bytes, storage_path").limit(2000),
+    supabase.from("clients").select("id, project_id, dossier_id, name, segment, contact_name, email, phone, doc_number, status, plan, monthly_value, contract_end, notes, updated_at").limit(1000),
+    supabase.from("client_docs").select("id, client_id, title, kind, doc_date, attachments, ai_summary").limit(3000),
+    supabase.from("client_log").select("id, client_id, log_date, text").limit(5000),
   ]);
 
   const projName = new Map(rows(projects as Rows<{ id: string; name: string }>, "projetos").map((p) => [p.id, p.name]));
@@ -52,6 +55,23 @@ export async function loadCorpus() {
       link: e.source === "documentacao" ? "/demandas" : "/cerebro",
       files: (e.attachments ?? []).map((a) => ({ bucket: "presence-app-brain-files", path: a.path, name: a.name, mime: a.mime, size: a.size })),
     });
+  }
+
+  // clientes: ficha + documentos (com o texto lido dos arquivos) + histórico, num documento por cliente
+  {
+    const { clientCorpusText } = await import("./clients");
+    type CL = { id: string; project_id: string; name: string; segment: string; contact_name: string; email: string; phone: string; doc_number: string; status: import("./clients").ClientStatus; plan: string; monthly_value: number | string; contract_end: string | null; notes: string; updated_at: string; dossier_id: string | null };
+    const cd = rows(cdocs as Rows<{ id: string; client_id: string; title: string; kind: string; doc_date: string | null; attachments: { path: string; name: string; mime: string; size: number }[] | null; ai_summary: string }>, "documentos dos clientes");
+    const cg = rows(clog as Rows<{ id: string; client_id: string; log_date: string; text: string }>, "histórico dos clientes");
+    for (const c of rows(cls as Rows<CL>, "clientes")) {
+      const myDocs = cd.filter((d) => d.client_id === c.id);
+      docs.push({
+        id: `cliente:${c.id}`, kind: "documentacao", title: `Cliente: ${c.name}`, date: c.updated_at.slice(0, 10), where: projName.get(c.project_id), link: "/demandas",
+        text: clientCorpusText({ id: c.id, projectId: c.project_id, dossierId: c.dossier_id, name: c.name, segment: c.segment, contactName: c.contact_name, email: c.email, phone: c.phone, docNumber: c.doc_number, status: c.status, plan: c.plan, monthlyValue: Number(c.monthly_value), contractEnd: c.contract_end, notes: c.notes },
+          myDocs.map((d) => ({ id: d.id, clientId: c.id, title: d.title, kind: d.kind, docDate: d.doc_date, attachments: [], summary: d.ai_summary })), cg.filter((l) => l.client_id === c.id).map((l) => ({ id: l.id, clientId: c.id, date: l.log_date, text: l.text }))),
+        files: myDocs.flatMap((d) => (d.attachments ?? []).map((a) => ({ bucket: "presence-app-brain-files", path: a.path, name: a.name, mime: a.mime, size: a.size }))),
+      });
+    }
   }
 
   const byCode = <T extends { project_id: string; code: string }>(l: T[]) => {
