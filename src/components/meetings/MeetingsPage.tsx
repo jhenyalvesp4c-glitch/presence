@@ -8,11 +8,10 @@ import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { Burst, Thinking, VoiceWave } from "@/components/ideas/fx";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
 import { WhatsAppPicker } from "@/components/meetings/WhatsAppPicker";
-import { transcribeAudio } from "@/lib/audio.functions";
 import { useMeetingActions, useMeetings, type Meeting } from "@/lib/data/meetings";
 import { actionsToInboxText, analysisToMarkdown, type Analysis, type Mode, type Source } from "@/lib/meetings";
 import { analyzeMeeting } from "@/lib/meetings.functions";
-import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
+import { useLiveRecorder } from "@/lib/use-live-recorder";
 
 const ls = { get: (k: string, d = "") => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sem armazenamento */ } } };
 const isoOf = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -24,34 +23,35 @@ export function MeetingsPage() {
   const history = useMeetings(), acts = useMeetingActions();
   const [mode, setMode] = useState<Mode>("reuniao"), [src, setSrc] = useState<"texto" | "voz" | "whatsapp">("texto"), [text, setText] = useState(""), [title, setTitle] = useState(""), [me, setMe] = useState(() => ls.get("orion:reunioes:eu"));
   const [busy, setBusy] = useState(false), [a, setA] = useState<Analysis | null>(null), [cur, setCur] = useState<{ id: string | null; title: string; date: string; raw: string; source: Source; mode: Mode } | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set()), [sent, setSent] = useState<Set<number>>(new Set()), [inbox, setInbox] = useState<{ id: number; text: string } | null>(null), [burst, setBurst] = useState(0), [transcribing, setTranscribing] = useState(false);
-  const rec = useRecorder(), resultRef = useRef<HTMLDivElement>(null), inboxRef = useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set()), [sent, setSent] = useState<Set<number>>(new Set()), [inbox, setInbox] = useState<{ id: number; text: string } | null>(null), [burst, setBurst] = useState(0), [chunkMs] = useState(() => { const n = typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("trecho")) : 0; return n >= 3000 && n <= 60000 ? n : 25000; });
+  const rec = useLiveRecorder(chunkMs), resultRef = useRef<HTMLDivElement>(null), inboxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { ls.set("orion:reunioes:eu", me); }, [me]);
   const append = (t: string) => setText((x) => (x.trim() ? `${x.trim()}\n\n${t}` : t));
-  // gravação: cada trecho (até 3 min) vira texto e se junta ao que já está na caixa
+  // gravação contínua: transcreve enquanto grava; ao finalizar, junta tudo ao texto e já organiza
+  const startRec = async () => { try { await rec.start(); setSrc("voz"); } catch (e) { toast.error((e as Error).message); } };
   const finishRecording = async () => {
-    const r = await rec.stop(); if (!r) return;
-    setTranscribing(true);
-    try { const t = await transcribeAudio({ data: { data: r.data, mime: r.mime } }); if (t.ok) { append(t.text); toast.success("Trecho transcrito"); } else toast.error(t.error); }
-    catch (e) { toast.error(`Não consegui transcrever: ${(e as Error).message}`); }
-    setTranscribing(false);
+    const { text: said, failed } = await rec.finish();
+    if (!said.trim()) { toast.error(failed ? "Não consegui transcrever o áudio (veja a conexão e a chave da OpenAI)." : "Não ouvi nada na gravação."); return; }
+    const full = text.trim() ? `${text.trim()}\n\n${said}` : said;
+    setText(full);
+    if (failed) toast.error(`${failed} trecho(s) não foram transcritos e ficaram de fora. Revise o texto antes de gerar a ata.`);
+    else void analyze(full, "voz");
   };
-  useEffect(() => { if (rec.state === "recording" && rec.seconds >= MAX_SECONDS) void finishRecording(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [rec.seconds, rec.state]);
-  const startRec = async () => { try { await rec.start(); } catch (e) { toast.error((e as Error).message); } };
 
-  const analyze = async () => {
-    if (text.trim().length < 20) { toast.error("Cole ou grave um pouco mais de conteúdo para eu analisar."); return; }
+  const analyze = async (override?: string, origem?: Source) => {
+    const body = override ?? text;
+    if (body.trim().length < 20) { toast.error("Cole ou grave um pouco mais de conteúdo para eu analisar."); return; }
     setBusy(true); setA(null); setInbox(null);
     const today = isoOf(), weekday = new Date().toLocaleDateString("pt-BR", { weekday: "long" });
     try {
-      const r = await analyzeMeeting({ data: { texto: text, modo: mode, hoje: today, diaSemana: weekday, euSou: me.trim(), titulo: title.trim() } });
+      const r = await analyzeMeeting({ data: { texto: body, modo: mode, hoje: today, diaSemana: weekday, euSou: me.trim(), titulo: title.trim() } });
       if (!r.ok) { toast.error(r.error); setBusy(false); return; }
-      const analysis = r.analise, source: Source = src;
+      const analysis = r.analise, source: Source = origem ?? src;
       setA(analysis); setSelected(new Set(analysis.acoes.map((_, i) => i))); setSent(new Set()); setBurst((n) => n + 1);
       let id: string | null = null;
       try { id = await acts.save.mutateAsync({ title: analysis.titulo, source, mode, raw: text, analysis, happenedOn: today }); } catch (e) { toast.error(`A análise ficou pronta, mas não consegui salvar no histórico: ${(e as Error).message}`); }
-      setCur({ id, title: analysis.titulo, date: today, raw: text, source, mode });
+      setCur({ id, title: analysis.titulo, date: today, raw: body, source, mode });
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     } catch (e) { toast.error(`Não consegui analisar: ${(e as Error).message}`); }
     setBusy(false);
@@ -86,13 +86,24 @@ export function MeetingsPage() {
           <div className="flex gap-1 rounded-2xl border border-white/10 p-1" role="tablist" aria-label="Origem">{([["texto", "Colar texto", FileText], ["voz", "Gravar", Mic], ["whatsapp", "Do WhatsApp", MessageCircle]] as const).map(([k, l, I]) => <button key={k} role="tab" aria-selected={src === k} onClick={() => setSrc(k)} data-testid={`origem-${k}`} className={tab(src === k)}><I size={15} />{l}</button>)}</div>
         </div>
 
-        {src === "voz" && <div className="mt-4 flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-black/20 p-4" data-testid="gravador">
-          {rec.state === "recording" ? <>
-            <button type="button" onClick={() => void finishRecording()} className="grid h-14 w-14 place-items-center rounded-full border border-destructive/60 bg-destructive/20 text-destructive shadow-[0_0_30px_-6px_var(--destructive)] transition active:scale-90" aria-label="Parar e transcrever" data-testid="parar-gravacao"><Square size={20} fill="currentColor" /></button>
-            <div className="min-w-0 flex-1"><VoiceWave bars={30} /><p className="mt-1 font-mono text-sm tabular-nums text-destructive">{Math.floor(rec.seconds / 60)}:{String(rec.seconds % 60).padStart(2, "0")} <span className="text-muted-foreground">/ {MAX_SECONDS / 60}:00</span></p></div>
-            <button type="button" onClick={rec.cancel} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><X size={13} /> cancelar</button></>
-            : <><button type="button" onClick={() => void startRec()} disabled={!rec.supported || transcribing} className="grid h-14 w-14 place-items-center rounded-full border border-violet/60 bg-violet/15 text-violet shadow-[0_0_30px_-8px_var(--violet)] transition hover:bg-violet/25 active:scale-90 disabled:opacity-40" aria-label="Gravar" data-testid="gravar">{transcribing ? <Loader2 size={20} className="animate-spin" /> : <Mic size={20} />}</button>
-              <p className="min-w-0 flex-1 text-sm text-muted-foreground">{rec.supported ? (transcribing ? "Transcrevendo o trecho…" : "Toque para gravar. Cada trecho vai até 3 minutos e é transcrito e juntado ao texto abaixo — grave quantos trechos precisar.") : "Este navegador não permite gravar. Use outro navegador ou cole o texto."}</p></>}
+        {src === "voz" && <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4" data-testid="gravador">
+          {!rec.recording && !rec.finishing && <div className="flex flex-wrap items-center gap-4">
+            <button type="button" onClick={() => void startRec()} disabled={!rec.supported} className="grid h-16 w-16 place-items-center rounded-full border border-violet/60 bg-violet/15 text-violet shadow-[0_0_34px_-8px_var(--violet)] transition hover:bg-violet/25 active:scale-90 disabled:opacity-40" aria-label="Gravar reunião" data-testid="gravar"><Mic size={24} /></button>
+            <p className="min-w-0 flex-1 text-sm text-muted-foreground">{rec.supported ? "Toque e fale (ou deixe a reunião rolando). O texto aparece enquanto você grava, sem limite de tempo. Ao finalizar, o Orion organiza tudo." : "Este navegador não permite gravar. Use outro navegador ou cole o texto."}</p></div>}
+          {(rec.recording || rec.finishing) && <div data-testid="gravando">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="relative grid h-14 w-14 shrink-0 place-items-center"><span aria-hidden className="absolute inset-0 rounded-full border border-destructive/40" style={{ animation: "pulse-ring 1.8s ease-out infinite" }} /><span className="grid h-11 w-11 place-items-center rounded-full bg-destructive/20 text-destructive"><Mic size={20} /></span></span>
+              <div className="min-w-0 flex-1"><VoiceWave bars={34} /><p className="mt-1 font-mono text-sm tabular-nums text-destructive" data-testid="gravacao-tempo">{String(Math.floor(rec.seconds / 3600)).padStart(2, "0")}:{String(Math.floor(rec.seconds / 60) % 60).padStart(2, "0")}:{String(rec.seconds % 60).padStart(2, "0")} <span className="font-body text-xs text-muted-foreground">· {rec.finishing ? "finalizando a transcrição…" : rec.pending ? "transcrevendo o último trecho…" : "gravando"}</span></p></div>
+              {!rec.finishing && <div className="flex items-center gap-3"><button type="button" onClick={rec.cancel} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><X size={13} /> descartar</button>
+                <button type="button" onClick={() => void finishRecording()} className="inline-flex items-center gap-2 rounded-full border border-emerald/50 bg-emerald/15 px-5 py-2.5 text-sm font-medium text-emerald shadow-[0_0_28px_-10px_var(--emerald)] transition hover:bg-emerald/25 active:scale-95" data-testid="finalizar-gravacao"><Square size={13} fill="currentColor" /> Finalizar e organizar</button></div>}
+            </div>
+            <div className="scroll-thin mt-3 max-h-56 min-h-16 overflow-y-auto rounded-xl border border-white/10 bg-black/30 p-3 text-sm leading-relaxed" data-testid="transcricao-ao-vivo" aria-live="polite">
+              {rec.chunks.length === 0 && !rec.live && <p className="text-xs text-muted-foreground">Ouvindo… o texto aparece aqui a cada poucos segundos.</p>}
+              {rec.chunks.map((c) => <span key={c.idx} className={c.status === "erro" ? "text-amber" : c.status === "pendente" ? "text-muted-foreground" : ""} style={{ animation: "fin-rise .5s both" }}>{c.status === "pendente" ? "… " : c.status === "erro" ? "[trecho não transcrito] " : c.text ? `${c.text} ` : ""}</span>)}
+              {rec.live && <span className="text-muted-foreground/70">{rec.live}<span className="ml-0.5 inline-block h-3.5 w-px animate-pulse bg-cyan align-middle" /></span>}
+            </div>
+            {rec.failedCount > 0 && !rec.finishing && <button type="button" onClick={() => void rec.retry()} className="mt-2 text-xs text-amber underline-offset-2 hover:underline">{rec.failedCount} trecho(s) não transcrito(s): tentar de novo</button>}
+          </div>}
         </div>}
         {src === "whatsapp" && <div className="mt-4"><WhatsAppPicker onText={(t) => { append(t); setSrc("texto"); }} /></div>}
 
@@ -101,7 +112,7 @@ export function MeetingsPage() {
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} maxLength={60000} disabled={busy} placeholder={mode === "grupo" ? "Traga os grupos pelo WhatsApp (acima) ou cole aqui as conversas. Para vários grupos, comece cada um com: === Grupo: nome ===" : "Cole aqui a conversa do WhatsApp, a transcrição ou as suas anotações da reunião…"} className="mt-3 w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-relaxed outline-none transition focus:border-violet/60 disabled:opacity-60" data-testid="reuniao-texto" />
         <div className="mt-1 flex items-center justify-between text-[0.68rem] text-muted-foreground"><span>{text.length.toLocaleString("pt-BR")} / 60.000 caracteres</span>{text && !busy && <button type="button" onClick={() => setText("")} className="hover:text-foreground">limpar</button>}</div>
         {busy ? <Thinking lines={mode === "grupo" ? THINK_GROUP : THINK_MEETING} />
-          : <button type="button" onClick={() => void analyze()} disabled={!text.trim()} className="mt-3 inline-flex items-center gap-2 rounded-full border border-violet/50 bg-violet/15 px-6 py-3 text-sm font-medium text-violet shadow-[0_0_30px_-10px_var(--violet)] transition hover:bg-violet/25 active:scale-95 disabled:opacity-40" data-testid="analisar"><Sparkles size={16} /> {mode === "grupo" ? "Resumir com o Orion" : "Gerar ata com o Orion"}</button>}
+          : <button type="button" onClick={() => void analyze()} disabled={!text.trim() || rec.recording} className="mt-3 inline-flex items-center gap-2 rounded-full border border-violet/50 bg-violet/15 px-6 py-3 text-sm font-medium text-violet shadow-[0_0_30px_-10px_var(--violet)] transition hover:bg-violet/25 active:scale-95 disabled:opacity-40" data-testid="analisar"><Sparkles size={16} /> {mode === "grupo" ? "Resumir com o Orion" : "Gerar ata com o Orion"}</button>}
       </section>
 
       <div ref={resultRef} className="mt-6 scroll-mt-6">
