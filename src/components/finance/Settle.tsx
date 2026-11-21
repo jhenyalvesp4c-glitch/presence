@@ -81,7 +81,7 @@ export function SettleView() {
             <div>
               <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Conta de {monthLabel(ym)}{acc ? " (acumulado)" : ""} com {sel.person}</p>
               <p className="mt-1 font-display text-3xl font-semibold" data-testid="acerto-final">
-                {bal.direction === "quite" ? "Ninguém deve nada" : bal.direction === "outro_paga" ? <>{sel.person} paga <span className="text-emerald">{brl(bal.amount)}</span> a você</> : <>Você paga <span className="text-violet">{brl(bal.amount)}</span> a {sel.person}</>}
+                {bal.direction === "quite" ? "Ninguém deve nada" : !acc && bal.direction === "eu_pago" && bal.owedByMe === 0 ? <>{sel.person} adiantou <span className="text-emerald">{brl(bal.amount)}</span><span className="block text-sm font-normal text-muted-foreground">Fica de crédito para os próximos meses. Você não deve nada neste mês.</span></> : bal.direction === "outro_paga" ? <>{sel.person} paga <span className="text-emerald">{brl(bal.amount)}</span> a você</> : <>Você paga <span className="text-violet">{brl(bal.amount)}</span> a {sel.person}</>}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
