@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, ChevronLeft, ChevronRight, CreditCard, Landmark, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
-import { accountBalance, addMonths, brl, cardAvailable, closingDateOf, closingYmOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
+import { sum, accountBalance, addMonths, brl, cardAvailable, closingDateOf, closingYmOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
@@ -25,19 +25,33 @@ export type Sel = { type: "card" | "acc"; id: string } | null;
 export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void }) {
   const f = useFinance(), { state, today } = f;
   const [edit, setEdit] = useState<{ type: "card" | "acc"; item?: Card | Account } | null>(null);
+  const [onlyMine, setOnlyMineState] = useState(() => { try { return localStorage.getItem("fin.fatura.minha") === "1"; } catch { return false; } });
+  const setOnlyMine = (v: boolean) => { setOnlyMineState(v); try { localStorage.setItem("fin.fatura.minha", v ? "1" : "0"); } catch { /* sem armazenamento */ } };
+  const invs = state.cards.map((c) => openInvoice(state, c, today)), allTotal = sum(invs.map((i) => i.total)), allMine = sum(invs.map((i) => i.mine));
   if (sel) return <Detail sel={sel} onBack={() => onSel(null)} />;
   return (
     <div className="space-y-8" data-testid="fin-contas">
-      <WealthHero />
+      <WealthHero onlyMine={onlyMine} />
       <section className="space-y-4">
         <SectionTitle kicker="Crédito" title="Seus" accent="cartões" sub="Toque num cartão para ver fatura, limite e compras." />
+        {state.cards.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3" data-testid="fin-faturas-soma">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              <span className={onlyMine ? "text-muted-foreground" : ""}>Todos os cartões <b className="tabular-nums">{brl(allTotal)}</b></span>
+              <span className={onlyMine ? "" : "text-muted-foreground"}>Só a minha parte <b className="tabular-nums text-emerald">{brl(allMine)}</b></span>
+            </div>
+            <div role="radiogroup" className="flex gap-1 rounded-2xl border border-white/10 bg-black/25 p-1">
+              {([[false, "Valor do banco"], [true, "Só a minha parte"]] as const).map(([v, t]) => <button key={t} type="button" role="radio" aria-checked={onlyMine === v} onClick={() => setOnlyMine(v)} data-testid={v ? "fin-cartoes-so-minha" : "fin-cartoes-banco"} className={`rounded-xl px-3 py-1.5 text-xs transition ${onlyMine === v ? "bg-white/12 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>)}
+            </div>
+          </div>
+        )}
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {state.cards.map((c, i) => {
             const used = c.limit ? (1 - cardAvailable(state, c) / c.limit) * 100 : 0, inv = openInvoice(state, c, today);
             return (
               <div key={c.id} style={{ animation: `fin-pop .55s ${i * 0.08}s both` }}>
                 <Tilt max={12}><CardVisual card={c} usedPct={used} onClick={() => onSel({ type: "card", id: c.id })} /></Tilt>
-                <div className="mt-3 flex items-center justify-between px-1 text-xs"><span className="text-muted-foreground">Fatura atual · vence {dateBR(inv.due).slice(0, 5)}</span><b className="text-sm tabular-nums">{brl(inv.total)}</b></div>
+                <div className="mt-3 flex items-center justify-between px-1 text-xs"><span className="text-muted-foreground">Fatura atual · vence {dateBR(inv.due).slice(0, 5)}</span><b className="text-sm tabular-nums" title={`Valor do banco ${brl(inv.total)}`}>{brl(onlyMine ? inv.mine : inv.total)}</b></div>
                 <div className="mt-1.5 px-1"><Meter pct={used} color={TONES[c.tone].glow} height={6} /><div className="mt-1 flex justify-between text-[0.7rem] text-muted-foreground"><span>Disponível {brl(cardAvailable(state, c))}</span><span>Limite {brl(c.limit)}</span></div></div>
               </div>
             );
@@ -61,11 +75,11 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
 }
 
 /** Topo da aba: quanto há nas contas, distribuição por conta e limite livre nos cartões. */
-function WealthHero() {
+function WealthHero({ onlyMine }: { onlyMine: boolean }) {
   const { state, today } = useFinance(), [active, setActive] = useState<string | null>(null);
   const balances = state.accounts.map((a) => ({ id: a.id, name: a.name, color: TONES[a.tone].glow, value: accountBalance(state, a, today) }));
   const totalBal = balances.reduce((a, b) => a + b.value, 0), pos = balances.filter((b) => b.value > 0);
-  const limit = state.cards.reduce((a, c) => a + c.limit, 0), free = state.cards.reduce((a, c) => a + Math.max(0, cardAvailable(state, c)), 0), inv = state.cards.reduce((a, c) => a + openInvoice(state, c, today).total, 0);
+  const limit = state.cards.reduce((a, c) => a + c.limit, 0), free = state.cards.reduce((a, c) => a + Math.max(0, cardAvailable(state, c)), 0), inv = state.cards.reduce((a, c) => { const i = openInvoice(state, c, today); return a + (onlyMine ? i.mine : i.total); }, 0);
   const on = balances.find((b) => b.id === active);
   return (
     <HeroPanel glow="var(--violet)" data-testid="fin-patrimonio">
@@ -75,7 +89,7 @@ function WealthHero() {
           <p className="mt-2 whitespace-nowrap font-display text-5xl font-semibold leading-none tracking-tight md:text-6xl"><span className="text-gradient"><Money value={totalBal} /></span></p>
           <p className="mt-2 text-sm text-muted-foreground">{state.accounts.length} contas e carteiras · {state.cards.length} cartões</p>
           <div className="mt-5 grid grid-cols-3 gap-2.5">
-            {[{ l: "Limite total", v: limit, c: "var(--cyan)" }, { l: "Livre nos cartões", v: free, c: "var(--emerald)" }, { l: "Faturas abertas", v: inv, c: "var(--violet)" }].map((k, i) => (
+            {[{ l: "Limite total", v: limit, c: "var(--cyan)" }, { l: "Livre nos cartões", v: free, c: "var(--emerald)" }, { l: onlyMine ? "Faturas · minha parte" : "Faturas abertas", v: inv, c: "var(--violet)" }].map((k, i) => (
               <div key={k.l} className="rounded-2xl border bg-white/[0.03] px-3 py-2.5" style={{ borderColor: `color-mix(in oklab, ${k.c} 28%, transparent)`, animation: `fin-rise .6s ${0.15 + i * 0.07}s both` }}>
                 <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: k.c }}>{k.l}</p>
                 <p className="mt-0.5 font-display text-base font-semibold tabular-nums sm:text-lg"><Money value={k.v} cents={false} /></p>
