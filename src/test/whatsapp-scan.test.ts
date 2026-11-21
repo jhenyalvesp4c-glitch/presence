@@ -49,3 +49,22 @@ describe("whatsapp: varredura de pedidos e mídia", () => {
     expect(mediaInfo({ documentMessage: { mimetype: "application/zip" } })).toBeNull(); expect(mediaInfo({ conversation: "oi" })).toBeNull();
   });
 });
+
+describe("whatsapp: conversas sem nome, busca e renomear", () => {
+  const s2 = new Store(":memory:");
+  const lid = "169007013449846@lid", fone = "5531988887777@s.whatsapp.net";
+  s2.addMessage({ id: "1", chat: lid, chat_name: "", is_group: false, sender: lid, sender_name: "", from_me: false, ts: base, text: "Oi Jheny, o disparo de ontem deu erro", kind: "texto", mentions_me: false, reply_to_me: false });
+  s2.addMessage({ id: "2", chat: fone, chat_name: "Bruno", is_group: false, sender: fone, sender_name: "Bruno", from_me: false, ts: base + 5, text: "Consegue criar o usuário?", kind: "texto", mentions_me: false, reply_to_me: false });
+  it("mostra a última mensagem e marca o que não tem nome", () => {
+    const c = s2.chats("", 10); const sem = c.find((x) => x.jid === lid)!;
+    expect(sem.sem_nome).toBe(true); expect(sem.preview).toMatch(/disparo de ontem/); expect(c.find((x) => x.jid === fone)!.sem_nome).toBeUndefined();
+  });
+  it("busca por nome ou por pedaço do número, em todas as conversas", () => {
+    expect(s2.chats("bruno").map((x) => x.jid)).toEqual([fone]); expect(s2.chats("31988887777").map((x) => x.jid)).toEqual([fone]); expect(s2.chats("9007013").map((x) => x.jid)).toEqual([lid]);
+  });
+  it("dar nome a uma conversa vale na lista e nas mensagens", () => {
+    expect(s2.renameChat(lid, "Romulo")).toBe(true); expect(s2.renameChat("nao-existe", "X")).toBe(false); expect(s2.renameChat(lid, "  ")).toBe(false);
+    const c = s2.chats("romulo"); expect(c).toHaveLength(1); expect(c[0]!.sem_nome).toBeUndefined();
+    expect(s2.messages(lid, { since: 0 })[0]!.chat_name).toBe("Romulo");
+  });
+});

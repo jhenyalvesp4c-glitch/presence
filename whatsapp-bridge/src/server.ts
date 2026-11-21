@@ -74,6 +74,7 @@ export function createApi(store: Store, state: BridgeState, token: string, contr
 
       if (route === "POST /pause") { const on = q.get("on") === "1"; controls.pause(on); return json(res, 200, { ok: true, paused: on }); }
       if (route === "POST /encerrar") { json(res, 200, { ok: true }); setTimeout(() => controls.shutdown(), 150); return; }
+      if (route === "POST /nome") { const ok = store.renameChat(q.get("jid") ?? "", q.get("nome") ?? ""); return json(res, 200, { ok }); }
       if (route === "POST /logout") { await controls.logout(); return json(res, 200, { ok: true }); }
       if (route === "POST /marcar-lidas") {
         const chat = q.get("chat");

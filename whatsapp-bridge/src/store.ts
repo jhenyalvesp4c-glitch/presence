@@ -14,7 +14,7 @@ export const nameWords = (q: string): string[] => { const all = norm(q).split(" 
 const userOf = (j: string): string => String(j ?? "").split("@")[0]!.split(":")[0]!;
 
 export type ChatRow = { jid: string; name: string; is_group: number; last_ts: number; checked_ts: number };
-export type ChatInfo = { jid: string; name: string; is_group: boolean; last_ts: number; novas: number };
+export type ChatInfo = { jid: string; name: string; is_group: boolean; last_ts: number; novas: number; /** Última mensagem (para reconhecer conversas sem nome) */ preview?: string; /** O nome é só o número (contato sem nome salvo) */ sem_nome?: boolean };
 
 // Carrega o SQLite embutido do Node sem import estático (o Vite dos testes não conhece esse módulo).
 const { DatabaseSync } = (process as unknown as { getBuiltinModule(n: string): typeof import("node:sqlite") }).getBuiltinModule("node:sqlite");
@@ -106,12 +106,21 @@ export class Store {
   chats(q = "", limit = 40): ChatInfo[] {
     const rows = this.db.prepare(`
       select c.jid, c.name, c.is_group, c.last_ts,
-        (select count(*) from messages m where m.chat = c.jid and m.ts > c.checked_ts and m.from_me = 0) as novas
-      from chats c order by c.last_ts desc limit 500`).all() as (ChatRow & { novas: number })[];
-    const words = nameWords(q);
+        (select count(*) from messages m where m.chat = c.jid and m.ts > c.checked_ts and m.from_me = 0) as novas,
+        (select case when m2.text != '' then m2.text else '[' || m2.kind || ']' end from messages m2 where m2.chat = c.jid order by m2.ts desc limit 1) as preview
+      from chats c order by c.last_ts desc limit 800`).all() as (ChatRow & { novas: number; preview: string | null })[];
+    const words = nameWords(q), digits = q.replace(/\D/g, "");
     return rows
-      .filter((r) => !words.length || words.every((w) => norm(`${r.name} ${r.jid}`).includes(w)))
-      .slice(0, limit).map((r) => ({ jid: r.jid, name: r.name || this.nameOf(r.jid) || r.jid.split("@")[0]!, is_group: !!r.is_group, last_ts: r.last_ts, novas: Number(r.novas) }));
+      .filter((r) => !words.length || words.every((w) => norm(`${r.name} ${this.nameOf(r.jid)} ${r.jid}`).includes(w)) || (digits.length >= 4 && r.jid.includes(digits)))
+      .slice(0, limit).map((r) => { const name = r.name || this.nameOf(r.jid); return { jid: r.jid, name: name || r.jid.split("@")[0]!, is_group: !!r.is_group, last_ts: r.last_ts, novas: Number(r.novas), ...(r.preview ? { preview: r.preview.replace(/\s+/g, " ").slice(0, 90) } : {}), ...(!name && !r.is_group ? { sem_nome: true } : {}) }; });
+  }
+
+  /** Dá (ou troca) o nome de uma conversa; vale para a lista e para as mensagens dessa pessoa. */
+  renameChat(jid: string, name: string): boolean {
+    const n = name.trim().slice(0, 80); if (!n) return false;
+    const r = this.db.prepare("update chats set name = ? where jid = ?").run(n, jid);
+    if (Number(r.changes) > 0 && !jid.endsWith("@g.us")) this.setContactName(jid, n);
+    return Number(r.changes) > 0;
   }
 
   /** Acha uma conversa pelo nome (aproximado) ou pelo número. */

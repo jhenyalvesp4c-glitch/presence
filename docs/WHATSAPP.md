@@ -21,6 +21,9 @@ O aplicativo "Orion" do Windows abre o **site publicado**. Mesmo assim o WhatsAp
 - `GET /varredura?since=&limit=` devolve as mensagens (grupos e privadas, de todos) depois de `since`, até 3.000, com `has_media`/`media_mime`. `GET /midia?chat=&id=` devolve a imagem/PDF guardado em base64 (só arquivos dentro de `~/.presence/whatsapp/media`).
 - A ponte baixa imagens e PDFs (até 6 MB) de cada mensagem nova (`downloadMediaMessage`, nunca derruba a ponte se falhar) e apaga os arquivos junto com as mensagens antigas.
 
+## Conversas sem nome
+O WhatsApp só entrega à ponte o nome de quem escreveu (nome do perfil) e o que sincroniza dos contatos; quem nunca escreveu, ou escreve sem nome, aparece pelo **número** (ou por um id interno `@lid`). `GET /chats` devolve `preview` (última mensagem) e `sem_nome`, e a busca (`?q=`) acha por nome **ou pedaço do número** em todas as conversas (não só nas primeiras). `POST /nome?jid=&nome=` dá o nome a uma conversa (vale na lista e nas mensagens). Em Reuniões → Do WhatsApp, o lápis ao lado do contato faz isso.
+
 ## Voz (src/lib/voice/agent.ts, src/lib/whatsapp/tools.ts)
 `whatsapp_conversas`, `whatsapp_ler` (por nome aproximado, período, busca, só novas), `whatsapp_mencoes`. "Novas" = ainda não lidas pelo Orion (ponteiro guardado só na ponte; não muda nada no WhatsApp).
 
