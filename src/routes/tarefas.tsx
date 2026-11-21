@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  AlarmClock, BarChart3, CalendarDays, Check, CheckCircle2, Clock, Flag, Layers, ListTodo, ListChecks, Loader2, Plus, Search,
+  AlarmClock, BarChart3, Repeat, CalendarDays, Check, CheckCircle2, Clock, Flag, Layers, ListTodo, ListChecks, Loader2, Plus, Search,
   SlidersHorizontal, Sparkles, Target, Trash2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,9 @@ import type { Color, Priority } from "@/lib/types";
 import { useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
 import { ListsView } from "@/components/lists/ListsView";
+import { FixedTasksPanel } from "@/components/FixedTasksPanel";
+import { useFixedActions, useFixedDone, useFixedTasks } from "@/lib/data/fixed-tasks";
+import { expandFixed, parseFixedKey } from "@/lib/fixed-tasks";
 
 const T0 = new Date(); T0.setHours(0, 0, 0, 0);
 
@@ -37,7 +40,7 @@ export const Route = createFileRoute("/tarefas")({
 
 type C = Color;
 type Row = {
-  id: string; t: string; d: string; tag: string; c: C; Icon: ReturnType<typeof getIcon>; time: string; done: boolean; cat: string; date: string; priority: Priority;
+  id: string; t: string; d: string; tag: string; c: C; Icon: ReturnType<typeof getIcon>; time: string; done: boolean; cat: string; date: string; priority: Priority; fixed?: boolean;
 };
 
 const tabs = ["Hoje", "Esta semana", "Este mês", "Todas"];
@@ -56,6 +59,7 @@ function TarefasPage() {
   const del = useDeleteTask();
   const createCat = useCreateCategory();
   const updateTask = useUpdateTask();
+  const fixedQ = useFixedTasks(), fixedAct = useFixedActions();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [tab, setTab] = useState(0);
@@ -99,6 +103,18 @@ function TarefasPage() {
     [categories, tasks],
   );
   const catId = newCat || cats[0]?.id || "";
+  // Tarefas fixas da semana escolhida (as de "Hoje" e "Esta semana"); cada dia tem a sua marcação de feito.
+  const weekStartIso = iso(startOfWeek(day, { weekStartsOn: 1 })), weekEndIso = iso(addDays(startOfWeek(day, { weekStartsOn: 1 }), 6));
+  const fixedDoneQ = useFixedDone(weekStartIso, weekEndIso);
+  const fixedRows: Row[] = useMemo(() => expandFixed(fixedQ.data ?? [], fixedDoneQ.data ?? new Set<string>(), weekStartIso, weekEndIso).map((o): Row => {
+    const c = o.fixed.category_id ? catById.get(o.fixed.category_id) : undefined;
+    return { id: o.key, t: o.fixed.title, d: c?.name ?? "Tarefa fixa", tag: "Fixa", c: (c?.color ?? "emerald") as C, Icon: getIcon(c?.icon ?? "check"), time: o.fixed.due_time ? hhmm(o.fixed.due_time) : "—", done: o.done, cat: o.fixed.category_id ?? "", date: o.date, priority: o.fixed.priority, fixed: true };
+  }), [fixedQ.data, fixedDoneQ.data, weekStartIso, weekEndIso, catById]);
+  const toggleRow = (tk: Row) => {
+    const fx = tk.fixed ? parseFixedKey(tk.id) : null;
+    if (fx) fixedAct.toggle.mutate({ id: fx.id, date: fx.date, done: !tk.done }, { onError: (e) => toast.error(e.message) });
+    else toggle.mutate({ id: tk.id, done: !tk.done }, { onError: (e) => toast.error(e.message) });
+  };
 
   // Tarefas sem data aparecem em "Hoje" (quando o dia é hoje) e em "Todas".
   const onDay = (t: Row) => (t.date ? isSameDay(fromIso(t.date), day) : isSameDay(day, T0));
@@ -108,18 +124,18 @@ function TarefasPage() {
     const d = fromIso(t.date);
     return tab === 0 ? isSameDay(d, day) : tab === 1 ? isSameWeek(d, day, { weekStartsOn: 1 }) : isSameMonth(d, day);
   };
-  const dayTasks = tasks.filter(onDay);
+  const dayTasks = [...tasks.filter(onDay), ...fixedRows.filter((t) => t.date === iso(day))];
   const taskDays = useMemo(() => [...new Set(tasks.map((t) => t.date).filter(Boolean))].map(fromIso), [tasks]);
   const upcoming = tasks.filter((t) => t.date && !t.done && fromIso(t.date) >= T0 && t.cat === compId).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 3);
   const done = tasks.filter((t) => t.done).length;
   const pct = dayTasks.length ? Math.round((dayTasks.filter((t) => t.done).length / dayTasks.length) * 100) : 0;
-  const shown = useMemo(() => tasks.filter((t) => inRange(t) && (!cat || t.cat === cat) && t.t.toLowerCase().includes(q.toLowerCase())), [tasks, cat, q, tab, day]);
+  const shown = useMemo(() => [...tasks, ...(tab < 2 ? fixedRows : [])].filter((t) => inRange(t) && (!cat || t.cat === cat) && t.t.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), [tasks, fixedRows, cat, q, tab, day]);
   const lastTime = shown.length ? shown.map((t) => t.time).filter((t) => t !== "—").sort().at(-1) : null;
 
   const weekStart = startOfWeek(day, { weekStartsOn: 1 });
   const week = weekLabels.map((label, i) => {
     const d = addDays(weekStart, i);
-    const mine = tasks.filter((t) => t.date && isSameDay(fromIso(t.date), d));
+    const mine = [...tasks, ...fixedRows].filter((t) => t.date && isSameDay(fromIso(t.date), d));
     return [label, mine.length, mine.length > 0 && mine.every((t) => t.done) ? 1 : 0] as const;
   });
   const dayPrios = dayTasks.filter((t) => !t.done).sort((a, b) => RANK[a.priority] - RANK[b.priority]).slice(0, 3);
@@ -250,7 +266,7 @@ function TarefasPage() {
               {shown.map((tk, i) => (
                 <li key={tk.id} style={{ "--glow": colorVar(tk.c), animationDelay: `${i * 0.05}s` } as React.CSSProperties}
                   className="group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 py-3 animate-rise sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]">
-                  <button aria-label="Concluir" onClick={() => toggle.mutate({ id: tk.id, done: !tk.done }, { onError: (e) => toast.error(e.message) })}
+                  <button aria-label="Concluir" onClick={() => toggleRow(tk)}
                     className={`grid h-5 w-5 place-items-center rounded-md border transition ${tk.done ? "border-cyan bg-cyan text-background shadow-[0_0_12px_var(--cyan)]" : "border-muted-foreground/50 hover:border-cyan"}`}>
                     {tk.done && <Check size={13} strokeWidth={3} />}
                   </button>
@@ -258,15 +274,15 @@ function TarefasPage() {
                     <span className="h-8 w-0.5 rounded-full bg-[color:var(--glow)] shadow-[0_0_8px_var(--glow)]" />
                     <tk.Icon size={20} className="text-[color:var(--glow)] transition group-hover:scale-110" />
                   </span>
-                  <button type="button" onClick={() => setEditingId(tk.id)} aria-label={`Editar tarefa ${tk.t}`} className="min-w-0 text-left">
+                  <button type="button" onClick={() => { if (!tk.fixed) setEditingId(tk.id); }} aria-label={tk.fixed ? `Tarefa fixa ${tk.t}` : `Editar tarefa ${tk.t}`} className={`min-w-0 text-left ${tk.fixed ? "cursor-default" : ""}`}>
                     <b className={`block truncate text-sm font-semibold transition ${tk.done ? "text-muted-foreground line-through" : ""}`}>{tk.t}</b>
                     <span className="block truncate text-xs text-muted-foreground">{tk.d}</span>
                   </button>
-                  <span className="tag hidden sm:inline">{tk.tag}</span>
+                  <span className={`tag hidden sm:inline ${tk.fixed ? "!text-emerald" : ""}`}>{tk.fixed && <Repeat size={10} className="mr-1 inline" />}{tk.tag}</span>
                   <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tab !== 0 && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
                   <span className="hidden items-center gap-2 text-muted-foreground sm:flex">
                     <AlarmClock size={15} className="text-[color:var(--glow)]" />
-                    <button aria-label="Excluir tarefa" onClick={() => del.mutate(tk.id, { onError: (e) => toast.error(e.message) })} className="opacity-40 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={15} /></button>
+                    {tk.fixed ? <span title="Tarefa fixa: gerencie em Tarefas fixas" className="opacity-60"><Repeat size={15} className="text-emerald" /></span> : <button aria-label="Excluir tarefa" onClick={() => del.mutate(tk.id, { onError: (e) => toast.error(e.message) })} className="opacity-40 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={15} /></button>}
                   </span>
                 </li>
               ))}
@@ -321,6 +337,7 @@ function TarefasPage() {
               </button>
             </div>
           </Panel>
+          <FixedTasksPanel categories={categories} defaultCategory={cats[0]?.id ?? ""} />
           <Panel c="cyan">
             <Head Icon={CalendarDays} t="Calendário" s="Escolha um dia para ver as tarefas." />
             <Calendar mode="single" selected={day} onSelect={(d) => d && setDay(d)} locale={ptBR} weekStartsOn={1}

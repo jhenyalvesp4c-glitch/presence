@@ -78,3 +78,19 @@ describe("diet ai", () => {
     expect(extras.map((e) => e.meal)).toEqual(["b-almoco", "c:Ceia"]); expect(novas).toEqual(["Ceia"]); expect(totalOf(r).kcal).toBe(160);
   });
 });
+
+import { appliesOn, expandFixed, parseFixedKey, weekdaysLabel, type FixedTask } from "./fixed-tasks";
+describe("fixed tasks", () => {
+  const f = (o: Partial<FixedTask> = {}): FixedTask => ({ id: "11111111-1111-4111-8111-111111111111", title: "Skin care", category_id: null, priority: "media", due_time: null, weekdays: [0, 1, 2, 3, 4, 5, 6], active: true, position: 0, ...o });
+  it("applies on chosen weekdays only and ignores paused", () => {
+    expect(appliesOn(f(), "2026-11-21")).toBe(true); // sábado
+    expect(appliesOn(f({ weekdays: [1, 2, 3, 4, 5] }), "2026-11-21")).toBe(false); expect(appliesOn(f({ weekdays: [1, 2, 3, 4, 5] }), "2026-11-23")).toBe(true);
+    expect(appliesOn(f({ active: false }), "2026-11-23")).toBe(false);
+  });
+  it("expands a range and marks done by date", () => {
+    const occ = expandFixed([f()], new Set(["11111111-1111-4111-8111-111111111111|2026-11-22"]), "2026-11-21", "2026-11-23");
+    expect(occ.map((o) => o.date)).toEqual(["2026-11-21", "2026-11-22", "2026-11-23"]); expect(occ.map((o) => o.done)).toEqual([false, true, false]);
+    expect(parseFixedKey(occ[1]!.key)).toEqual({ id: "11111111-1111-4111-8111-111111111111", date: "2026-11-22" });
+  });
+  it("labels weekdays", () => { expect(weekdaysLabel([0, 1, 2, 3, 4, 5, 6])).toBe("Todos os dias"); expect(weekdaysLabel([1, 2, 3, 4, 5])).toBe("Dias úteis"); expect(weekdaysLabel([6, 0])).toBe("Fins de semana"); expect(weekdaysLabel([3, 1])).toBe("Seg · Qua"); });
+});

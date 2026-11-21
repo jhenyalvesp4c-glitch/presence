@@ -5,9 +5,9 @@ import { Ring } from "@/components/finance/charts";
 import { dayName, faseDaSemana, type Program } from "@/lib/program";
 
 const Card = ({ title, Icon = Gauge, color = "var(--cyan)", n = 0, children }: { title: string; Icon?: typeof Gauge; color?: string; n?: number; children: React.ReactNode }) => (
-  <section className="glass relative overflow-hidden rounded-3xl p-5 sm:p-6" style={{ animation: "fin-rise .6s both", animationDelay: `${n * 80}ms` }}>
-    <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full opacity-15 blur-3xl" style={{ background: color }} />
-    <h3 className="relative mb-4 flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em]"><span className="grid h-8 w-8 place-items-center rounded-xl border" style={{ color, borderColor: `color-mix(in oklab, ${color} 40%, transparent)`, background: `color-mix(in oklab, ${color} 12%, transparent)` }}><Icon size={15} /></span>{title}</h3>
+  <section className="ex-card px-5 py-5 sm:px-6" style={{ "--rail": color, animation: "fin-rise .6s both", animationDelay: `${n * 80}ms` } as React.CSSProperties}>
+    <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full opacity-[0.1] blur-3xl" style={{ background: color }} />
+    <h3 className="relative mb-4 flex items-center gap-2.5"><Icon size={14} style={{ color }} /><span className="mono-caps !text-[0.68rem]">{title}</span><span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" /></h3>
     <div className="relative">{children}</div>
   </section>
 );
@@ -15,7 +15,7 @@ const Card = ({ title, Icon = Gauge, color = "var(--cyan)", n = 0, children }: {
 export function PlanTab({ program, week, onToggleGoal }: { program: Program; week: number; onToggleGoal: (i: number) => void }) {
   const done = program.metas.filter((m) => m.feita).length;
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {program.estrategia && <Card title="Estratégia" n={0}><p className="text-sm leading-relaxed">{program.estrategia}</p>
         <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[420px] text-sm"><thead><tr className="text-left text-[0.65rem] uppercase tracking-wider text-muted-foreground"><th className="pb-2 font-medium">Dia</th><th className="pb-2 font-medium">Treino</th><th className="pb-2 font-medium">Foco</th></tr></thead>
           <tbody>{program.dias.map((d) => <tr key={d.id} className="border-t border-white/10"><td className="py-2 pr-3 font-medium">{dayName(d.dia)}</td><td className="py-2 pr-3">{d.titulo}</td><td className="py-2 text-muted-foreground">{d.foco}</td></tr>)}</tbody></table></div></Card>}

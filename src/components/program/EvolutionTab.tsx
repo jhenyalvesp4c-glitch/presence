@@ -10,9 +10,9 @@ import type { MeasurementEntry } from "@/lib/data/health";
 const kg = (n: number) => `${String(Math.round(n * 10) / 10).replace(".", ",")} kg`;
 const dm = (iso: string) => iso.split("-").reverse().slice(0, 2).join("/");
 const Box = ({ title, Icon, color = "var(--cyan)", n = 0, children, className = "" }: { title: string; Icon: typeof Activity; color?: string; n?: number; children: React.ReactNode; className?: string }) => (
-  <section className={`glass relative overflow-hidden rounded-3xl p-5 ${className}`} style={{ animation: "fin-rise .6s both", animationDelay: `${n * 80}ms` }}>
-    <span aria-hidden className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full opacity-15 blur-3xl" style={{ background: color }} />
-    <h3 className="relative mb-3 flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em]"><span className="grid h-8 w-8 place-items-center rounded-xl border" style={{ color, borderColor: `color-mix(in oklab, ${color} 40%, transparent)`, background: `color-mix(in oklab, ${color} 12%, transparent)` }}><Icon size={15} /></span>{title}</h3>
+  <section className={`ex-card px-5 py-5 ${className}`} style={{ "--rail": color, animation: "fin-rise .6s both", animationDelay: `${n * 80}ms` } as React.CSSProperties}>
+    <span aria-hidden className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full opacity-[0.1] blur-3xl" style={{ background: color }} />
+    <h3 className="relative mb-3 flex items-center gap-2.5"><Icon size={14} style={{ color }} /><span className="mono-caps !text-[0.68rem]">{title}</span><span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" /></h3>
     <div className="relative">{children}</div>
   </section>
 );
@@ -35,7 +35,7 @@ export function EvolutionTab({ program, week, logs, weeklies, measures }: { prog
   return (
     <div className="space-y-4" data-testid="evolucao">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{([["Treinos feitos", totalDays, Dumbbell, "var(--cyan)"], ["Séries registradas", totalSets, Flame, "var(--violet)"], ["Recordes", personalRecords(logs).length, Award, "var(--amber)"], ["Semana", Math.min(Math.max(week, 1), program.semanas), CalendarCheck, "var(--emerald)"]] as const).map(([k, v, I, c]) => (
-        <Tilt key={k} max={6} className="rounded-2xl"><div className="glass rounded-2xl p-4"><I size={15} style={{ color: c }} /><p className="mt-2 font-display text-3xl font-semibold tabular-nums" style={{ color: c, textShadow: `0 0 22px ${c}` }}>{v}</p><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">{k}</p></div></Tilt>))}</div>
+        <Tilt key={k} max={6} className="rounded-2xl"><div className="ex-card px-4 py-3"><I size={15} style={{ color: c }} /><p className="mt-2 font-display text-3xl font-semibold tabular-nums" style={{ color: c, textShadow: `0 0 22px ${c}` }}>{v}</p><p className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">{k}</p></div></Tilt>))}</div>
 
       {tips.length > 0 && <Box title="O que o Orion percebeu" Icon={TrendingUp} color="var(--emerald)" n={1}><ul className="space-y-2">{tips.map((t) => <li key={t.texto} className={`rounded-xl border px-3 py-2 text-sm ${t.tom === "bom" ? "border-emerald/30 bg-emerald/[0.06]" : "border-amber/30 bg-amber/[0.06]"}`}>{t.texto}</li>)}</ul></Box>}
 
