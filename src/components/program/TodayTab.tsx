@@ -77,9 +77,10 @@ function ExecVideo({ src, nome }: { src: string; nome: string }) {
   const [big, setBig] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setBig(true)} aria-label={`Ver a execução de ${nome}`} data-testid="ver-execucao" className="group/vid relative h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-xl border border-white/10 transition hover:border-cyan/60 hover:shadow-[0_0_24px_-6px_var(--cyan)]">
+      <button type="button" onClick={() => setBig(true)} aria-label={`Ver a execução de ${nome}`} data-testid="ver-execucao" className="group/vid relative block aspect-square w-full overflow-hidden rounded-2xl border border-white/10 transition hover:border-cyan/60 hover:shadow-[0_0_34px_-8px_var(--cyan)]">
         <video src={src} autoPlay loop muted playsInline preload="metadata" className="h-full w-full object-cover" />
-        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent py-0.5 text-center font-mono text-[0.5rem] uppercase tracking-wider text-cyan">ver execução</span>
+        <span aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 py-2 font-mono text-[0.6rem] uppercase tracking-[0.18em] text-cyan"><Play size={10} fill="currentColor" /> ver execução</span>
       </button>
       {big && createPortal(
         <div className="fixed inset-0 z-[70] grid place-items-center bg-background/90 p-4 backdrop-blur-md" {...backdropProps(() => setBig(false))} data-testid="video-execucao">
@@ -110,11 +111,12 @@ function ExerciseCard({ ex, logs, date, week, actions, onRest, index }: { ex: Pr
       <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-[0.12] blur-3xl" style={{ background: done ? "var(--emerald)" : tone.c }} />
       <header className="relative flex items-start gap-3">
         <span className="pt-1 font-mono text-[0.7rem] tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
-        {media && <ExecVideo src={media.src} nome={ex.nome} />}
         <div className="min-w-0 flex-1"><h3 className="font-display text-base font-semibold leading-snug tracking-tight">{ex.nome}</h3><p className="mt-0.5 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground">{ex.grupo}{ex.grupo ? " · " : ""}{equip}</p></div>
         <div className="text-right"><p className="font-mono text-base font-semibold tabular-nums">{presc}</p><p className="font-mono text-[0.62rem] uppercase tracking-wider text-muted-foreground">{ex.descansoS ? `${ex.descansoS} s` : ""}{ex.rir && isForce ? ` · RIR ${ex.rir}` : ""}</p></div>
       </header>
 
+      <div className={media ? "relative grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]" : "contents"}>
+        <div className="min-w-0">
       {isForce && <div className="relative mt-3 border-l pl-3" style={{ borderColor: `color-mix(in oklab, ${tone.c} 55%, transparent)` }} data-testid="sugestao" data-acao={sug.acao}>
         <p className="flex items-center gap-1.5 text-[0.82rem] font-medium" style={{ color: tone.c }}><SugIcon size={13} /><span className="font-mono text-[0.6rem] uppercase tracking-[0.16em] opacity-70">{tone.label}</span><span className="text-foreground/90">{sug.titulo}</span></p>
         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{sug.motivo}</p>
@@ -128,6 +130,9 @@ function ExerciseCard({ ex, logs, date, week, actions, onRest, index }: { ex: Pr
         : <button type="button" onClick={() => void actions.logSet.mutateAsync({ exerciseId: ex.id, exerciseName: ex.nome, date, week, set: 1, load: null, reps: 1, rir: null, warmup: false, flags: [] }).catch((e) => toast.error((e as Error).message))} disabled={done} className={`relative mt-3 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm transition active:scale-95 ${done ? "border-emerald/40 bg-emerald/10 text-emerald" : "border-white/15 hover:border-cyan/50 hover:text-cyan"}`} data-testid="marcar-feito"><Check size={14} /> {done ? "Feito" : "Marcar como feito"}</button>}
 
       {ex.instrucoes && <><button type="button" onClick={() => setHelp((v) => !v)} className="relative mt-3 flex items-center gap-1 font-mono text-[0.65rem] uppercase tracking-wider text-muted-foreground transition hover:text-foreground"><ChevronDown size={11} className={help ? "rotate-180" : ""} /> como executar</button>{help && <p className="relative mt-1.5 text-xs leading-relaxed text-foreground/75" style={{ animation: "fin-rise .3s both" }}>{ex.instrucoes}</p>}</>}
+        </div>
+        {media && <aside className="order-first mx-auto w-full max-w-[16rem] md:order-last md:mt-3 md:max-w-none"><ExecVideo src={media.src} nome={ex.nome} /></aside>}
+      </div>
     </article>
   );
 }
