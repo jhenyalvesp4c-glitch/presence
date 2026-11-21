@@ -101,12 +101,29 @@ export function SettleView() {
 
         <Panel>
           <Head icon={ArrowRightLeft} title="Lançamentos" sub={`${items.length} item${items.length === 1 ? "" : "s"} em ${monthLabel(ym)}${acc ? " e antes" : ""} · ${allItems.length} no total`} />
-          {items.length === 0 ? <Empty icon={Receipt} title="Sem lançamentos neste mês" hint="Envie a foto do extrato do seu cartão (e depois a do cartão dela) ou lance à mão." /> : (
-            <ul className="divide-y divide-white/5" data-testid="acerto-itens">
-              {items.map((it) => <ItemRow key={it.id} it={it} person={sel.person} onEdit={() => setEditor({ item: it, kind: it.kind })}
-                onDelete={() => { if (window.confirm(`Excluir "${it.description || "lançamento"}"?`)) acts.removeItem.mutate({ settlementId: sel.id, id: it.id }, { onError: (e) => toast.error(`Não consegui excluir: ${e.message}`) }); }} />)}
-            </ul>
-          )}
+          {items.length === 0 ? <Empty icon={Receipt} title="Sem lançamentos neste mês" hint="Envie a foto do extrato do seu cartão (e depois a do cartão dela) ou lance à mão." /> : (() => {
+            const rm = (it: SettleItem) => acts.removeItem.mutate({ settlementId: sel.id, id: it.id }, { onError: (e) => toast.error(`Não consegui excluir: ${e.message}`) });
+            const row = (it: SettleItem) => <ItemRow key={it.id} it={it} person={sel.person} onEdit={() => setEditor({ item: it, kind: it.kind })} onDelete={() => { if (window.confirm(`Excluir "${it.description || "lançamento"}"?`)) rm(it); }} />;
+            const dele = items.filter((i) => i.kind === "compra" && i.payer === "eu"), meu = items.filter((i) => i.kind === "compra" && i.payer === "outro"), pix = items.filter((i) => i.kind === "pagamento");
+            const grupo = (titulo: string, lista: SettleItem[], total: number, cor: string, vazio: string) => (
+              <section className="mt-4 first:mt-0" data-testid={`acerto-grupo-${cor}`}>
+                <div className="flex items-baseline justify-between border-b border-white/10 pb-1.5"><h3 className="text-sm font-semibold">{titulo}</h3><b className={`tabular-nums text-sm ${cor === "verde" ? "text-emerald" : cor === "roxo" ? "text-violet" : ""}`}>{brl(fromCents(total))}</b></div>
+                {lista.length ? <ul className="divide-y divide-white/5">{lista.map(row)}</ul> : <p className="py-2 text-xs text-muted-foreground">{vazio}</p>}
+              </section>
+            );
+            const net = bal.net, abs = Math.abs(net) / 100;
+            return (<>
+              {grupo(`${sel.person} deve a você`, dele, bal.owedToMe, "verde", "Nada no seu cartão neste período.")}
+              {grupo(`Você deve a ${sel.person}`, meu, bal.owedByMe, "roxo", "Nada no cartão dele(a) neste período.")}
+              {grupo("Pix já feitos", pix, bal.paidByOther - bal.paidByMe, "neutro", "Nenhum pix neste período.")}
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm" data-testid="acerto-conta-final">
+                <p className="flex justify-between"><span className="text-muted-foreground">{sel.person} deve a você</span><b className="tabular-nums text-emerald">{brl(fromCents(bal.owedToMe))}</b></p>
+                <p className="flex justify-between"><span className="text-muted-foreground">Você deve a {sel.person}</span><b className="tabular-nums text-violet">− {brl(fromCents(bal.owedByMe))}</b></p>
+                {(bal.paidByMe > 0 || bal.paidByOther > 0) && <p className="flex justify-between"><span className="text-muted-foreground">Pix já feitos (saldo)</span><b className="tabular-nums">{bal.paidByOther - bal.paidByMe > 0 ? "−" : "+"} {brl(Math.abs(fromCents(bal.paidByOther - bal.paidByMe)))}</b></p>}
+                <p className="mt-2 flex justify-between border-t border-white/10 pt-2 text-base font-semibold"><span>Resultado</span><span className="tabular-nums">{net === 0 ? "Quites" : net < 0 && bal.owedByMe === 0 ? <span className="text-emerald">{sel.person} adiantou {brl(abs)} (crédito)</span> : net > 0 ? <span className="text-emerald">{sel.person} paga {brl(abs)} a você</span> : <span className="text-violet">Você paga {brl(abs)} a {sel.person}</span>}</span></p>
+              </div>
+            </>);
+          })()}
         </Panel>
 
         <Panel glow="var(--cyan)">
