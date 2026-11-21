@@ -6,6 +6,7 @@ import { ClipboardCopy, Clock, FileText, Loader2, Mic, MessageCircle, Send, Spar
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt } from "@/components/finance/fx";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { Burst, Thinking, VoiceWave } from "@/components/ideas/fx";
+import { demoAnalysis } from "@/lib/meetings-demo";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
 import { WhatsAppPicker } from "@/components/meetings/WhatsAppPicker";
 import { useMeetingActions, useMeetings, type Meeting } from "@/lib/data/meetings";
@@ -22,7 +23,7 @@ const THINK_MEETING = ["Lendo a conversa…", "Separando os assuntos…", "Achan
 export function MeetingsPage() {
   const history = useMeetings(), acts = useMeetingActions();
   const [mode, setMode] = useState<Mode>("reuniao"), [src, setSrc] = useState<"texto" | "voz" | "whatsapp">("texto"), [text, setText] = useState(""), [title, setTitle] = useState(""), [me, setMe] = useState(() => ls.get("orion:reunioes:eu"));
-  const [busy, setBusy] = useState(false), [a, setA] = useState<Analysis | null>(null), [cur, setCur] = useState<{ id: string | null; title: string; date: string; raw: string; source: Source; mode: Mode } | null>(null);
+  const [busy, setBusy] = useState(false), [a, setA] = useState<Analysis | null>(null), [cur, setCur] = useState<{ id: string | null; title: string; date: string; raw: string; source: Source; mode: Mode; demo?: boolean } | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set()), [sent, setSent] = useState<Set<number>>(new Set()), [inbox, setInbox] = useState<{ id: number; text: string } | null>(null), [burst, setBurst] = useState(0), [chunkMs] = useState(() => { const n = typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("trecho")) : 0; return n >= 3000 && n <= 60000 ? n : 25000; });
   const rec = useLiveRecorder(chunkMs), resultRef = useRef<HTMLDivElement>(null), inboxRef = useRef<HTMLDivElement>(null);
 
@@ -57,8 +58,10 @@ export function MeetingsPage() {
     setBusy(false);
   };
   const open = (m: Meeting) => { setA(m.analysis); setCur({ id: m.id, title: m.title, date: m.happenedOn, raw: m.raw, source: m.source, mode: m.mode }); setSelected(new Set(m.analysis.acoes.map((_, i) => i).filter((i) => !m.sent.includes(i)))); setSent(new Set(m.sent)); setInbox(null); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); };
+  const showDemo = (m: Mode) => { const an = demoAnalysis(m); setMode(m); setA(an); setCur({ id: null, title: an.titulo, date: isoOf(), raw: "", source: "texto", mode: m, demo: true }); setSelected(new Set(an.acoes.map((_, i) => i))); setSent(new Set()); setInbox(null); setBurst((n) => n + 1); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
   const sendToCentral = () => {
     if (!a || !cur) return;
+    if (cur.demo) { toast.message("Isto é só um exemplo", { description: "Gere uma ata de verdade para criar demandas e lembretes." }); return; }
     const idx = [...selected].filter((i) => !sent.has(i)).sort((x, y) => x - y), list = idx.map((i) => a.acoes[i]!);
     const wantsNext = !!a.proxima?.data && !sent.has(-1);
     if (!list.length && !wantsNext) { toast.error("Marque pelo menos uma ação."); return; }
@@ -113,11 +116,12 @@ export function MeetingsPage() {
         <div className="mt-1 flex items-center justify-between text-[0.68rem] text-muted-foreground"><span>{text.length.toLocaleString("pt-BR")} / 60.000 caracteres</span>{text && !busy && <button type="button" onClick={() => setText("")} className="hover:text-foreground">limpar</button>}</div>
         {busy ? <Thinking lines={mode === "grupo" ? THINK_GROUP : THINK_MEETING} />
           : <button type="button" onClick={() => void analyze()} disabled={!text.trim() || rec.recording} className="mt-3 inline-flex items-center gap-2 rounded-full border border-violet/50 bg-violet/15 px-6 py-3 text-sm font-medium text-violet shadow-[0_0_30px_-10px_var(--violet)] transition hover:bg-violet/25 active:scale-95 disabled:opacity-40" data-testid="analisar"><Sparkles size={16} /> {mode === "grupo" ? "Resumir com o Orion" : "Gerar ata com o Orion"}</button>}
+        <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 pt-3 text-xs text-muted-foreground">Quer só ver como fica?<button type="button" onClick={() => showDemo("reuniao")} className="text-violet underline-offset-2 hover:underline" data-testid="exemplo-reuniao">Exemplo de reunião</button><button type="button" onClick={() => showDemo("grupo")} className="text-emerald underline-offset-2 hover:underline" data-testid="exemplo-grupo">Exemplo de resumo de grupos</button><span className="opacity-70">(dados inventados, não usa IA e não salva)</span></p>
       </section>
 
       <div ref={resultRef} className="mt-6 scroll-mt-6">
         {a && cur && <>
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="mono-caps !text-[0.62rem]">{dm(cur.date)} · {cur.mode === "grupo" ? "resumo de grupos" : "reunião"}</p><h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="reuniao-titulo-final">{cur.title}</h2></div>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="mono-caps !text-[0.62rem]">{dm(cur.date)} · {cur.mode === "grupo" ? "resumo de grupos" : "reunião"}{cur.demo && <span className="ml-2 rounded-full bg-amber/20 px-2 py-0.5 text-amber" data-testid="badge-exemplo">exemplo com dados inventados</span>}</p><h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="reuniao-titulo-final">{cur.title}</h2></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void copy()} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm hover:bg-white/10" data-testid="copiar-ata"><ClipboardCopy size={14} /> Copiar ata</button>
               <button type="button" onClick={sendToCentral} disabled={nSel === 0 && !(a.proxima?.data && !sent.has(-1))} className="inline-flex items-center gap-2 rounded-full border border-emerald/50 bg-emerald/15 px-5 py-2 text-sm font-medium text-emerald shadow-[0_0_28px_-10px_var(--emerald)] transition hover:bg-emerald/25 active:scale-95 disabled:opacity-40" data-testid="enviar-central"><Send size={14} /> Criar demandas e lembretes ({nSel}{a.proxima?.data && !sent.has(-1) ? " + compromisso" : ""})</button></div></div>
           <MeetingResult a={a} selected={selected} sent={new Set([...sent].filter((i) => i >= 0))} onToggle={(i) => setSelected((s) => { const n = new Set(s); if (n.has(i)) n.delete(i); else n.add(i); return n; })} onSelectAll={(on) => setSelected(on ? new Set(a.acoes.map((_, i) => i).filter((i) => !sent.has(i))) : new Set())} />
