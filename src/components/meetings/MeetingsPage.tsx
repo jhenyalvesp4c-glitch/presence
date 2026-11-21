@@ -1,6 +1,7 @@
 /** Assistente de reuniões: cole, grave ou traga do WhatsApp; o Orion devolve ata, decisões, quem faz o quê e manda as ações para a Central (demandas, lembretes, compromisso). */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { copyText } from "@/lib/clipboard";
 import { ClipboardCopy, Clock, FileText, Loader2, Mic, MessageCircle, Radar, Send, Sparkles, Square, Trash2, X } from "lucide-react";
 
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt } from "@/components/finance/fx";
@@ -72,7 +73,7 @@ export function MeetingsPage() {
     if (cur.id) acts.markSent.mutate({ id: cur.id, sent: [...next] });
     setTimeout(() => inboxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   };
-  const copy = async () => { if (!a || !cur) return; try { await navigator.clipboard.writeText(analysisToMarkdown(a, cur.date)); toast.success("Ata copiada", { description: "Cole no WhatsApp, no e-mail ou num documento." }); } catch { toast.error("Não consegui copiar."); } };
+  const copy = async () => { if (!a || !cur) return; if (await copyText(analysisToMarkdown(a, cur.date))) toast.success("Ata copiada", { description: "Cole no WhatsApp, no e-mail ou num documento." }); else toast.error("Não consegui copiar."); };
   const remove = (m: Meeting) => { if (window.confirm(`Apagar “${m.title}” do histórico?`)) acts.remove.mutate(m.id, { onSuccess: () => { if (cur?.id === m.id) { setA(null); setCur(null); } }, onError: (e) => toast.error(e.message) }); };
   const nSel = useMemo(() => [...selected].filter((i) => !sent.has(i)).length, [selected, sent]);
 

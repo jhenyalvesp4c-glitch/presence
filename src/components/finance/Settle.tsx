@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { copyText } from "@/lib/clipboard";
 import { ArrowRightLeft, Camera, Check, ClipboardCopy, FileText, Handshake, Home, Image as ImageIcon, Loader2, Pencil, Plus, Printer, Receipt, Trash2, Wallet } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
@@ -45,7 +46,7 @@ export function SettleView() {
     if (!sel || !drafts.length) return;
     try { await acts.addItems.mutateAsync({ settlementId: sel.id, drafts, start: allItems.length }); toast.success(`${drafts.length} lançamento${drafts.length === 1 ? "" : "s"} adicionado${drafts.length === 1 ? "" : "s"}.`); } catch (e) { toast.error(`Não consegui salvar: ${(e as Error).message}`); }
   };
-  const copy = async () => { try { await navigator.clipboard.writeText(text); toast.success("Extrato copiado. Cole no WhatsApp."); } catch { toast.error("Não consegui copiar. Use a imagem ou o PDF."); } };
+  const copy = async () => { if (await copyText(text)) toast.success("Extrato copiado. Cole no WhatsApp."); else toast.error("Não consegui copiar. Use a imagem ou o PDF."); };
   const png = async () => { try { download(await statementPng(text), `acerto-${sel?.person ?? "contas"}.png`); } catch (e) { toast.error((e as Error).message); } };
 
   return (

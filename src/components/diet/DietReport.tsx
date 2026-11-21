@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { copyText } from "@/lib/clipboard";
 import { Copy, FileText, Printer, Share2, X } from "lucide-react";
 
 import type { DietBundle } from "@/components/diet/DietHub";
@@ -33,7 +34,7 @@ function Doc({ r }: { r: DietReport }) {
 export function DietReportTab({ b }: { b: DietBundle }) {
   const [days, setDays] = useState(7), [open, setOpen] = useState(false), to = b.today, from = days === 0 ? b.row.startDate : L(to, days);
   const report = useMemo(() => buildDietReport(b.plan, from, to, to, b.logs, b.weeklies), [b.plan, from, to, b.logs, b.weeklies]), text = dietReportText(report);
-  const copy = async () => { try { await navigator.clipboard.writeText(text); toast.success("Relatório copiado", { description: "Cole no WhatsApp ou no e-mail do nutricionista." }); } catch { toast.error("Não consegui copiar. Use Imprimir / salvar PDF."); } };
+  const copy = async () => { if (await copyText(text)) toast.success("Relatório copiado", { description: "Cole no WhatsApp ou no e-mail do nutricionista." }); else toast.error("Não consegui copiar. Use Imprimir / salvar PDF."); };
   const share = async () => { try { if (navigator.share) await navigator.share({ title: report.titulo, text }); else await copy(); } catch { /* cancelado */ } };
   const bar = <div data-print-hide className="mb-3 flex flex-wrap items-center justify-end gap-2">
     <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-sm hover:bg-white/10" data-testid="dieta-relatorio-imprimir"><Printer size={15} /> Imprimir / salvar PDF</button>
