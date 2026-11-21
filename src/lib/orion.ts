@@ -2,7 +2,7 @@
  * Orion (segundo cérebro): funções puras para montar o "acervo" pesquisável e ordenar por relevância.
  * Sem acesso ao banco aqui; quem lê as tabelas é orion.functions.ts.
  */
-export type OrionKind = "registro" | "documentacao" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento" | "memoria" | "habito" | "saude" | "lista" | "plano" | "financeiro" | "ideia";
+export type OrionKind = "registro" | "documentacao" | "demanda" | "tarefa" | "nota" | "conversa" | "treinamento" | "memoria" | "habito" | "saude" | "lista" | "plano" | "financeiro" | "ideia" | "reuniao";
 
 /** Arquivo guardado no Orion (print, PDF, anexo de demanda…) que acompanha um documento. */
 export type FileRef = { bucket: string; path: string; name: string; mime: string; size: number };
@@ -23,7 +23,7 @@ export type OrionDoc = {
 export type OrionSource = { n: number; id: string; kind: OrionKind; title: string; snippet: string; date?: string | undefined; where?: string | undefined; link: string; files: FileRef[] };
 
 export const KIND_LABEL: Record<OrionKind, string> = {
-  registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com o assistente", treinamento: "Treinamento", memoria: "Memória", habito: "Hábitos", saude: "Saúde", lista: "Lista", plano: "Plano do dia", financeiro: "Financeiro", ideia: "Ideia",
+  registro: "Anotação", documentacao: "Documentação", demanda: "Demanda", tarefa: "Tarefa", nota: "Nota", conversa: "Conversa com o assistente", treinamento: "Treinamento", memoria: "Memória", habito: "Hábitos", saude: "Saúde", lista: "Lista", plano: "Plano do dia", financeiro: "Financeiro", reuniao: "Reunião", ideia: "Ideia",
 };
 
 export const normalize = (s: string) =>

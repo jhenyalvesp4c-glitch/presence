@@ -147,6 +147,15 @@ export async function loadCorpus() {
       workoutSplit: ok(workoutSplit as never), lists: ok(lists as never), listItems: ok(listItems as never), schedule: ok(schedule as never), settlements: ok(settlements as never), settleItems: ok(settleItems as never), ideas: ok(ideas as never),
     }, finance, new Date(`${todayIso}T12:00:00`)));
   } catch { /* o resto continua funcionando */ }
+  // reuniões: ata, decisões, quem faz o quê e pendências (também a conversa original, cortada)
+  try {
+    const { cleanAnalysis, analysisToMarkdown } = await import("./meetings");
+    const m = await supabase.from("meetings").select("id, title, raw, analysis, happened_on").order("created_at", { ascending: false }).limit(200);
+    if (!m.error) for (const r of (m.data ?? []) as { id: string; title: string; raw: string; analysis: unknown; happened_on: string }[]) {
+      const a = cleanAnalysis(r.analysis); if (!a) continue;
+      docs.push({ id: `reuniao:${r.id}`, kind: "reuniao", title: `Reunião: ${r.title}`, text: `${analysisToMarkdown(a, r.happened_on)}\n\nConversa original:\n${r.raw.slice(0, 6000)}`, date: r.happened_on, link: "/reunioes" });
+    }
+  } catch { /* reuniões não derrubam a busca */ }
   return docs;
 }
 

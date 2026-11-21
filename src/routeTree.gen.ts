@@ -29,6 +29,7 @@ import { Route as ProgramaRouteImport } from './routes/programa'
 import { Route as ProgressoRouteImport } from './routes/progresso'
 import { Route as ProjetosRouteImport } from './routes/projetos'
 import { Route as ResumoRouteImport } from './routes/resumo'
+import { Route as ReunioesRouteImport } from './routes/reunioes'
 import { Route as SaudeRouteImport } from './routes/saude'
 import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as TreinoRouteImport } from './routes/treino'
@@ -148,6 +149,11 @@ const ResumoRoute = ResumoRouteImport.update({
   path: '/resumo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReunioesRoute = ReunioesRouteImport.update({
+  id: '/reunioes',
+  path: '/reunioes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SaudeRoute = SaudeRouteImport.update({
   id: '/saude',
   path: '/saude',
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
   '/resumo': typeof ResumoRoute
+  '/reunioes': typeof ReunioesRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
@@ -300,6 +307,7 @@ export interface FileRoutesByTo {
   '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
   '/resumo': typeof ResumoRoute
+  '/reunioes': typeof ReunioesRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
@@ -341,6 +349,7 @@ export interface FileRoutesById {
   '/progresso': typeof ProgressoRoute
   '/projetos': typeof ProjetosRoute
   '/resumo': typeof ResumoRoute
+  '/reunioes': typeof ReunioesRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
   '/treino': typeof TreinoRoute
@@ -383,6 +392,7 @@ export interface FileRouteTypes {
     | '/progresso'
     | '/projetos'
     | '/resumo'
+    | '/reunioes'
     | '/saude'
     | '/tarefas'
     | '/treino'
@@ -423,6 +433,7 @@ export interface FileRouteTypes {
     | '/progresso'
     | '/projetos'
     | '/resumo'
+    | '/reunioes'
     | '/saude'
     | '/tarefas'
     | '/treino'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/progresso'
     | '/projetos'
     | '/resumo'
+    | '/reunioes'
     | '/saude'
     | '/tarefas'
     | '/treino'
@@ -504,6 +516,7 @@ export interface RootRouteChildren {
   ProgressoRoute: typeof ProgressoRoute
   ProjetosRoute: typeof ProjetosRoute
   ResumoRoute: typeof ResumoRoute
+  ReunioesRoute: typeof ReunioesRoute
   SaudeRoute: typeof SaudeRoute
   TarefasRoute: typeof TarefasRoute
   TreinoRoute: typeof TreinoRoute
@@ -662,6 +675,13 @@ declare module '@tanstack/react-router' {
       path: '/resumo'
       fullPath: '/resumo'
       preLoaderRoute: typeof ResumoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reunioes': {
+      id: '/reunioes'
+      path: '/reunioes'
+      fullPath: '/reunioes'
+      preLoaderRoute: typeof ReunioesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/saude': {
@@ -835,6 +855,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProgressoRoute: ProgressoRoute,
   ProjetosRoute: ProjetosRoute,
   ResumoRoute: ResumoRoute,
+  ReunioesRoute: ReunioesRoute,
   SaudeRoute: SaudeRoute,
   TarefasRoute: TarefasRoute,
   TreinoRoute: TreinoRoute,
