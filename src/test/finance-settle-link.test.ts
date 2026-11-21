@@ -55,3 +55,13 @@ describe("assinaturas divididas", () => {
     expect(d[0]?.draft).toMatchObject({ date: "2026-10-10", amount: 55.9, otherShare: 50, description: "Netflix" });
   });
 });
+
+import { balance } from "@/lib/finance/settle";
+describe("pix aguardando", () => {
+  it("não entra no saldo até ser confirmado", () => {
+    const compra = { id: "1", kind: "compra" as const, date: "2026-11-04", description: "Lava", amount: 152.52, payer: "eu" as const, otherShare: 50, installment: "" };
+    const pix = { id: "2", kind: "pagamento" as const, date: "2026-11-30", description: "Ajuda", amount: 200, payer: "outro" as const, otherShare: 100, installment: "", pending: true };
+    expect(balance([compra, pix]).net).toBe(7626);
+    expect(balance([compra, { ...pix, pending: false }]).net).toBe(7626 - 20000);
+  });
+});

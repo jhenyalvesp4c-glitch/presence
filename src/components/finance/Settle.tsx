@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { readFiles, type LocalFile } from "@/components/inbox/files";
 import { monthLabel } from "@/lib/finance/calc";
 import { readStatement, type StatementLine } from "@/lib/finance/statement.functions";
-import { balance, brl, fromCents, parseBills, parseMoney, split, statementText, type Payer, type SettleItem } from "@/lib/finance/settle";
+import { balance, brl, fromCents, parseBills, parseMoney, split, statementText, toCents, type Payer, type SettleItem } from "@/lib/finance/settle";
 import { download, printStatement, statementPng } from "@/lib/finance/settle-export";
 import { useSettleActions, useSettlementItems, useSettlements, type ItemDraft, type Settlement } from "@/lib/finance/settle-data";
 import { Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TextInput, btn } from "./ui";
@@ -103,8 +103,8 @@ export function SettleView() {
           <Head icon={ArrowRightLeft} title="Lançamentos" sub={`${items.length} item${items.length === 1 ? "" : "s"} em ${monthLabel(ym)}${acc ? " e antes" : ""} · ${allItems.length} no total`} />
           {items.length === 0 ? <Empty icon={Receipt} title="Sem lançamentos neste mês" hint="Envie a foto do extrato do seu cartão (e depois a do cartão dela) ou lance à mão." /> : (() => {
             const rm = (it: SettleItem) => acts.removeItem.mutate({ settlementId: sel.id, id: it.id }, { onError: (e) => toast.error(`Não consegui excluir: ${e.message}`) });
-            const row = (it: SettleItem) => <ItemRow key={it.id} it={it} person={sel.person} onEdit={() => setEditor({ item: it, kind: it.kind })} onDelete={() => { if (window.confirm(`Excluir "${it.description || "lançamento"}"?`)) rm(it); }} />;
-            const dele = items.filter((i) => i.kind === "compra" && i.payer === "eu"), meu = items.filter((i) => i.kind === "compra" && i.payer === "outro"), pix = items.filter((i) => i.kind === "pagamento");
+            const row = (it: SettleItem) => <ItemRow key={it.id} it={it} person={sel.person} onEdit={() => setEditor({ item: it, kind: it.kind })} onDelete={() => { if (window.confirm(`Excluir "${it.description || "lançamento"}"?`)) rm(it); }} onConfirm={it.pending ? () => { const { id, linked: _l, ...draft } = it; acts.updateItem.mutate({ settlementId: sel.id, id, draft: { ...draft, pending: false, date: todayIso() } }, { onError: (e) => toast.error(`Não consegui salvar: ${e.message}`) }); } : undefined} />;
+            const dele = items.filter((i) => i.kind === "compra" && i.payer === "eu"), meu = items.filter((i) => i.kind === "compra" && i.payer === "outro"), pix = items.filter((i) => i.kind === "pagamento" && !i.pending), aguardando = items.filter((i) => i.kind === "pagamento" && i.pending);
             const grupo = (titulo: string, lista: SettleItem[], total: number, cor: string, vazio: string) => (
               <section className="mt-4 first:mt-0" data-testid={`acerto-grupo-${cor}`}>
                 <div className="flex items-baseline justify-between border-b border-white/10 pb-1.5"><h3 className="text-sm font-semibold">{titulo}</h3><b className={`tabular-nums text-sm ${cor === "verde" ? "text-emerald" : cor === "roxo" ? "text-violet" : ""}`}>{brl(fromCents(total))}</b></div>
@@ -115,11 +115,13 @@ export function SettleView() {
             return (<>
               {grupo(`${sel.person} deve a você`, dele, bal.owedToMe, "verde", "Nada no seu cartão neste período.")}
               {grupo(`Você deve a ${sel.person}`, meu, bal.owedByMe, "roxo", "Nada no cartão dele(a) neste período.")}
-              {grupo("Pix já feitos", pix, bal.paidByOther - bal.paidByMe, "neutro", "Nenhum pix neste período.")}
+              {grupo("Pix já feitos", pix, bal.paidByOther - bal.paidByMe, "neutro", "Nenhum pix feito neste período.")}
+              {aguardando.length > 0 && grupo("Pix combinados (aguardando)", aguardando, aguardando.reduce((a, i) => a + toCents(i.amount) * (i.payer === "outro" ? 1 : -1), 0), "ambar", "")}
               <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm" data-testid="acerto-conta-final">
                 <p className="flex justify-between"><span className="text-muted-foreground">{sel.person} deve a você</span><b className="tabular-nums text-emerald">{brl(fromCents(bal.owedToMe))}</b></p>
                 <p className="flex justify-between"><span className="text-muted-foreground">Você deve a {sel.person}</span><b className="tabular-nums text-violet">− {brl(fromCents(bal.owedByMe))}</b></p>
                 {(bal.paidByMe > 0 || bal.paidByOther > 0) && <p className="flex justify-between"><span className="text-muted-foreground">Pix já feitos (saldo)</span><b className="tabular-nums">{bal.paidByOther - bal.paidByMe > 0 ? "−" : "+"} {brl(Math.abs(fromCents(bal.paidByOther - bal.paidByMe)))}</b></p>}
+                {aguardando.length > 0 && <p className="flex justify-between text-xs text-amber"><span>Pix aguardando (ainda não conta)</span><b className="tabular-nums">{brl(aguardando.reduce((a, i) => a + i.amount * (i.payer === "outro" ? 1 : -1), 0))}</b></p>}
                 <p className="mt-2 flex justify-between border-t border-white/10 pt-2 text-base font-semibold"><span>Resultado</span><span className="tabular-nums">{net === 0 ? "Quites" : net < 0 && bal.owedByMe === 0 ? <span className="text-emerald">{sel.person} adiantou {brl(abs)} (crédito)</span> : net > 0 ? <span className="text-emerald">{sel.person} paga {brl(abs)} a você</span> : <span className="text-violet">Você paga {brl(abs)} a {sel.person}</span>}</span></p>
               </div>
             </>);
@@ -148,14 +150,18 @@ export function SettleView() {
   );
 }
 
-function ItemRow({ it, person, onEdit, onDelete }: { it: SettleItem; person: string; onEdit: () => void; onDelete: () => void }) {
-  const s = split(it);
-  const who = it.kind === "pagamento" ? (it.payer === "eu" ? `Pix seu → ${person}` : `Pix de ${person} → você`) : it.payer === "eu" ? `No seu cartão · ${person} deve ${brl(fromCents(s.other))}${it.otherShare < 100 ? ` (${it.otherShare}%)` : ""}` : `No cartão de ${person} · você deve ${brl(fromCents(s.mine))}${it.otherShare > 0 ? ` (${100 - it.otherShare}%)` : ""}`;
+function ItemRow({ it, person, onEdit, onDelete, onConfirm }: { it: SettleItem; person: string; onEdit: () => void; onDelete: () => void; onConfirm?: (() => void) | undefined }) {
+  const s = split(it), pix = it.kind === "pagamento";
+  // compra: o valor em destaque é o que cada um deve (a parte do outro lado), e o total da compra fica como contexto
+  const part = pix ? toCents(it.amount) : it.payer === "eu" ? s.other : s.mine, parcial = !pix && part !== toCents(it.amount);
+  const pct = it.payer === "eu" ? it.otherShare : 100 - it.otherShare;
+  const who = pix ? (it.payer === "eu" ? `Pix seu → ${person}` : `Pix de ${person} → você`) : it.payer === "eu" ? `No seu cartão${parcial ? ` · compra de ${brl(it.amount)} · ${person} fica com ${pct}%` : ` · ${person} paga tudo`}` : `No cartão de ${person}${parcial ? ` · compra de ${brl(it.amount)} · você fica com ${pct}%` : " · você paga tudo"}`;
   return (
     <li className="flex items-center gap-3 py-2.5" data-testid="acerto-item">
       <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{dm(it.date)}</span>
-      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (it.kind === "pagamento" ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({it.installment})</span>}{it.linked && <span className="ml-1.5 rounded-full border border-emerald/40 px-1.5 py-0.5 text-[0.62rem] text-emerald" title="Vem de uma compra dividida no financeiro. Para mudar, edite a compra.">da compra</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
-      <b className="tabular-nums text-sm">{brl(it.amount)}</b>
+      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (pix ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({it.installment})</span>}{it.pending && <span className="ml-1.5 rounded-full border border-amber/40 px-1.5 py-0.5 text-[0.62rem] text-amber">aguardando</span>}{it.linked && <span className="ml-1.5 rounded-full border border-emerald/40 px-1.5 py-0.5 text-[0.62rem] text-emerald" title="Vem de uma compra dividida no financeiro. Para mudar, edite a compra.">da compra</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
+      <b className={`tabular-nums text-sm ${!pix ? (it.payer === "eu" ? "text-emerald" : "text-violet") : ""}`} data-testid="acerto-item-valor">{brl(fromCents(part))}</b>
+      {onConfirm && <button className={`${btn.ghost} !px-2.5 !py-1 text-xs`} onClick={onConfirm} data-testid="acerto-confirmar-pix">Recebi</button>}
       {!it.linked && <button className={btn.icon} onClick={onEdit} aria-label="Editar"><Pencil size={14} /></button>}
       {!it.linked && <button className={btn.icon} onClick={onDelete} aria-label="Excluir"><Trash2 size={14} /></button>}
     </li>
@@ -169,7 +175,7 @@ function ItemEditor({ person, defaultShare, initial, kind, onSave, onClose }: { 
   // compra nova: começa pela divisão padrão do acerto (se houver); compra existente: como foi lançada
   const start = initial ? initial.otherShare : defaultShare;
   const [who, setWho] = useState<"tudo" | "metade" | "pct">(() => (start === null ? "tudo" : start === 50 ? "metade" : start === 100 || start === 0 ? "tudo" : "pct"));
-  const [pct, setPct] = useState(start !== null && ![0, 50, 100].includes(start) ? start : 30), [inst, setInst] = useState(initial?.installment ?? "");
+  const [pct, setPct] = useState(start !== null && ![0, 50, 100].includes(start) ? start : 30), [inst, setInst] = useState(initial?.installment ?? ""), [pend, setPend] = useState(!!initial?.pending);
   const pix = kind === "pagamento";
   // para quem é a compra: "tudo" = a parte inteira do OUTRO lado do cartão (se paguei eu, é dela; se ela pagou, é minha)
   const otherShare = pix ? 100 : who === "metade" ? 50 : who === "pct" ? Math.min(100, Math.max(0, pct)) : payer === "eu" ? 100 : 0;
@@ -177,11 +183,12 @@ function ItemEditor({ person, defaultShare, initial, kind, onSave, onClose }: { 
   const parts = amount && !pix ? split({ amount, otherShare }) : null;
   return (
     <Modal open onClose={onClose} title={initial ? "Editar lançamento" : pix ? "Registrar pix" : "Lançar compra"} width="max-w-lg"
-      footer={<><button className={btn.ghost} onClick={onClose}>Cancelar</button><button className={btn.primary} disabled={!ok} data-testid="acerto-salvar-item" onClick={() => amount && onSave({ kind, date: date || null, description: desc, amount, payer, otherShare, installment: inst })}>Salvar</button></>}>
+      footer={<><button className={btn.ghost} onClick={onClose}>Cancelar</button><button className={btn.primary} disabled={!ok} data-testid="acerto-salvar-item" onClick={() => amount && onSave({ kind, date: date || null, description: desc, amount, payer, otherShare, installment: inst, pending: pix && pend })}>Salvar</button></>}>
       <div className="space-y-4">
         <Field label={pix ? "Quem fez o pix?" : "Em qual cartão foi?"} group>
           <Segmented value={payer} onChange={setPayer} options={[{ value: "eu", label: pix ? "Eu" : "No meu cartão" }, { value: "outro", label: pix ? person : `No cartão de ${person}` }]} />
         </Field>
+        {pix && <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={pend} onChange={(e) => setPend(e.target.checked)} data-testid="acerto-pix-aguardando" /> Ainda não foi feito (aguardando; só entra na conta quando você confirmar)</label>}
         {!pix && <Field label={payer === "eu" ? `De quem é a compra?` : "De quem é a compra?"} group>
           <Segmented value={who} onChange={setWho} options={[{ value: "tudo", label: payer === "eu" ? `Toda de ${person}` : "Toda minha" }, { value: "metade", label: "Dividida 50/50" }, { value: "pct", label: "Outra divisão" }]} />
           {who === "pct" && <label className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">{person} fica com <input type="number" min={0} max={100} value={pct} onChange={(e) => setPct(Number(e.target.value))} className="w-20 rounded-xl border border-white/10 bg-black/25 px-2 py-1 text-right text-foreground" /> %</label>}

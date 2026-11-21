@@ -17,6 +17,8 @@ export type SettleItem = {
   otherShare: number; installment: string;
   /** Veio de uma compra dividida do financeiro: só muda editando a compra. */
   linked?: boolean | undefined;
+  /** Pix combinado que ainda não aconteceu: não entra na conta até ser confirmado. */
+  pending?: boolean | undefined;
 };
 
 export const toCents = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100);
@@ -54,6 +56,7 @@ export type Balance = {
 export function balance(items: SettleItem[]): Balance {
   let owedToMe = 0, owedByMe = 0, paidByMe = 0, paidByOther = 0;
   for (const it of items) {
+    if (it.kind === "pagamento" && it.pending) continue;
     if (it.kind === "pagamento") { if (it.payer === "eu") paidByMe += toCents(it.amount); else paidByOther += toCents(it.amount); continue; }
     const s = split(it);
     if (it.payer === "eu") owedToMe += s.other; else owedByMe += s.mine;
@@ -68,7 +71,7 @@ const pct = (n: number) => `${clampShare(n)}%`;
 /** Texto pronto para colar no WhatsApp: cada compra, os totais, os pix já feitos e o valor final. */
 export function statementText(opts: { me: string; person: string; items: SettleItem[]; generatedOn: string }): string {
   const { me, person, items } = opts, b = balance(items);
-  const compras = items.filter((i) => i.kind === "compra"), pix = items.filter((i) => i.kind === "pagamento");
+  const compras = items.filter((i) => i.kind === "compra"), pix = items.filter((i) => i.kind === "pagamento" && !i.pending);
   const mine = compras.filter((i) => i.payer === "eu"), theirs = compras.filter((i) => i.payer === "outro");
   const line = (i: SettleItem, share: number) => `• ${dm(i.date)} ${i.description || "Compra"}${i.installment ? ` (${i.installment})` : ""} — ${brl(i.amount)}${share === 100 ? "" : ` · ${pct(share)} = ${brl(fromCents(Math.round((toCents(i.amount) * share) / 100)))}`}`;
   const out: string[] = [`*Acerto de contas — ${me} e ${person}*`, `Gerado em ${opts.generatedOn.split("-").reverse().join("/")}`, ""];

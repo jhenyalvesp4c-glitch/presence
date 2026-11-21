@@ -6,19 +6,19 @@ import { must, supabase } from "../data/db";
 import type { SettleItem } from "./settle";
 
 export type Settlement = { id: string; person: string; note: string; closed: boolean; createdAt: string; /** % das contas da casa que fica com a outra pessoa (null = não definido). */ defaultShare: number | null };
-export type ItemDraft = Omit<SettleItem, "id">;
+export type ItemDraft = Omit<SettleItem, "id" | "linked">;
 
 const LIST = ["settlements"] as const;
 const itemsKey = (id: string | null) => ["settlement-items", id] as const;
 
 type SRow = { id: string; person: string; note: string; closed: boolean; created_at: string; default_share: number | null };
-type IRow = { id: string; kind: SettleItem["kind"]; item_date: string | null; description: string; amount: number | string; payer: SettleItem["payer"]; other_share: number; installment: string; source_ref?: string | null };
+type IRow = { id: string; kind: SettleItem["kind"]; item_date: string | null; description: string; amount: number | string; payer: SettleItem["payer"]; other_share: number; installment: string; source_ref?: string | null; pending?: boolean | null };
 
 const toSettlement = (r: SRow): Settlement => ({ id: r.id, person: r.person, note: r.note, closed: r.closed, createdAt: r.created_at, defaultShare: r.default_share });
-const toItem = (r: IRow): SettleItem => ({ id: r.id, kind: r.kind, date: r.item_date, description: r.description, amount: Number(r.amount), payer: r.payer, otherShare: r.other_share, installment: r.installment, linked: !!r.source_ref });
+const toItem = (r: IRow): SettleItem => ({ id: r.id, kind: r.kind, date: r.item_date, description: r.description, amount: Number(r.amount), payer: r.payer, otherShare: r.other_share, installment: r.installment, linked: !!r.source_ref, pending: !!r.pending });
 const toRow = (d: ItemDraft, settlementId: string, position: number) => ({
   settlement_id: settlementId, kind: d.kind, item_date: d.date || null, description: d.description.trim().slice(0, 200), amount: Math.round(d.amount * 100) / 100,
-  payer: d.payer, other_share: Math.min(100, Math.max(0, Math.round(d.otherShare))), installment: d.installment.trim().slice(0, 20), position,
+  payer: d.payer, other_share: Math.min(100, Math.max(0, Math.round(d.otherShare))), installment: d.installment.trim().slice(0, 20), pending: d.kind === "pagamento" && !!d.pending, position,
 });
 
 export function useSettlements() {
@@ -31,7 +31,7 @@ export function useSettlements() {
 export function useSettlementItems(id: string | null) {
   return useQuery({
     queryKey: itemsKey(id), enabled: !!id,
-    queryFn: async () => (must(await supabase.from("fin_settlement_items").select("id, kind, item_date, description, amount, payer, other_share, installment, source_ref").eq("settlement_id", id!).order("position").order("created_at")) as IRow[]).map(toItem),
+    queryFn: async () => (must(await supabase.from("fin_settlement_items").select("id, kind, item_date, description, amount, payer, other_share, installment, source_ref, pending").eq("settlement_id", id!).order("position").order("created_at")) as IRow[]).map(toItem),
   });
 }
 
