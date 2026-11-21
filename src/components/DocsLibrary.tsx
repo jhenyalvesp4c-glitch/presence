@@ -7,13 +7,14 @@ import { toast } from "sonner";
 import { loadProjectState } from "@/lib/data/project-data";
 import { backdropProps } from "@/lib/backdrop";
 import {
-  BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Download, Link2, Eye, EyeOff, FileText, FileVideo, Folder,
+  BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Download, Link2, Rocket, Eye, EyeOff, FileText, FileVideo, Folder,
   FolderOpen, FolderPlus, GraduationCap, KeyRound, LayoutGrid, Lightbulb, List, MoreHorizontal, Plus, Search, Send,
   Sparkles, Star, Trash2, User, Users, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil, ClipboardCopy,
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
 import { ClientsView } from "@/components/ClientsView";
 import { DossierHub } from "@/components/DossierHub";
+import { PlaybooksView } from "@/components/PlaybooksView";
 import { matchDossier, parseLogins, prettySlug } from "@/lib/login-import";
 import { readLoginEmails } from "@/lib/login-emails.functions";
 import { readFiles } from "@/components/inbox/files";
@@ -140,18 +141,18 @@ const mapFolders = (fs: FolderT[], id: string, fn: (f: FolderT) => FolderT): Fol
   fs.map((f) => (f.id === id ? fn(f) : { ...f, subs: f.subs && mapFolders(f.subs, id, fn) }));
 
 export function DocsLibrary({ projectId }: { projectId: string }) {
-  const [section, setSection] = useState<"lib" | "tre" | "cli">("lib");
+  const [section, setSection] = useState<"lib" | "tre" | "cli" | "pla">("lib");
   return (
     <div className="space-y-4">
       <div className="glass inline-flex rounded-2xl p-1 animate-rise">
-        {([["lib", "Biblioteca", BookOpen, "cyan"], ["tre", "Treinamentos", GraduationCap, "pink"], ["cli", "Clientes", Users, "violet"]] as const).map(([k, l, I, c]) => (
+        {([["lib", "Biblioteca", BookOpen, "cyan"], ["tre", "Treinamentos", GraduationCap, "pink"], ["cli", "Clientes", Users, "violet"], ["pla", "Playbooks", Rocket, "emerald"]] as const).map(([k, l, I, c]) => (
           <button key={k} onClick={() => setSection(k)} style={tint(c)}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition ${section === k ? "bg-[color-mix(in_oklab,var(--glow)_15%,transparent)] text-[var(--glow)] shadow-[0_0_20px_-8px_var(--glow)]" : "text-muted-foreground hover:text-foreground"}`}>
             <I size={15} /> {l}
           </button>
         ))}
       </div>
-      {section === "lib" ? <Library projectId={projectId} /> : section === "tre" ? <TrainingScripts projectId={projectId} /> : <ClientsView projectId={projectId} />}
+      {section === "lib" ? <Library projectId={projectId} /> : section === "tre" ? <TrainingScripts projectId={projectId} /> : section === "cli" ? <ClientsView projectId={projectId} /> : <PlaybooksView projectId={projectId} onOpenClients={() => setSection("cli")} onOpenLibrary={() => setSection("lib")} />}
     </div>
   );
 }
