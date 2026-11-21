@@ -6,6 +6,7 @@ import { ArrowRightLeft, Camera, Check, ClipboardCopy, FileText, Handshake, Home
 
 import { useAuth } from "@/lib/auth";
 import { readFiles, type LocalFile } from "@/components/inbox/files";
+import { monthLabel } from "@/lib/finance/calc";
 import { readStatement, type StatementLine } from "@/lib/finance/statement.functions";
 import { balance, brl, fromCents, parseBills, parseMoney, split, statementText, type Payer, type SettleItem } from "@/lib/finance/settle";
 import { download, printStatement, statementPng } from "@/lib/finance/settle-export";
@@ -27,7 +28,12 @@ export function SettleView() {
   const [reader, setReader] = useState(false), [bills, setBills] = useState(false), [editor, setEditor] = useState<{ item: SettleItem | null; kind: SettleItem["kind"] } | null>(null);
   const settlements = list.data ?? [];
   const sel: Settlement | undefined = settlements.find((s) => s.id === selId) ?? settlements.find((s) => !s.closed) ?? settlements[0];
-  const items = useSettlementItems(sel?.id ?? null).data ?? [];
+  const allItems = useSettlementItems(sel?.id ?? null).data ?? [];
+  // mês a mês: compras parceladas só pesam no mês em que vencem; "acumulado" soma tudo até o mês escolhido (inclui meses anteriores em aberto)
+  const nowYm = todayIso().slice(0, 7), [ym, setYm] = useState(nowYm), [acc, setAcc] = useState(false);
+  const itemYm = (it: SettleItem) => it.date?.slice(0, 7) ?? nowYm;
+  const items = useMemo(() => allItems.filter((it) => (acc ? itemYm(it) <= ym : itemYm(it) === ym)), [allItems, ym, acc, nowYm]);
+  const monthsWith = useMemo(() => [...new Set([nowYm, ...allItems.map(itemYm)])].sort(), [allItems, nowYm]);
   const bal = useMemo(() => balance(items), [items]);
   const text = sel ? statementText({ me, person: sel.person, items, generatedOn: todayIso() }) : "";
 
@@ -37,7 +43,7 @@ export function SettleView() {
   };
   const saveDrafts = async (drafts: ItemDraft[]) => {
     if (!sel || !drafts.length) return;
-    try { await acts.addItems.mutateAsync({ settlementId: sel.id, drafts, start: items.length }); toast.success(`${drafts.length} lançamento${drafts.length === 1 ? "" : "s"} adicionado${drafts.length === 1 ? "" : "s"}.`); } catch (e) { toast.error(`Não consegui salvar: ${(e as Error).message}`); }
+    try { await acts.addItems.mutateAsync({ settlementId: sel.id, drafts, start: allItems.length }); toast.success(`${drafts.length} lançamento${drafts.length === 1 ? "" : "s"} adicionado${drafts.length === 1 ? "" : "s"}.`); } catch (e) { toast.error(`Não consegui salvar: ${(e as Error).message}`); }
   };
   const copy = async () => { try { await navigator.clipboard.writeText(text); toast.success("Extrato copiado. Cole no WhatsApp."); } catch { toast.error("Não consegui copiar. Use a imagem ou o PDF."); } };
   const png = async () => { try { download(await statementPng(text), `acerto-${sel?.person ?? "contas"}.png`); } catch (e) { toast.error((e as Error).message); } };
@@ -60,10 +66,20 @@ export function SettleView() {
       </Panel>
 
       {sel && <>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5" data-testid="acerto-mes">
+          <div className="flex items-center gap-1.5">
+            <button className={btn.icon} aria-label="Mês anterior" disabled={ym <= monthsWith[0]!} onClick={() => setYm(monthsWith[Math.max(0, monthsWith.indexOf(ym) - 1)]!)}>‹</button>
+            <b className="min-w-36 text-center text-sm capitalize">{monthLabel(ym)}{ym === nowYm ? " · este mês" : ""}</b>
+            <button className={btn.icon} aria-label="Próximo mês" disabled={ym >= monthsWith[monthsWith.length - 1]!} onClick={() => setYm(monthsWith[Math.min(monthsWith.length - 1, monthsWith.indexOf(ym) + 1)]!)}>›</button>
+          </div>
+          <div role="radiogroup" className="flex gap-1 rounded-2xl border border-white/10 bg-black/25 p-1">
+            {([[false, "Só este mês"], [true, "Acumulado até aqui"]] as const).map(([v, t]) => <button key={t} type="button" role="radio" aria-checked={acc === v} onClick={() => setAcc(v)} className={`rounded-xl px-3 py-1.5 text-xs transition ${acc === v ? "bg-white/12 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>)}
+          </div>
+        </div>
         <Panel glow={bal.direction === "eu_pago" ? "var(--violet)" : "var(--emerald)"} data-testid="acerto-saldo">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Conta final com {sel.person}</p>
+              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Conta de {monthLabel(ym)}{acc ? " (acumulado)" : ""} com {sel.person}</p>
               <p className="mt-1 font-display text-3xl font-semibold" data-testid="acerto-final">
                 {bal.direction === "quite" ? "Ninguém deve nada" : bal.direction === "outro_paga" ? <>{sel.person} paga <span className="text-emerald">{brl(bal.amount)}</span> a você</> : <>Você paga <span className="text-violet">{brl(bal.amount)}</span> a {sel.person}</>}
               </p>
@@ -84,8 +100,8 @@ export function SettleView() {
         </Panel>
 
         <Panel>
-          <Head icon={ArrowRightLeft} title="Lançamentos" sub={`${items.length} item${items.length === 1 ? "" : "s"}`} />
-          {items.length === 0 ? <Empty icon={Receipt} title="Sem lançamentos" hint="Envie a foto do extrato do seu cartão (e depois a do cartão dela) ou lance à mão." /> : (
+          <Head icon={ArrowRightLeft} title="Lançamentos" sub={`${items.length} item${items.length === 1 ? "" : "s"} em ${monthLabel(ym)}${acc ? " e antes" : ""} · ${allItems.length} no total`} />
+          {items.length === 0 ? <Empty icon={Receipt} title="Sem lançamentos neste mês" hint="Envie a foto do extrato do seu cartão (e depois a do cartão dela) ou lance à mão." /> : (
             <ul className="divide-y divide-white/5" data-testid="acerto-itens">
               {items.map((it) => <ItemRow key={it.id} it={it} person={sel.person} onEdit={() => setEditor({ item: it, kind: it.kind })}
                 onDelete={() => { if (window.confirm(`Excluir "${it.description || "lançamento"}"?`)) acts.removeItem.mutate({ settlementId: sel.id, id: it.id }, { onError: (e) => toast.error(`Não consegui excluir: ${e.message}`) }); }} />)}
