@@ -45,7 +45,7 @@ export function ConnectionMap({ height = "calc(100vh - 250px)" }: { height?: str
   ui.current = { ...ui.current, on, onlyOpen, q: q.trim().toLowerCase(), paused, selected, hover };
 
   const visible = useCallback((n: SimNode) => ui.current.on.has(n.kind) && (!ui.current.onlyOpen || !((n.kind === "demanda" || n.kind === "tarefa" || n.kind === "ideia") && !n.open)), []);
-  const fit = useCallback(() => { const s = sim.current; if (s) fly.current = { to: s.fit(size.current.w, size.current.h, 60, visible), t0: performance.now() }; }, [visible]);
+  const fit = useCallback(() => { const s = sim.current; if (s) fly.current = { to: s.fit(size.current.w, size.current.h, 60, visible, size.current.w < 700 ? 200 : 140), t0: performance.now() }; }, [visible]);
 
   // nasce uma simulação nova quando a rede muda
   useEffect(() => {
@@ -166,20 +166,22 @@ export function ConnectionMap({ height = "calc(100vh - 250px)" }: { height?: str
       <canvas ref={canvas} className="absolute inset-0 h-full w-full cursor-grab touch-none" style={{ width: "100%", height: "100%" }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => { if (!drag.current) setHover(null); }} onWheel={onWheel} data-testid="mapa-canvas" aria-label="Mapa de conexões do Orion" />
       <Corners />
 
-      <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-3 sm:left-6 sm:top-6">
-        <div className="glass pointer-events-auto flex gap-5 rounded-2xl px-4 py-2.5" data-testid="mapa-stats"><Stat v={graph.nodes.length} l="nós" c="var(--cyan)" /><Stat v={graph.links.length} l="ligações" c="var(--violet)" /><Stat v={graph.nodes.filter((n) => n.urgent).length} l="urgentes" c="oklch(0.72 0.19 25)" /></div>
-        <div className="pointer-events-auto flex max-w-[22rem] flex-wrap gap-1.5" data-testid="mapa-legenda">{KINDS.map((k) => graph.counts[k.k] > 0 && (
-          <button key={k.k} type="button" aria-pressed={on.has(k.k)} onClick={() => setOn((s) => { const n = new Set(s); if (n.has(k.k)) n.delete(k.k); else n.add(k.k); return n; })} data-testid={`tipo-${k.k}`} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.68rem] backdrop-blur transition active:scale-95 ${on.has(k.k) ? "border-white/20 bg-background/60 text-foreground" : "border-white/5 bg-background/30 text-muted-foreground/50 line-through"}`}>
-            <span className="h-2 w-2 rounded-full" style={{ background: k.color, boxShadow: `0 0 8px ${k.color}` }} />{k.label}<span className="font-mono opacity-60">{graph.counts[k.k]}</span></button>))}</div>
-      </div>
-
-      <div className="absolute right-4 top-4 flex flex-col items-end gap-2 sm:right-6 sm:top-6">
-        <label className="glass flex items-center gap-2 rounded-full px-3.5 py-2"><Search size={13} className="text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar no mapa…" className="w-44 bg-transparent text-xs outline-none placeholder:text-muted-foreground" data-testid="mapa-busca" />{q && <button type="button" aria-label="Limpar" onClick={() => setQ("")}><X size={12} /></button>}</label>
-        <div className="flex flex-wrap justify-end gap-1.5">
+      <div className="pointer-events-none absolute inset-x-4 top-4 flex flex-col gap-2.5 sm:inset-x-6 sm:top-6" data-testid="mapa-topo">
+       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
+        <div className="glass pointer-events-auto flex shrink-0 gap-5 rounded-2xl px-4 py-2.5" data-testid="mapa-stats"><Stat v={graph.nodes.length} l="nós" c="var(--cyan)" /><Stat v={graph.links.length} l="ligações" c="var(--violet)" /><Stat v={graph.nodes.filter((n) => n.urgent).length} l="urgentes" c="oklch(0.72 0.19 25)" /></div>
+      <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5">
+        <label className="glass flex items-center gap-2 rounded-full px-3.5 py-2"><Search size={13} className="text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar no mapa…" className="w-32 bg-transparent text-xs outline-none sm:w-44 placeholder:text-muted-foreground" data-testid="mapa-busca" />{q && <button type="button" aria-label="Limpar" onClick={() => setQ("")}><X size={12} /></button>}</label>
+        <div className="contents">
           {([[fit, "Enquadrar", Crosshair, false], [() => { sim.current?.scatter(); setTimeout(fit, 900); }, "Reorganizar", RefreshCw, false], [() => setPaused((p) => !p), paused ? "Soltar movimento" : "Pausar", paused ? Play : Pause, paused], [() => setOnlyOpen((o) => !o), onlyOpen ? "Só pendentes" : "Tudo", onlyOpen ? EyeOff : Eye, onlyOpen]] as [() => void, string, typeof Crosshair, boolean][]).map(([fn, l, I, act]) => <button key={l} type="button" onClick={fn} className={`glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition active:scale-95 ${act ? "!border-cyan/50 text-cyan" : "text-muted-foreground hover:text-foreground"}`}><I size={12} />{l}</button>)}
           <button type="button" onClick={() => setDemo((d) => !d)} aria-pressed={demo} data-testid="mapa-exemplo" className={`glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition active:scale-95 ${demo ? "!border-amber/50 text-amber" : "text-muted-foreground hover:text-foreground"}`}><FlaskConical size={12} />{demo ? "Voltar aos meus dados" : "Ver exemplo"}</button>
         </div>
       </div>
+       </div>
+        <div className="pointer-events-auto flex flex-wrap gap-1.5" data-testid="mapa-legenda">{KINDS.map((k) => graph.counts[k.k] > 0 && (
+          <button key={k.k} type="button" aria-pressed={on.has(k.k)} onClick={() => setOn((s) => { const n = new Set(s); if (n.has(k.k)) n.delete(k.k); else n.add(k.k); return n; })} data-testid={`tipo-${k.k}`} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.68rem] backdrop-blur transition active:scale-95 ${on.has(k.k) ? "border-white/20 bg-background/60 text-foreground" : "border-white/5 bg-background/30 text-muted-foreground/50 line-through"}`}>
+            <span className="h-2 w-2 rounded-full" style={{ background: k.color, boxShadow: `0 0 8px ${k.color}` }} />{k.label}<span className="font-mono opacity-60">{graph.counts[k.k]}</span></button>))}</div>
+      </div>
+
 
       <canvas ref={mini} width={170} height={110} className="glass pointer-events-none absolute bottom-4 left-4 hidden rounded-xl sm:block sm:bottom-6 sm:left-6" aria-hidden />
       <p className="pointer-events-none absolute bottom-4 left-1/2 hidden -translate-x-1/2 items-center gap-2 font-mono text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground md:flex"><Sparkles size={11} className="text-cyan" /> roda para zoom · arraste para mover · clique num nó{demo && <span className="text-amber">· exemplo</span>}</p>

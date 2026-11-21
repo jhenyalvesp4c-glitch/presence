@@ -70,13 +70,14 @@ export class MapSim {
     return best;
   }
   /** Enquadramento que mostra todos os nós (com folga). */
-  fit(w: number, h: number, pad = 70, enabled?: (n: SimNode) => boolean): View {
+  /** `top`: faixa reservada no alto (filtros sobrepostos): o grafo é enquadrado só na área que sobra. */
+  fit(w: number, h: number, pad = 70, enabled?: (n: SimNode) => boolean, top = 0): View {
     const L = this.nodes.filter((n) => !enabled || enabled(n));
     if (!L.length) return { x: w / 2, y: h / 2, k: 1 };
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const n of L) { x0 = Math.min(x0, n.x - n.r); y0 = Math.min(y0, n.y - n.r); x1 = Math.max(x1, n.x + n.r); y1 = Math.max(y1, n.y + n.r); }
-    const k = Math.min(1.6, Math.max(0.15, Math.min((w - pad * 2) / Math.max(1, x1 - x0), (h - pad * 2) / Math.max(1, y1 - y0))));
-    return { k, x: w / 2 - ((x0 + x1) / 2) * k, y: h / 2 - ((y0 + y1) / 2) * k };
+    const k = Math.min(1.6, Math.max(0.15, Math.min((w - pad * 2) / Math.max(1, x1 - x0), (h - top - pad * 2) / Math.max(1, y1 - y0))));
+    return { k, x: w / 2 - ((x0 + x1) / 2) * k, y: top + (h - top) / 2 - ((y0 + y1) / 2) * k };
   }
   neighbors(id: string): Set<string> { return this.adj.get(id) ?? new Set(); }
 }
