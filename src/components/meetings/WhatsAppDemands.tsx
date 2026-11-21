@@ -2,14 +2,14 @@
 import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { AlertTriangle, BellOff, Check, CheckCheck, FileText, Loader2, MessageCircle, Quote, Radar, RefreshCw, Search, Send, Users, X } from "lucide-react";
+import { AlertTriangle, BellOff, Brain, Check, CheckCheck, FileText, Loader2, MessageCircle, Quote, Radar, RefreshCw, Search, Send, Users, X } from "lucide-react";
 
 import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { readFiles, type LocalFile } from "@/components/inbox/files";
 import { Thinking } from "@/components/ideas/fx";
 import { backdropProps } from "@/lib/backdrop";
-import { useDecide, useDecided, useUndecide } from "@/lib/data/wa-requests";
-import { buildBatches, groupChats, mergeRequests, requestsToInboxText, sinceSeconds, type ImageRef, type Req, type WaMessage } from "@/lib/wa-requests";
+import { useDecide, useDecided, useRules, useSaveRules, useUndecide } from "@/lib/data/wa-requests";
+import { DEFAULT_RULES, buildBatches, groupChats, mergeRequests, requestsToInboxText, sinceSeconds, type ImageRef, type Req, type WaMessage } from "@/lib/wa-requests";
 import { findRequests } from "@/lib/wa-requests.functions";
 import { startBridge, waGet } from "@/lib/whatsapp/client";
 
@@ -33,7 +33,9 @@ async function loadMedia(ref: ImageRef): Promise<LocalFile | null> {
 }
 
 export function WhatsAppDemands() {
-  const decided = useDecided(), decide = useDecide(), undecide = useUndecide();
+  const decided = useDecided(), decide = useDecide(), undecide = useUndecide(), rulesQ = useRules(), saveRules = useSaveRules();
+  const [rulesOpen, setRulesOpen] = useState(false), [rulesText, setRulesText] = useState<string | null>(null);
+  const rules = rulesText ?? (rulesQ.data || DEFAULT_RULES), aceitos = (decided.data ?? []).filter((d) => d.status === "enviada"), descartados = (decided.data ?? []).filter((d) => d.status === "descartada");
   const [period, setPeriod] = useState<Period>("ultima"), [grupos, setGrupos] = useState(true), [privadas, setPrivadas] = useState(true), [imagens, setImagens] = useState(true);
   const [phase, setPhase] = useState<"idle" | "scan" | "done">("idle"), [prog, setProg] = useState({ txt: "", done: 0, total: 0 }), [offline, setOffline] = useState<string | null>(null), [starting, setStarting] = useState(false);
   const [reqs, setReqs] = useState<Req[]>([]), [imgs, setImgs] = useState<Map<number, Img>>(new Map()), [sel, setSel] = useState<Set<string>>(new Set()), [q, setQ] = useState(""), [showResolved, setShowResolved] = useState(false);
@@ -64,7 +66,7 @@ export function WhatsAppDemands() {
       }
       setProg({ txt: `A IA está procurando pedidos (${i + 1}/${batches.length})…`, done: i, total: batches.length });
       try {
-        const res = await findRequests({ data: { texto: b.text, hoje: iso(), diaSemana: new Date().toLocaleDateString("pt-BR", { weekday: "long" }), euSou, files } });
+        const res = await findRequests({ data: { texto: b.text, hoje: iso(), diaSemana: new Date().toLocaleDateString("pt-BR", { weekday: "long" }), euSou, regras: rulesQ.data ?? "", aceitos: aceitos.slice(0, 12).map((d) => ({ titulo: d.title, chat: d.chat, trecho: d.quote })), descartados: descartados.slice(0, 12).map((d) => ({ titulo: d.title, chat: d.chat, trecho: d.quote })), files } });
         if (res.ok) lists.push(res.pedidos); else { falhas++; toast.error(res.error); }
       } catch (e) { falhas++; toast.error(`Falhou um lote: ${(e as Error).message}`); }
     }
@@ -99,6 +101,10 @@ export function WhatsAppDemands() {
           <button type="button" onClick={() => void scan()} disabled={phase === "scan" || (!grupos && !privadas)} className="inline-flex items-center gap-2 rounded-full border border-emerald/50 bg-emerald/15 px-6 py-3 text-sm font-semibold text-emerald shadow-[0_0_34px_-10px_var(--emerald)] transition hover:bg-emerald/25 active:scale-95 disabled:opacity-50" data-testid="verificar">{phase === "scan" ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} {phase === "scan" ? "Verificando…" : "Verificar agora"}</button></div>
         <div className="mt-4 flex flex-wrap items-center gap-2"><span className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">Período</span>{PERIODS.map(([k, l]) => <button key={k} type="button" aria-pressed={period === k} onClick={() => setPeriod(k)} data-testid={`periodo-${k}`} className={chip(period === k)}>{l}</button>)}</div>
         <div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">Incluir</span><button type="button" aria-pressed={grupos} onClick={() => setGrupos((o) => !o)} className={chip(grupos)}><Users size={12} className="mr-1 inline" />Grupos</button><button type="button" aria-pressed={privadas} onClick={() => setPrivadas((o) => !o)} className={chip(privadas)}><MessageCircle size={12} className="mr-1 inline" />Conversas privadas</button><button type="button" aria-pressed={imagens} onClick={() => setImagens((o) => !o)} className={chip(imagens)}>Imagens e PDFs</button></div>
+        <div className="mt-4 border-t border-white/10 pt-3"><button type="button" onClick={() => setRulesOpen((o) => !o)} aria-expanded={rulesOpen} className="inline-flex items-center gap-2 text-xs text-muted-foreground transition hover:text-foreground" data-testid="regras-abrir"><Brain size={13} className="text-violet" /> O que conta como demanda para mim <span className="rounded-full bg-violet/15 px-2 py-0.5 text-violet">aprendendo com {aceitos.length} aceito(s) e {descartados.length} descartado(s)</span></button>
+          {rulesOpen && <div className="mt-3" data-testid="regras" style={{ animation: "fin-rise .35s both" }}><p className="mb-2 text-xs text-muted-foreground">É o que a IA sabe sobre o seu trabalho. Já vem com os assuntos do CRM/P4C; edite à vontade. Além disso, ela aprende com o que você marca e descarta.</p>
+            <textarea value={rules} onChange={(e) => setRulesText(e.target.value)} rows={12} maxLength={5000} className="w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-relaxed outline-none focus:border-violet/60" data-testid="regras-texto" />
+            <div className="mt-2 flex flex-wrap items-center gap-3"><button type="button" onClick={() => saveRules.mutate(rules === DEFAULT_RULES ? "" : rules, { onSuccess: () => { setRulesText(null); toast.success("Regras salvas"); }, onError: (e) => toast.error(e.message) })} disabled={saveRules.isPending || rulesText === null} className="rounded-full border border-violet/50 bg-violet/15 px-4 py-1.5 text-xs font-medium text-violet hover:bg-violet/25 disabled:opacity-40" data-testid="regras-salvar">Salvar</button><button type="button" onClick={() => setRulesText(DEFAULT_RULES)} className="text-xs text-muted-foreground hover:text-foreground hover:underline">Voltar ao padrão</button></div></div>}</div>
         {offline && <div className="mt-4 rounded-xl border border-amber/30 bg-amber/10 px-3 py-2 text-xs text-amber" data-testid="wa-offline-demandas"><p className="flex items-start gap-2"><AlertTriangle size={13} className="mt-0.5 shrink-0" />{offline}</p>
           <div className="mt-2 flex flex-wrap items-center gap-3"><button type="button" onClick={() => void turnOn()} disabled={starting} className="inline-flex items-center gap-1.5 rounded-full border border-emerald/50 bg-emerald/10 px-3 py-1 font-medium text-emerald hover:bg-emerald/20 disabled:opacity-50">{starting && <Loader2 size={12} className="animate-spin" />} Ligar o WhatsApp aqui</button><span className="text-muted-foreground">No site publicado: dois cliques em whatsapp-fundo.cmd (uma vez).</span></div></div>}
         {phase === "scan" && <div className="mt-4"><Thinking lines={["Lendo grupos e conversas…", "Baixando as imagens…", "Procurando quem pediu o quê…", "Separando o que parece demanda…"]} />

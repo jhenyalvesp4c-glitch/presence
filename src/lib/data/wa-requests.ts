@@ -5,12 +5,12 @@ import type { Req } from "../wa-requests";
 import { must, supabase } from "./db";
 
 const KEY = ["wa-requests"] as const;
-export type Decided = { key: string; status: "enviada" | "descartada"; title: string; chat: string; createdAt: string };
-type Row = { key: string; status: "enviada" | "descartada"; title: string; chat_name: string; created_at: string };
+export type Decided = { key: string; status: "enviada" | "descartada"; title: string; chat: string; quote: string; createdAt: string };
+type Row = { key: string; status: "enviada" | "descartada"; title: string; chat_name: string; quote: string; created_at: string };
 
 export const useDecided = () => useQuery({
   queryKey: KEY,
-  queryFn: async (): Promise<Decided[]> => (must(await supabase.from("whatsapp_requests").select("key, status, title, chat_name, created_at").order("created_at", { ascending: false }).limit(2000)) as Row[]).map((r) => ({ key: r.key, status: r.status, title: r.title, chat: r.chat_name, createdAt: r.created_at })),
+  queryFn: async (): Promise<Decided[]> => (must(await supabase.from("whatsapp_requests").select("key, status, title, chat_name, quote, created_at").order("created_at", { ascending: false }).limit(2000)) as Row[]).map((r) => ({ key: r.key, status: r.status, title: r.title, chat: r.chat_name, quote: r.quote, createdAt: r.created_at })),
 });
 export function useDecide() {
   const qc = useQueryClient();
@@ -25,4 +25,11 @@ export function useDecide() {
 export function useUndecide() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: async (key: string) => { must(await supabase.from("whatsapp_requests").delete().eq("key", key).select("id")); }, onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }) });
+}
+
+/** O que conta como demanda para a pessoa (texto editável; vazio = padrão do CRM/P4C). */
+export const useRules = () => useQuery({ queryKey: ["wa-rules"], queryFn: async (): Promise<string> => ((must(await supabase.from("wa_demand_rules").select("rules").limit(1)) as { rules: string }[])[0]?.rules ?? "") });
+export function useSaveRules() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: async (rules: string) => { must(await supabase.from("wa_demand_rules").upsert({ rules, updated_at: new Date().toISOString() }, { onConflict: "user_id" }).select("user_id")); }, onSuccess: () => void qc.invalidateQueries({ queryKey: ["wa-rules"] }) });
 }

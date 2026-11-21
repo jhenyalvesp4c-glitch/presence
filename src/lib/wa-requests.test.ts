@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBatches, cleanRequests, groupChats, mergeRequests, reqKey, requestsToInboxText, sinceSeconds, stamp, type WaMessage } from "./wa-requests";
+import { DEFAULT_RULES, buildBatches, rulesPrompt, cleanRequests, groupChats, mergeRequests, reqKey, requestsToInboxText, sinceSeconds, stamp, type WaMessage } from "./wa-requests";
 
 const base = Math.floor(new Date(2026, 10, 21, 14, 0).getTime() / 1000);
 const m = (chat: string, name: string, group: boolean, id: string, ts: number, text: string, o: Partial<WaMessage> = {}): WaMessage => ({ id, chat, chat_name: name, is_group: group, sender_name: "Carla", from_me: false, ts, text, kind: "texto", ...o });
@@ -34,5 +34,11 @@ describe("wa-requests", () => {
     const [r] = cleanRequests({ pedidos: [{ chat: "Polo Norte", grupo: true, quem: "Carla", titulo: "Enviar relatório", quando: "21/11 14:00", prazo: "2026-11-28", trecho: "preciso do relatório", imagens: [1] }] }, new Set([1]));
     const t = requestsToInboxText([r!], { 1: "whatsapp-polo-norte-1.jpg" }); expect(t).toMatch(/Enviar relatório — pedido por Carla no grupo "Polo Norte"/); expect(t).toMatch(/Prazo: 28\/11\/2026/); expect(t).toMatch(/whatsapp-polo-norte-1\.jpg/);
     expect(sinceSeconds("ultima", 1234)).toBe(1234); expect(sinceSeconds("ultima", null, new Date(2026, 10, 21, 12))).toBe(Math.floor(new Date(2026, 10, 21, 12).getTime() / 1000) - 86400); expect(stamp(base)).toBe("21/11 14:00");
+  });
+  it("prompt de regras: padrão do CRM, personalizado e exemplos aprendidos", () => {
+    expect(DEFAULT_RULES).toMatch(/template/i); expect(DEFAULT_RULES).toMatch(/fora do horário/i); expect(DEFAULT_RULES).toMatch(/usuários/i); expect(DEFAULT_RULES).toMatch(/disparo/i);
+    expect(rulesPrompt("", [], [])).toContain("QR Code"); expect(rulesPrompt("só CRM", [], [])).toContain("só CRM"); expect(rulesPrompt("só CRM", [], [])).not.toContain("QR Code");
+    const p = rulesPrompt("", [{ titulo: "Reconectar o número", chat: "Polo Norte", trecho: "o QR caiu" }], [{ titulo: "Pagar fatura", chat: "Financeiro", trecho: "" }]);
+    expect(p).toMatch(/JÁ ACEITOU[\s\S]*Reconectar o número[\s\S]*o QR caiu/); expect(p).toMatch(/DESCARTOU[\s\S]*Pagar fatura/);
   });
 });

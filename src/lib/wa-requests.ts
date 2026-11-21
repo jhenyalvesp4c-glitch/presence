@@ -93,3 +93,27 @@ export function requestsToInboxText(reqs: Req[], fileNames: Record<number, strin
   }
   return L.join("\n");
 }
+
+/* ───────────── o que conta como demanda (conhecimento + aprendizado) ───────────── */
+export const DEFAULT_RULES = `Tudo que envolve o CRM / P4C e o atendimento dos clientes por WhatsApp é trabalho meu. Conta como demanda (mesmo que a pessoa não escreva "preciso": um relato de erro ou uma dúvida dessas já é um pedido de ajuda):
+- Mensagem automática enviada ao lead com erro, ou mensagem automática que não está sendo enviada
+- Mensagem fora do horário de funcionamento (ausência) que não está sendo enviada
+- Trocar ou alterar mensagens automáticas, textos e configurações do atendimento
+- Criar usuários, dar acesso, permissão ou alterar cadastro de usuário
+- Dúvida de como fazer algo no CRM / P4C
+- Criar templates, ver se o template foi aprovado, template reprovado ou com erro ao enviar
+- Disparo de campanha em massa: fazer, programar, conferir, erro no disparo
+- Problemas no fluxo de atendimento (filas, distribuição, transferência, chatbot, encerrar conversa)
+- Erro ao enviar mensagem; erro ao enviar vídeos, imagens, áudios ou arquivos
+- Conexão do número: QR Code caiu, reconectar, número bloqueado ou limitado, API oficial
+Normalmente NÃO é demanda minha: anúncios pagos e tráfego (saldo de anúncios, verba, criativos), cobranças e faturas, conversa social e avisos sem pedido.`;
+
+export type Example = { titulo: string; chat: string; trecho: string };
+const ex = (l: Example[]) => l.slice(0, 12).map((e) => `- "${e.titulo}" (${e.chat})${e.trecho ? ` — mensagem: "${e.trecho.slice(0, 140)}"` : ""}`).join("\n");
+/** Trecho do prompt com o que conta como demanda para esta pessoa e o que ela já aceitou ou descartou antes. */
+export function rulesPrompt(rules: string, aceitos: Example[], descartados: Example[]): string {
+  const r = (rules.trim() || DEFAULT_RULES).slice(0, 5000), parts = [`O QUE É DEMANDA PARA ESTA PESSOA (conhecimento do trabalho dela; siga):\n${r}`];
+  if (aceitos.length) parts.push(`Pedidos que ela JÁ ACEITOU como demanda (liste coisas parecidas):\n${ex(aceitos)}`);
+  if (descartados.length) parts.push(`Pedidos que ela DESCARTOU, não eram demanda (não liste coisas parecidas):\n${ex(descartados)}`);
+  return parts.join("\n\n");
+}
