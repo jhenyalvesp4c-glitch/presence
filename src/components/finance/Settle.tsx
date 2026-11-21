@@ -10,7 +10,7 @@ import { readFiles, type LocalFile } from "@/components/inbox/files";
 import { monthLabel } from "@/lib/finance/calc";
 import { readStatement, type StatementLine } from "@/lib/finance/statement.functions";
 import { balance, brl, fromCents, parseBills, parseMoney, split, statementText, toCents, type Payer, type SettleItem } from "@/lib/finance/settle";
-import { download, printStatement, statementPng } from "@/lib/finance/settle-export";
+import { download, printStatement, statementCard, type CardRow } from "@/lib/finance/settle-export";
 import { useSettleActions, useSettlementItems, useSettlements, type ItemDraft, type Settlement } from "@/lib/finance/settle-data";
 import { Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TextInput, btn } from "./ui";
 
@@ -47,7 +47,25 @@ export function SettleView() {
     try { await acts.addItems.mutateAsync({ settlementId: sel.id, drafts, start: allItems.length }); toast.success(`${drafts.length} lançamento${drafts.length === 1 ? "" : "s"} adicionado${drafts.length === 1 ? "" : "s"}.`); } catch (e) { toast.error(`Não consegui salvar: ${(e as Error).message}`); }
   };
   const copy = async () => { if (await copyText(text)) toast.success("Extrato copiado. Cole no WhatsApp."); else toast.error("Não consegui copiar. Use a imagem ou o PDF."); };
-  const png = async () => { try { download(await statementPng(text), `acerto-${sel?.person ?? "contas"}.png`); } catch (e) { toast.error((e as Error).message); } };
+  const png = async () => {
+    if (!sel) return;
+    try {
+      const row = (it: SettleItem): CardRow => {
+        const sp = split(it), pix = it.kind === "pagamento", part = pix ? toCents(it.amount) : it.payer === "eu" ? sp.other : sp.mine, parcial = !pix && part !== toCents(it.amount), pct = it.payer === "eu" ? it.otherShare : 100 - it.otherShare;
+        const who = it.payer === "eu" ? sel.person : "você";
+        return { title: `${it.description || (pix ? "Pix" : "Compra")}${it.installment ? ` (${it.installment})` : ""}`, date: dm(it.date), value: part, tone: pix ? "neutro" : it.payer === "eu" ? "verde" : "roxo",
+          sub: pix ? (it.payer === "eu" ? `Pix seu → ${sel.person}` : `Pix de ${sel.person} → você`) : parcial ? `Compra de ${brl(it.amount)} · ${who} fica com ${pct}%` : `${who === "você" ? "Você paga" : `${sel.person} paga`} tudo` };
+      };
+      const ok = items.filter((i) => !(i.kind === "pagamento" && i.pending));
+      const blob = await statementCard({
+        me, person: sel.person, period: new Date(`${ym}-15T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }), accumulated: acc, generatedOn: todayIso(),
+        dele: ok.filter((i) => i.kind === "compra" && i.payer === "eu").map(row), meu: ok.filter((i) => i.kind === "compra" && i.payer === "outro").map(row), pix: ok.filter((i) => i.kind === "pagamento").map(row),
+        aguardando: items.filter((i) => i.kind === "pagamento" && i.pending).reduce((a, i) => a + toCents(i.amount) * (i.payer === "outro" ? 1 : -1), 0),
+        owedToMe: bal.owedToMe, owedByMe: bal.owedByMe, pixNet: bal.paidByOther - bal.paidByMe, net: bal.net,
+      });
+      download(blob, `acerto-${sel.person}-${ym}.png`);
+    } catch (e) { toast.error((e as Error).message); }
+  };
 
   return (
     <div className="space-y-5" data-testid="acerto">
