@@ -9,5 +9,9 @@ export const EXERCISE_MEDIA: Record<string, { src: string }> = {
   "remada-baixa-na-polia": { src: "/exercicios/remada-na-polia.mp4" }, // mesma remada sentada na polia
   "face-pull-na-polia": { src: "/exercicios/face-pull-na-polia.mp4" },
   "prancha-lateral": { src: "/exercicios/prancha-lateral.mp4" },
+  "agachamento-goblet": { src: "/exercicios/agachamento-goblet.mp4" },
+  "elevacao-pelvica-com-halter": { src: "/exercicios/elevacao-pelvica-com-halter.mp4" },
+  "dead-bug": { src: "/exercicios/dead-bug.mp4" },
+  "crunch-abdominal": { src: "/exercicios/crunch-abdominal.mp4" },
 };
 export const mediaFor = (ex: { id: string; nome: string }) => EXERCISE_MEDIA[ex.id] ?? EXERCISE_MEDIA[slugOf(ex.nome)] ?? null;
