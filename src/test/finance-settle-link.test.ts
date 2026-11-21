@@ -11,8 +11,8 @@ describe("vínculo compras divididas ↔ acerto", () => {
   it("ajuda fixa de 400: 5 parcelas inteiras + 45,50 da sexta, tudo da pessoa", () => {
     const d = desiredItems(st([kindle({ person: "Felipe", percent: 56, fixed: 400 })]));
     expect(d.map((x) => x.draft.amount)).toEqual([70.9, 70.9, 70.9, 70.9, 70.9, 45.5]);
-    expect(d[0]).toMatchObject({ ref: "plan:k:1", person: "Felipe", draft: { date: "2026-12-05", installment: "1/10", otherShare: 100, payer: "eu" } });
-    expect(d[5]?.draft.date).toBe("2027-05-05");
+    expect(d[0]).toMatchObject({ ref: "plan:k:1", person: "Felipe", draft: { date: "2026-11-28", installment: "1/10", otherShare: 100, payer: "eu" } });
+    expect(d[5]?.draft.date).toBe("2027-04-28");
   });
   it("fatia percentual: parcela inteira e a % da pessoa", () => {
     const d = desiredItems(st([kindle({ person: "Ana", percent: 30 })]));

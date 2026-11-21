@@ -3,13 +3,16 @@
  * sempre os mesmos (chave `source_ref`), então editar ou apagar a compra atualiza o acerto sem duplicar.
  * A parte pura (quais itens devem existir) fica aqui; a gravação, em `syncSettlementLinks`.
  */
-import { addMonths, dayIn, dueDateOf, parcelAmount, planShare, recurringActiveIn, round2, ymOf } from "./calc";
+import { addMonths, closingDateOf, dayIn, invoiceMonthOf, parcelAmount, planShare, recurringActiveIn, round2, ymOf } from "./calc";
 import type { FinanceState } from "./types";
 import type { ItemDraft } from "./settle-data";
 
 export type LinkedItem = { ref: string; person: string; draft: ItemDraft };
 
 export const personKey = (s: string) => s.trim().toLocaleLowerCase("pt-BR");
+
+/** Data que conta no acerto: compra no crédito vale pelo FECHAMENTO da fatura em que cai (não pelo vencimento), para o mês bater com o que você paga. */
+const countDate = (card: { closingDay: number; dueDay: number } | undefined, dateIso: string, credit: boolean) => (card && credit ? closingDateOf(card, invoiceMonthOf(card, dateIso)) : dateIso);
 
 /** Itens do acerto que devem existir hoje, a partir das parcelas e movimentações divididas. */
 export function desiredItems(s: FinanceState, today: Date = new Date()): LinkedItem[] {
@@ -25,13 +28,13 @@ export function desiredItems(s: FinanceState, today: Date = new Date()): LinkedI
       // ajuda fixa: o valor exato que a pessoa cobre (pode ser só parte da parcela); fatia: parcela inteira e a %
       const part = fixed ? round2((amount * sh.percent) / 100) : amount;
       if (part <= 0) continue;
-      out.push({ ref: `plan:${p.id}:${n}`, person, draft: { kind: "compra", date: dueDateOf(card, addMonths(p.first, n - 1)), description: p.desc, amount: part, payer: "eu", otherShare: fixed ? 100 : Math.round(sh.percent), installment: `${n}/${p.count}` } });
+      out.push({ ref: `plan:${p.id}:${n}`, person, draft: { kind: "compra", date: closingDateOf(card, addMonths(p.first, n - 1)), description: p.desc, amount: part, payer: "eu", otherShare: fixed ? 100 : Math.round(sh.percent), installment: `${n}/${p.count}` } });
     }
   }
   for (const t of s.transactions) {
     const person = t.shared?.person.trim();
     if (!person || t.kind !== "despesa" || !t.shared || t.amount <= 0) continue;
-    out.push({ ref: `tx:${t.id}`, person, draft: { kind: "compra", date: t.date, description: t.desc, amount: t.amount, payer: "eu", otherShare: Math.round(t.shared.percent), installment: "" } });
+    out.push({ ref: `tx:${t.id}`, person, draft: { kind: "compra", date: countDate(s.cards.find((c) => c.id === t.cardId), t.date, t.method === "credito"), description: t.desc, amount: t.amount, payer: "eu", otherShare: Math.round(t.shared.percent), installment: "" } });
   }
   // assinaturas e contas fixas divididas: um item por mês ativo (até 24 meses atrás e 12 à frente), respeitando as pausas
   const nowYm = ymOf(today), from = addMonths(nowYm, -24), to = addMonths(nowYm, 12);
@@ -40,7 +43,7 @@ export function desiredItems(s: FinanceState, today: Date = new Date()): LinkedI
     if (!person || !r.shared || r.kind !== "despesa" || r.amount <= 0) continue;
     for (let ym = r.startYm > from ? r.startYm : from; ym <= to; ym = addMonths(ym, 1)) {
       if (!recurringActiveIn(r, ym)) continue;
-      out.push({ ref: `rec:${r.id}:${ym}`, person, draft: { kind: "compra", date: dayIn(ym, r.day), description: r.desc, amount: r.amount, payer: "eu", otherShare: Math.round(r.shared.percent), installment: "" } });
+      out.push({ ref: `rec:${r.id}:${ym}`, person, draft: { kind: "compra", date: countDate(s.cards.find((c) => c.id === r.cardId), dayIn(ym, r.day), r.method === "credito"), description: r.desc, amount: r.amount, payer: "eu", otherShare: Math.round(r.shared.percent), installment: "" } });
     }
   }
   return out;

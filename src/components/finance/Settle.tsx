@@ -100,7 +100,7 @@ export function SettleView() {
         </Panel>
 
         <Panel>
-          <Head icon={ArrowRightLeft} title="Lançamentos" sub={`${items.length} item${items.length === 1 ? "" : "s"} em ${monthLabel(ym)}${acc ? " e antes" : ""} · ${allItems.length} no total`} />
+          <Head icon={ArrowRightLeft} title="Lançamentos" sub={`${items.length} item${items.length === 1 ? "" : "s"} em ${monthLabel(ym)}${acc ? " e antes" : ""} · ${allItems.length} no total · compras no cartão contam pelo fechamento da fatura`} />
           {items.length === 0 ? <Empty icon={Receipt} title="Sem lançamentos neste mês" hint="Envie a foto do extrato do seu cartão (e depois a do cartão dela) ou lance à mão." /> : (() => {
             const rm = (it: SettleItem) => acts.removeItem.mutate({ settlementId: sel.id, id: it.id }, { onError: (e) => toast.error(`Não consegui excluir: ${e.message}`) });
             const row = (it: SettleItem) => <ItemRow key={it.id} it={it} person={sel.person} onEdit={() => setEditor({ item: it, kind: it.kind })} onDelete={() => { if (window.confirm(`Excluir "${it.description || "lançamento"}"?`)) rm(it); }} onConfirm={it.pending ? () => { const { id, linked: _l, ...draft } = it; acts.updateItem.mutate({ settlementId: sel.id, id, draft: { ...draft, pending: false, date: todayIso() } }, { onError: (e) => toast.error(`Não consegui salvar: ${e.message}`) }); } : undefined} />;
