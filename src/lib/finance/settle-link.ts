@@ -3,7 +3,7 @@
  * sempre os mesmos (chave `source_ref`), então editar ou apagar a compra atualiza o acerto sem duplicar.
  * A parte pura (quais itens devem existir) fica aqui; a gravação, em `syncSettlementLinks`.
  */
-import { addMonths, dueDateOf, parcelAmount, planShare, round2 } from "./calc";
+import { addMonths, dayIn, dueDateOf, parcelAmount, planShare, recurringActiveIn, round2, ymOf } from "./calc";
 import type { FinanceState } from "./types";
 import type { ItemDraft } from "./settle-data";
 
@@ -12,7 +12,7 @@ export type LinkedItem = { ref: string; person: string; draft: ItemDraft };
 export const personKey = (s: string) => s.trim().toLocaleLowerCase("pt-BR");
 
 /** Itens do acerto que devem existir hoje, a partir das parcelas e movimentações divididas. */
-export function desiredItems(s: FinanceState): LinkedItem[] {
+export function desiredItems(s: FinanceState, today: Date = new Date()): LinkedItem[] {
   const out: LinkedItem[] = [];
   for (const p of s.plans) {
     const person = p.shared?.person.trim();
@@ -32,6 +32,16 @@ export function desiredItems(s: FinanceState): LinkedItem[] {
     const person = t.shared?.person.trim();
     if (!person || t.kind !== "despesa" || !t.shared || t.amount <= 0) continue;
     out.push({ ref: `tx:${t.id}`, person, draft: { kind: "compra", date: t.date, description: t.desc, amount: t.amount, payer: "eu", otherShare: Math.round(t.shared.percent), installment: "" } });
+  }
+  // assinaturas e contas fixas divididas: um item por mês ativo (até 24 meses atrás e 12 à frente), respeitando as pausas
+  const nowYm = ymOf(today), from = addMonths(nowYm, -24), to = addMonths(nowYm, 12);
+  for (const r of s.recurring) {
+    const person = r.shared?.person.trim();
+    if (!person || !r.shared || r.kind !== "despesa" || r.amount <= 0) continue;
+    for (let ym = r.startYm > from ? r.startYm : from; ym <= to; ym = addMonths(ym, 1)) {
+      if (!recurringActiveIn(r, ym)) continue;
+      out.push({ ref: `rec:${r.id}:${ym}`, person, draft: { kind: "compra", date: dayIn(ym, r.day), description: r.desc, amount: r.amount, payer: "eu", otherShare: Math.round(r.shared.percent), installment: "" } });
+    }
   }
   return out;
 }

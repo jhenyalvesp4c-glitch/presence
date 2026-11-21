@@ -43,3 +43,15 @@ describe("vínculo compras divididas ↔ acerto", () => {
     expect(planSync(d, [{ id: "s1", person: "Felipe", closed: true }], ex).update).toEqual([]);
   });
 });
+
+describe("assinaturas divididas", () => {
+  it("geram um item por mês ativo, sem os meses pausados", () => {
+    const rec = { id: "r1", kind: "despesa", desc: "Netflix", amount: 55.9, day: 10, category: "assinaturas", method: "credito", startYm: "2026-10", pauses: [{ from: "2026-12", to: "2026-12" }], shared: { person: "Felipe", percent: 50 } } as unknown as FinanceState["recurring"][number];
+    const d = desiredItems({ ...st([]), recurring: [rec] }, new Date("2026-11-21T12:00:00"));
+    const yms = d.map((x) => x.ref.split(":")[2]);
+    expect(yms[0]).toBe("2026-10");
+    expect(yms).toContain("2026-11");
+    expect(yms).not.toContain("2026-12");
+    expect(d[0]?.draft).toMatchObject({ date: "2026-10-10", amount: 55.9, otherShare: 50, description: "Netflix" });
+  });
+});
