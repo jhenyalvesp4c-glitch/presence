@@ -25,7 +25,7 @@ describe("MapSim", () => {
 
 describe("MapSim em escala", () => {
   it("1.500 nós e 3.000 ligações: cada passo da física é rápido", () => {
-    const nodes = Array.from({ length: 1500 }, (_, i) => ({ id: `n${i}`, kind: (["demanda", "anotacao", "tarefa", "dossie"] as const)[i % 4], label: `N${i}`, sub: "", open: i % 3 === 0, urgent: false, link: "/", degree: 2, r: 8 }));
+    const nodes = Array.from({ length: 1500 }, (_, i) => ({ id: `n${i}`, kind: (["demanda", "anotacao", "tarefa", "dossie"] as const)[i % 4]!, label: `N${i}`, sub: "", open: i % 3 === 0, urgent: false, link: "/", degree: 2, r: 8 }));
     const links = Array.from({ length: 3000 }, (_, i) => ({ a: `n${i % 1500}`, b: `n${(i * 7 + 13) % 1500}`, rel: "contem" as const })).filter((l) => l.a !== l.b);
     const s = new MapSim({ nodes, links, counts: { projeto: 0, dossie: 375, demanda: 375, anotacao: 375, doc: 0, tarefa: 375, ideia: 0, reuniao: 0, pessoa: 0, conversa: 0, pedido: 0 } }, 1200, 800);
     const t0 = performance.now(); for (let i = 0; i < 20; i++) s.tick(i * 16); const per = (performance.now() - t0) / 20;

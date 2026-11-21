@@ -1,9 +1,13 @@
 /** Treino do dia: aquecimento, cada exercício com a meta, a sugestão de progressão e o registro série a série com cronômetro de descanso. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Check, ChevronDown, Flame, Loader2, Pause, Play, Timer, Trash2, TrendingUp } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Flame, Loader2, Pause, Play, Timer, Trash2, TrendingUp, X } from "lucide-react";
+
+import { createPortal } from "react-dom";
 
 import { Ring } from "@/components/finance/charts";
+import { backdropProps } from "@/lib/backdrop";
+import { mediaFor } from "@/lib/exercise-media";
 
 import { useProgramActions } from "@/lib/data/program";
 import { addDays, dayName, faseDaSemana, isoOf, sessionsOf, suggest, weekOf, type Action, type ProgDay, type ProgExercise, type Program, type SetLog } from "@/lib/program";
@@ -68,6 +72,27 @@ function SetRow({ ex, n, saved, date, week, preload, onSave, onDelete }: { ex: P
   );
 }
 
+/** Vídeo curto da execução: miniatura que repete sozinha (como um gif) e abre grande ao tocar. */
+function ExecVideo({ src, nome }: { src: string; nome: string }) {
+  const [big, setBig] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setBig(true)} aria-label={`Ver a execução de ${nome}`} data-testid="ver-execucao" className="group/vid relative h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-xl border border-white/10 transition hover:border-cyan/60 hover:shadow-[0_0_24px_-6px_var(--cyan)]">
+        <video src={src} autoPlay loop muted playsInline preload="metadata" className="h-full w-full object-cover" />
+        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent py-0.5 text-center font-mono text-[0.5rem] uppercase tracking-wider text-cyan">ver execução</span>
+      </button>
+      {big && createPortal(
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-background/90 p-4 backdrop-blur-md" {...backdropProps(() => setBig(false))} data-testid="video-execucao">
+          <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <p className="mb-2 text-center font-mono text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">Execução · {nome}</p>
+            <video src={src} autoPlay loop muted playsInline controls className="w-full rounded-2xl border border-white/10 shadow-[0_0_60px_-20px_var(--cyan)]" />
+            <button type="button" onClick={() => setBig(false)} aria-label="Fechar" className="absolute -right-2 -top-2 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-background"><X size={15} /></button>
+          </div>
+        </div>, document.body)}
+    </>
+  );
+}
+
 function ExerciseCard({ ex, logs, date, week, actions, onRest, index }: { ex: ProgExercise; logs: SetLog[]; date: string; week: number; actions: ReturnType<typeof useProgramActions>; onRest: (s: number) => void; index: number }) {
   const [help, setHelp] = useState(false);
   const before = useMemo(() => sessionsOf(logs.filter((l) => l.date < date), ex.id), [logs, date, ex.id]);
@@ -75,7 +100,7 @@ function ExerciseCard({ ex, logs, date, week, actions, onRest, index }: { ex: Pr
   const today = useMemo(() => logs.filter((l) => l.exerciseId === ex.id && l.date === date && !l.warmup), [logs, ex.id, date]);
   const bySet = (n: number) => today.find((l) => l.set === n);
   const save = async (l: SetLog) => { await actions.logSet.mutateAsync(l); if (ex.descansoS > 0 && l.set < ex.series) onRest(ex.descansoS); };
-  const isForce = ex.tipo === "forca", done = today.length >= (isForce ? ex.series : 1);
+  const media = mediaFor(ex), isForce = ex.tipo === "forca", done = today.length >= (isForce ? ex.series : 1);
   const presc = isForce ? `${ex.series} × ${ex.repsMin === ex.repsMax ? ex.repsMin : `${ex.repsMin}–${ex.repsMax}`}${ex.repsNota ? ` ${ex.repsNota}` : ""}` : ex.prescricao;
   const equip = ex.equip === "maquina" ? "máquina" : ex.equip === "halter" ? "halter" : ex.equip === "polia" ? "polia" : ex.equip === "corpo" ? "peso do corpo" : "livre";
   const SugIcon = sug.acao === "aumentar" ? TrendingUp : sug.acao === "interromper" || sug.acao === "reduzir" ? AlertTriangle : Flame;
@@ -85,6 +110,7 @@ function ExerciseCard({ ex, logs, date, week, actions, onRest, index }: { ex: Pr
       <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-[0.12] blur-3xl" style={{ background: done ? "var(--emerald)" : tone.c }} />
       <header className="relative flex items-start gap-3">
         <span className="pt-1 font-mono text-[0.7rem] tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
+        {media && <ExecVideo src={media.src} nome={ex.nome} />}
         <div className="min-w-0 flex-1"><h3 className="font-display text-base font-semibold leading-snug tracking-tight">{ex.nome}</h3><p className="mt-0.5 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground">{ex.grupo}{ex.grupo ? " · " : ""}{equip}</p></div>
         <div className="text-right"><p className="font-mono text-base font-semibold tabular-nums">{presc}</p><p className="font-mono text-[0.62rem] uppercase tracking-wider text-muted-foreground">{ex.descansoS ? `${ex.descansoS} s` : ""}{ex.rir && isForce ? ` · RIR ${ex.rir}` : ""}</p></div>
       </header>
