@@ -49,7 +49,7 @@ export function WhatsAppDemands() {
     const last = Number(ls.get("orion:wa:varredura", "0")) || null, since = sinceSeconds(period, last), startedAt = Math.floor(Date.now() / 1000);
     setProg({ txt: "Buscando as mensagens…", done: 0, total: 0 });
     const r = await waGet<{ ok?: boolean; messages: WaMessage[]; truncated: boolean }>("varredura", { since: String(since), limit: "3000" });
-    if (!r.ok) { setOffline(r.erro); setPhase("idle"); return; }
+    if (!r.ok) { setOffline(/404/.test(r.erro) ? "A ponte do WhatsApp que está ligada é de uma versão antiga (ainda não sabe fazer a verificação). Rode o atualizar, depois dê dois cliques em whatsapp-parar.cmd e em seguida em whatsapp-fundo.cmd." : r.erro); setPhase("idle"); return; }
     const chats = groupChats(r.data.messages ?? [], { grupos, privadas }), batches = buildBatches(chats, { withImages: imagens });
     if (!batches.length) { setStats({ conversas: 0, mensagens: 0, ocultos: 0, falhas: 0, truncado: false }); setPhase("done"); ls.set("orion:wa:varredura", String(startedAt)); return; }
     const euSou = ls.get("orion:reunioes:eu"), lists: Req[][] = [], allImgs = new Map<number, Img>(); let falhas = 0;
