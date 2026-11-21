@@ -90,7 +90,7 @@ describe("whatsapp: API local", () => {
   store.addMessage({ id: "1", chat: grupo, chat_name: "Juiz de Fora", is_group: true, sender: "5521988880000@s.whatsapp.net", sender_name: "Carlos", from_me: false, ts: 1_800_000_000, text: "Oi grupo", kind: "texto", mentions_me: true, reply_to_me: false });
   const state: BridgeState = { phase: "conectado", qr: null, phone: "5511999990000", name: "Jheny", since: 1, paused: false };
   let paused = false;
-  const server = createApi(store, state, "segredo", { logout: async () => undefined, pause: (on) => { paused = on; } });
+  const server = createApi(store, state, "segredo", { logout: async () => undefined, pause: (on) => { paused = on; }, shutdown: () => undefined });
   const ready = new Promise<number>((r) => server.listen(0, "127.0.0.1", () => r((server.address() as AddressInfo).port)));
   afterAll(() => { server.close(); });
   const call = async (path: string, init: RequestInit = {}, token = "segredo") => { const port = await ready; const r = await fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers: { "x-presence-token": token } }); return { status: r.status, body: await r.json() as Record<string, any> }; };
@@ -115,7 +115,7 @@ describe("whatsapp: API local", () => {
 describe("whatsapp: acesso pelo navegador (site do Orion)", () => {
   const store = new Store(":memory:");
   const state: BridgeState = { phase: "conectado", qr: null, phone: "55", name: "J", since: 1, paused: false };
-  const server = createApi(store, state, "segredo", { logout: async () => undefined, pause: () => undefined });
+  const server = createApi(store, state, "segredo", { logout: async () => undefined, pause: () => undefined, shutdown: () => undefined });
   const ready = new Promise<number>((r) => server.listen(0, "127.0.0.1", () => r((server.address() as AddressInfo).port)));
   afterAll(() => { server.close(); });
   const req = async (path: string, headers: Record<string, string> = {}, method = "GET") => { const port = await ready; const r = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers }); return { status: r.status, h: r.headers, body: await r.text() }; };

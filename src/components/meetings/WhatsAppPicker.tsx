@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, MessageCircle, RefreshCw, Search, Users } from "lucide-react";
 
-import { directEnabled, enableDirect, waGet } from "@/lib/whatsapp/client";
+import { directEnabled, enableDirect, startBridge, waGet } from "@/lib/whatsapp/client";
 import { sinceFor, waToText, type WaLine } from "@/lib/meetings";
 
 type WaChat = { jid: string; name: string; is_group: boolean; last_ts: number; novas: number };
@@ -12,7 +12,12 @@ type Period = (typeof PERIODS)[number][0];
 const chip = (on: boolean) => `rounded-full border px-3 py-1.5 text-xs transition active:scale-95 ${on ? "border-emerald/60 bg-emerald/15 text-emerald shadow-[0_0_16px_-6px_var(--emerald)]" : "border-white/10 text-muted-foreground hover:text-foreground"}`;
 
 export function WhatsAppPicker({ onText }: { onText: (text: string, names: string[]) => void }) {
-  const [chats, setChats] = useState<WaChat[] | null>(null), [err, setErr] = useState(""), [loading, setLoading] = useState(false), [q, setQ] = useState(""), [sel, setSel] = useState<string[]>([]), [period, setPeriod] = useState<Period>("24h"), [busy, setBusy] = useState(false), [onlyGroups, setOnlyGroups] = useState(true);
+  const [starting, setStarting] = useState(false), [chats, setChats] = useState<WaChat[] | null>(null), [err, setErr] = useState(""), [loading, setLoading] = useState(false), [q, setQ] = useState(""), [sel, setSel] = useState<string[]>([]), [period, setPeriod] = useState<Period>("24h"), [busy, setBusy] = useState(false), [onlyGroups, setOnlyGroups] = useState(true);
+  const turnOn = async () => {
+    setStarting(true); const r = await startBridge();
+    if (!r.ok) toast.error(r.erro); else { toast.success("WhatsApp ligado em segundo plano"); await load(); }
+    setStarting(false);
+  };
   const load = async () => {
     setLoading(true); setErr("");
     const r = await waGet<{ chats: WaChat[] }>("chats", { limit: "120" });
@@ -38,12 +43,13 @@ export function WhatsAppPicker({ onText }: { onText: (text: string, names: strin
     toast.success(`${blocks.length} conversa(s) trazida(s)`, capped ? { description: "Algumas passaram de 200 mensagens: vieram as mais recentes. Use um período menor para ver tudo." } : undefined);
   };
   if (!directEnabled() && chats === null && !loading) return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm" data-testid="wa-desligado"><p className="text-muted-foreground">O WhatsApp fica no seu computador (somente leitura). Para trazer grupos para cá, ligue a ponte (<b>whatsapp.cmd</b>) e deixe este site procurá-la.</p>
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm" data-testid="wa-desligado"><p className="text-muted-foreground">O WhatsApp fica no seu computador (somente leitura). Para trazer grupos para cá, ligue a ponte (Configurações → WhatsApp, ou dois cliques em <b>whatsapp-fundo.cmd</b>, sem janela) e deixe este site procurá-la.</p>
       <button type="button" onClick={() => { enableDirect(); void load(); }} className="mt-3 rounded-full border border-emerald/50 bg-emerald/10 px-4 py-1.5 text-xs font-medium text-emerald hover:bg-emerald/20">Procurar a ponte neste computador</button></div>
   );
   return (
     <div className="space-y-3" data-testid="wa-picker">
-      {err && <p className="rounded-xl border border-amber/30 bg-amber/10 px-3 py-2 text-xs text-amber">{err}</p>}
+      {err && <div className="rounded-xl border border-amber/30 bg-amber/10 px-3 py-2 text-xs text-amber">{err}
+        <div className="mt-2 flex flex-wrap items-center gap-3"><button type="button" onClick={() => void turnOn()} disabled={starting} className="inline-flex items-center gap-1.5 rounded-full border border-emerald/50 bg-emerald/10 px-3 py-1 font-medium text-emerald hover:bg-emerald/20 disabled:opacity-50" data-testid="wa-ligar">{starting ? <Loader2 size={12} className="animate-spin" /> : null} Ligar o WhatsApp aqui</button><span className="text-muted-foreground">No site publicado: dê dois cliques em whatsapp-fundo.cmd (uma vez).</span></div></div>}
       <div className="flex flex-wrap items-center gap-2"><label className="relative min-w-0 flex-1"><Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar grupo ou conversa…" className="w-full rounded-full border border-white/10 bg-black/25 py-2 pl-8 pr-3 text-sm outline-none focus:border-emerald/60" /></label>
         <button type="button" onClick={() => setOnlyGroups((o) => !o)} aria-pressed={onlyGroups} className={chip(onlyGroups)}><Users size={12} className="mr-1 inline" />Só grupos</button>
         <button type="button" onClick={() => void load()} aria-label="Atualizar lista" className="grid h-8 w-8 place-items-center rounded-full border border-white/10 text-muted-foreground hover:text-foreground">{loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}</button></div>

@@ -6,7 +6,9 @@ O Orion lê suas conversas e grupos do WhatsApp, avisa quando alguém **marcar v
 - `whatsapp-bridge/` é uma **ponte local** (Node 22.18+): entra no WhatsApp como "aparelho conectado" (biblioteca não oficial Baileys), guarda as mensagens num SQLite **no seu computador** (`~/.presence/whatsapp`, apagadas após 30 dias) e abre uma API só em `127.0.0.1:3939`, com senha (`bridge.json`).
 - O app (servidor local) fala com a ponte em `/api/whatsapp` (`src/routes/api.whatsapp.ts`, `src/lib/whatsapp/bridge.ts`). No site publicado (Vercel) a ponte não existe: a tela mostra "Ponte desligada".
 - **Somente leitura**: não há código para enviar mensagem, marcar como lida ou aparecer online (`markOnlineOnConnect: false`).
-- Para ligar: dois cliques em `whatsapp.cmd`, depois Configurações → WhatsApp → ler o QR Code.
+- Para ligar **sem janela**: Configurações → WhatsApp → **Ligar o WhatsApp aqui** (app do computador; o servidor do app inicia a ponte escondida, `src/lib/whatsapp/launcher.ts`) ou, para ficar ligada sempre e também com o site publicado, dois cliques em `whatsapp-fundo.cmd` **uma vez**: ele põe um atalho invisível na pasta Inicializar do Windows (`OrionWhatsApp.vbs` → `whatsapp-fundo.vbs`) e liga a ponte agora. Para desfazer: `whatsapp-parar.cmd`. O registro da ponte fica em `~/.presence/whatsapp/ponte.log`.
+- `whatsapp.cmd` continua existindo para depurar (mostra a janela com as mensagens da ponte).
+- Depois de ligar, Configurações → WhatsApp → ler o QR Code (só na primeira vez; a sessão fica guardada).
 
 ## Site publicado (Vercel) e o aplicativo do Windows
 O aplicativo "Orion" do Windows abre o **site publicado**. Mesmo assim o WhatsApp funciona: o **navegador** (que roda no PC da pessoa) fala direto com a ponte em `http://127.0.0.1:3939`.

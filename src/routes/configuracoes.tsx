@@ -1,14 +1,15 @@
 import { refreshApp } from "@/lib/refresh-app";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, Mic, Pause, Play, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Unplug, Volume2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bell, Check, Loader2, LogOut, MessageCircle, Mic, Pause, Play, Power, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Unplug, Volume2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
 import { openBriefing, useBriefingSafe } from "@/lib/use-briefing";
 import { useVoice } from "@/lib/voice/use-voice";
 import { listImprovements, STATUS_LABEL, type Improvement } from "@/lib/data/improvements";
 import { avg, onPerf, perfSamples, type PerfSample } from "@/lib/voice/perf";
-import { directEnabled, enableDirect, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
+import { toast } from "sonner";
+import { directEnabled, enableDirect, startBridge, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
 
 export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Orion" }] }) });
 
@@ -31,7 +32,8 @@ function WhatsApp() {
   const [why, setWhy] = useState("");
   const [direct, setDirect] = useState(true);
   useEffect(() => { setDirect(directEnabled()); }, []);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false), [starting, setStarting] = useState(false), [isLocal, setIsLocal] = useState(false);
+  useEffect(() => { setIsLocal(location.hostname === "localhost" || location.hostname === "127.0.0.1"); }, []);
   const [alerts, setAlerts] = useState(true), [voice, setVoice] = useState(true), [byName, setByName] = useState(true), [byCrm, setByCrm] = useState(true);
   const [lists, setLists] = useState({ nomes: "", crm: "", ignorar: "" });
   useEffect(() => { setAlerts(waPrefs.alerts()); setVoice(waPrefs.voice()); setByName(waPrefs.names()); setByCrm(waPrefs.crm()); setLists({ nomes: waPrefs.list("nomes"), crm: waPrefs.list("crm"), ignorar: waPrefs.list("ignorar") }); }, []);
@@ -45,6 +47,11 @@ function WhatsApp() {
   const act = async (r: string, params: Record<string, string> = {}, confirmMsg?: string) => {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     setBusy(true); await waPost(r, params); await load(); setBusy(false);
+  };
+  const turnOn = async () => {
+    setStarting(true); const r = await startBridge();
+    if (!r.ok) toast.error(r.erro); else { toast.success("WhatsApp ligado em segundo plano"); await new Promise((ok) => setTimeout(ok, 800)); await load(); }
+    setStarting(false);
   };
   const connected = st?.phase === "conectado" || st?.phase === "pausado";
 
@@ -65,11 +72,13 @@ function WhatsApp() {
       <div className="relative mt-5 space-y-4">
         {offline && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm" data-testid="wa-offline">
-            <p className="font-medium">Para ligar:</p>
+            {isLocal && <div className="mb-4 rounded-xl border border-emerald/30 bg-emerald/5 p-3"><p className="font-medium text-foreground">Ligar sem abrir janela</p><p className="mt-1 text-xs text-muted-foreground">O Orion liga a ponte em segundo plano, sem janela preta. Depois é só ler o QR Code.</p>
+              <button className={`${btn} mt-2`} disabled={starting} data-testid="wa-ligar-aqui" onClick={() => void turnOn()}>{starting ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />} Ligar o WhatsApp aqui</button></div>}
+            <p className="font-medium">{isLocal ? "Ou, para ligar sozinho sempre que o Windows abrir:" : "Para deixar ligado sem janela (uma vez só):"}</p>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
-              <li>Na pasta do Orion no seu computador, dê dois cliques em <b className="text-foreground">whatsapp.cmd</b> (precisa do Node 22.18 ou mais novo).</li>
-              <li>Deixe aquela janela preta aberta enquanto usar o WhatsApp aqui.</li>
-              <li>Volte a esta tela: o QR Code aparece sozinho.</li>
+              <li>Na pasta do Orion no seu computador, dê dois cliques em <b className="text-foreground">whatsapp-fundo.cmd</b> (precisa do Node 22.18 ou mais novo).</li>
+              <li>Pronto: a ponte liga escondida agora e toda vez que o computador iniciar. Não há janela para deixar aberta.</li>
+              <li>Volte a esta tela: o QR Code aparece sozinho. Para desfazer, dê dois cliques em <b className="text-foreground">whatsapp-parar.cmd</b>.</li>
             </ol>
             {!direct ? (
               <div className="mt-3 rounded-xl border border-cyan/30 bg-cyan/5 p-3 text-xs">

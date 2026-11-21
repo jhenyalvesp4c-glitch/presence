@@ -71,3 +71,12 @@ export const waPrefs = {
   list: (k: "nomes" | "crm" | "ignorar") => get(`presence.wa.lista.${k}`, ""), setList: (k: "nomes" | "crm" | "ignorar", v: string) => set(`presence.wa.lista.${k}`, v),
   cursor: () => Number(get("presence.wa.cursor", "0")) || 0, setCursor: (n: number) => set("presence.wa.cursor", String(n)),
 };
+
+/** Liga a ponte em segundo plano (só funciona no app do computador; no site publicado devolve a orientação). */
+export async function startBridge(): Promise<{ ok: true } | { ok: false; erro: string }> {
+  try {
+    const res = await fetch("/api/whatsapp?r=iniciar", { method: "POST", headers: await authHeaders() });
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return res.ok ? { ok: true } : { ok: false, erro: body.error ?? `o app respondeu ${res.status}` };
+  } catch (e) { return { ok: false, erro: e instanceof Error ? e.message : "erro" }; }
+}

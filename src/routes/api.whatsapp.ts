@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 // Ponte entre a tela (Configurações, avisos) e a ponte local do WhatsApp. Só leitura e controles; nunca envia mensagens.
 const READ = new Set(["status", "chats", "messages", "mentions", "recentes"]);
-const WRITE = new Set(["pause", "logout", "clear", "marcar-lidas"]);
+const WRITE = new Set(["pause", "logout", "clear", "marcar-lidas", "encerrar"]);
 const json = (status: number, v: unknown) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 export const Route = createFileRoute("/api/whatsapp")({
@@ -31,6 +31,11 @@ export const Route = createFileRoute("/api/whatsapp")({
         return withUser(request, async () => {
           const u = new URL(request.url);
           const r = u.searchParams.get("r") ?? "";
+          if (r === "iniciar") {
+            const { startBridgeHidden } = await import("@/lib/whatsapp/launcher");
+            const out = await startBridgeHidden();
+            return out.ok ? json(200, { ok: true, ja: out.ja }) : json(500, { error: out.erro });
+          }
           if (!WRITE.has(r)) return json(400, { error: "pedido inválido" });
           const rest = new URLSearchParams(u.searchParams); rest.delete("r");
           const { bridge } = await import("@/lib/whatsapp/bridge");

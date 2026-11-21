@@ -16,7 +16,7 @@ const token = randomBytes(24).toString("hex");
 const store = new Store(join(dir, "mensagens.db"));
 const state: BridgeState = { phase: "desligado", qr: null, phone: "", name: "", since: 0, paused: false };
 const conn = startConnection(store, state, join(dir, "auth"));
-const server = createApi(store, state, token, { logout: () => conn.logout(), pause: (on) => conn.pause(on) });
+const server = createApi(store, state, token, { logout: () => conn.logout(), pause: (on) => conn.pause(on), shutdown: () => { conn.stop(); store.close(); process.exit(0); } });
 
 server.on("error", (e: NodeJS.ErrnoException) => {
   if (e.code === "EADDRINUSE") {

@@ -4,7 +4,7 @@ import type { Store } from "./store.ts";
 
 export type Phase = "desligado" | "aguardando_qr" | "conectando" | "conectado" | "pausado";
 export type BridgeState = { phase: Phase; qr: string | null; phone: string; name: string; since: number; paused: boolean; erro?: string };
-export type Controls = { logout(): Promise<void>; pause(on: boolean): void };
+export type Controls = { logout(): Promise<void>; pause(on: boolean): void; shutdown(): void };
 
 const json = (res: ServerResponse, status: number, body: unknown) => { res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(body)); };
 
@@ -62,6 +62,7 @@ export function createApi(store: Store, state: BridgeState, token: string, contr
       if (route === "GET /recentes") return json(res, 200, { messages: store.recent(n("after"), n("limit", 200)), now: Math.floor(Date.now() / 1000) });
 
       if (route === "POST /pause") { const on = q.get("on") === "1"; controls.pause(on); return json(res, 200, { ok: true, paused: on }); }
+      if (route === "POST /encerrar") { json(res, 200, { ok: true }); setTimeout(() => controls.shutdown(), 150); return; }
       if (route === "POST /logout") { await controls.logout(); return json(res, 200, { ok: true }); }
       if (route === "POST /marcar-lidas") {
         const chat = q.get("chat");
