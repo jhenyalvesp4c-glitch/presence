@@ -31,7 +31,7 @@ export function WorkspaceSection({ section }: { section: Exclude<HealthTabKey, "
     <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
       <div className="aurora pointer-events-none absolute inset-0" />
       <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
-      <main className="relative z-10 mx-auto max-w-7xl px-5 py-6 md:px-10">
+      <main className="relative z-10 mx-auto max-w-7xl px-5 py-6 md:px-5">
         <HealthTabs active={section} />
         <header className="mb-10 flex items-center gap-5">
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-primary shadow-glow"><Icon className="h-7 w-7 text-primary-foreground" /></div>

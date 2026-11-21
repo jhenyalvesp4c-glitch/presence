@@ -21,7 +21,7 @@ export function ProgramPage() {
   };
   if (prog.isLoading || prog.data) return <main className="grid min-h-[60vh] place-items-center"><span className="mono-caps animate-pulse">Abrindo o programa…</span></main>;
   return (
-    <main className="relative mx-auto min-h-screen max-w-6xl px-4 pb-40 pt-6 md:py-10 md:pl-24" data-testid="programa"><FinBackdrop />
+    <main className="relative mx-auto min-h-screen max-w-[1500px] px-4 pb-40 pt-6 md:py-10" data-testid="programa"><FinBackdrop />
       <HeroPanel glow="var(--violet)"><div className="grid items-center gap-6 lg:grid-cols-[1.3fr_0.7fr]"><div>
         <p className="mono-caps flex items-center gap-3">Saúde · Programa de treino <LiveDot color="var(--violet)" label="pronto para começar" /></p>
         <h1 className="mt-3 font-serif text-5xl leading-[0.95] tracking-tight md:text-7xl">Seu <span className="text-gradient inline-block pr-3 italic">programa</span></h1>

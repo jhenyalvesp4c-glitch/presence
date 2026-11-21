@@ -70,7 +70,7 @@ export function HealthToday() {
   if (!ready) return <HealthLoading />;
   return <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
     <div className="aurora pointer-events-none absolute inset-0" /><div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
-    <main className="relative z-10 mx-auto max-w-[1440px] px-5 py-6 sm:px-8 lg:px-12">
+    <main className="relative z-10 mx-auto max-w-[1440px] px-5 py-6 sm:px-5">
       <HealthTabs active="saude" />
 
       {/* Hero */}

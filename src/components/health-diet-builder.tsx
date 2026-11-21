@@ -63,7 +63,7 @@ function DietBuilderForm({ embedded = false, onCancel }: { embedded?: boolean; o
   return <div className={`health-area nutrition-page relative ${embedded ? "min-h-full" : "min-h-screen"} overflow-hidden bg-background font-body text-foreground`}>
     <div className="aurora pointer-events-none absolute inset-0" />
     <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
-    <main className="relative z-10 mx-auto max-w-7xl px-5 pb-12 pt-7 sm:px-8 lg:px-12">
+    <main className="relative z-10 mx-auto max-w-7xl px-5 pb-12 pt-7 sm:px-5">
       {!embedded && <HealthTabs active="saude" />}
       <header className="mb-9 flex items-start gap-4">
         <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-primary shadow-glow"><Leaf className="h-7 w-7 text-primary-foreground" /></div>

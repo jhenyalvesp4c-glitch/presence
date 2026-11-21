@@ -10,7 +10,7 @@ export const Route = createFileRoute("/mapa")({
 
 function MapPage() {
   return (
-    <main className="relative mx-auto min-h-screen max-w-[1500px] px-4 pb-32 pt-6 md:py-8 md:pl-24" data-testid="pagina-mapa"><FinBackdrop />
+    <main className="relative mx-auto min-h-screen max-w-[1500px] px-4 pb-32 pt-6 md:py-8" data-testid="pagina-mapa"><FinBackdrop />
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3" style={{ animation: "fin-rise .6s both" }}>
         <div><p className="mono-caps flex items-center gap-3">Segundo cérebro <LiveDot color="var(--cyan)" label="rede viva" /></p>
           <h1 className="mt-2 font-serif text-5xl leading-[0.95] tracking-tight md:text-6xl">Mapa de <span className="text-gradient inline-block pr-3 italic">conexões</span></h1></div>

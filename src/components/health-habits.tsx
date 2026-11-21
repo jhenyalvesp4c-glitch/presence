@@ -50,7 +50,7 @@ export function HealthHabits() {
     <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
       <div className="aurora pointer-events-none absolute inset-0" />
       <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
-      <main className="relative z-10 mx-auto max-w-7xl px-5 py-6 md:px-10">
+      <main className="relative z-10 mx-auto max-w-7xl px-5 py-6 md:px-5">
         <HealthTabs active="habitos" />
         <header className="mb-8 flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-5">

@@ -56,7 +56,7 @@ function FinancePage() {
   const onboarding = !f.state.onboarded || refazer === "1";
 
   return (
-    <main className="relative mx-auto min-h-screen max-w-6xl px-4 pb-40 pt-6 md:py-10 md:pl-24" data-testid="financeiro">
+    <main className="relative mx-auto min-h-screen max-w-[1500px] px-4 pb-40 pt-6 md:py-10" data-testid="financeiro">
       <FinBackdrop />
 
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">

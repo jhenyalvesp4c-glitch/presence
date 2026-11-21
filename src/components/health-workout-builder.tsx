@@ -77,7 +77,7 @@ function NovaFichaTreinoForm({ embedded = false, onCancel }: { embedded?: boolea
       <div className="aurora pointer-events-none absolute inset-0" />
       <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
 
-      <main className="relative z-10 mx-auto max-w-6xl px-5 py-8 md:px-10">
+      <main className="relative z-10 mx-auto max-w-6xl px-5 py-8 md:px-5">
         {!embedded && <HealthTabs active="saude" />}
 
         <header className="mb-10 flex items-start gap-4 [&>div:last-child]:min-w-0">

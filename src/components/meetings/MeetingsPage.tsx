@@ -77,7 +77,7 @@ export function MeetingsPage() {
   const nSel = useMemo(() => [...selected].filter((i) => !sent.has(i)).length, [selected, sent]);
 
   return (
-    <main className="relative mx-auto min-h-screen max-w-6xl px-4 pb-40 pt-6 md:py-10 md:pl-24" data-testid="reunioes"><FinBackdrop />
+    <main className="relative mx-auto min-h-screen max-w-[1500px] px-4 pb-40 pt-6 md:py-10" data-testid="reunioes"><FinBackdrop />
       {burst > 0 && <Burst key={burst} />}
       <HeroPanel glow="var(--violet)"><div className="grid items-center gap-6 lg:grid-cols-[1.4fr_0.6fr]"><div>
         <p className="mono-caps flex items-center gap-3">Assistente de reuniões <LiveDot color="var(--emerald)" label="ata em segundos" /></p>

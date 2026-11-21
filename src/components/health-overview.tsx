@@ -32,7 +32,7 @@ export function HealthOverview({ tab }: { tab: SheetTab }) {
   if (!ready) return <HealthLoading />;
   return <div className="health-area relative min-h-screen overflow-hidden bg-background font-body text-foreground">
     <div className="aurora pointer-events-none absolute inset-0" /><div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
-    <main className="relative z-10 mx-auto max-w-[1440px] px-5 py-6 sm:px-8 lg:px-12">
+    <main className="relative z-10 mx-auto max-w-[1440px] px-5 py-6 sm:px-5">
       <HealthTabs active="saude" />
       <header className="mb-8 flex flex-wrap items-center justify-between gap-5">
         <div className="flex items-center gap-4"><div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-primary shadow-glow"><Sun className="h-7 w-7 text-primary-foreground" /></div><div><p className="mb-1 font-mono text-[10px] uppercase text-primary">Saúde · Sua rotina</p><h1 className="font-display-h text-4xl font-semibold sm:text-5xl">{title}<span className="text-primary">.</span></h1></div></div>

@@ -170,7 +170,7 @@ function MontarTreinosForm() {
       <div className="aurora pointer-events-none absolute inset-0" />
       <div className="grid-bg pointer-events-none absolute inset-0 opacity-40" />
 
-      <main className="relative z-10 mx-auto max-w-6xl px-5 py-8 md:px-10">
+      <main className="relative z-10 mx-auto max-w-6xl px-5 py-8 md:px-5">
         <HealthTabs active="saude" />
 
         <header className="mb-10 flex items-center gap-5">
