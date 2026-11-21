@@ -27,7 +27,7 @@ export function MeetingResult({ a, selected, sent, onToggle, onSelectAll }: { a:
       {a.resumo && <Card title="Ata" Icon={FileText} n={n++} testId="ata">
         <p className="text-sm leading-relaxed">{a.resumo}</p>
         {a.participantes.length > 0 && <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><Users size={12} />{a.participantes.map((p) => <span key={p} className="rounded-full border border-white/10 px-2 py-0.5">{p}</span>)}</p>}
-        {a.topicos.length > 0 && <ol className="relative mt-4 space-y-3 border-l border-white/10 pl-4">{a.topicos.map((t, i) => <li key={t.assunto} style={{ animation: "fin-rise .5s both", animationDelay: `${i * 60}ms` }}><span aria-hidden className="absolute -left-[5px] mt-1.5 h-2 w-2 rounded-full bg-cyan shadow-[0_0_8px_var(--cyan)]" /><b className="text-sm">{t.assunto}</b>{t.pontos.length > 0 && <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">{t.pontos.map((p) => <li key={p}>• {p}</li>)}</ul>}</li>)}</ol>}
+        {a.topicos.length > 0 && <ol className="relative mt-4 space-y-3 border-l border-white/10 pl-4">{a.topicos.map((t, i) => <li key={t.assunto} className="relative" style={{ animation: "fin-rise .5s both", animationDelay: `${i * 60}ms` }}><span aria-hidden className="absolute -left-[21px] top-[0.4rem] h-2 w-2 rounded-full bg-cyan shadow-[0_0_8px_var(--cyan)]" /><b className="text-sm">{t.assunto}</b>{t.pontos.length > 0 && <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">{t.pontos.map((p) => <li key={p}>• {p}</li>)}</ul>}</li>)}</ol>}
       </Card>}
 
       {a.grupos.length > 0 && <Card title="Resumo por grupo" Icon={MessagesSquare} color="var(--emerald)" n={n++} testId="grupos">
