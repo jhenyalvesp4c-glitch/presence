@@ -15,6 +15,8 @@ export type SettleItem = {
   amount: number; payer: Payer;
   /** compra: % do valor que é DA OUTRA PESSOA (0 = tudo meu, 100 = tudo dela, 50 = dividido). */
   otherShare: number; installment: string;
+  /** Veio de uma compra dividida do financeiro: só muda editando a compra. */
+  linked?: boolean | undefined;
 };
 
 export const toCents = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100);

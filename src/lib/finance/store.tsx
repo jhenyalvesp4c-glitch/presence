@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { syncSettlementLinks } from "./settle-link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { migrateInvoiceTotals, migratePaidManual } from "./calc";
 import { makeMock } from "./mock";
@@ -35,6 +37,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { let alive = true; void financeRepo.load().then((s0) => { const s = migratePaidManual(migrateInvoiceTotals(s0), new Date()); if (alive) { setState(s); loaded.current = true; setReady(true); } }); return () => { alive = false; }; }, []);
   useEffect(() => { if (loaded.current) void financeRepo.save(state); }, [state]);
+  // compras divididas com alguém viram itens no acerto dessa pessoa (e acompanham edições); só com sessão e dados já carregados
+  const qc = useQueryClient(), linking = useRef(false);
+  useEffect(() => {
+    if (!ready || !state.cards.length) return;
+    const t = setTimeout(() => {
+      if (linking.current || sync === "local" || sync === "error" || sync === "saving") return;
+      linking.current = true;
+      void syncSettlementLinks(state).then((changed) => { if (changed) { void qc.invalidateQueries({ queryKey: ["settlements"] }); void qc.invalidateQueries({ queryKey: ["settlement-items"] }); } }).catch(() => { /* tenta de novo na próxima alteração */ }).finally(() => { linking.current = false; });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [state, ready, sync, qc]);
   // a voz alterou o financeiro no servidor: traz o que mudou (se não há gravação em andamento)
   useEffect(() => {
     const refresh = () => { if (!loaded.current || financeRepo.status() === "saving") return; void financeRepo.load().then((s) => setState((cur) => (JSON.stringify(cur) === JSON.stringify(s) || financeRepo.status() === "error" ? cur : s))); };

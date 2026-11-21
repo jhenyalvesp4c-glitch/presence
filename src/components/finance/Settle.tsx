@@ -121,10 +121,10 @@ function ItemRow({ it, person, onEdit, onDelete }: { it: SettleItem; person: str
   return (
     <li className="flex items-center gap-3 py-2.5" data-testid="acerto-item">
       <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{dm(it.date)}</span>
-      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (it.kind === "pagamento" ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({it.installment})</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
+      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (it.kind === "pagamento" ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({it.installment})</span>}{it.linked && <span className="ml-1.5 rounded-full border border-emerald/40 px-1.5 py-0.5 text-[0.62rem] text-emerald" title="Vem de uma compra dividida no financeiro. Para mudar, edite a compra.">da compra</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
       <b className="tabular-nums text-sm">{brl(it.amount)}</b>
-      <button className={btn.icon} onClick={onEdit} aria-label="Editar"><Pencil size={14} /></button>
-      <button className={btn.icon} onClick={onDelete} aria-label="Excluir"><Trash2 size={14} /></button>
+      {!it.linked && <button className={btn.icon} onClick={onEdit} aria-label="Editar"><Pencil size={14} /></button>}
+      {!it.linked && <button className={btn.icon} onClick={onDelete} aria-label="Excluir"><Trash2 size={14} /></button>}
     </li>
   );
 }
