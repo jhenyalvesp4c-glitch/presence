@@ -595,3 +595,12 @@ html, body { max-width: 100%; overflow-x: clip; }
 @keyframes ex-sweep { from { transform: translateX(-130%); } to { transform: translateX(260%); } }
 @keyframes ex-tick { 0% { transform: scale(.3); opacity: 0; } 65% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { [data-ex-fx] { animation: none !important; } }
+
+/* Demandas: brilho que varre o cartão ao passar o mouse e entrada em cascata. */
+@utility card-sheen {
+  position: relative; overflow: hidden;
+  &::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,.08) 50%, transparent 62%); transform: translateX(-130%); transition: transform .9s cubic-bezier(.2,.8,.2,1); }
+  &:hover::after { transform: translateX(130%); }
+}
+@keyframes demand-ping { 0% { transform: scale(.8); opacity: .7; } 100% { transform: scale(2.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .card-sheen::after { transition: none !important; } }

@@ -19,6 +19,8 @@ import {
 import { importAppointments, unlinkDossierAppointments, useDeleteCalendarItem, useSaveAppointment } from "@/lib/data/appointments";
 import { useCategories, useTasks, useToggleTask } from "@/lib/data/tasks";
 import { useQueryClient } from "@tanstack/react-query";
+import { FinBackdrop, Tilt } from "@/components/finance/fx";
+import { Ring, useCountUp } from "@/components/finance/charts";
 import { toast } from "sonner";
 import { DemandCalendar } from "@/components/demand-calendar";
 import { DemandMaterials, NewDemandMaterials } from "@/components/demand-materials";
@@ -324,15 +326,18 @@ function Demandas() {
     <LabelCtx.Provider value={L}>
     <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard, selecting, picked, toggle }}>
     <div className="rail-bleed relative min-h-screen overflow-x-clip">
+      <FinBackdrop />
       <BgFx />
       <div className={`relative mx-auto max-w-[1500px] px-4 py-4 transition-[padding] duration-500 max-md:pb-40 md:px-8 md:py-6 ${sel ? "xl:pr-[500px]" : ""}`}>
         {/* topo */}
-        <header className="flex flex-wrap items-center justify-between gap-4 animate-rise md:gap-6">
+        <header className="fin-frame glass relative flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-[2rem] p-4 animate-rise md:gap-6 md:p-6" style={{ boxShadow: "inset 0 1px 0 oklch(1 0 0 / 7%), 0 40px 100px -56px var(--cyan)" }} data-testid="topo-projeto">
+          <div aria-hidden className="fin-dots pointer-events-none absolute inset-0 opacity-50 [mask-image:radial-gradient(ellipse_at_top_left,#000,transparent_70%)]" />
+          <span aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-[var(--cyan)] opacity-20 blur-3xl" /><span aria-hidden className="pointer-events-none absolute -bottom-28 right-10 h-64 w-64 rounded-full bg-[var(--violet)] opacity-20 blur-3xl" />
           <div className="flex items-center gap-3 md:gap-5">
             <Link to="/projetos" className="icon-tile h-11 w-11 md:h-9 md:w-9 transition hover:scale-105" style={tint("cyan")} aria-label="Voltar aos projetos" title="Voltar aos projetos"><ArrowLeft size={15} /></Link>
             <div className="max-md:hidden"><HexLogo /></div>
             <div>
-              <h1 className="font-display text-3xl font-extrabold tracking-tight md:text-4xl">{project?.name ?? "P4C"}<span className="glow-text" style={tint(project?.color ?? "cyan")}>.</span></h1>
+              <h1 className="font-display text-3xl font-extrabold tracking-tight md:text-5xl"><span className="text-gradient">{project?.name ?? "P4C"}</span><span className="glow-text" style={tint(project?.color ?? "cyan")}>.</span></h1>
               <p className="mono-caps !tracking-[0.4em] max-md:hidden">Projeto</p>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald"><span className="h-1.5 w-1.5 animate-pulse-ring rounded-full bg-emerald shadow-[0_0_8px_var(--emerald)]" /> Ativo</p>
             </div>
@@ -346,14 +351,15 @@ function Demandas() {
               className="disabled:opacity-50 max-md:hidden flex items-center gap-2 rounded-2xl border border-cyan/60 bg-cyan/10 px-4 py-3 text-sm font-medium text-cyan shadow-[0_0_30px_-8px_var(--cyan)] transition hover:bg-cyan/20">
               <Plus size={16} /> Nova demanda
             </button>
-            <div className="glass grid w-full grid-cols-4 divide-x divide-border rounded-2xl py-2.5 md:w-auto md:py-3">
-              {[{ v: pend, l: "pendentes", c: "amber" }, { v: done, l: "concluídas", c: "emerald" }, { v: notes.length, l: "anotações", c: "violet" }, { v: ds.dossiers.length, l: L.plural.toLowerCase(), c: "cyan" }].map((s) => (
-                <div key={s.l} className="px-2 text-center md:px-5" style={tint(s.c)}>
-                  <p className="font-display text-2xl font-bold glow-text tabular-nums md:text-3xl">{s.v}</p>
-                  <p className="text-[0.65rem] text-muted-foreground">{s.l}</p>
-                </div>
-              ))}
+            <div className="relative grid w-full grid-cols-2 gap-2.5 sm:grid-cols-4 md:w-auto" data-testid="kpis">
+              {[{ v: pend, l: "pendentes", c: "amber", p: items.length ? (pend / items.length) * 100 : 0 }, { v: done, l: "concluídas", c: "emerald", p: items.length ? (done / items.length) * 100 : 0 }, { v: notes.length, l: "anotações", c: "violet", p: Math.min(100, notes.length * 10) }, { v: ds.dossiers.length, l: L.plural.toLowerCase(), c: "cyan", p: Math.min(100, ds.dossiers.length * 4) }].map((s2, i) => <Kpi key={s2.l} {...s2} i={i} />)}
             </div>
+          </div>
+          <div className="relative flex w-full items-center gap-3 border-t border-white/10 pt-3 text-xs text-muted-foreground" data-testid="execucao-geral">
+            <span className="mono-caps !text-[0.62rem]">Execução geral</span>
+            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full transition-[width] duration-1000" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%`, background: "linear-gradient(90deg, var(--emerald), var(--cyan), var(--violet))", boxShadow: "0 0 14px var(--cyan)" }} /></span>
+            <span className="font-mono tabular-nums text-foreground">{items.length ? Math.round((done / items.length) * 100) : 0}%</span>
+            <span className="max-md:hidden">{done} de {items.length} demandas</span>
           </div>
         </header>
 
@@ -363,13 +369,13 @@ function Demandas() {
             const on = tab === t.k;
             return (
               <button key={t.k} onClick={(e) => { setTab(t.k); e.currentTarget.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); }} style={tint(t.color)}
-                className={`accent-card group flex items-center gap-3 !rounded-2xl p-3 text-left max-md:shrink-0 max-md:snap-center max-md:gap-2 max-md:!rounded-full max-md:!py-2 max-md:!pl-2 max-md:!pr-3 ${on ? "!border-[color-mix(in_oklab,var(--glow)_70%,transparent)] shadow-[0_0_40px_-12px_var(--glow)]" : "opacity-80 hover:opacity-100"}`}>
+                className={`accent-card card-sheen group flex items-center gap-3 !rounded-2xl p-3 text-left max-md:shrink-0 max-md:snap-center max-md:gap-2 max-md:!rounded-full max-md:!py-2 max-md:!pl-2 max-md:!pr-3 ${on ? "!border-[color-mix(in_oklab,var(--glow)_70%,transparent)] shadow-[0_0_40px_-12px_var(--glow)]" : "opacity-80 hover:opacity-100"}`}>
                 <span className={`icon-tile h-10 w-10 shrink-0 !rounded-full transition max-md:!h-8 max-md:!w-8 group-hover:rotate-12 ${on ? "shadow-[0_0_20px_-4px_var(--glow)]" : ""}`}><t.icon size={18} /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold max-md:whitespace-nowrap">{t.label}</span>
                   <span className="block truncate text-[0.65rem] text-muted-foreground max-md:hidden">{t.sub}</span>
                 </span>
-                <span className="tag !text-[0.65rem] !tracking-normal">{t.n}</span>
+                <CountTag n={t.n} />
                 {on && <span className="absolute inset-x-6 bottom-0 h-px bg-[var(--glow)] shadow-[0_0_12px_var(--glow)]" />}
               </button>
             );
@@ -433,7 +439,7 @@ function Demandas() {
             <Matrix items={boardItems(tab)} names={names} selId={selId} onOpen={openCard} onCell={cycleCell} />
           ) : tab === "overview" ? (
             <div className="grid gap-4 2xl:grid-cols-[1fr_270px]">
-              <section className="glass relative overflow-hidden rounded-3xl p-4 animate-rise max-md:rounded-2xl max-md:p-3">
+              <section className="fin-frame glass relative overflow-hidden rounded-3xl p-4 animate-rise max-md:rounded-2xl max-md:p-3">
                 <div className="mb-4 flex flex-wrap items-center gap-3">
                   <span className="icon-tile h-8 w-8" style={tint("cyan")}><Layers size={15} /></span>
                   <h2 className="font-display text-lg font-semibold">Demandas por tipo</h2>
@@ -767,6 +773,18 @@ function Matrix({ items, names, selId, onOpen, onCell }: { items: Demand[]; name
 }
 
 /* ---------------- efeitos de fundo ---------------- */
+/** Número que sobe até o valor, dentro de um anel de progresso (cartão inclinável). */
+function Kpi({ v, l, c, p, i }: { v: number; l: string; c: string; p: number; i: number }) {
+  const n = Math.round(useCountUp(v));
+  return (
+    <Tilt max={7} className="rounded-2xl"><div className="glass flex items-center gap-3 rounded-2xl px-3.5 py-2.5" style={{ ...tint(c), animation: "fin-rise .6s both", animationDelay: `${i * 80}ms` }} data-testid={`kpi-${l}`}>
+      <Ring pct={p} color={`var(--${c})`} size={46} thickness={5}><span className="font-display text-sm font-bold tabular-nums" style={{ color: `var(--${c})` }}>{n}</span></Ring>
+      <p className="text-[0.62rem] uppercase leading-tight tracking-wider text-muted-foreground">{l}</p>
+    </div></Tilt>
+  );
+}
+function CountTag({ n }: { n: number }) { return <span className="tag !text-[0.65rem] !tracking-normal tabular-nums">{Math.round(useCountUp(n, 700))}</span>; }
+
 function BgFx() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
@@ -790,6 +808,7 @@ function HexLogo() {
     <div className="relative grid h-20 w-20 place-items-center">
       <Hexagon size={84} strokeWidth={0.8} className="absolute text-cyan/50 animate-[spin_24s_linear_infinite]" />
       <Hexagon size={70} strokeWidth={0.6} className="absolute text-violet/50 animate-[spin_18s_linear_infinite_reverse]" />
+      <span aria-hidden className="absolute h-14 w-14 rounded-2xl border border-cyan/40" style={{ animation: "demand-ping 2.6s ease-out infinite" }} />
       <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-brand text-primary-foreground shadow-[0_0_40px_-4px_var(--cyan)] animate-float">
         <Layers size={20} />
       </div>
@@ -839,6 +858,7 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
   const [st, setSt] = useState<Status>(() => firstStatus(items));
   return (
     <div className="accent-card flex flex-col p-3 max-md:w-[88%] max-md:shrink-0 max-md:snap-center" style={tint(m.color)}>
+      <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent shadow-[0_0_14px_var(--glow)]" />
       <div className="flex items-center gap-3 px-1">
         <span className="icon-tile h-11 w-11 !rounded-full shadow-[0_0_24px_-6px_var(--glow)]"><m.icon size={20} /></span>
         <div className="min-w-0 flex-1">
@@ -876,11 +896,12 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
   return (
     <div className="group/card relative">
     <button onClick={onClick} style={{ ...tint(typeBase[d.type].color), animationDelay: `${delay * 0.05}s` }}
-      className={`group relative w-full overflow-hidden rounded-xl border bg-secondary/40 p-2 text-left transition animate-rise max-md:rounded-2xl max-md:p-3.5 hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
+      className={`group card-sheen relative w-full overflow-hidden rounded-xl border bg-secondary/40 p-2 pl-3 text-left transition animate-rise max-md:rounded-2xl max-md:p-3.5 hover:-translate-y-1 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
+      <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" />
       {active && <span className="scanline absolute inset-0" />}
       <p className="font-mono text-[0.55rem] text-muted-foreground max-md:text-[0.65rem]">{d.id}</p>
       <p className="mt-0.5 line-clamp-4 break-words text-[0.74rem] font-medium leading-snug max-md:text-[0.95rem]">{d.title}</p>
-      <span className="tag mt-1.5 inline-block !px-1.5 !py-0 !text-[0.5rem]" style={tint(prio[d.priority].color)}>{prio[d.priority].label}</span>
+      <span className="tag mt-1.5 inline-flex items-center gap-1 !px-1.5 !py-0 !text-[0.5rem]" style={tint(prio[d.priority].color)}>{d.priority === "alta" && d.status !== "done" && <span className="relative flex h-1.5 w-1.5"><span className="absolute inset-0 rounded-full bg-[var(--glow)]" style={{ animation: "demand-ping 1.6s ease-out infinite" }} /><span className="h-1.5 w-1.5 rounded-full bg-[var(--glow)]" /></span>}{prio[d.priority].label}</span>
       <p className="mt-1.5 flex items-start gap-1 break-words text-[0.6rem] leading-tight text-muted-foreground max-md:text-xs [&>svg]:mt-px [&>svg]:shrink-0">
         {d.type === "geral" ? <><Calendar size={9} /> {d.deadline}</> : d.type === "polo" ? <><MapPin size={9} /> {d.polo}</> : <><Network size={9} /> {d.polos!.length} {L.plural.toLowerCase()} · {progress(d)}%</>}
       </p>
@@ -895,7 +916,7 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
   const L = useLabel();
   const [st, setSt] = useState<Status>(() => firstStatus(items));
   return (
-    <section className="glass relative overflow-hidden rounded-3xl p-5 animate-rise max-md:rounded-2xl max-md:p-3" style={tint(m.color)}>
+    <section className="fin-frame glass relative overflow-hidden rounded-3xl p-5 animate-rise max-md:rounded-2xl max-md:p-3" style={tint(m.color)}>
       <div className="mb-5 flex items-center gap-3">
         <span className="icon-tile h-11 w-11 !rounded-full shadow-[0_0_24px_-6px_var(--glow)]"><m.icon size={20} /></span>
         <div>
@@ -909,6 +930,7 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
           const col = items.filter((i) => i.status === s);
           return (
             <div key={s} className={`accent-card flex min-h-[200px] flex-col p-3 ${s === st ? "" : "max-md:hidden"}`} style={tint(statusMeta[s].color)}>
+              <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent shadow-[0_0_14px_var(--glow)]" />
               <div className="flex items-center gap-2 px-1 pb-3 max-md:hidden">
                 <span className="h-2.5 w-2.5 animate-pulse-ring rounded-full bg-[var(--glow)] shadow-[0_0_10px_var(--glow)]" />
                 <h3 className="font-display font-semibold">{statusMeta[s].label}</h3>
@@ -935,7 +957,7 @@ function BigCard({ d, active, onClick, delay }: { d: Demand; active: boolean; on
   return (
     <div className="group/card relative">
     <button onClick={onClick} style={{ ...tint(prio[d.priority].color), animationDelay: `${delay * 0.06}s` }}
-      className={`group relative w-full overflow-hidden rounded-2xl border bg-secondary/40 p-4 text-left transition animate-rise hover:-translate-y-0.5 hover:shadow-[0_12px_30px_-14px_var(--cyan)] ${active ? "border-cyan shadow-[0_0_30px_-6px_var(--cyan)]" : "border-border hover:border-cyan/40"}`}>
+      className={`group card-sheen relative w-full overflow-hidden rounded-2xl border bg-secondary/40 p-4 text-left transition animate-rise hover:-translate-y-1 hover:shadow-[0_16px_36px_-14px_var(--glow)] ${active ? "border-cyan shadow-[0_0_30px_-6px_var(--cyan)]" : "border-border hover:border-cyan/40"}`}>
       <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" />
       {active && <span className="scanline absolute inset-0" />}
       <p className="font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground">{d.id}</p>
