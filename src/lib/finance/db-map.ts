@@ -34,7 +34,7 @@ export function toRows(st: FinanceState): Rows {
 
 export const emptyRows = (): Rows => toRows(EMPTY_STATE);
 
-const shared = (v: unknown): Shared | undefined => { const o = v as { person?: unknown; percent?: unknown } | null; const p = Number(o?.percent); return o && typeof o.person === "string" && o.person && Number.isFinite(p) && p > 0 ? { person: o.person, percent: Math.min(100, Math.round(p)) } : undefined; };
+const shared = (v: unknown): Shared | undefined => { const o = v as { person?: unknown; percent?: unknown; fixed?: unknown } | null; const p = Number(o?.percent), f = Number(o?.fixed); return o && typeof o.person === "string" && o.person && Number.isFinite(p) && p > 0 ? { person: o.person, percent: Math.min(100, Math.round(p)), ...(Number.isFinite(f) && f > 0 ? { fixed: f } : {}) } : undefined; };
 const pauses = (v: unknown): RecurringPause[] => (Array.isArray(v) ? v.flatMap((p): RecurringPause[] => { const o = p as { from?: unknown; to?: unknown }; return typeof o.from === "string" ? [{ from: o.from, to: s(o.to) }] : []; }) : []);
 const adjustments = (v: unknown): Record<string, number> => { const out: Record<string, number> = {}; if (v && typeof v === "object") for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = n(x); return out; };
 

@@ -9,7 +9,8 @@ export type GoalKind = "guardar" | "reserva" | "quitar_cartao" | "economizar_men
 export type Tone = "roxo" | "verde" | "azul" | "laranja" | "grafite" | "rosa" | "dourado" | "ciano";
 
 /** Gasto dividido com outra pessoa. `percent` é a fatia DELA (1 a 100); o resto é seu. O total do banco não muda: a parte dela entra como receita a receber. */
-export type Shared = { person: string; percent: number };
+/** `fixed`: valor fixo que a outra pessoa dá numa compra parcelada — cobre as primeiras parcelas até acabar. */
+export type Shared = { person: string; percent: number; fixed?: number | undefined };
 
 export type Account = { id: string; name: string; kind: AccountKind; tone: Tone; balanceBase: number; baseDate: string };
 export type Card = {

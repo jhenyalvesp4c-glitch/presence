@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
-import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, fixedCoverage, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
 import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
 import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Shared, Tone, Transaction, TxKind } from "@/lib/finance/types";
@@ -97,7 +97,7 @@ export function CardForm({ initial, onSave, onCancel }: { initial?: Card | undef
  * "Dividir com alguém": quem paga junto (marido, amiga, sócio…) e que fatia é dela. O total do banco não muda; a parte dela entra como
  * receita a receber e dá para ver a fatura só com a sua parte. Nomes sugeridos: das pessoas dos acertos e de divisões anteriores.
  */
-export function SharePicker({ value, onChange, amount, label = "Dividir com alguém" }: { value: Shared | undefined; onChange: (v: Shared | undefined) => void; amount?: number | undefined; label?: string }) {
+export function SharePicker({ value, onChange, amount, label = "Dividir com alguém", plan }: { value: Shared | undefined; onChange: (v: Shared | undefined) => void; amount?: number | undefined; label?: string; plan?: { total: number; per: number; count: number } | undefined }) {
   const { state } = useFinance(), acertos = useSettlements().data ?? [];
   const names = [...new Set([...acertos.map((a) => a.person), ...state.plans.flatMap((p) => (p.shared ? [p.shared.person] : [])), ...state.transactions.flatMap((t) => (t.shared ? [t.shared.person] : [])), ...state.recurring.flatMap((r) => (r.shared ? [r.shared.person] : []))])];
   const on = !!value, pct = value?.percent ?? 50, part = amount && value ? Math.round((amount * pct)) / 100 : null;
@@ -107,14 +107,20 @@ export function SharePicker({ value, onChange, amount, label = "Dividir com algu
         <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(on ? undefined : { person: acertos[0]?.person ?? "", percent: 50 })} data-testid="fin-dividir-chave" className={`relative h-6 w-11 rounded-full transition ${on ? "bg-emerald/70" : "bg-white/15"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[1.35rem]" : "left-0.5"}`} /></button></label>
       {on && value && (
         <div className="mt-3 space-y-3">
+          {plan && <Segmented value={value.fixed ? "fixo" : "pct"} onChange={(m) => onChange(m === "fixo" ? { ...value, fixed: Math.round(plan.total / 2), percent: 50 } : { person: value.person, percent: value.percent })} options={[{ value: "pct", label: "Fatia (%)" }, { value: "fixo", label: "Valor fixo de ajuda" }]} />}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Com quem?"><TextInput list="fin-dividir-nomes" value={value.person} onChange={(e) => onChange({ ...value, person: e.target.value.slice(0, 80) })} placeholder="Nome da pessoa" data-testid="fin-dividir-pessoa" /><datalist id="fin-dividir-nomes">{names.map((n) => <option key={n} value={n} />)}</datalist></Field>
+            {plan && value.fixed ? (
+              <Field label={`Ajuda ${value.person ? `de ${value.person}` : "dela(e)"}`}><MoneyInput value={value.fixed} onChange={(v) => { const f = Math.min(plan.total, v ?? 0); onChange({ ...value, fixed: f, percent: Math.min(100, Math.max(1, Math.round((f / plan.total) * 100))) }); }} data-testid="fin-dividir-fixo" /></Field>
+            ) : (
             <Field label={`Fatia ${value.person ? `de ${value.person}` : "dela(e)"}`} group>
               <div className="flex items-center gap-1.5">{[50, 30, 70].map((n) => <button key={n} type="button" onClick={() => onChange({ ...value, percent: n })} className={`rounded-xl border px-2.5 py-2 text-xs transition ${pct === n ? "border-emerald/60 bg-emerald/10 text-emerald" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>{n}%</button>)}
                 <input type="number" min={1} max={100} value={pct} onChange={(e) => onChange({ ...value, percent: Math.min(100, Math.max(1, Math.round(Number(e.target.value) || 1))) })} aria-label="Porcentagem" data-testid="fin-dividir-pct" className="w-16 rounded-xl border border-white/10 bg-black/25 px-2 py-2 text-right text-sm" /><span className="text-xs text-muted-foreground">%</span></div>
-            </Field>
+            </Field>)}
           </div>
-          <p className="text-xs text-muted-foreground" data-testid="fin-dividir-previa">{amount && part !== null ? <>{value.person || "A outra pessoa"} fica com <b className="text-emerald">{brl(part)}</b> e você com <b className="text-foreground">{brl(Math.round((amount - part) * 100) / 100)}</b>. A parte dela(e) entra como receita a receber.</> : "A parte dela(e) entra como receita a receber; o total do banco não muda."}</p>
+          {plan && value.fixed ? (() => { const c = fixedCoverage(plan.total, plan.per, plan.count, value.fixed), who = value.person || "A outra pessoa"; return (
+            <p className="text-xs text-muted-foreground" data-testid="fin-dividir-previa">{who} paga as primeiras parcelas até acabar a ajuda de <b className="text-emerald">{brl(c.covered)}</b>: {c.full > 0 ? `cobre ${c.full === 1 ? "a parcela 1" : `as parcelas 1 a ${c.full}`}` : "nenhuma parcela inteira"}{c.partial > 0 ? ` e ${brl(c.partial)} da ${c.partialN}ª (você paga o resto dela)` : ""}. Você paga <b className="text-foreground">{brl(c.mine)}</b>{c.full + (c.partial > 0 ? 1 : 0) < plan.count ? ` — a partir da ${c.full + 1}ª parcela` : ""}. O banco continua cobrando tudo; o que ela(e) cobre fica como a receber.</p>); })() : (
+          <p className="text-xs text-muted-foreground" data-testid="fin-dividir-previa">{amount && part !== null ? <>{value.person || "A outra pessoa"} fica com <b className="text-emerald">{brl(part)}</b> e você com <b className="text-foreground">{brl(Math.round((amount - part) * 100) / 100)}</b>. A parte dela(e) entra como receita a receber.</> : "A parte dela(e) entra como receita a receber; o total do banco não muda."}</p>)}
         </div>
       )}
     </div>
@@ -138,7 +144,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const paidN = Math.max(0, Math.min(n, Math.round(Number(paid) || 0)));
   // "já paguei N": a próxima parcela (N+1) cai na próxima fatura a vencer; o mês da 1ª parcela sai dessa conta
   const firstV = mode === "manual" ? firstFromPaid(card, today, paidN) : firstTouched ? first : card ? invoiceMonthOf(card, `${purchaseYm}-15`) : first;
-  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today), ...(share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent } } : {}) } : null;
+  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today), ...(share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent, ...(share.fixed ? { fixed: share.fixed } : {}) } } : {}) } : null;
   const info = useMemo(() => (draft ? planInfo(draft, card, today) : null), [draft, card, today]);
   return (
     <div className="space-y-4">
@@ -154,7 +160,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
       <Field group label="Situação atual"><Segmented value={mode} onChange={setMode} options={[{ value: "datas", label: "Calcular pelas datas" }, { value: "manual", label: "Informar parcelas pagas" }]} /></Field>
       {mode === "manual" && <Field label="Quantas parcelas já foram pagas?"><TextInput type="number" min={0} max={n} value={paid} onChange={(e) => setPaid(e.target.value)} /></Field>}
       <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} /></Field>
-      <SharePicker value={share} onChange={setShare} amount={total} label="Dividir esta compra com alguém" />
+      <SharePicker value={share} onChange={setShare} amount={total} plan={total && perV ? { total, per: perV, count: n } : undefined} label="Dividir esta compra com alguém" />
       {info && draft && (
         <div className="rounded-2xl border border-cyan/25 bg-cyan/[0.06] p-4" data-testid="fin-plano-previa" style={{ animation: "fin-fade .4s both" }}>
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-cyan">Como vai ficar</p>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { CalendarCheck, ChevronDown, CreditCard, Layers, Pencil, Plus, Trash2, Wallet } from "lucide-react";
-import { addMonths, brl, commitments, dateBR, monthLabel, planInfo, sum, totalFutureParcels, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, commitments, dateBR, monthLabel, planInfo, planShare, sum, totalFutureParcels, ymOf } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
 import type { Plan } from "@/lib/finance/types";
 import { AreaChart, Money, Ring, StackedBars } from "./charts";
@@ -32,7 +32,7 @@ export function PlanCard({ plan, onEdit, onDelete, index = 0 }: { plan: Plan; on
         {info.schedule.slice(0, 36).map((p, k) => <span key={p.n} className="h-2 flex-1 rounded-full" style={{ background: p.paid ? `linear-gradient(90deg, ${color}, color-mix(in oklab, ${color} 60%, var(--violet)))` : "color-mix(in oklab, white 10%, transparent)", boxShadow: p.paid ? `0 0 8px -1px ${color}` : undefined, animation: `fin-pop .35s ${0.2 + k * 0.025}s both` }} />)}
       </div>
       <div className="relative mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">Falta pagar <b className="text-foreground tabular-nums">{brl(info.remainingAmount)}</b>{info.nextDue ? <> · próxima em <b className="text-foreground">{dateBR(info.nextDue)}</b></> : null}</span>
+        <span className="text-muted-foreground">{plan.shared?.fixed ? <>Ajuda de {plan.shared.person}: <b className="text-emerald tabular-nums">{brl(plan.shared.fixed)}</b> · </> : null}Falta pagar <b className="text-foreground tabular-nums">{brl(info.remainingAmount)}</b>{info.nextDue ? <> · próxima em <b className="text-foreground">{dateBR(info.nextDue)}</b></> : null}</span>
         <span className="flex items-center gap-1.5">
           <button className="flex items-center gap-1 rounded-full px-2.5 py-1 text-muted-foreground transition hover:bg-white/8 hover:text-foreground" onClick={() => setOpen(!open)} aria-expanded={open}>Parcelas <ChevronDown size={13} className={`transition ${open ? "rotate-180" : ""}`} /></button>
           {onEdit && <button className={btn.icon} aria-label={`Editar ${plan.desc}`} onClick={() => onEdit(plan)}><Pencil size={14} /></button>}
@@ -44,7 +44,7 @@ export function PlanCard({ plan, onEdit, onDelete, index = 0 }: { plan: Plan; on
           {info.schedule.map((p) => (
             <li key={p.n} className={`flex items-center justify-between rounded-xl px-3 py-1.5 text-xs ${p.paid ? "bg-white/[0.03] text-muted-foreground" : "bg-white/[0.07]"}`}>
               <span className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full text-[0.6rem] font-semibold" style={{ background: p.paid ? `color-mix(in oklab, ${color} 30%, transparent)` : "color-mix(in oklab, white 10%, transparent)" }}>{p.n}</span>{monthLabel(p.ym)} · vence {dateBR(p.due).slice(0, 5)}</span>
-              <span className="tabular-nums">{brl(p.amount)} {p.paid ? "✓" : ""}</span>
+              <span className="tabular-nums">{(() => { const sh = plan.shared?.fixed ? planShare(plan, p.n) : undefined; const part = sh ? Math.round(p.amount * sh.percent) / 100 : 0; return sh ? (part >= p.amount - 0.005 ? <span className="mr-1.5 text-emerald">paga por {sh.person}</span> : <span className="mr-1.5 text-emerald">{brl(part)} de {sh.person} · você {brl(p.amount - part)}</span>) : plan.shared?.fixed ? <span className="mr-1.5 text-muted-foreground">você</span> : null; })()}{brl(p.amount)} {p.paid ? "✓" : ""}</span>
             </li>
           ))}
         </ol>

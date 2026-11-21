@@ -1,6 +1,6 @@
 /** Cálculos do módulo financeiro: faturas, parcelas, projeções, categorias e alertas. Puro (recebe `today`), fácil de testar. */
 import { catOf } from "./categories";
-import type { Account, Card, Entry, FinanceState, Plan, Recurring, Transaction } from "./types";
+import type { Account, Card, Entry, FinanceState, Plan, Recurring, Shared, Transaction } from "./types";
 
 /* ───────────── datas ───────────── */
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -43,6 +43,26 @@ export const parcelAmount = (plan: Plan, n: number) => {
   if (n !== plan.count) return plan.per;
   const last = round2(plan.total - plan.per * (plan.count - 1));
   return last > 0 ? last : plan.per;
+};
+/** Divisão da parcela `n` de um plano: com ajuda de valor fixo, a pessoa cobre as primeiras parcelas até o valor acabar. */
+export const planShare = (p: Plan, n: number): Shared | undefined => {
+  const sh = p.shared;
+  if (!sh?.fixed || sh.fixed <= 0) return sh;
+  let used = 0;
+  for (let k = 1; k < n; k++) used += parcelAmount(p, k);
+  const amount = parcelAmount(p, n), part = round2(Math.min(amount, Math.max(0, sh.fixed - used)));
+  return part > 0 ? { person: sh.person, percent: (part / amount) * 100, fixed: sh.fixed } : undefined;
+};
+/** Prévia da ajuda fixa: parcelas inteiras cobertas, parcela parcial e quanto sobra para quem compra. */
+export const fixedCoverage = (total: number, per: number, count: number, fixed: number) => {
+  const plan = { total, per, count } as Plan;
+  let left = fixed, full = 0, partial = 0, partialN = 0;
+  for (let n = 1; n <= count && left > 0.004; n++) {
+    const a = parcelAmount(plan, n);
+    if (left >= a - 0.004) { full = n; left = round2(left - a); } else { partial = round2(left); partialN = n; left = 0; }
+  }
+  const covered = Math.min(fixed, total);
+  return { full, partial, partialN, covered, mine: round2(total - covered) };
 };
 /** Mês de vencimento da primeira fatura ainda não paga (vence depois de hoje). */
 export function nextUnpaidYm(card: Pick<Card, "dueDay"> | undefined, today: Date): string {
@@ -136,7 +156,7 @@ export function monthEntries(s: FinanceState, ym: string, upTo?: string): Entry[
   for (const t of s.transactions) if (ymOf(t.date) === ym) add(txEntry(t), t.shared);
   for (const p of s.plans) {
     const card = s.cards.find((c) => c.id === p.cardId), dueDay = card?.dueDay ?? 10;
-    for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === ym) add({ id: `${p.id}:${n}`, kind: "despesa", desc: p.desc, amount: parcelAmount(p, n), date: dayIn(ym, dueDay), category: p.category, method: "credito", cardId: p.cardId, source: "parcela", planId: p.id, parcel: `${n}/${p.count}` }, p.shared);
+    for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === ym) add({ id: `${p.id}:${n}`, kind: "despesa", desc: p.desc, amount: parcelAmount(p, n), date: dayIn(ym, dueDay), category: p.category, method: "credito", cardId: p.cardId, source: "parcela", planId: p.id, parcel: `${n}/${p.count}` }, planShare(p, n));
   }
   for (const r of s.recurring) { const e = recurringEntry(r, ym); if (e) add(e, r.shared); }
   return out.filter((e) => !upTo || e.date <= upTo).sort((a, b) => b.date.localeCompare(a.date));
@@ -262,7 +282,7 @@ const shareOf = (amount: number, sh: { person: string; percent: number } | undef
 export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice {
   const lines: InvoiceLine[] = [];
   for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx", ...shareOf(t.amount, t.shared) });
-  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...shareOf(parcelAmount(p, n), p.shared) });
+  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...shareOf(parcelAmount(p, n), planShare(p, n)) });
   // cobrança fixa no cartão: cada cobrança (mês do calendário `m`) cai na fatura que contém a data dela. Assim, pausar depois do dia da renovação
   // mantém a cobrança já feita na fatura certa e só tira as próximas; pausar antes do dia tira também a que ainda não aconteceu.
   for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa") for (let k = -3; k <= 1; k++) {
