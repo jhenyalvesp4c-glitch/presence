@@ -12,3 +12,9 @@ Carteira de clientes com ficha própria, ligada aos dossiês do projeto.
 - **Orion:** cada cliente (ficha + documentos + histórico) entra no `loadCorpus`, então a busca e as perguntas do Orion o encontram.
 
 Tabelas: `clients`, `client_docs`, `client_log`, `client_access` (RLS só do dono) e `meetings.client_id`. Regras puras em `src/lib/clients.ts`.
+
+## Pasta ligada a um dossiê (Documentação → Biblioteca)
+
+- Ao criar uma pasta (ou pelo seletor no topo da pasta) dá para escolher o **dossiê**. A pasta mostra a **página do dossiê**: visão geral, documentos da pasta, demandas, logins, reuniões, registros/notas e o cliente.
+- Demandas: pelo nome do dossiê (podem ser marcadas como feitas ali). Logins: os logins do dossiê (senhas só neste navegador). Reuniões: vincule atas existentes (`meetings.dossier_id`). Registros: anotações do Orion marcadas com o dossiê e notas do projeto.
+- Novos tipos de documento em "Clientes": Contrato, Proposta, Ficha do cliente e Termo.

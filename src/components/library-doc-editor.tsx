@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import {
   BarChart3, BookOpen, Check, ChevronDown, ClipboardList, Compass, FileText, GraduationCap, HelpCircle, ImageIcon, LayoutTemplate, ListChecks, Loader2, MessageSquareText,
-  NotebookPen, Paperclip, PencilLine, PlayCircle, Save, Scale, ShieldCheck, Users, Workflow, X, type LucideIcon,
+  NotebookPen, Paperclip, PencilLine, PlayCircle, Save, Scale, ShieldCheck, Users, Workflow, X, FileSignature, Handshake, IdCard, ScrollText, type LucideIcon,
 } from "lucide-react";
 
 import { backdropProps } from "@/lib/backdrop";
@@ -29,10 +29,14 @@ export const DOC_KINDS: DocKind[] = [
   { kind: "Decisão", color: "amber", Icon: Scale, group: "Registrar", what: "Uma escolha e o motivo dela, para não rediscutir.", example: "Passamos o disparo para duas etapas" },
   { kind: "Registro", color: "emerald", Icon: NotebookPen, group: "Registrar", what: "O que aconteceu, com data, para consultar depois.", example: "Falhas de disparo de novembro" },
   { kind: "Relatório", color: "emerald", Icon: BarChart3, group: "Registrar", what: "Resultado de um período, com números.", example: "Disparos da semana" },
+  { kind: "Contrato", color: "amber", Icon: FileSignature, group: "Clientes", what: "Contrato ou aditivo, com prazo e valores.", example: "Contrato de prestação, polo Barra da Tijuca" },
+  { kind: "Proposta", color: "violet", Icon: Handshake, group: "Clientes", what: "Proposta enviada ou recebida, com escopo e preço.", example: "Proposta comercial v2" },
+  { kind: "Ficha do cliente", color: "cyan", Icon: IdCard, group: "Clientes", what: "Dados de contato, responsáveis e combinados do cliente.", example: "Contatos e horários do polo" },
+  { kind: "Termo", color: "emerald", Icon: ScrollText, group: "Clientes", what: "Termo, autorização ou aceite assinado.", example: "Termo de uso de imagem" },
   { kind: "Documento", color: "cyan", Icon: FileText, group: "Outros", what: "Qualquer texto que não se encaixe nos outros tipos.", example: "Contrato, proposta, comunicado" },
   { kind: "Rascunho", color: "cyan", Icon: PencilLine, group: "Outros", what: "Algo ainda em construção, que ainda não vale.", example: "Ideia de manual para revisar" },
 ];
-const GROUPS = ["Ensinar", "Fazer", "Registrar", "Outros"];
+const GROUPS = ["Ensinar", "Fazer", "Registrar", "Clientes", "Outros"];
 const hue = (c: string) => (c === "amber" ? "oklch(0.82 0.15 75)" : c === "pink" || c === "rose" ? "oklch(0.72 0.18 10)" : `var(--${c})`);
 
 /** Seletor de tipo: botão com o tipo atual e um painel com cartões (ícone, o que é e exemplo), agrupados. */

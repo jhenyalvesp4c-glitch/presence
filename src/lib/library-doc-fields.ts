@@ -13,6 +13,22 @@ export const DEFAULT_FIELDS: KindFields = {
 };
 
 export const KIND_FIELDS: Record<string, KindFields> = {
+  Contrato: { title: "Ex.: Contrato de prestação, polo Barra da Tijuca",
+    desc: D("Resumo do contrato", "Partes, objeto, valor, vigência e renovação. Ex.: Prestação mensal de R$ 4.800, vigência até 12/2026."),
+    rules: L("Cláusulas importantes", "Ex.: Reajuste anual pelo IPCA\nEx.: Aviso prévio de 30 dias"),
+    steps: L("Prazos e marcos", "Ex.: Assinatura em 12/01\nEx.: Renovação em 12/12", "um por linha, na ordem") },
+  Proposta: { title: "Ex.: Proposta comercial v2",
+    desc: D("Resumo da proposta", "Escopo, preço, condições e prazo de validade."),
+    rules: L("Condições", "Ex.: Validade de 15 dias\nEx.: Pagamento em 2 parcelas"),
+    steps: L("Entregas", "Ex.: Diagnóstico inicial\nEx.: Plano de ação em 30 dias", "um por linha, na ordem") },
+  "Ficha do cliente": { title: "Ex.: Contatos e horários do polo",
+    desc: D("Quem é o cliente", "Responsáveis, contatos, horários e o que combinamos."),
+    rules: L("Combinados e preferências", "Ex.: Ligar só depois das 14h\nEx.: Relatório sempre às sextas"),
+    steps: L("Contatos", "Ex.: Fernando — (21) 90000-0000\nEx.: Financeiro — financeiro@exemplo.com", "um por linha") },
+  Termo: { title: "Ex.: Termo de uso de imagem",
+    desc: D("O que o termo autoriza", "Quem assinou, o que autoriza e até quando."),
+    rules: L("Condições", "Ex.: Vale por 12 meses\nEx.: Uso só em redes sociais"),
+    steps: L("Datas", "Ex.: Assinado em 05/02\nEx.: Vence em 05/02 do ano seguinte", "um por linha") },
   Tutorial: { title: "Ex.: Como importar a base de contatos",
     desc: D("O que a pessoa vai aprender", "Para que serve e o resultado final. Ex.: Ao final você terá a base importada e segmentada."),
     rules: L("Antes de começar", "Ex.: Ter a planilha pronta em .csv\nEx.: Acesso de administrador"),

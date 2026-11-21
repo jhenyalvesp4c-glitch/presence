@@ -7,12 +7,13 @@ import { toast } from "sonner";
 import { loadProjectState } from "@/lib/data/project-data";
 import { backdropProps } from "@/lib/backdrop";
 import {
-  BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Download, Eye, EyeOff, FileText, FileVideo, Folder,
+  BookOpen, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Download, Link2, Eye, EyeOff, FileText, FileVideo, Folder,
   FolderOpen, FolderPlus, GraduationCap, KeyRound, LayoutGrid, Lightbulb, List, MoreHorizontal, Plus, Search, Send,
   Sparkles, Star, Trash2, User, Users, X, LayoutTemplate, Files, Paperclip, ArrowRight, Pencil, ClipboardCopy,
 } from "lucide-react";
 import { TrainingScripts } from "@/components/TrainingScripts";
 import { ClientsView } from "@/components/ClientsView";
+import { DossierHub } from "@/components/DossierHub";
 import { matchDossier, parseLogins, prettySlug } from "@/lib/login-import";
 import { readLoginEmails } from "@/lib/login-emails.functions";
 import { readFiles } from "@/components/inbox/files";
@@ -27,7 +28,7 @@ type Doc = {
   /** Arquivos reais anexados (Storage) e o texto lido deles (para o Orion). */
   attachments?: Attachment[]; summary?: string;
 };
-type FolderT = { id: string; name: string; icon: typeof Folder; color: string; docs: Doc[]; subs?: FolderT[] | undefined };
+type FolderT = { id: string; name: string; icon: typeof Folder; color: string; docs: Doc[]; subs?: FolderT[] | undefined; /** Dossiê a que a pasta está vinculada (a página do dossiê reúne tudo dele). */ dossierId?: string | null | undefined };
 
 const mk = (id: string, title: string, desc: string, kind: string, color: string, extra: Partial<Doc> = {}): Doc => ({ id, title, desc, kind, color, updated: "30/10", ...extra });
 const login = (polo: string, user: string, owner: string): Doc =>
@@ -116,7 +117,7 @@ const folderIdOf = (fs: FolderT[], id: string): string | undefined => {
 /** Junta o que está salvo no banco (documentos e pastas da usuária) com os exemplos do app. */
 function applyRows(base: FolderT[], rows: { docs: DocRow[]; folders: FolderRow[] }): FolderT[] {
   let out = base;
-  for (const f of rows.folders) if (!findFolder(out, f.id)) out = [...out, { id: f.id, name: f.name, icon: Folder, color: f.color, docs: [] }];
+  for (const f of rows.folders) { if (!findFolder(out, f.id)) out = [...out, { id: f.id, name: f.name, icon: Folder, color: f.color, docs: [], dossierId: f.dossier_id ?? null }]; else if (f.dossier_id) out = mapFolders(out, f.id, (x) => ({ ...x, dossierId: f.dossier_id })); }
   for (const r of rows.docs) {
     const cur = allDocs(out).find((d) => d.id === r.id);
     if (r.deleted) { out = dropDoc(out, r.id); continue; }
@@ -168,6 +169,7 @@ function Library({ projectId }: { projectId: string }) {
   const [editDoc, setEditDoc] = useState<{ doc: Doc; isNew: boolean; folderId: string } | null>(null);
   const [urls, setUrls] = useState<Record<string, { view: string; download: string }>>({});
   const [dossiers, setDossiers] = useState<string[]>([]);
+  const [dossierList, setDossierList] = useState<{ id: string; name: string }[]>([]), [newFolderDossier, setNewFolderDossier] = useState("");
   const [editing, setEditing] = useState<Doc | { preset: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [group, setGroup] = useState<string | null>(null);
@@ -182,7 +184,7 @@ function Library({ projectId }: { projectId: string }) {
       setFolders((fs) => applyRows(fs, rows));
       setTouched(new Set(rows.docs.filter((d) => !d.deleted).map((d) => d.id)));
     }).catch((e: Error) => toast.error(`Não consegui carregar a Documentação: ${e.message}`));
-    loadProjectState(projectId).then((st) => setDossiers(st.ds.dossiers.map((d) => d.name))).catch(() => undefined);
+    loadProjectState(projectId).then((st) => { setDossiers(st.ds.dossiers.map((d) => d.name)); setDossierList(st.ds.dossiers.map((d) => ({ id: d.id, name: d.name }))); }).catch(() => undefined);
   }, [projectId]);
   useEffect(() => { if (loaded) saveLogins(findFolder(folders, "log")?.docs ?? []); }, [folders, loaded]);
   // Tudo da Documentação também vai para o segundo cérebro (Orion). Senhas NUNCA vão: ficam só neste navegador.
@@ -197,17 +199,20 @@ function Library({ projectId }: { projectId: string }) {
         text: `Login do dossiê ${g}. Usuário: ${l.user}. Responsável: ${l.owner || "não informado"}. ${d.desc} (A senha fica guardada só neste navegador e não entra no segundo cérebro.)`,
       });
     }
+    const dossierByFolder = new Map<string, string>();
+    const walk = (fs: FolderT[]) => { for (const f of fs) { const dn = dossierList.find((x) => x.id === f.dossierId)?.name; if (dn) dossierByFolder.set(f.name, dn); walk(f.subs ?? []); } };
+    walk(folders);
     for (const d of allDocs(folders)) {
       if (d.login || !touched.has(d.id)) continue; // só o que a usuária criou ou editou (os exemplos intactos não entram)
       list.push({
-        refId: `doc:${d.id}`, title: d.title,
+        refId: `doc:${d.id}`, title: d.title, ...(dossierByFolder.get(d.folder) ? { dossier: dossierByFolder.get(d.folder)! } : {}),
         text: [`${d.kind} na pasta ${d.folder}.`, d.desc, d.rules?.length ? `${fieldsOf(d.kind).rules?.label ?? "Regras importantes"}:\n- ${d.rules.join("\n- ")}` : "", d.steps?.length ? `${fieldsOf(d.kind).steps?.label ?? "Passo a passo"}:\n${d.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : ""].filter(Boolean).join("\n"),
         attachments: d.attachments ?? [], summary: d.summary ?? "",
       });
     }
     const t = setTimeout(() => { syncMirrors(list).catch(() => undefined); }, 900);
     return () => clearTimeout(t);
-  }, [folders, loaded, touched]);
+  }, [folders, loaded, touched, dossierList]);
 
   const saveLogin = (d: Doc) => {
     setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: f.docs.some((x) => x.id === d.id) ? f.docs.map((x) => (x.id === d.id ? d : x)) : [d, ...f.docs] })));
@@ -283,9 +288,14 @@ function Library({ projectId }: { projectId: string }) {
   const createFolder = () => {
     if (!newFolder?.trim()) return setNewFolder(null);
     const id = `f${Date.now().toString(36)}`;
-    setFolders((fs) => [...fs, { id, name: newFolder.trim(), icon: Folder, color: "cyan", docs: [] }]);
-    saveFolderRow({ id, name: newFolder.trim(), color: "cyan", position: folders.length }).catch((e: Error) => toast.error(`Não consegui salvar a pasta: ${e.message}`));
-    setCur(id); setNewFolder(null);
+    const dossierId = newFolderDossier || null;
+    setFolders((fs) => [...fs, { id, name: newFolder.trim(), icon: Folder, color: "cyan", docs: [], dossierId }]);
+    saveFolderRow({ id, name: newFolder.trim(), color: "cyan", position: folders.length, dossier_id: dossierId }).catch((e: Error) => toast.error(`Não consegui salvar a pasta: ${e.message}`));
+    setCur(id); setNewFolder(null); setNewFolderDossier("");
+  };
+  const linkFolder = (f: FolderT, dossierId: string | null) => {
+    setFolders((fs) => mapFolders(fs, f.id, (x) => ({ ...x, dossierId })));
+    saveFolderRow({ id: f.id, name: f.name, color: f.color, position: Math.max(0, folders.findIndex((x) => x.id === f.id)), dossier_id: dossierId }).then(() => toast.success(dossierId ? "Pasta vinculada ao dossiê" : "Vínculo removido")).catch((e: Error) => toast.error(`Não consegui vincular: ${e.message}`));
   };
 
   // Endereços temporários dos arquivos do documento aberto.
@@ -315,9 +325,10 @@ function Library({ projectId }: { projectId: string }) {
               <Plus size={15} /> Nova pasta
             </button>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); createFolder(); }} className="mt-4 flex items-center gap-2 rounded-full border border-cyan/60 px-3 py-1.5">
-              <FolderPlus size={14} className="text-cyan" />
-              <input autoFocus value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onBlur={createFolder} placeholder="Nome da pasta" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+            <form onSubmit={(e) => { e.preventDefault(); createFolder(); }} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) createFolder(); }} className="mt-4 space-y-2 rounded-2xl border border-cyan/60 px-3 py-2">
+              <div className="flex items-center gap-2"><FolderPlus size={14} className="text-cyan" />
+                <input autoFocus value={newFolder} onChange={(e) => setNewFolder(e.target.value)} placeholder="Nome da pasta" data-testid="pasta-nome" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" /></div>
+              <select value={newFolderDossier} onChange={(e) => setNewFolderDossier(e.target.value)} aria-label="Vincular a um dossiê" data-testid="pasta-dossie" className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-muted-foreground"><option value="">Sem dossiê vinculado</option>{dossierList.map((d) => <option key={d.id} value={d.id}>Dossiê: {d.name}</option>)}</select>
             </form>
           )}
           <nav className="mt-4 space-y-1">
@@ -338,6 +349,8 @@ function Library({ projectId }: { projectId: string }) {
                 <h3 className="font-display text-xl font-semibold">{q ? `Busca: "${q}"` : folder.name}</h3>
                 <p className="text-xs text-muted-foreground">{shown.length} documentos</p>
               </div>
+              {!q && <label className="glass flex items-center gap-2 rounded-xl px-3 py-2" title="Ligue a pasta a um dossiê para ver a página dele"><Link2 size={13} className={folder.dossierId ? "text-violet" : "text-muted-foreground"} />
+                <select value={folder.dossierId ?? ""} onChange={(e) => linkFolder(folder, e.target.value || null)} aria-label="Dossiê vinculado à pasta" data-testid="pasta-vincular" className="max-w-[9.5rem] bg-transparent text-xs outline-none"><option value="">Sem dossiê</option>{dossierList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}
               <label className="glass flex items-center gap-2 rounded-xl px-3 py-2">
                 <Search size={13} className="text-muted-foreground" />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar documentos…" className="w-36 bg-transparent text-xs outline-none placeholder:text-muted-foreground" />
@@ -350,6 +363,14 @@ function Library({ projectId }: { projectId: string }) {
               </div>
               <button onClick={addDoc} className="flex items-center gap-1.5 rounded-xl bg-gradient-brand px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:scale-105"><Plus size={13} /> Documento</button>
             </div>
+
+            {!q && folder.dossierId && dossierList.find((d) => d.id === folder.dossierId) && (() => {
+              const dos = dossierList.find((d) => d.id === folder.dossierId)!, key = dos.name.trim().toLowerCase();
+              const flat = (f: FolderT): Doc[] => [...f.docs, ...(f.subs ?? []).flatMap(flat)];
+              return <div className="mt-4"><DossierHub projectId={projectId} dossier={dos} docs={flat(folder).map((d) => ({ id: d.id, title: d.title, kind: d.kind, updated: d.updated }))}
+                logins={logins.filter((l) => groupOf(l).trim().toLowerCase() === key).map((l) => ({ id: l.id, title: l.title, user: l.login?.user ?? "", owner: l.login?.owner ?? "" }))}
+                onOpenDoc={(id) => setSelId(id)} onOpenLogin={(id) => { setCur("log"); setOpen((o) => ({ ...o, log: true })); setSelId(id); }} /></div>;
+            })()}
 
             <div className={`mt-4 grid gap-3 ${grid ? "sm:grid-cols-2" : ""}`}>
               {shown.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground sm:col-span-2">Pasta vazia. Crie o primeiro documento ✦</p>}

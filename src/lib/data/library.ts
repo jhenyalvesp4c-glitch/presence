@@ -6,7 +6,7 @@ export type DocRow = {
   id: string; folder_id: string; title: string; description: string; kind: string; color: string; fav: boolean;
   rules: string[]; steps: string[]; attachments: Attachment[]; ai_summary: string; deleted: boolean; updated_label: string;
 };
-export type FolderRow = { id: string; name: string; color: string; position: number };
+export type FolderRow = { id: string; name: string; color: string; position: number; dossier_id?: string | null };
 const DOC_COLS = "id, folder_id, title, description, kind, color, fav, rules, steps, attachments, ai_summary, deleted, updated_label";
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
@@ -14,7 +14,7 @@ const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 export async function loadLibraryRows(): Promise<{ docs: DocRow[]; folders: FolderRow[] }> {
   const [d, f] = await Promise.all([
     supabase.from("library_docs").select(DOC_COLS).order("created_at"),
-    supabase.from("library_folders").select("id, name, color, position").order("position").order("created_at"),
+    supabase.from("library_folders").select("id, name, color, position, dossier_id").order("position").order("created_at"),
   ]);
   const docs = (must(d) as DocRow[]).map((r) => ({ ...r, rules: arr<string>(r.rules), steps: arr<string>(r.steps), attachments: arr<Attachment>(r.attachments) }));
   return { docs, folders: must(f) as FolderRow[] };
