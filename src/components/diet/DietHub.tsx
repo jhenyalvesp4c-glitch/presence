@@ -38,7 +38,7 @@ export function DietHeader({ b }: { b: DietBundle }) {
   const { plan, sum, todayLog } = b, [importing, setImporting] = useState(false), pmax = plan.proteina.max ?? plan.proteina.min ?? sum.plannedProtein, pmin = plan.proteina.min ?? 0;
   const water = todayLog?.waterMl ?? 0;
   return (
-    <section className="glass relative mb-6 overflow-hidden rounded-[2rem] p-5 sm:p-6" style={{ animation: "fin-rise .6s both" }} data-testid="dieta-cabecalho">
+    <section className="ex-card mb-6 px-5 py-5 sm:px-6" style={{ animation: "fin-rise .6s both" }} data-testid="dieta-cabecalho">
       <span aria-hidden className="pointer-events-none absolute -left-20 -top-20 h-60 w-60 rounded-full bg-emerald opacity-15 blur-3xl" /><span aria-hidden className="pointer-events-none absolute -bottom-24 right-0 h-60 w-60 rounded-full bg-cyan opacity-15 blur-3xl" />
       <div className="relative flex flex-wrap items-center justify-between gap-5">
         <div className="min-w-0"><p className="mono-caps flex flex-wrap items-center gap-3">Plano alimentar <LiveDot color="var(--emerald)" label={`semana ${b.week}`} /></p>

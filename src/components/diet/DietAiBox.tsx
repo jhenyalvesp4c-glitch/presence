@@ -31,7 +31,7 @@ export function DietAiBox({ plan, customNames, cur, write, defaultMeal }: { plan
   };
   const t = res ? totalOf(res) : null;
   return (
-    <section className="glass fin-frame relative overflow-hidden rounded-3xl p-5" data-testid="dieta-ia">
+    <section className="ex-card px-5 py-5" style={{ "--rail": "var(--violet)" } as React.CSSProperties} data-testid="dieta-ia">
       <span aria-hidden className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-violet opacity-15 blur-3xl" /><span aria-hidden className="pointer-events-none absolute -bottom-20 right-0 h-44 w-44 rounded-full bg-cyan opacity-10 blur-3xl" />
       <h3 className="relative flex items-center gap-2 font-display text-lg font-semibold"><Sparkles size={17} className="text-violet drop-shadow-[0_0_8px_var(--violet)]" /> Conte o que você comeu</h3>
       <p className="relative text-xs text-muted-foreground">Escreva do seu jeito, com as quantidades. O Orion separa as refeições e calcula as calorias e os macros.</p>

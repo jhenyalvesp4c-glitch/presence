@@ -28,7 +28,7 @@ export function DietPage() {
         <p className="mt-3 max-w-xl text-sm text-muted-foreground">Coloque a sua ficha aqui e o Orion monta tudo na tela de Saúde: refeições de hoje, proteína do dia, água, trocas, comparação entre as opções e o acompanhamento semanal.</p>
         <button onClick={() => setImporting(true)} className="mt-6 inline-flex items-center gap-2 rounded-full border border-emerald/50 bg-emerald/10 px-5 py-3 text-sm font-medium text-emerald hover:bg-emerald/20" data-testid="enviar-dieta"><FileUp size={16} /> Enviar minha ficha (prints, PDF ou texto)</button></div>
         <div className="mx-auto"><OrbitArt size={200}><Utensils size={34} className="text-emerald drop-shadow-[0_0_14px_var(--emerald)]" /></OrbitArt></div></div></HeroPanel>
-      <section className="glass mt-5 rounded-3xl p-5 sm:p-6" style={{ animation: "fin-rise .6s both" }}>
+      <section className="ex-card mt-5 px-5 py-5 sm:px-6" style={{ animation: "fin-rise .6s both" }}>
         <h2 className="flex items-center gap-2 font-display text-xl font-semibold"><Sparkles size={18} className="text-emerald" /> Ficha pronta: Recomposição corporal</h2>
         <p className="mt-1 text-sm text-muted-foreground">A ficha que você me enviou: opção A (2 refeições) e opção B (3 refeições), proteína de 115–130 g/dia, trocas por grupos, hidratação, intestino e acompanhamento semanal.</p>
         <div className="mt-4 flex flex-wrap items-end gap-3"><label className="text-xs text-muted-foreground">Começa em<input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 block rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm" data-testid="dieta-inicio" /></label>
