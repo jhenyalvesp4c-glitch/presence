@@ -22,3 +22,9 @@ do $$ declare t text; begin
     execute format('grant select, insert, update, delete on presence_app.%I to authenticated', t);
   end loop;
 end $$;
+
+-- Frequência: a cada N semanas (a partir de start_date) ou "N vezes por semana" em qualquer dia.
+alter table presence_app.fixed_tasks
+  add column if not exists every_weeks smallint not null default 1 check (every_weeks between 1 and 8),
+  add column if not exists start_date date not null default ((now() at time zone 'America/Sao_Paulo')::date),
+  add column if not exists times_per_week smallint check (times_per_week is null or times_per_week between 1 and 7);

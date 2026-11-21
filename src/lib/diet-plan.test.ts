@@ -79,9 +79,9 @@ describe("diet ai", () => {
   });
 });
 
-import { appliesOn, expandFixed, parseFixedKey, weekdaysLabel, type FixedTask } from "./fixed-tasks";
+import { appliesOn, expandFixed, parseFixedKey, ruleLabel, type FixedTask } from "./fixed-tasks";
 describe("fixed tasks", () => {
-  const f = (o: Partial<FixedTask> = {}): FixedTask => ({ id: "11111111-1111-4111-8111-111111111111", title: "Skin care", category_id: null, priority: "media", due_time: null, weekdays: [0, 1, 2, 3, 4, 5, 6], active: true, position: 0, ...o });
+  const f = (o: Partial<FixedTask> = {}): FixedTask => ({ id: "11111111-1111-4111-8111-111111111111", title: "Skin care", category_id: null, priority: "media", due_time: null, weekdays: [0, 1, 2, 3, 4, 5, 6], active: true, position: 0, every_weeks: 1, start_date: "2026-11-01", times_per_week: null, ...o });
   it("applies on chosen weekdays only and ignores paused", () => {
     expect(appliesOn(f(), "2026-11-21")).toBe(true); // sábado
     expect(appliesOn(f({ weekdays: [1, 2, 3, 4, 5] }), "2026-11-21")).toBe(false); expect(appliesOn(f({ weekdays: [1, 2, 3, 4, 5] }), "2026-11-23")).toBe(true);
@@ -92,5 +92,16 @@ describe("fixed tasks", () => {
     expect(occ.map((o) => o.date)).toEqual(["2026-11-21", "2026-11-22", "2026-11-23"]); expect(occ.map((o) => o.done)).toEqual([false, true, false]);
     expect(parseFixedKey(occ[1]!.key)).toEqual({ id: "11111111-1111-4111-8111-111111111111", date: "2026-11-22" });
   });
-  it("labels weekdays", () => { expect(weekdaysLabel([0, 1, 2, 3, 4, 5, 6])).toBe("Todos os dias"); expect(weekdaysLabel([1, 2, 3, 4, 5])).toBe("Dias úteis"); expect(weekdaysLabel([6, 0])).toBe("Fins de semana"); expect(weekdaysLabel([3, 1])).toBe("Seg · Qua"); });
+  it("labels the rules", () => { expect(ruleLabel(f())).toBe("Todos os dias"); expect(ruleLabel(f({ weekdays: [1, 2, 3, 4, 5] }))).toBe("Dias úteis"); expect(ruleLabel(f({ weekdays: [3] }))).toBe("Qua · toda semana"); expect(ruleLabel(f({ weekdays: [3, 1], every_weeks: 2 }))).toBe("Seg · Qua · a cada 2 semanas"); expect(ruleLabel(f({ times_per_week: 2 }))).toBe("2× por semana"); });
+  it("every 2 weeks counts from the start week", () => {
+    const r = f({ weekdays: [1], every_weeks: 2, start_date: "2026-11-02" }); // segunda
+    expect(appliesOn(r, "2026-11-02")).toBe(true); expect(appliesOn(r, "2026-11-09")).toBe(false); expect(appliesOn(r, "2026-11-16")).toBe(true); expect(appliesOn(r, "2026-10-26")).toBe(false);
+  });
+  it("N times per week disappears once the quota is met", () => {
+    const id = "11111111-1111-4111-8111-111111111111", r = f({ times_per_week: 2, start_date: "2026-11-16" });
+    const occ = expandFixed([r], new Set([`${id}|2026-11-16`, `${id}|2026-11-18`]), "2026-11-16", "2026-11-22");
+    expect(occ.map((o) => o.date)).toEqual(["2026-11-16", "2026-11-18"]); // só os dias feitos; o resto da semana some
+    const part = expandFixed([r], new Set([`${id}|2026-11-16`]), "2026-11-16", "2026-11-22");
+    expect(part.length).toBe(7); // cota não batida: aparece todos os dias
+  });
 });

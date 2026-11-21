@@ -5,7 +5,7 @@ import type { FixedTask } from "../fixed-tasks";
 import type { Priority } from "../types";
 import { must, supabase } from "./db";
 
-const COLS = "id, title, category_id, priority, due_time, weekdays, active, position";
+const COLS = "id, title, category_id, priority, due_time, weekdays, active, position, every_weeks, start_date, times_per_week";
 type Row = Omit<FixedTask, "weekdays"> & { weekdays: number[] | null };
 export const useFixedTasks = () => useQuery({
   queryKey: ["fixed-tasks"],
@@ -17,7 +17,7 @@ export const useFixedDone = (from: string, to: string) => useQuery({
   queryFn: async (): Promise<Set<string>> => new Set((must(await supabase.from("fixed_task_done").select("fixed_id, done_date").gte("done_date", from).lte("done_date", to).limit(2000)) as { fixed_id: string; done_date: string }[]).map((r) => `${r.fixed_id}|${r.done_date}`)),
 });
 
-export type NewFixed = { title: string; category_id: string | null; priority: Priority; due_time: string | null; weekdays: number[] };
+export type NewFixed = { title: string; category_id: string | null; priority: Priority; due_time: string | null; weekdays: number[]; every_weeks: number; start_date: string; times_per_week: number | null };
 export function useFixedActions() {
   const qc = useQueryClient(), refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ["fixed-tasks"] }), qc.invalidateQueries({ queryKey: ["fixed-done"] })]);
   return {
