@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnaliseRouteImport } from './routes/analise'
 import { Route as AssistenteRouteImport } from './routes/assistente'
 import { Route as CalendarioRouteImport } from './routes/calendario'
+import { Route as CentralRouteImport } from './routes/central'
 import { Route as CerebroRouteImport } from './routes/cerebro'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CursosRouteImport } from './routes/cursos'
@@ -69,6 +70,11 @@ const AssistenteRoute = AssistenteRouteImport.update({
 const CalendarioRoute = CalendarioRouteImport.update({
   id: '/calendario',
   path: '/calendario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CentralRoute = CentralRouteImport.update({
+  id: '/central',
+  path: '/central',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CerebroRoute = CerebroRouteImport.update({
@@ -262,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/analise': typeof AnaliseRoute
   '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
+  '/central': typeof CentralRoute
   '/cerebro': typeof CerebroRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/cursos': typeof CursosRoute
@@ -305,6 +312,7 @@ export interface FileRoutesByTo {
   '/analise': typeof AnaliseRoute
   '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
+  '/central': typeof CentralRoute
   '/cerebro': typeof CerebroRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/cursos': typeof CursosRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/analise': typeof AnaliseRoute
   '/assistente': typeof AssistenteRoute
   '/calendario': typeof CalendarioRoute
+  '/central': typeof CentralRoute
   '/cerebro': typeof CerebroRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/cursos': typeof CursosRoute
@@ -394,6 +403,7 @@ export interface FileRouteTypes {
     | '/analise'
     | '/assistente'
     | '/calendario'
+    | '/central'
     | '/cerebro'
     | '/configuracoes'
     | '/cursos'
@@ -437,6 +447,7 @@ export interface FileRouteTypes {
     | '/analise'
     | '/assistente'
     | '/calendario'
+    | '/central'
     | '/cerebro'
     | '/configuracoes'
     | '/cursos'
@@ -480,6 +491,7 @@ export interface FileRouteTypes {
     | '/analise'
     | '/assistente'
     | '/calendario'
+    | '/central'
     | '/cerebro'
     | '/configuracoes'
     | '/cursos'
@@ -524,6 +536,7 @@ export interface RootRouteChildren {
   AnaliseRoute: typeof AnaliseRoute
   AssistenteRoute: typeof AssistenteRoute
   CalendarioRoute: typeof CalendarioRoute
+  CentralRoute: typeof CentralRoute
   CerebroRoute: typeof CerebroRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   CursosRoute: typeof CursosRoute
@@ -589,6 +602,13 @@ declare module '@tanstack/react-router' {
       path: '/calendario'
       fullPath: '/calendario'
       preLoaderRoute: typeof CalendarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/central': {
+      id: '/central'
+      path: '/central'
+      fullPath: '/central'
+      preLoaderRoute: typeof CentralRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cerebro': {
@@ -879,6 +899,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnaliseRoute: AnaliseRoute,
   AssistenteRoute: AssistenteRoute,
   CalendarioRoute: CalendarioRoute,
+  CentralRoute: CentralRoute,
   CerebroRoute: CerebroRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   CursosRoute: CursosRoute,
