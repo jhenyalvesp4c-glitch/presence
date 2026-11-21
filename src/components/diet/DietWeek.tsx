@@ -19,7 +19,7 @@ export function DietWeek({ b }: { b: DietBundle }) {
   const [f, setF] = useState<Record<string, string>>(() => ({ weight: fmt(cur?.weight ?? null), waist: fmt(cur?.waist ?? null), abdomen: fmt(cur?.abdomen ?? null), hip: fmt(cur?.hip ?? null), bowelCount: fmt(cur?.bowelCount ?? null), waterL: fmt(cur?.waterL ?? null) }));
   const [sc, setSc] = useState<Record<string, number | null>>({ energy: cur?.energy ?? null, training: cur?.training ?? null, difficulty: cur?.difficulty ?? null, digestive: cur?.digestive ?? null, satiety: cur?.satiety ?? null });
   const [notes, setNotes] = useState(cur?.notes ?? ""), [busy, setBusy] = useState(false);
-  const stats = compareOptions(plan, logs), wt = waterTrend(logs, today), best = stats.filter((s) => s.dias >= 3).sort((a, b2) => (b2.adherence - a.adherence) || ((a.discomfort ?? 9) - (b2.discomfort ?? 9)))[0];
+  const stats = compareOptions(plan, logs), wt = waterTrend(logs, today), best = stats.filter((s) => s.dias >= 3).sort((a, b2) => (b2.adherence - a.adherence) || ((b2.protein ?? 0) - (a.protein ?? 0)))[0];
   const save = async () => {
     setBusy(true);
     const w: DietWeekly = { week, date: today, weight: num(f["weight"] ?? ""), waist: num(f["waist"] ?? ""), abdomen: num(f["abdomen"] ?? ""), hip: num(f["hip"] ?? ""), bowelCount: num(f["bowelCount"] ?? ""), waterL: num(f["waterL"] ?? ""), energy: sc["energy"] ?? null, training: sc["training"] ?? null, difficulty: sc["difficulty"] ?? null, digestive: sc["digestive"] ?? null, satiety: sc["satiety"] ?? null, notes };
@@ -29,14 +29,14 @@ export function DietWeek({ b }: { b: DietBundle }) {
   return (
     <div className="space-y-5" data-testid="dieta-semana">
       <section className="glass relative overflow-hidden rounded-3xl p-5" data-testid="dieta-comparar"><h3 className="font-display text-lg font-semibold">Qual opção funciona melhor para você?</h3>
-        <p className="mb-4 text-xs text-muted-foreground">{plan.comparar.nota || "Marque a opção e “como foi o dia” em Hoje; aqui aparecem as médias."}</p>
+        <p className="mb-4 text-xs text-muted-foreground">{plan.comparar.nota || "Marque a opção do dia em Hoje e registre o que comeu; aqui aparecem as médias."}</p>
         <div className="grid gap-4 md:grid-cols-2">{stats.map((s, i) => { const c = i === 0 ? "var(--cyan)" : "var(--emerald)"; return (
           <article key={s.id} className="rounded-2xl border bg-black/20 p-4" style={{ borderColor: `color-mix(in oklab, ${c} 35%, transparent)` }}>
             <div className="flex items-center justify-between"><h4 className="font-display text-base font-semibold" style={{ color: c }}>{s.nome}</h4><span className="text-xs text-muted-foreground">{s.dias} {s.dias === 1 ? "dia" : "dias"}</span>{best?.id === s.id && <Trophy size={16} className="text-amber" />}</div>
-            {s.dias ? <dl className="mt-3 space-y-2 text-xs">{([["Estômago cheio", s.fullness, true], ["Facilidade", s.difficulty, false], ["Energia", s.energy, false], ["Treino", s.training, false], ["Desconforto", s.discomfort, true]] as const).map(([l, v, inv]) => <div key={l}><div className="mb-0.5 flex justify-between"><dt className="text-muted-foreground">{l}{inv ? " (menor é melhor)" : ""}</dt><dd className="font-mono">{v ?? "—"}</dd></div><Meter pct={((v ?? 0) / 5) * 100} color={c} warn={false} height={5} /></div>)}
-              <div className="flex justify-between border-t border-white/5 pt-2"><dt className="text-muted-foreground">Refeições cumpridas</dt><dd className="font-mono">{s.adherence}%</dd></div><div className="flex justify-between"><dt className="text-muted-foreground">Proteína média</dt><dd className="font-mono">{s.protein ?? "—"} g</dd></div></dl>
+            {s.dias ? <dl className="mt-3 space-y-2 text-xs"><div><div className="mb-0.5 flex justify-between"><dt className="text-muted-foreground">Refeições cumpridas</dt><dd className="font-mono">{s.adherence}%</dd></div><Meter pct={s.adherence} color={c} warn={false} height={5} /></div>
+              <div className="flex justify-between"><dt className="text-muted-foreground">Calorias médias</dt><dd className="font-mono">{s.kcal ?? "—"} kcal</dd></div><div className="flex justify-between"><dt className="text-muted-foreground">Proteína média</dt><dd className="font-mono">{s.protein ?? "—"} g</dd></div></dl>
               : <p className="mt-3 text-xs text-muted-foreground">Ainda sem dias com esta opção.</p>}</article>); })}</div>
-        {best && <p className="mt-4 rounded-xl border border-emerald/30 bg-emerald/10 px-3 py-2 text-sm text-emerald">Até agora, <b>{best.nome}</b> está com mais refeições cumpridas e menos desconforto. Leve isso para o nutricionista.</p>}
+        {best && <p className="mt-4 rounded-xl border border-emerald/30 bg-emerald/10 px-3 py-2 text-sm text-emerald">Até agora, <b>{best.nome}</b> é a que você mais cumpre. Leve isso para o nutricionista.</p>}
         {wt.avg !== null && <p className="mt-3 text-xs text-muted-foreground">Água: média de {(wt.avg / 1000).toFixed(1).replace(".", ",")} L nos últimos 7 dias ({wt.days} {wt.days === 1 ? "dia registrado" : "dias registrados"}).</p>}</section>
 
       <section className="glass relative overflow-hidden rounded-3xl p-5" data-testid="dieta-semanal"><h3 className="font-display text-lg font-semibold">Avaliação da semana {week}</h3><p className="mb-4 text-xs text-muted-foreground">{plan.semanal.join(" · ")}</p>

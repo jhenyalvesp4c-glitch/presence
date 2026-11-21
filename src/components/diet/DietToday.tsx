@@ -1,5 +1,5 @@
 /** Diário do dia (como um app de contagem de macros, no visual do Orion): navegar entre dias, metas e macros, refeições com alimentos em g/colheres, água e "como foi o dia". */
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Check, ChevronLeft, ChevronRight, Droplets, Minus, MoreVertical, Plus, Repeat, Target, Undo2, X } from "lucide-react";
@@ -12,11 +12,6 @@ import { Burst } from "@/components/ideas/fx";
 import { backdropProps } from "@/lib/backdrop";
 import { customMealName, daySummary, mealMacros, sumMacros, swapsFor, type DayLog, type DietMeal, type Macros, type Swap } from "@/lib/diet-plan";
 
-const SCALES: { key: "fullness" | "difficulty" | "energy" | "training" | "discomfort"; label: string; lo: string; hi: string; good: "high" | "low" }[] = [
-  { key: "fullness", label: "Estômago cheio", lo: "leve", hi: "pesado", good: "low" }, { key: "difficulty", label: "Facilidade de cumprir", lo: "difícil", hi: "fácil", good: "high" },
-  { key: "energy", label: "Energia", lo: "baixa", hi: "alta", good: "high" }, { key: "training", label: "Treino", lo: "fraco", hi: "forte", good: "high" }, { key: "discomfort", label: "Desconforto digestivo", lo: "nenhum", hi: "muito", good: "low" },
-];
-const toneOf = (v: number, good: "high" | "low") => { const s = good === "high" ? v : 6 - v; return s >= 4 ? "var(--emerald)" : s === 3 ? "var(--cyan)" : "oklch(0.78 0.16 70)"; };
 const r0 = (n: number) => Math.round(n), r1 = (n: number) => Math.round(n * 10) / 10;
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const shift = (s: string, n: number) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return iso(d); };
@@ -85,10 +80,7 @@ export function DietToday({ b }: { b: DietBundle }) {
   const { plan, today } = b, save = b.actions.saveDay.mutate, [date, setDate] = useState(today), [adding, setAdding] = useState<string | null>(null), [metas, setMetas] = useState(false), [naming, setNaming] = useState<string | null>(null), [burst, setBurst] = useState(0);
   const stored = b.logs.find((l) => l.date === date) ?? null, base = daySummary(plan, stored), opt = base.opt;
   const cur: DayLog = stored ?? emptyDay(date, opt.id), sum = daySummary(plan, cur), m = sum.macros;
-  const [note, setNote] = useState(cur.notes), tm = useRef<ReturnType<typeof setTimeout> | null>(null), wr = useRef<(p: Partial<DayLog>) => void>(() => {});
-  useEffect(() => { setNote(stored?.notes ?? ""); }, [stored?.notes, date]);
   const write = (patch: Partial<DayLog>) => save({ ...cur, optionId: cur.optionId ?? opt.id, ...patch }, { onError: (e) => toast.error(e.message) });
-  wr.current = write;
   const goalP = plan.metas.p ?? plan.proteina.min ?? plan.proteina.max, goalK = plan.metas.kcal, water = cur.waterMl ?? 0;
   const customNames = [...new Set([...cur.customMeals, ...cur.extras.map((e) => customMealName(e.meal)).filter((n): n is string => !!n)])];
   const cards: CardMeal[] = [...opt.refeicoes.map((x) => ({ id: x.id, nome: x.nome, hora: x.hora, plan: x, custom: false })), ...customNames.map((n) => ({ id: `c:${n}`, nome: n, hora: "", plan: null, custom: true })), ...(cur.extras.some((e) => (e.meal ?? "outros") === "outros") ? [{ id: "outros", nome: "Outros", hora: "", plan: null, custom: false }] : [])];
@@ -130,12 +122,8 @@ export function DietToday({ b }: { b: DietBundle }) {
             <div className="mt-3 flex flex-wrap gap-2">{[250, 500].map((ml) => <button key={ml} type="button" onClick={() => write({ waterMl: water + ml })} className="rounded-full border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-xs text-cyan transition hover:bg-cyan/20 active:scale-95" data-testid={`agua-${ml}`}>+ {ml} ml</button>)}<button type="button" onClick={() => write({ waterMl: Math.max(0, water - 250) })} className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-muted-foreground active:scale-95">− 250</button></div>
             <p className="mt-2 text-xs text-muted-foreground">Sem meta rígida: suba aos poucos{plan.hidratacao.atualMl ? ` (antes você bebia ≈ ${(plan.hidratacao.atualMl / 1000).toFixed(1).replace(".", ",")} L)` : ""}.</p></section>
           <section className="glass rounded-3xl p-5" data-testid="dieta-proteina"><div className="flex items-center justify-between gap-2 text-xs"><span className="text-muted-foreground">Proteína extra sem cadastrar (whey, ovo…)</span><span className="flex items-center gap-2"><button type="button" aria-label="Menos 5 g" onClick={() => write({ extraProteinG: Math.max(0, (cur.extraProteinG ?? 0) - 5) })} className="grid h-7 w-7 place-items-center rounded-full border border-white/10 active:scale-90"><Minus size={12} /></button><b className="w-12 text-center font-mono">{cur.extraProteinG ?? 0} g</b><button type="button" aria-label="Mais 5 g" onClick={() => write({ extraProteinG: (cur.extraProteinG ?? 0) + 5 })} className="grid h-7 w-7 place-items-center rounded-full border border-white/10 active:scale-90" data-testid="proteina-mais"><Plus size={12} /></button></span></div></section>
-          <section className="glass rounded-3xl p-5" data-testid="dieta-dia"><h3 className="mb-3 font-display text-sm font-semibold uppercase tracking-[0.16em]">Como foi o dia</h3>
-            <div className="space-y-3">{SCALES.map((s) => { const v = cur[s.key]; return (
-              <div key={s.key}><div className="mb-1 flex items-baseline justify-between text-xs"><span>{s.label}</span><span className="text-[0.65rem] text-muted-foreground">{s.lo} ↔ {s.hi}</span></div>
-                <div className="flex gap-1.5">{[1, 2, 3, 4, 5].map((n) => { const on = v === n, c = toneOf(n, s.good); return <button key={n} type="button" aria-pressed={on} aria-label={`${s.label} ${n}`} onClick={() => write({ [s.key]: on ? null : n } as Partial<DayLog>)} data-testid={`dia-${s.key}-${n}`} className="h-9 flex-1 rounded-lg border text-sm font-semibold tabular-nums transition active:scale-90" style={{ borderColor: on ? c : "rgba(255,255,255,.1)", background: on ? `color-mix(in oklab, ${c} 22%, transparent)` : "transparent", color: on ? c : undefined, boxShadow: on ? `0 0 16px -4px ${c}` : undefined }}>{n}</button>; })}</div></div>); })}
-              <div className="flex items-center justify-between text-xs"><span>Evacuou?</span><div className="flex gap-1.5">{([[true, "Sim"], [false, "Não"]] as const).map(([val, l]) => <button key={l} type="button" aria-pressed={cur.bowel === val} onClick={() => write({ bowel: cur.bowel === val ? null : val })} className={`rounded-full border px-3 py-1 transition active:scale-95 ${cur.bowel === val ? "border-emerald/60 bg-emerald/15 text-emerald" : "border-white/10 text-muted-foreground"}`}>{l}</button>)}</div></div>
-              <textarea value={note} onChange={(e) => { setNote(e.target.value); if (tm.current) clearTimeout(tm.current); tm.current = setTimeout(() => wr.current({ notes: e.target.value }), 700); }} rows={2} maxLength={2000} placeholder="Observações do dia…" className="w-full resize-y rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-emerald/60" data-testid="dia-obs" /></div></section>
+          <section className="glass rounded-3xl p-5" data-testid="dieta-dia"><div className="flex items-center justify-between gap-3"><div><h3 className="font-display text-sm font-semibold uppercase tracking-[0.16em]">Intestino</h3><p className="mt-0.5 text-xs text-muted-foreground">Fica gravado no dia e vai para o relatório.</p></div>
+            <div className="flex items-center gap-2"><span className="text-sm">Evacuou?</span>{([[true, "Sim"], [false, "Não"]] as const).map(([val, l]) => <button key={l} type="button" aria-pressed={cur.bowel === val} onClick={() => write({ bowel: cur.bowel === val ? null : val })} data-testid={`evacuou-${l}`} className={`rounded-full border px-4 py-1.5 text-sm transition active:scale-95 ${cur.bowel === val ? "border-emerald/60 bg-emerald/15 text-emerald shadow-[0_0_16px_-4px_var(--emerald)]" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>{l}</button>)}</div></div></section>
         </div>
       </div>
       {adding && addingCard && <AddFoodSheet b={{ ...b, sum }} mealLabel={addingCard.nome} onAdd={addEntry} onClose={() => setAdding(null)} />}

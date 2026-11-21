@@ -43,7 +43,7 @@ export function dietReportText(r: DietReport): string {
   }
   if (r.semanais.length) { L.push("AVALIAÇÕES SEMANAIS"); for (const w of r.semanais) L.push(`Semana ${w.week}: peso ${w.weight ?? "—"} kg · cintura ${w.waist ?? "—"} · abdômen ${w.abdomen ?? "—"} · quadril ${w.hip ?? "—"} · evacuações ${w.bowelCount ?? "—"}`); L.push(""); }
   const op = r.opcoes.filter((o) => o.dias > 0);
-  if (op.length > 1) { L.push("COMPARAÇÃO DAS OPÇÕES (médias de 1 a 5)"); for (const o of op) L.push(`${o.nome}: ${o.dias} dia(s) · estômago cheio ${o.fullness ?? "—"} · facilidade ${o.difficulty ?? "—"} · energia ${o.energy ?? "—"} · treino ${o.training ?? "—"} · desconforto ${o.discomfort ?? "—"} · refeições cumpridas ${o.adherence}%`); L.push(""); }
+  if (op.length > 1) { L.push("COMPARAÇÃO DAS OPÇÕES"); for (const o of op) L.push(`${o.nome}: ${o.dias} dia(s) · ${o.kcal ?? "—"} kcal · proteína ${o.protein ?? "—"} g · refeições cumpridas ${o.adherence}%`); L.push(""); }
   if (r.observacoes.length) L.push("OBSERVAÇÕES", ...r.observacoes.map((o) => `- ${o}`), "");
   L.push("Gerado pelo Orion. Calorias e macros são estimativas pelas porções informadas; o plano é uma proposta inicial a validar com nutricionista e médico.");
   return L.join("\n");

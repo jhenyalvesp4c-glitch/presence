@@ -141,13 +141,13 @@ export function daySummary(p: DietPlan, log: DayLog | null) {
   const macros = sumMacros(parts), protein = Math.round(macros.p);
   return { opt, done: counted.length, total: opt.refeicoes.length, protein, macros, plannedProtein: optionProtein(opt), pct: opt.refeicoes.length ? counted.length / opt.refeicoes.length : 0 };
 }
-export type OptionStats = { id: string; nome: string; dias: number; fullness: number | null; difficulty: number | null; energy: number | null; training: number | null; discomfort: number | null; adherence: number; protein: number | null };
+export type OptionStats = { kcal: number | null; id: string; nome: string; dias: number; fullness: number | null; difficulty: number | null; energy: number | null; training: number | null; discomfort: number | null; adherence: number; protein: number | null };
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x !== null); return v.length ? Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10 : null; };
 /** Médias por opção (só dias com a opção marcada): a base para "qual opção provoca menos estômago cheio, é mais fácil de cumprir…". */
 export function compareOptions(p: DietPlan, logs: DayLog[]): OptionStats[] {
   return p.opcoes.map((o) => {
     const ds = logs.filter((l) => l.optionId === o.id);
-    return { id: o.id, nome: o.nome, dias: ds.length, fullness: avg(ds.map((l) => l.fullness)), difficulty: avg(ds.map((l) => l.difficulty)), energy: avg(ds.map((l) => l.energy)), training: avg(ds.map((l) => l.training)), discomfort: avg(ds.map((l) => l.discomfort)),
+    return { kcal: ds.length ? Math.round(avg(ds.map((l) => daySummary(p, l).macros.kcal)) ?? 0) : null, id: o.id, nome: o.nome, dias: ds.length, fullness: avg(ds.map((l) => l.fullness)), difficulty: avg(ds.map((l) => l.difficulty)), energy: avg(ds.map((l) => l.energy)), training: avg(ds.map((l) => l.training)), discomfort: avg(ds.map((l) => l.discomfort)),
       adherence: ds.length ? Math.round((ds.reduce((a, l) => a + l.mealsDone.filter((id) => o.refeicoes.some((m) => m.id === id)).length / o.refeicoes.length, 0) / ds.length) * 100) : 0, protein: ds.length ? Math.round(avg(ds.map((l) => daySummary(p, l).protein)) ?? 0) : null };
   });
 }
