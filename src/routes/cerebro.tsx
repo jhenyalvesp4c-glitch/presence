@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Brain, Files, History, Network, Paperclip, Search, Sparkles, X } from "lucide-react";
 
 import { PlanShell } from "@/components/PlanShell";
-import { BrainGraph } from "@/components/brain/BrainGraph";
+import { ConnectionMap } from "@/components/map/ConnectionMap";
 import { EntryCard, EntryDrawer, FileTile, brDate, entryTitle, tint, type Urls } from "@/components/brain/EntryViews";
 import { OrionPanel } from "@/components/orion/OrionPanel";
 import { deleteEntry, listAllEntries, signedUrls, todayIso, type BrainEntry } from "@/lib/data/brain";
@@ -177,7 +177,7 @@ function CerebroPage() {
               </div>
             ))}
 
-            {ready && tab === "mapa" && <BrainGraph entries={filtered} onOpen={setOpenId} onDossier={(d) => { setDossier(d); setTab("linha"); }} />}
+            {ready && tab === "mapa" && <ConnectionMap height="72vh" />}
 
             {ready && tab === "arquivos" && (files.length ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="grade-arquivos">{files.map(({ a, e }) => <FileTile key={a.path} a={a} e={e} urls={urls} onOpen={() => setOpenId(e.id)} />)}</div>

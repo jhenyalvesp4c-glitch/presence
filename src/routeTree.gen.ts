@@ -23,6 +23,7 @@ import { Route as HabitosRouteImport } from './routes/habitos'
 import { Route as HojeRouteImport } from './routes/hoje'
 import { Route as IdeiasRouteImport } from './routes/ideias'
 import { Route as ListasRouteImport } from './routes/listas'
+import { Route as MapaRouteImport } from './routes/mapa'
 import { Route as OrganizarRouteImport } from './routes/organizar'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
 import { Route as ProgramaRouteImport } from './routes/programa'
@@ -117,6 +118,11 @@ const IdeiasRoute = IdeiasRouteImport.update({
 const ListasRoute = ListasRouteImport.update({
   id: '/listas',
   path: '/listas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapaRoute = MapaRouteImport.update({
+  id: '/mapa',
+  path: '/mapa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizarRoute = OrganizarRouteImport.update({
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/hoje': typeof HojeRoute
   '/ideias': typeof IdeiasRoute
   '/listas': typeof ListasRoute
+  '/mapa': typeof MapaRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
   '/programa': typeof ProgramaRoute
@@ -301,6 +308,7 @@ export interface FileRoutesByTo {
   '/hoje': typeof HojeRoute
   '/ideias': typeof IdeiasRoute
   '/listas': typeof ListasRoute
+  '/mapa': typeof MapaRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
   '/programa': typeof ProgramaRoute
@@ -343,6 +351,7 @@ export interface FileRoutesById {
   '/hoje': typeof HojeRoute
   '/ideias': typeof IdeiasRoute
   '/listas': typeof ListasRoute
+  '/mapa': typeof MapaRoute
   '/organizar': typeof OrganizarRoute
   '/planejamento': typeof PlanejamentoRoute
   '/programa': typeof ProgramaRoute
@@ -386,6 +395,7 @@ export interface FileRouteTypes {
     | '/hoje'
     | '/ideias'
     | '/listas'
+    | '/mapa'
     | '/organizar'
     | '/planejamento'
     | '/programa'
@@ -427,6 +437,7 @@ export interface FileRouteTypes {
     | '/hoje'
     | '/ideias'
     | '/listas'
+    | '/mapa'
     | '/organizar'
     | '/planejamento'
     | '/programa'
@@ -468,6 +479,7 @@ export interface FileRouteTypes {
     | '/hoje'
     | '/ideias'
     | '/listas'
+    | '/mapa'
     | '/organizar'
     | '/planejamento'
     | '/programa'
@@ -510,6 +522,7 @@ export interface RootRouteChildren {
   HojeRoute: typeof HojeRoute
   IdeiasRoute: typeof IdeiasRoute
   ListasRoute: typeof ListasRoute
+  MapaRoute: typeof MapaRoute
   OrganizarRoute: typeof OrganizarRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
   ProgramaRoute: typeof ProgramaRoute
@@ -633,6 +646,13 @@ declare module '@tanstack/react-router' {
       path: '/listas'
       fullPath: '/listas'
       preLoaderRoute: typeof ListasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mapa': {
+      id: '/mapa'
+      path: '/mapa'
+      fullPath: '/mapa'
+      preLoaderRoute: typeof MapaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organizar': {
@@ -849,6 +869,7 @@ const rootRouteChildren: RootRouteChildren = {
   HojeRoute: HojeRoute,
   IdeiasRoute: IdeiasRoute,
   ListasRoute: ListasRoute,
+  MapaRoute: MapaRoute,
   OrganizarRoute: OrganizarRoute,
   PlanejamentoRoute: PlanejamentoRoute,
   ProgramaRoute: ProgramaRoute,
