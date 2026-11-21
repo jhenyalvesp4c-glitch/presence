@@ -7,6 +7,8 @@ export type Msg = {
   ts: number; text: string; kind: string; mentions_me: boolean; reply_to_me: boolean;
   /** Nomes de quem foi marcado na mensagem (preenchido ao ler do banco). */
   marcados?: string[];
+  /** Imagem/PDF baixado para este computador (preenchido ao ler do banco). */
+  has_media?: boolean; media_mime?: string;
 };
 
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -89,4 +91,13 @@ export function normalizeMessage(m: Json, me: Me, chatName = ""): Msg | null {
     id: String(key["id"] ?? `${chat}-${ts}`), chat, chat_name: chatName, is_group: group, sender, sender_name: fromMe ? (me.name || "Você") : String(m["pushName"] ?? ""),
     from_me: fromMe, ts, text: text.slice(0, 4000), kind, mentions_me, reply_to_me,
   };
+}
+
+/** Imagem ou PDF que vale baixar como evidência: devolve o tipo e o tamanho anunciado. */
+export function mediaInfo(message: Json | null | undefined): { mime: string; size: number } | null {
+  const m = unwrap(message);
+  const img = m["imageMessage"], doc = m["documentMessage"];
+  if (img) return { mime: String(img.mimetype ?? "image/jpeg").split(";")[0]!, size: Number(img.fileLength ?? 0) || 0 };
+  if (doc && /^(application\/pdf|image\/)/.test(String(doc.mimetype ?? ""))) return { mime: String(doc.mimetype).split(";")[0]!, size: Number(doc.fileLength ?? 0) || 0 };
+  return null;
 }

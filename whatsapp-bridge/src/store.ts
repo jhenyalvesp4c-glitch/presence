@@ -1,4 +1,6 @@
 // Guarda as mensagens só neste computador (SQLite embutido no Node). Leitura e busca; nada é enviado para fora daqui.
+import { rmSync } from "node:fs";
+import { resolve, sep } from "node:path";
 import type { DatabaseSync as DB } from "node:sqlite";
 import type { Msg } from "./normalize.ts";
 
@@ -19,6 +21,8 @@ const { DatabaseSync } = (process as unknown as { getBuiltinModule(n: string): t
 
 export class Store {
   db: DB;
+  /** Pasta onde ficam as imagens/PDFs baixados (só arquivos dentro dela são entregues). */
+  mediaRoot = "";
   constructor(file: string) {
     this.db = new DatabaseSync(file);
     this.db.exec(`
@@ -34,6 +38,7 @@ export class Store {
       create table if not exists names (jid text primary key, name text not null);
       create table if not exists aliases (a text not null, b text not null, primary key (a, b));
     `);
+    for (const col of ["media_path text", "media_mime text"]) { try { this.db.exec(`alter table messages add column ${col}`); } catch { /* já existe */ } }
   }
 
   setChatName(jid: string, name: string, isGroup?: boolean) {
@@ -80,6 +85,21 @@ export class Store {
       .run(m.chat, m.id, m.sender, m.sender_name, m.from_me ? 1 : 0, m.ts, m.text, m.kind, m.mentions_me ? 1 : 0, m.reply_to_me ? 1 : 0);
     if (Number(r.changes) > 0) { this.db.prepare("update chats set last_ts = max(last_ts, ?) where jid = ?").run(m.ts, m.chat); return true; }
     return false;
+  }
+
+  /** Guarda onde ficou a imagem/PDF baixado de uma mensagem. */
+  setMedia(chat: string, id: string, path: string, mime: string) { this.db.prepare("update messages set media_path = ?, media_mime = ? where chat = ? and id = ?").run(path, mime, chat, id); }
+  /** Arquivo de uma mensagem, só se estiver dentro da pasta de mídia. */
+  mediaOf(chat: string, id: string): { path: string; mime: string } | null {
+    const r = this.db.prepare("select media_path, media_mime from messages where chat = ? and id = ?").get(chat, id) as { media_path: string | null; media_mime: string | null } | undefined;
+    if (!r?.media_path || !this.mediaRoot) return null;
+    const p = resolve(r.media_path); return p.startsWith(resolve(this.mediaRoot) + sep) ? { path: p, mime: r.media_mime || "application/octet-stream" } : null;
+  }
+  /** Varredura: todas as mensagens (de grupos e conversas diretas, de todos) depois de `since`, da mais antiga para a mais nova. */
+  scan(since: number, limit = 3000): { messages: Msg[]; truncated: boolean } {
+    const rows = this.db.prepare("select m.*, c.name as chat_name, c.is_group as is_group from messages m join chats c on c.jid = m.chat where m.ts > ? order by m.ts asc limit ?").all(since, Math.min(limit, 6000) + 1) as Record<string, unknown>[];
+    const truncated = rows.length > Math.min(limit, 6000);
+    return { messages: rows.slice(0, Math.min(limit, 6000)).map((r) => this.toMsg(r, String(r["chat_name"] ?? ""), !!r["is_group"])), truncated };
   }
 
   /** Conversas, da mais recente para a mais antiga, com quantas mensagens novas (que o Orion ainda não leu). */
@@ -147,7 +167,9 @@ export class Store {
 
   /** Apaga mensagens antigas (padrão: mais de 30 dias). */
   prune(days = 30): number {
-    const r = this.db.prepare("delete from messages where ts < ?").run(Math.floor(Date.now() / 1000) - days * 86400);
+    const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
+    for (const f of this.db.prepare("select media_path from messages where ts < ? and media_path is not null").all(cutoff) as { media_path: string }[]) { try { rmSync(f.media_path, { force: true }); } catch { /* ok */ } }
+    const r = this.db.prepare("delete from messages where ts < ?").run(cutoff);
     return Number(r.changes);
   }
   clear() { this.db.exec("delete from messages; delete from chats; delete from names;"); }
@@ -160,6 +182,7 @@ export class Store {
       id: String(r["id"]), chat: String(r["chat"]), chat_name: chatName || this.nameOf(String(r["chat"])), is_group: group, sender,
       sender_name: String(r["sender_name"] || this.nameOf(sender) || sender.split("@")[0] || ""), from_me: !!r["from_me"], ts: Number(r["ts"]), text, marcados,
       kind: String(r["kind"] ?? "texto"), mentions_me: !!r["mentions_me"], reply_to_me: !!r["reply_to_me"],
+      has_media: !!r["media_path"], ...(r["media_mime"] ? { media_mime: String(r["media_mime"]) } : {}),
     };
   }
 }

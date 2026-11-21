@@ -1,13 +1,14 @@
 /** Assistente de reuniões: cole, grave ou traga do WhatsApp; o Orion devolve ata, decisões, quem faz o quê e manda as ações para a Central (demandas, lembretes, compromisso). */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ClipboardCopy, Clock, FileText, Loader2, Mic, MessageCircle, Send, Sparkles, Square, Trash2, X } from "lucide-react";
+import { ClipboardCopy, Clock, FileText, Loader2, Mic, MessageCircle, Radar, Send, Sparkles, Square, Trash2, X } from "lucide-react";
 
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt } from "@/components/finance/fx";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { Burst, Thinking, VoiceWave } from "@/components/ideas/fx";
 import { demoAnalysis } from "@/lib/meetings-demo";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
+import { WhatsAppDemands } from "@/components/meetings/WhatsAppDemands";
 import { WhatsAppPicker } from "@/components/meetings/WhatsAppPicker";
 import { useMeetingActions, useMeetings, type Meeting } from "@/lib/data/meetings";
 import { actionsToInboxText, analysisToMarkdown, type Analysis, type Mode, type Source } from "@/lib/meetings";
@@ -22,6 +23,7 @@ const THINK_MEETING = ["Lendo a conversa…", "Separando os assuntos…", "Achan
 
 export function MeetingsPage() {
   const history = useMeetings(), acts = useMeetingActions();
+  const [view, setView] = useState<"reunioes" | "demandas">(() => (typeof location !== "undefined" && new URLSearchParams(location.search).get("aba") === "demandas" ? "demandas" : "reunioes"));
   const [mode, setMode] = useState<Mode>("reuniao"), [src, setSrc] = useState<"texto" | "voz" | "whatsapp">("texto"), [text, setText] = useState(""), [title, setTitle] = useState(""), [me, setMe] = useState(() => ls.get("orion:reunioes:eu"));
   const [busy, setBusy] = useState(false), [a, setA] = useState<Analysis | null>(null), [cur, setCur] = useState<{ id: string | null; title: string; date: string; raw: string; source: Source; mode: Mode; demo?: boolean } | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set()), [sent, setSent] = useState<Set<number>>(new Set()), [inbox, setInbox] = useState<{ id: number; text: string } | null>(null), [burst, setBurst] = useState(0), [chunkMs] = useState(() => { const n = typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("trecho")) : 0; return n >= 3000 && n <= 60000 ? n : 25000; });
@@ -83,6 +85,8 @@ export function MeetingsPage() {
         <p className="mt-3 max-w-xl text-sm text-muted-foreground">Cole a conversa do WhatsApp, grave a reunião ou traga os grupos. O Orion entrega a ata, as decisões, quem ficou de fazer o quê — e já manda as ações para a Central virarem demandas e lembretes.</p></div>
         <div className="mx-auto"><OrbitArt size={190}><Mic size={32} className="text-violet drop-shadow-[0_0_14px_var(--violet)]" /></OrbitArt></div></div></HeroPanel>
 
+      <div className="mt-5 flex gap-1 rounded-2xl border border-white/10 bg-black/20 p-1 sm:w-fit" role="tablist" aria-label="Área" data-testid="abas-reunioes">{([["reunioes", "Reuniões e grupos", FileText], ["demandas", "Demandas do WhatsApp", Radar]] as const).map(([k, l, I]) => <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} data-testid={`aba-${k}`} className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition sm:flex-none ${view === k ? "bg-cyan/10 text-cyan shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--cyan)_45%,transparent),0_0_24px_-8px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}><I size={15} />{l}</button>)}</div>
+      {view === "demandas" ? <div className="mt-5"><WhatsAppDemands /></div> : <>
       <section className="ex-card mt-5 px-5 py-5 sm:px-6" style={{ "--rail": "var(--violet)", animation: "fin-rise .6s both" } as React.CSSProperties} data-testid="reuniao-entrada">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1 rounded-2xl border border-white/10 p-1" role="tablist" aria-label="Tipo">{([["reuniao", "Reunião", FileText], ["grupo", "Resumir grupos", MessageCircle]] as const).map(([k, l, I]) => <button key={k} role="tab" aria-selected={mode === k} onClick={() => { setMode(k); if (k === "grupo") setSrc("whatsapp"); }} data-testid={`modo-${k}`} className={tab(mode === k)}><I size={15} />{l}</button>)}</div>
@@ -139,6 +143,7 @@ export function MeetingsPage() {
               <b className="mt-0.5 block truncate font-display text-base">{m.title}</b><span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{m.analysis.resumo || m.analysis.grupos[0]?.resumo}</span>
               <span className="mt-2 flex gap-3 font-mono text-[0.62rem] text-muted-foreground"><span>{m.analysis.acoes.length} ações</span><span>{m.analysis.decisoes.length} decisões</span>{m.sent.length > 0 && <span className="text-emerald">{m.sent.filter((n) => n >= 0).length} enviadas</span>}</span></button>
             <button type="button" onClick={() => remove(m)} aria-label={`Apagar ${m.title}`} className="absolute right-3 top-3 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={13} /></button></li>))}</ul></section>
+      </>}
     </main>
   );
 }

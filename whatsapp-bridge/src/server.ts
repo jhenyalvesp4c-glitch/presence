@@ -1,4 +1,5 @@
 // API local da ponte: só escuta neste computador (127.0.0.1), exige a senha (token) e só LÊ. Não existe rota para enviar mensagens.
+import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import type { Store } from "./store.ts";
 
@@ -55,6 +56,16 @@ export function createApi(store: Store, state: BridgeState, token: string, contr
         const messages = store.messages(f.chat.jid, { since: n("since"), limit: n("limit", 40), q: q.get("q") ?? "", onlyNew });
         if (q.get("marcar") === "1" && messages.length) store.markChecked(f.chat.jid, Math.max(...messages.map((m) => m.ts)));
         return json(res, 200, { ok: true, chat: f.chat, messages, total: messages.length });
+      }
+
+      if (route === "GET /varredura") { const r = store.scan(n("since"), n("limit", 3000)); return json(res, 200, { ok: true, messages: r.messages, truncated: r.truncated, now: Math.floor(Date.now() / 1000) }); }
+
+      if (route === "GET /midia") {
+        const f = store.mediaOf(q.get("chat") ?? "", q.get("id") ?? "");
+        if (!f) return json(res, 200, { ok: false, erro: "Sem arquivo guardado para esta mensagem." });
+        const data = await readFile(f.path).catch(() => null);
+        if (!data) return json(res, 200, { ok: false, erro: "O arquivo não está mais no computador." });
+        return json(res, 200, { ok: true, mime: f.mime, size: data.length, data: data.toString("base64") });
       }
 
       if (route === "GET /mentions") return json(res, 200, { mentions: store.mentions(n("after"), n("limit", 50)), now: Math.floor(Date.now() / 1000) });

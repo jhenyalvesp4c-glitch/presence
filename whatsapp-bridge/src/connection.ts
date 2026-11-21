@@ -1,10 +1,11 @@
 // Liga ao WhatsApp como um "aparelho conectado" (igual ao WhatsApp Web), só para LER. Nunca envia mensagem, nunca marca como lida,
 // nunca aparece "online" (as notificações continuam chegando no seu celular).
 // ATENÇÃO: usa uma biblioteca NÃO oficial. O WhatsApp pode não gostar de acessos automáticos; existe risco de o número ser limitado.
-import { rmSync } from "node:fs";
-import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } from "@whiskeysockets/baileys";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers, downloadMediaMessage } from "@whiskeysockets/baileys";
 import QRCode from "qrcode";
-import { normalizeMessage, type Me } from "./normalize.ts";
+import { mediaInfo, normalizeMessage, type Me } from "./normalize.ts";
 import type { Store } from "./store.ts";
 import type { BridgeState } from "./server.ts";
 
@@ -12,7 +13,7 @@ const quiet: any = { level: "silent", trace() {}, debug() {}, info() {}, warn() 
 
 const log = (...a: unknown[]) => console.log("[whatsapp]", ...a);
 
-export function startConnection(store: Store, state: BridgeState, authDir: string) {
+export function startConnection(store: Store, state: BridgeState, authDir: string, mediaDir = "") {
   let sock: any = null;
   let stopped = false;
   let me: Me = { jids: [], name: "" };
@@ -60,7 +61,19 @@ export function startConnection(store: Store, state: BridgeState, authDir: strin
       if (c?.id && c?.lid) store.link(c.id, c.lid);
       if (c?.id && c?.phoneNumber) store.link(c.id, c.phoneNumber);
     };
-    const save = (raw: any) => { learn(raw); if (state.paused) return; const m = normalizeMessage(raw, me, ""); if (m) store.addMessage({ ...m, chat_name: store.chats(m.chat, 1)[0]?.name ?? "" }); };
+    // Baixa imagens e PDFs (até 6 MB) para este computador, para servir de evidência. Nunca derruba a ponte.
+    const grab = async (raw: any, m: { chat: string; id: string }) => {
+      const info = mediaInfo(raw?.message); if (!info || !mediaDir || info.size > 6_000_000) return;
+      try {
+        const buf = (await downloadMediaMessage(raw, "buffer", {}, { logger: quiet, reuploadRequest: sock.updateMediaMessage })) as Buffer;
+        if (!buf?.length || buf.length > 6_000_000) return;
+        const safe = (x: string) => x.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80);
+        const dir = join(mediaDir, safe(m.chat)); mkdirSync(dir, { recursive: true });
+        const ext = info.mime === "application/pdf" ? "pdf" : info.mime.split("/")[1]?.replace(/[^a-z0-9]/g, "") || "bin", file = join(dir, `${safe(m.id)}.${ext}`);
+        writeFileSync(file, buf); store.setMedia(m.chat, m.id, file, info.mime);
+      } catch (e) { log("Não consegui baixar a mídia (segue sem ela):", e instanceof Error ? e.message : e); }
+    };
+    const save = (raw: any) => { learn(raw); if (state.paused) return; const m = normalizeMessage(raw, me, ""); if (m && store.addMessage({ ...m, chat_name: store.chats(m.chat, 1)[0]?.name ?? "" })) void grab(raw, m); };
     sock.ev.on("messages.upsert", ({ messages }: any) => { for (const m of messages ?? []) save(m); });
     sock.ev.on("messaging-history.set", ({ chats, contacts, messages }: any) => {
       for (const c of chats ?? []) if (c.name) store.setChatName(c.id, c.name);

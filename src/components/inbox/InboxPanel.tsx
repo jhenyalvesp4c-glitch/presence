@@ -20,7 +20,7 @@ type Phase = "idle" | "processing" | "review" | "done";
  * mostra cada registro em um cartão por destino para revisar/editar/remover e só distribui depois de confirmar.
  */
 export function InboxPanel({ incoming, onClose, onListen, listening, interim }: {
-  incoming: { id: number; text: string } | null; onClose: () => void; onListen: () => void; listening: boolean; interim: string;
+  incoming: { id: number; text: string; files?: LocalFile[] } | null; onClose: () => void; onListen: () => void; listening: boolean; interim: string;
 }) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<LocalFile[]>([]);
@@ -49,13 +49,13 @@ export function InboxPanel({ incoming, onClose, onListen, listening, interim }: 
     rejected.forEach((r) => toast.error(r));
   }, [files]);
 
-  const interpret = useCallback(async (override?: string) => {
-    const t = (override ?? text).trim();
-    if (!t && !files.length) { toast.error("Escreva, cole ou anexe algo para interpretar."); return; }
+  const interpret = useCallback(async (override?: string, filesOverride?: LocalFile[]) => {
+    const t = (override ?? text).trim(), fl = filesOverride ?? files;
+    if (!t && !fl.length) { toast.error("Escreva, cole ou anexe algo para interpretar."); return; }
     setPhase("processing"); setStep(0); setResult(null); setUndone(false);
     const id = ++reqId.current;
     try {
-      const res: InterpretResult = await interpretInbox({ data: { text: t, files: files.map(({ name, mime, size, data }) => ({ name, mime, size, data })) } });
+      const res: InterpretResult = await interpretInbox({ data: { text: t, files: fl.map(({ name, mime, size, data }) => ({ name, mime, size, data })) } });
       if (id !== reqId.current) return;
       if (!res.ok) { toast.error(res.error); setPhase("idle"); return; }
       setItems(res.itens); setCheck(res.check);
@@ -74,7 +74,9 @@ export function InboxPanel({ incoming, onClose, onListen, listening, interim }: 
     if (!incoming || incoming.id === lastIncoming.current) return;
     lastIncoming.current = incoming.id;
     setText((t) => (t.trim() ? `${t.trim()}\n${incoming.text}` : incoming.text));
-    void interpret(`${text.trim() ? `${text.trim()}\n` : ""}${incoming.text}`);
+    const merged = incoming.files?.length ? [...files, ...incoming.files.filter((a) => !files.some((x) => x.name === a.name))] : files;
+    if (incoming.files?.length) setFiles(merged);
+    void interpret(`${text.trim() ? `${text.trim()}\n` : ""}${incoming.text}`, merged);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incoming]);
 
