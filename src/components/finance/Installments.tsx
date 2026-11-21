@@ -43,7 +43,7 @@ export function PlanCard({ plan, onEdit, onDelete, index = 0 }: { plan: Plan; on
         <ol className="relative mt-3 grid gap-1.5 sm:grid-cols-2" style={{ animation: "fin-fade .3s both" }}>
           {info.schedule.map((p) => (
             <li key={p.n} className={`flex items-center justify-between rounded-xl px-3 py-1.5 text-xs ${p.paid ? "bg-white/[0.03] text-muted-foreground" : "bg-white/[0.07]"}`}>
-              <span className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full text-[0.6rem] font-semibold" style={{ background: p.paid ? `color-mix(in oklab, ${color} 30%, transparent)` : "color-mix(in oklab, white 10%, transparent)" }}>{p.n}</span>{monthLabel(p.ym)} · vence {dateBR(p.due).slice(0, 5)}</span>
+              <span className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full text-[0.6rem] font-semibold" style={{ background: p.paid ? `color-mix(in oklab, ${color} 30%, transparent)` : "color-mix(in oklab, white 10%, transparent)" }}>{p.n}</span>{monthLabel(p.closeYm)} · fecha {dateBR(p.close).slice(0, 5)} · vence {dateBR(p.due).slice(0, 5)}</span>
               <span className="tabular-nums">{(() => { const sh = plan.shared?.fixed ? planShare(plan, p.n) : undefined; const part = sh ? Math.round(p.amount * sh.percent) / 100 : 0; return sh ? (part >= p.amount - 0.005 ? <span className="mr-1.5 text-emerald">paga por {sh.person}</span> : <span className="mr-1.5 text-emerald">{brl(part)} de {sh.person} · você {brl(p.amount - part)}</span>) : plan.shared?.fixed ? <span className="mr-1.5 text-muted-foreground">você</span> : null; })()}{brl(p.amount)} {p.paid ? "✓" : ""}</span>
             </li>
           ))}

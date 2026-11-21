@@ -72,8 +72,9 @@ describe("projeção e lançamentos do mês", () => {
   });
   it("parcela aparece só no mês certo e recorrente a partir do início", () => {
     const s = mock(), es = (ym: string) => monthEntries(s, ym);
-    expect(es(addMonths(ymOf(TODAY), 1)).some((e) => e.desc === "Passagens Lisboa" && e.parcel === "1/6")).toBe(true);
-    expect(es(ymOf(TODAY)).some((e) => e.desc === "Passagens Lisboa")).toBe(false);
+    // a parcela conta no mês de FECHAMENTO da fatura: aparece uma única vez, no mês do vencimento ou no anterior
+    const meses = [-1, 0, 1, 2].map((i) => addMonths(ymOf(TODAY), i)).filter((m) => es(m).some((e) => e.desc === "Passagens Lisboa" && e.parcel === "1/6"));
+    expect(meses).toHaveLength(1);
     expect(es(addMonths(ymOf(TODAY), -20)).some((e) => e.source === "recorrente")).toBe(false);
     expect(es(ymOf(TODAY)).some((e) => e.source === "recorrente" && e.desc === "Aluguel")).toBe(true);
   });

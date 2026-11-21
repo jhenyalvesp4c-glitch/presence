@@ -36,7 +36,7 @@ export const dueDateOf = (card: Pick<Card, "dueDay">, dueYm: string): string => 
 export type PlanInfo = {
   paid: number; remaining: number; pct: number; currentIndex: number; nextDue: string | null;
   lastYm: string; remainingAmount: number; paidAmount: number; done: boolean;
-  schedule: { n: number; ym: string; due: string; amount: number; paid: boolean }[];
+  schedule: { n: number; ym: string; due: string; /** Data e mês de fechamento da fatura em que a parcela cai (é por ele que os meses contam). */ close: string; closeYm: string; amount: number; paid: boolean }[];
 };
 /** Valor da parcela `n` (1..count) de um plano; a última absorve a diferença de centavos. */
 export const parcelAmount = (plan: Plan, n: number) => {
@@ -81,12 +81,13 @@ export function migratePaidManual(st: FinanceState, today: Date): FinanceState {
   return { ...st, plans: st.plans.map((p) => { if (p.paidManual === undefined) return p; const { paidManual, ...rest } = p; return { ...rest, first: firstFromPaid(st.cards.find((c) => c.id === p.cardId), today, Math.min(p.count, paidManual)) }; }) };
 }
 
-export function planInfo(plan: Plan, card: Pick<Card, "dueDay"> | undefined, today: Date): PlanInfo {
+export function planInfo(plan: Plan, card: (Pick<Card, "dueDay"> & Partial<Pick<Card, "closingDay">>) | undefined, today: Date): PlanInfo {
   const dueDay = card?.dueDay ?? 10;
   const todayIso = isoOf(today);
   const schedule = Array.from({ length: plan.count }, (_, i) => {
     const ym = addMonths(plan.first, i), due = dayIn(ym, dueDay);
-    return { n: i + 1, ym, due, amount: parcelAmount(plan, i + 1), paid: due <= todayIso };
+    const close = card?.closingDay ? closingDateOf({ closingDay: card.closingDay, dueDay }, ym) : due;
+    return { n: i + 1, ym, due, close, closeYm: close.slice(0, 7), amount: parcelAmount(plan, i + 1), paid: due <= todayIso };
   });
   if (plan.paidManual !== undefined) schedule.forEach((p, i) => { p.paid = i < Math.max(0, Math.min(plan.count, plan.paidManual!)); });
   const paid = schedule.filter((p) => p.paid).length, remaining = plan.count - paid;
@@ -155,8 +156,9 @@ export function monthEntries(s: FinanceState, ym: string, upTo?: string): Entry[
   const add = (e: Entry, sh: { person: string; percent: number } | undefined) => { out.push(e); const r = receivable(e, sh); if (r) out.push(r); };
   for (const t of s.transactions) if (ymOf(t.date) === ym) add(txEntry(t), t.shared);
   for (const p of s.plans) {
-    const card = s.cards.find((c) => c.id === p.cardId), dueDay = card?.dueDay ?? 10;
-    for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === ym) add({ id: `${p.id}:${n}`, kind: "despesa", desc: p.desc, amount: parcelAmount(p, n), date: dayIn(ym, dueDay), category: p.category, method: "credito", cardId: p.cardId, source: "parcela", planId: p.id, parcel: `${n}/${p.count}` }, planShare(p, n));
+    const card = s.cards.find((c) => c.id === p.cardId);
+    // a parcela conta no mês em que a fatura FECHA (não no do vencimento), com a data do fechamento
+    for (let n = 1; n <= p.count; n++) { const dueYm = addMonths(p.first, n - 1), date = card ? closingDateOf(card, dueYm) : dayIn(dueYm, 10); if (ymOf(date) === ym) add({ id: `${p.id}:${n}`, kind: "despesa", desc: p.desc, amount: parcelAmount(p, n), date, category: p.category, method: "credito", cardId: p.cardId, source: "parcela", planId: p.id, parcel: `${n}/${p.count}` }, planShare(p, n)); }
   }
   for (const r of s.recurring) { const e = recurringEntry(r, ym); if (e) add(e, r.shared); }
   return out.filter((e) => !upTo || e.date <= upTo).sort((a, b) => b.date.localeCompare(a.date));
@@ -489,11 +491,13 @@ export function cashflow(s: FinanceState, today: Date, days = 60): Cashflow {
 
 /* ───────────── comprometimento futuro ───────────── */
 export type Commitment = { ym: string; label: string; parcelas: number; recorrentes: number; total: number; porCartao: Record<string, number> };
+/** Mês (de fechamento da fatura) em que a parcela `k` do plano conta. */
+const closeYmOfParcel = (s: FinanceState, p: Plan, k: number): string => { const card = s.cards.find((c) => c.id === p.cardId), dueYm = addMonths(p.first, k - 1); return card ? ymOf(closingDateOf(card, dueYm)) : dueYm; };
 export function commitments(s: FinanceState, currentYm: string, n = 12): Commitment[] {
   return Array.from({ length: n }, (_, i) => addMonths(currentYm, i)).map((ym) => {
     const porCartao: Record<string, number> = {};
     let parcelas = 0;
-    for (const p of s.plans) for (let k = 1; k <= p.count; k++) if (addMonths(p.first, k - 1) === ym) { const v = parcelAmount(p, k); parcelas += v; porCartao[p.cardId] = round2((porCartao[p.cardId] ?? 0) + v); }
+    for (const p of s.plans) for (let k = 1; k <= p.count; k++) if (closeYmOfParcel(s, p, k) === ym) { const v = parcelAmount(p, k); parcelas += v; porCartao[p.cardId] = round2((porCartao[p.cardId] ?? 0) + v); }
     const recorrentes = sum(s.recurring.filter((r) => r.kind === "despesa" && recurringActiveIn(r, ym)).map((r) => r.amount));
     return { ym, label: monthShort(ym), parcelas: round2(parcelas), recorrentes, total: round2(parcelas + recorrentes), porCartao };
   });
