@@ -124,6 +124,9 @@ function TarefasPage() {
     const d = fromIso(t.date);
     return tab === 0 ? isSameDay(d, day) : tab === 1 ? isSameWeek(d, day, { weekStartsOn: 1 }) : isSameMonth(d, day);
   };
+  // O primeiro botão mostra o dia que está sendo visto: "Hoje" só quando é hoje (senão parece que a tarefa de amanhã está em hoje).
+  const dayLabel = isSameDay(day, T0) ? "Hoje" : isSameDay(day, addDays(T0, 1)) ? "Amanhã" : isSameDay(day, addDays(T0, -1)) ? "Ontem" : cap(format(day, "EEE dd/MM", { locale: ptBR }));
+  const tabNames = [dayLabel, ...tabs.slice(1)];
   const dayTasks = [...tasks.filter(onDay), ...fixedRows.filter((t) => t.date === iso(day))];
   const taskDays = useMemo(() => [...new Set(tasks.map((t) => t.date).filter(Boolean))].map(fromIso), [tasks]);
   const upcoming = tasks.filter((t) => t.date && !t.done && fromIso(t.date) >= T0 && t.cat === compId).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 3);
@@ -244,7 +247,7 @@ function TarefasPage() {
 
         <div className="flex min-w-0 flex-col gap-4">
           <div className="glass flex gap-1 rounded-2xl p-1.5">
-            {tabs.map((t, i) => (
+            {tabNames.map((t, i) => (
               <button key={t} onClick={() => setTab(i)}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2 text-sm transition ${tab === i ? "bg-cyan/10 text-cyan shadow-[inset_0_0_0_1px_var(--cyan),0_0_20px_-6px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}>
                 <CalendarDays size={15} /> {t}
@@ -253,7 +256,7 @@ function TarefasPage() {
           </div>
           <Panel c="cyan" className="scan-line flex flex-1 flex-col overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Head Icon={CalendarDays} t={`Tarefas · ${tabs[tab]}`} s={cat ? `Filtrando: ${cats.find((c) => c.id === cat)?.t}` : cap(format(day, "EEEE, d 'de' MMMM", { locale: ptBR }))} />
+              <Head Icon={CalendarDays} t={`Tarefas · ${tabNames[tab]}`} s={cat ? `Filtrando: ${cats.find((c) => c.id === cat)?.t}` : cap(format(day, "EEEE, d 'de' MMMM", { locale: ptBR }))} />
               <div className="flex items-center gap-2">
                 <label className="flex items-center gap-2 rounded-full border border-border bg-secondary/40 px-3 py-1.5 text-sm focus-within:border-cyan">
                   <Search size={14} className="text-muted-foreground" />
