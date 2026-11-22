@@ -14,7 +14,7 @@ import { ClientsPreview } from "@/components/ClientsPreview";
 import { SetupSummary } from "@/components/SetupGuide";
 import { MAX_PENDING, readPending, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { signedUrls } from "@/lib/data/brain";
-import { useClientActions, useClientExtras, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
+import { useClientActions, useClientExtras, useClientLinks, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
 import { DOC_KINDS, STATUS_LABEL, STATUS_TONE, brl, dateBR, dueOf, quickAnswer, summarize, todayBR, type Client, type ClientStatus, type QuickAnswer } from "@/lib/clients";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -22,6 +22,14 @@ const COLORS = ["violet", "cyan", "emerald", "amber", "pink"] as const;
 const colorOf = (id: string) => COLORS[[...id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % COLORS.length]!;
 const ini = (n: string) => n.split(" ").filter((w) => w.length > 2).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || n.slice(0, 2).toUpperCase();
 const cssColor = (tone: string) => `var(--${tone})`;
+/** Logins cadastrados na Documentação para o dossiê (ficam só neste navegador). Nunca devolve a senha. */
+function readLoginsFor(dossier: string): { id: string; title: string; user: string; owner: string }[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem("presence.logins.v1") ?? "[]") as { id?: string; title?: string; login?: { user?: string; owner?: string; dossier?: string } }[];
+    const key = dossier.trim().toLowerCase();
+    return raw.filter((d) => d.login && (d.login.dossier?.trim() || d.title || "").toLowerCase() === key).map((d) => ({ id: String(d.id), title: d.title ?? "Login", user: d.login?.user ?? "", owner: d.login?.owner ?? "" }));
+  } catch { return []; }
+}
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 type Tab = "docs" | "reun" | "dem" | "ace" | "lin" | "imp";
@@ -37,10 +45,10 @@ function Venc({ c }: { c: Client }) {
 
 export function ClientsView({ projectId }: { projectId: string }) {
   const clientsQ = useClients(projectId), clients = clientsQ.data ?? [];
-  const extrasQ = useClientExtras(projectId, clients), ex = extrasQ.data;
+  const extrasQ = useClientExtras(projectId, clients), ex = extrasQ.data, linksQ = useClientLinks(projectId, clients), links = linksQ.data ?? {};
   const dossiers = useProjectDossiers(projectId).data ?? [], acts = useClientActions(projectId);
   const [filtro, setFiltro] = useState<"todos" | ClientStatus>("todos"), [q, setQ] = useState(""), [vista, setVista] = useState<"tab" | "cards" | "pas">("cards");
-  const [selId, setSelId] = useState<string | null>(null), [tab, setTab] = useState<Tab>("docs"), [form, setForm] = useState<{ edit: Client | null } | null>(null), [exemplo, setExemplo] = useState(false);
+  const [importing, setImporting] = useState(false), [selId, setSelId] = useState<string | null>(null), [tab, setTab] = useState<Tab>("docs"), [form, setForm] = useState<{ edit: Client | null } | null>(null), [exemplo, setExemplo] = useState(false);
   const [ask, setAsk] = useState(""), [answer, setAnswer] = useState<QuickAnswer | null>(null), [active, setActive] = useState<string | null>(null);
 
   const docs = ex?.docs ?? [], demands = ex?.demands ?? [];
@@ -49,7 +57,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
   const open = demands.filter((d) => d.status !== "done").length, sum = summarize(clients, open);
   const dossierName = (id: string | null) => dossiers.find((d) => d.id === id)?.name;
   const slices = clients.filter((c) => c.status === "ativo" && c.monthlyValue > 0).map((c) => ({ id: c.id, name: c.name, color: cssColor(colorOf(c.id)), value: c.monthlyValue }));
-  const perClient = (id: string) => { const dm = demands.filter((d) => d.clientId === id); return { total: dm.length, done: dm.filter((d) => d.status === "done").length, pct: dm.length ? Math.round((dm.filter((d) => d.status === "done").length / dm.length) * 100) : 0 }; };
+  const perClient = (id: string) => { const dm = [...demands.filter((d) => d.clientId === id), ...(links[id]?.demands ?? []).filter((d) => !demands.some((x) => x.clientId === id && x.code === d.code))]; return { total: dm.length, done: dm.filter((d) => d.status === "done").length, pct: dm.length ? Math.round((dm.filter((d) => d.status === "done").length / dm.length) * 100) : 0 }; };
 
   const perguntar = (t: string) => { setAsk(t); const a = quickAnswer(t, { clients, docs, demands }); setAnswer(a ?? { title: "Ainda não sei responder isso por aqui", lines: ["Tente: vencimentos, demandas abertas, receita ou “contrato do <cliente>”. Para perguntas livres, use o assistente do Orion."] }); };
   const err = (e: unknown) => toast.error(`Não consegui salvar: ${(e as Error).message}`);
@@ -67,6 +75,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
               <SectionTitle kicker="Clientes" title="Sua carteira" accent="começa aqui" sub="Cadastre um cliente e ligue ao dossiê dele: demandas, reuniões, documentos e vencimentos ficam numa ficha só." />
               <div className="mt-5 flex flex-wrap gap-2.5">
                 <button onClick={() => setForm({ edit: null })} data-testid="cliente-novo" className="flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan to-violet px-5 py-2.5 text-sm font-semibold text-background shadow-[0_0_28px_-6px_var(--cyan)] transition active:scale-95"><Plus size={16} /> Cadastrar primeiro cliente</button>
+                <button onClick={() => setImporting(true)} data-testid="clientes-importar" className="flex items-center gap-2 rounded-full border border-violet/50 px-5 py-2.5 text-sm text-violet transition hover:bg-violet/10"><Link2 size={15} /> Importar dos dossiês</button>
                 <button onClick={() => setExemplo(true)} className="flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm text-muted-foreground transition hover:text-foreground"><FlaskConical size={15} /> Ver exemplo preenchido</button>
               </div>
             </div>
@@ -112,6 +121,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
           <span className="grow" />
           <label className="glass flex min-w-[200px] items-center gap-2 rounded-xl px-3 py-2"><Search size={13} className="text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente, contato, documento…" aria-label="Buscar" className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground" />{q && <button onClick={() => setQ("")} aria-label="Limpar"><X size={11} /></button>}</label>
           <div className="glass flex rounded-xl p-1">{([["cards", "Cards", LayoutGrid], ["tab", "Tabela", List], ["pas", "Pastas", FolderOpen]] as const).map(([k, l, I]) => <button key={k} onClick={() => setVista(k)} aria-pressed={vista === k} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition ${vista === k ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}><I size={13} /> {l}</button>)}</div>
+          <button onClick={() => setImporting(true)} data-testid="clientes-importar" className="flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-muted-foreground transition hover:border-violet/50 hover:text-foreground"><Link2 size={14} /> Importar dos dossiês</button>
           <button onClick={() => setForm({ edit: null })} data-testid="cliente-novo" className="flex items-center gap-1.5 rounded-full border border-cyan/60 px-4 py-2 text-sm text-cyan shadow-[0_0_24px_-10px_var(--cyan)] transition hover:bg-cyan/10"><Plus size={15} /> Novo cliente</button>
         </div>
 
@@ -119,7 +129,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
           <section className={vista === "cards" ? "" : "glass overflow-hidden rounded-3xl animate-rise"} data-testid="clientes-lista">
             {shown.length === 0 ? <p className="glass rounded-3xl p-8 text-center text-sm text-muted-foreground">Nenhum cliente com esse filtro.</p> : vista === "cards" ? (
               <div className={`grid gap-4 sm:grid-cols-2 ${sel ? "" : "xl:grid-cols-3"}`}>{shown.map((c, i) => {
-                const p = perClient(c.id), tone = colorOf(c.id), d = dueOf(c), nDocs = docs.filter((x) => x.clientId === c.id).length;
+                const p = perClient(c.id), tone = colorOf(c.id), d = dueOf(c), nDocs = docs.filter((x) => x.clientId === c.id).length + (links[c.id]?.libDocs.length ?? 0);
                 return (
                   <div key={c.id} style={{ animation: `fin-pop .55s ${Math.min(i, 8) * 0.06}s both` }}>
                     <Tilt max={9}>
@@ -154,13 +164,35 @@ export function ClientsView({ projectId }: { projectId: string }) {
             )}
           </section>
 
-          {sel && <Ficha key={sel.id} client={sel} tab={tab} setTab={setTab} onClose={() => setSelId(null)} onEdit={() => setForm({ edit: sel })} dossierName={dossierName(sel.dossierId)} acts={acts} extras={ex} err={err}
+          {sel && <Ficha key={sel.id} links={links[sel.id]} projectId={projectId} client={sel} tab={tab} setTab={setTab} onClose={() => setSelId(null)} onEdit={() => setForm({ edit: sel })} dossierName={dossierName(sel.dossierId)} acts={acts} extras={ex} err={err}
             onDelete={() => acts.remove.mutate(sel, { onSuccess: () => { setSelId(null); toast.success("Cliente apagado"); }, onError: err })} />}
         </div>
       </>)}
 
+      {importing && <ImportDossiers dossiers={dossiers} existing={new Set(clients.map((c) => c.dossierId).filter((x): x is string => !!x))} onClose={() => setImporting(false)} onImport={(list) => acts.importDossiers.mutate(list, { onSuccess: (n) => { setImporting(false); toast.success(`${n} cliente${n === 1 ? "" : "s"} criado${n === 1 ? "" : "s"} a partir dos dossiês`); }, onError: err })} busy={acts.importDossiers.isPending} />}
       {form && <ClientForm key={form.edit?.id ?? "novo"} initial={form.edit} dossiers={dossiers} busy={acts.save.isPending} onClose={() => setForm(null)} onSave={(c) => acts.save.mutate(c, { onSuccess: (id) => { setForm(null); if (id) { setSelId(String(id)); setTab("docs"); } toast.success(c.id ? "Cliente atualizado" : "Cliente cadastrado"); }, onError: err })} />}
     </div>
+  );
+}
+
+/** Cria clientes a partir dos dossiês do projeto (os que ainda não têm cliente), já ligados a eles. */
+function ImportDossiers({ dossiers, existing, onClose, onImport, busy }: { dossiers: { id: string; name: string }[]; existing: Set<string>; onClose: () => void; onImport: (l: { id: string; name: string }[]) => void; busy: boolean }) {
+  const free = dossiers.filter((d) => !existing.has(d.id)), [sel, setSel] = useState<Set<string>>(() => new Set(free.map((d) => d.id))), [q, setQ] = useState("");
+  const shown = free.filter((d) => norm(d.name).includes(norm(q.trim())));
+  const toggle = (id: string) => setSel((x) => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
+      <DialogContent className="max-h-[88vh] max-w-lg overflow-hidden rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.9)] p-0 backdrop-blur-2xl" data-testid="clientes-importar-dialogo" aria-describedby={undefined}>
+        <div className="flex max-h-[88vh] flex-col px-6 pb-5 pt-6">
+          <div className="mb-3 flex items-center gap-3"><span className="icon-tile h-10 w-10 shrink-0 !rounded-full" style={tint("violet")}><Link2 size={16} /></span><div><p className="mono-caps">Clientes</p><DialogTitle className="font-display text-lg font-semibold">Importar dos dossiês</DialogTitle></div></div>
+          {free.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Todos os dossiês deste projeto já têm cliente.</p> : <>
+            <p className="mb-3 text-xs text-muted-foreground">Cada dossiê marcado vira um cliente, já ligado a ele. Você completa contato, valor e contrato depois.</p>
+            <div className="mb-2 flex items-center gap-2"><label className="glass flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1.5"><Search size={12} className="text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar dossiê…" aria-label="Buscar dossiê" className="min-w-0 flex-1 bg-transparent text-xs outline-none" /></label><button onClick={() => setSel(new Set(shown.map((d) => d.id)))} className="text-xs text-cyan hover:underline">Marcar todos</button><button onClick={() => setSel(new Set())} className="text-xs text-muted-foreground hover:text-foreground">Nenhum</button></div>
+            <ul className="scroll-neon -mx-1 min-h-0 flex-1 space-y-1 overflow-y-auto px-1">{shown.map((d) => <li key={d.id}><button onClick={() => toggle(d.id)} role="checkbox" aria-checked={sel.has(d.id)} className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-white/[0.05]"><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${sel.has(d.id) ? "border-cyan bg-cyan/20 text-cyan" : "border-white/25"}`}>{sel.has(d.id) && <Check size={12} />}</span><span className="min-w-0 flex-1 truncate text-sm">{d.name}</span></button></li>)}</ul>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4"><button onClick={onClose} disabled={busy} className="px-2 py-2 text-sm text-muted-foreground hover:text-foreground">Cancelar</button><button onClick={() => onImport(free.filter((d) => sel.has(d.id)))} disabled={busy || sel.size === 0} data-testid="clientes-importar-ok" className="rounded-full bg-gradient-to-r from-cyan to-violet px-6 py-2.5 text-sm font-semibold text-background shadow-[0_0_30px_-8px_var(--cyan)] disabled:opacity-40">{busy ? "Criando…" : `Criar ${sel.size} cliente${sel.size === 1 ? "" : "s"}`}</button></div></>}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -184,11 +216,15 @@ function Radar({ clients, onPick }: { clients: Client[]; onPick: (id: string) =>
 }
 
 type Acts = ReturnType<typeof useClientActions>;
-function Ficha({ client: c, tab, setTab, onClose, onEdit, onDelete, dossierName, acts, extras, err }: { client: Client; tab: Tab; setTab: (t: Tab) => void; onClose: () => void; onEdit: () => void; onDelete: () => void; dossierName: string | undefined; acts: Acts; extras: ReturnType<typeof useClientExtras>["data"]; err: (e: unknown) => void }) {
+function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit, onDelete, dossierName, acts, extras, err }: { links: import("@/lib/data/clients").ClientLinks | undefined; projectId: string; client: Client; tab: Tab; setTab: (t: Tab) => void; onClose: () => void; onEdit: () => void; onDelete: () => void; dossierName: string | undefined; acts: Acts; extras: ReturnType<typeof useClientExtras>["data"]; err: (e: unknown) => void }) {
   const docs = (extras?.docs ?? []).filter((d) => d.clientId === c.id), log = (extras?.log ?? []).filter((l) => l.clientId === c.id), access = (extras?.access ?? []).filter((a) => a.clientId === c.id);
-  const meets = (extras?.meetings ?? []).filter((m) => m.clientId === c.id), dem = (extras?.demands ?? []).filter((d) => d.clientId === c.id);
+  const ownMeets = (extras?.meetings ?? []).filter((m) => m.clientId === c.id);
+  const meets = [...ownMeets, ...(links?.meetings ?? []).filter((m) => !ownMeets.some((x) => x.id === m.id)).map((m) => ({ id: m.id, clientId: c.id, title: m.title, happenedOn: m.happenedOn, summary: "do dossiê" }))];
+  const ownDem = (extras?.demands ?? []).filter((d) => d.clientId === c.id);
+  const dem = [...ownDem, ...(links?.demands ?? []).filter((d) => !ownDem.some((x) => x.code === d.code)).map((d) => ({ ...d, clientId: c.id }))];
+  const logins = useMemo(() => (dossierName ? readLoginsFor(dossierName) : []), [dossierName]);
   const [confirm, setConfirm] = useState(false), tone = colorOf(c.id);
-  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["ace", "Acessos", KeyRound], ["lin", "Histórico", Sparkles]];
+  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
   return (
     <aside className="glass space-y-4 rounded-3xl p-5 animate-rise xl:sticky xl:top-4 xl:self-start" data-testid="cliente-ficha">
       <div className="flex items-start gap-3">
@@ -204,11 +240,11 @@ function Ficha({ client: c, tab, setTab, onClose, onEdit, onDelete, dossierName,
       </dl>
       <div role="tablist" className="flex flex-wrap gap-x-1 border-b border-white/10">{tabs.map(([k, l, I]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs transition ${tab === k ? "border-cyan text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}><I size={12} /> {l}</button>)}</div>
       {tab === "imp" && <SetupSummary clientId={c.id} clientName={c.name} projectId={c.projectId} />}
-      {tab === "docs" && <DocsTab client={c} docs={docs} acts={acts} err={err} />}
+      {tab === "docs" && <><DocsTab client={c} docs={docs} acts={acts} err={err} />{(links?.libDocs.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-docs-dossie"><p className="mono-caps">Da pasta do dossiê (Biblioteca)</p>{links!.libDocs.map((d) => <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><FileText size={14} className="shrink-0 text-cyan" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{d.title}</p><p className="truncate text-xs text-muted-foreground">{d.kind}{d.folder && ` · ${d.folder}`}{d.updated && ` · ${d.updated}`}</p></div></div>)}</div>}</>}
       {tab === "reun" && <MeetingsTab client={c} meets={meets} acts={acts} err={err} />}
       {tab === "dem" && <div className="space-y-2">{!c.dossierId ? <p className="rounded-xl border border-dashed border-white/15 p-4 text-center text-xs text-muted-foreground">Vincule um dossiê a este cliente (botão de editar) e as demandas dele aparecem aqui.</p> : dem.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma demanda neste dossiê.</p> : dem.map((d) => <button key={d.code} onClick={() => acts.setDemand.mutate({ code: d.code, status: d.status === "done" ? "todo" : "done" }, { onError: err })} className="ex-card flex w-full items-center gap-3 p-3 text-left" style={{ "--rail": "var(--emerald)" } as CSSProperties}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${d.status === "done" ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{d.status === "done" && <Check size={12} />}</span><div className="min-w-0"><p className={`truncate text-sm font-medium ${d.status === "done" ? "text-muted-foreground line-through" : ""}`}>{d.title}</p><p className="text-xs text-muted-foreground">{d.code}{d.deadline && ` · prazo ${d.deadline}`}</p></div></button>)}<Link to="/demandas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as demandas</Link></div>}
-      {tab === "ace" && <AccessTab client={c} access={access} acts={acts} err={err} />}
-      {tab === "lin" && <LogTab client={c} log={log} acts={acts} err={err} />}
+      {tab === "ace" && <><AccessTab client={c} access={access} acts={acts} err={err} />{logins.length > 0 && <div className="mt-4 space-y-2" data-testid="cliente-logins-dossie"><p className="mono-caps">Logins do dossiê (Documentação)</p>{logins.map((l) => <div key={l.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}><KeyRound size={14} className="shrink-0 text-amber" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{l.title}</p><p className="truncate font-mono text-xs text-muted-foreground">{l.user}{l.owner && ` · ${l.owner}`}</p></div></div>)}<p className="text-[0.65rem] text-muted-foreground">As senhas ficam só neste navegador e não aparecem aqui.</p></div>}</>}
+      {tab === "lin" && <><LogTab client={c} log={log} acts={acts} err={err} />{(links?.records.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-registros-dossie"><p className="mono-caps">Registros e notas do dossiê</p>{links!.records.slice(0, 12).map((r) => <div key={r.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"><p className="mono-caps">{r.kind === "nota" ? "Nota" : "Registro"} · {r.kind === "nota" ? r.date : dateBR(r.date)}</p><p className="line-clamp-2 whitespace-pre-wrap text-sm">{r.text}</p></div>)}</div>}</>}
       <div className="border-t border-white/10 pt-3">{confirm ? <div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-muted-foreground">Apagar o cliente, documentos e histórico? Não dá para desfazer.</span><button onClick={onDelete} data-testid="cliente-apagar-ok" className="rounded-full border border-destructive/60 px-3 py-1 text-destructive hover:bg-destructive/10">Apagar</button><button onClick={() => setConfirm(false)} className="rounded-full border border-white/15 px-3 py-1">Cancelar</button></div> : <button onClick={() => setConfirm(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"><Trash2 size={12} /> Apagar cliente</button>}</div>
           </aside>
   );

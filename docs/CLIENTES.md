@@ -18,3 +18,7 @@ Tabelas: `clients`, `client_docs`, `client_log`, `client_access` (RLS só do don
 - Ao criar uma pasta (ou pelo seletor no topo da pasta) dá para escolher o **dossiê**. A pasta mostra a **página do dossiê**: visão geral, documentos da pasta, demandas, logins, reuniões, registros/notas e o cliente.
 - Demandas: pelo nome do dossiê (podem ser marcadas como feitas ali). Logins: os logins do dossiê (senhas só neste navegador). Reuniões: vincule atas existentes (`meetings.dossier_id`). Registros: anotações do Orion marcadas com o dossiê e notas do projeto.
 - Novos tipos de documento em "Clientes": Contrato, Proposta, Ficha do cliente e Termo.
+
+## Importar dos dossiês e tudo ligado ao dossiê
+- **Importar dos dossiês** (botão em Clientes): lista os dossiês do projeto que ainda não têm cliente, com busca e marcação; cada marcado vira um cliente já ligado ao dossiê (`importDossiersAsClients`).
+- **A ficha puxa tudo do dossiê vinculado:** documentos das pastas da Biblioteca ligadas a ele, reuniões vinculadas ao dossiê, demandas (inclusive de vários dossiês, via `demand_executions`), registros e notas, e os logins da Documentação (só usuário/responsável; senhas ficam no navegador). Consulta em `useClientLinks` (`src/lib/data/clients.ts`).
