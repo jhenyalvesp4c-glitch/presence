@@ -333,11 +333,11 @@ function Library({ projectId }: { projectId: string }) {
       <div className="animate-rise"><OrionPanel /></div>
 
       <div className="relative">
-        <div aria-hidden className="pointer-events-none absolute -inset-x-10 -inset-y-6 -z-10 overflow-hidden rounded-[3rem]">
-          <span className="absolute -left-16 top-0 h-[26rem] w-[26rem] rounded-full bg-[var(--violet)] opacity-30 blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} />
-          <span className="absolute left-1/3 top-1/4 h-[24rem] w-[30rem] rounded-full bg-[var(--cyan)] opacity-[0.22] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} />
-          <span className="absolute -right-10 bottom-0 h-[24rem] w-[24rem] rounded-full bg-[var(--emerald)] opacity-[0.16] blur-3xl" style={{ animation: "fin-aurora 26s ease-in-out infinite" }} />
-          <div className="absolute inset-x-0 bottom-0 h-[55%] opacity-50"><div className="fin-floor h-full w-full" /></div>
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+          <span className="absolute left-[8%] top-[22%] h-[28rem] w-[28rem] rounded-full bg-[var(--violet)] opacity-[0.16] blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} />
+          <span className="absolute left-[38%] top-[30%] h-[26rem] w-[32rem] rounded-full bg-[var(--cyan)] opacity-[0.13] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} />
+          <span className="absolute right-[4%] bottom-[6%] h-[24rem] w-[24rem] rounded-full bg-[var(--emerald)] opacity-[0.09] blur-3xl" style={{ animation: "fin-aurora 26s ease-in-out infinite" }} />
+          <div className="absolute inset-x-[-20%] bottom-[-10%] h-[45%] opacity-40"><div className="fin-floor h-full w-full" /></div>
         </div>
       <div className="grid gap-4 xl:grid-cols-[280px_1fr_380px]">
         {/* árvore */}
