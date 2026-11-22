@@ -1,4 +1,4 @@
-import { BrandTile, brandOf, popularBrands } from "./brands";
+import { BrandTile, brandOf, brandsFor } from "./brands";
 import { useMemo, useState, type ReactNode } from "react";
 import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
 import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, fixedCoverage, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
@@ -235,11 +235,11 @@ export function RecurringForm({ initial, onSave, onCancel, subscription = false 
       {!subscription && <Segmented value={kind} onChange={(k) => { setKind(k); setCat(k === "receita" ? "salario" : "moradia"); }} options={[{ value: "despesa", label: "Despesa fixa" }, { value: "receita", label: "Receita fixa" }]} />}
       {subscription && (() => { const cur = brandOf(desc); return (
         <div data-testid="fin-marcas">
-          <p className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">Escolha a assinatura {cur && <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-foreground"><BrandTile brand={cur} size={18} className="!rounded-md" /> {cur.name} reconhecida</span>}</p>
-          <div className="scroll-thin flex gap-2 overflow-x-auto pb-2">
-            {popularBrands().map((b) => (
+          <p className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">Escolha a assinatura ou digite o nome {cur && <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-foreground"><BrandTile brand={cur} size={18} className="!rounded-md" /> {cur.name} reconhecida</span>}</p>
+          <div className="scroll-thin grid max-h-44 grid-cols-4 gap-2 overflow-y-auto pb-1 pr-1 sm:grid-cols-5" data-testid="fin-marcas-grade">
+            {brandsFor(cur && desc.trim().toLowerCase() === cur.name.toLowerCase() ? "" : desc).map((b) => (
               <button key={b.id} type="button" onClick={() => setDesc(b.name)} aria-pressed={cur?.id === b.id} aria-label={b.name} title={b.name} data-testid={`fin-marca-${b.id}`}
-                className={`group flex w-[4.1rem] shrink-0 flex-col items-center gap-1.5 rounded-2xl border px-1.5 py-2 transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.06] active:scale-95 ${cur?.id === b.id ? "border-cyan/60 bg-cyan/10 shadow-[0_0_22px_-8px_var(--cyan)]" : "border-white/10 bg-white/[0.03]"}`}>
+                className={`group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border px-1.5 py-2 transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.06] active:scale-95 ${cur?.id === b.id ? "border-cyan/60 bg-cyan/10 shadow-[0_0_22px_-8px_var(--cyan)]" : "border-white/10 bg-white/[0.03]"}`}>
                 <BrandTile brand={b} size={40} className="transition duration-300 group-hover:scale-110 group-hover:rotate-3" />
                 <span className="w-full truncate text-center text-[0.6rem] text-muted-foreground">{b.name}</span>
               </button>))}
