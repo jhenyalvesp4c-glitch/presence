@@ -916,20 +916,32 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
   const L = useLabel();
   const [st, setSt] = useState<Status>(() => firstStatus(items));
   return (
-    <section className="fin-frame glass relative overflow-hidden rounded-3xl p-5 animate-rise max-md:rounded-2xl max-md:p-3" style={tint(m.color)}>
-      <div className="mb-5 flex items-center gap-3">
-        <span className="icon-tile h-11 w-11 !rounded-full shadow-[0_0_24px_-6px_var(--glow)]"><m.icon size={20} /></span>
-        <div>
+    <section className="fin-frame glass glass-clear relative overflow-hidden rounded-3xl p-5 animate-rise max-md:rounded-2xl max-md:p-3" style={tint(m.color)}>
+      <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full opacity-20 blur-3xl" style={{ background: "var(--glow)" }} />
+      <div className="relative mb-5 flex flex-wrap items-center gap-4">
+        <span className="relative grid h-12 w-12 shrink-0 place-items-center">
+          <span aria-hidden className="absolute inset-0 rounded-full border border-[var(--glow)]/50" style={{ animation: "pulse-ring 2.6s ease-out infinite" }} />
+          <span className="icon-tile h-12 w-12 !rounded-full shadow-[0_0_28px_-6px_var(--glow)]"><m.icon size={21} /></span>
+        </span>
+        <div className="min-w-0 flex-1">
           <h2 className="font-mono text-sm uppercase tracking-[0.3em]">{m.label} ({items.length})</h2>
           <p className="text-xs text-muted-foreground">{type === "multi" ? `Uma demanda principal com execução individual por ${L.singular.toLowerCase()}.` : m.sub + "."}</p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">{STATUSES.map((s, i) => { const n = items.filter((x) => x.status === s).length; return (
+            <span key={s} className="inline-flex items-center gap-1.5 rounded-full border bg-white/[0.04] px-2.5 py-1 text-[0.68rem] backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08]" style={{ ...tint(statusMeta[s].color), borderColor: "color-mix(in oklab, var(--glow) 35%, transparent)", animation: `fin-rise .5s ${0.08 + i * 0.06}s both` }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" /><b className="tabular-nums">{n}</b><span className="text-muted-foreground">{statusMeta[s].label.toLowerCase()}</span>
+            </span>); })}</div>
         </div>
+        {items.length > 0 && <div className="flex items-center gap-3" data-testid={`resumo-${type}`}>
+          <Ring pct={Math.round((items.filter((x) => x.status === "done").length / items.length) * 100)} color="var(--emerald)" size={64} thickness={6}><span className="text-[0.7rem] font-semibold tabular-nums">{Math.round((items.filter((x) => x.status === "done").length / items.length) * 100)}%</span></Ring>
+          <p className="hidden text-[0.68rem] leading-tight text-muted-foreground sm:block">concluído<br />de {items.length} demanda{items.length === 1 ? "" : "s"}</p>
+        </div>}
       </div>
       <StatusTabs value={st} onChange={setSt} items={items} />
       <div className="mt-3 grid gap-4 md:mt-0 md:grid-cols-3">
         {STATUSES.map((s) => {
           const col = items.filter((i) => i.status === s);
           return (
-            <div key={s} className={`accent-card flex min-h-[200px] flex-col p-3 ${s === st ? "" : "max-md:hidden"}`} style={tint(statusMeta[s].color)}>
+            <div key={s} className={`ex-card ex-glass flex min-h-[200px] flex-col p-3 ${s === st ? "" : "max-md:hidden"}`} style={{ ...tint(statusMeta[s].color), "--rail": "var(--glow)" } as React.CSSProperties}>
               <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent shadow-[0_0_14px_var(--glow)]" />
               <div className="flex items-center gap-2 px-1 pb-3 max-md:hidden">
                 <span className="h-2.5 w-2.5 animate-pulse-ring rounded-full bg-[var(--glow)] shadow-[0_0_10px_var(--glow)]" />
@@ -938,9 +950,13 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
               </div>
               <div className="max-h-[36rem] flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1">
                 {col.map((d, i) => <BigCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
+                {!col.length && <div className="grid place-items-center gap-2 rounded-2xl border border-dashed border-white/15 px-3 py-8 text-center" data-testid={`vazio-${type}-${s}`}>
+                  <span className="relative grid h-12 w-12 place-items-center" aria-hidden><span className="absolute inset-0 rounded-full border border-[var(--glow)]/40" style={{ animation: "pulse-ring 3s ease-out infinite" }} /><span className="h-2.5 w-2.5 rounded-full bg-[var(--glow)] shadow-[0_0_14px_var(--glow)]" /></span>
+                  <p className="text-xs text-muted-foreground">{s === "todo" ? "Nada a fazer por aqui" : s === "doing" ? "Nada em andamento" : "Nada concluído ainda"}</p>
+                </div>}
               </div>
-              <button onClick={() => onCreate(s)} className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-xs text-cyan transition hover:border-cyan/40 hover:bg-cyan/5">
-                <Plus size={13} /> Adicionar demanda
+              <button onClick={() => onCreate(s)} className="group/add mt-3 flex items-center justify-center gap-2 rounded-full border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-white/[0.03] py-2 text-xs text-[var(--glow)] backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--glow)_12%,transparent)] hover:shadow-[0_0_26px_-8px_var(--glow)] active:scale-95">
+                <Plus size={13} className="transition duration-300 group-hover/add:rotate-90" /> Adicionar demanda
               </button>
             </div>
           );
@@ -957,7 +973,7 @@ function BigCard({ d, active, onClick, delay }: { d: Demand; active: boolean; on
   return (
     <div className="group/card relative">
     <button onClick={onClick} style={{ ...tint(prio[d.priority].color), animationDelay: `${delay * 0.06}s` }}
-      className={`group card-sheen relative w-full overflow-hidden rounded-2xl border bg-secondary/40 p-4 text-left transition animate-rise hover:-translate-y-1 hover:shadow-[0_16px_36px_-14px_var(--glow)] ${active ? "border-cyan shadow-[0_0_30px_-6px_var(--cyan)]" : "border-border hover:border-cyan/40"}`}>
+      className={`group card-sheen relative w-full overflow-hidden rounded-2xl border bg-[linear-gradient(135deg,color-mix(in_oklab,var(--glow)_11%,transparent),rgba(255,255,255,.02)_60%)] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-md transition duration-300 animate-rise hover:-translate-y-1 hover:shadow-[0_16px_36px_-14px_var(--glow)] active:scale-[0.99] ${active ? "border-cyan shadow-[0_0_30px_-6px_var(--cyan)]" : "border-white/12 hover:border-[color-mix(in_oklab,var(--glow)_55%,transparent)]"}`}>
       <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" />
       {active && <span className="scanline absolute inset-0" />}
       <p className="font-mono text-[0.6rem] tracking-[0.2em] text-muted-foreground">{d.id}</p>
@@ -970,7 +986,7 @@ function BigCard({ d, active, onClick, delay }: { d: Demand; active: boolean; on
         <span className="tag !tracking-normal !normal-case !text-[0.65rem]">{prio[d.priority].label}</span>
       </div>
       <div className="mt-3 flex items-center gap-2 text-[0.65rem] text-muted-foreground">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: pct === 100 ? "var(--emerald)" : "var(--gradient-brand)", boxShadow: "0 0 10px var(--cyan)" }} />
         </div>
         {d.polos && <span>{dn}/{d.polos.length}</span>}
