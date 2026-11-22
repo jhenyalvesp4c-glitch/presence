@@ -56,3 +56,20 @@ export function buildPlan(p: Playbook, input: RunInput, steps: PlaybookStep[] = 
 export function summarizePlan(plan: Plan) {
   return { tarefas: plan.steps.filter((x) => x.kind === "tarefa").length, demandas: plan.steps.filter((x) => x.kind === "demanda").length, documentos: plan.docs.length, checklist: plan.checklist.length, ultimaData: plan.steps.at(-1)?.date ?? null };
 }
+
+/** Passos guardados pela usuária (modelo dela). Ignora o que não tiver o formato certo; sem nada válido, devolve `fallback`. */
+export function sanitizeSteps(raw: unknown, fallback: PlaybookStep[]): PlaybookStep[] {
+  if (!Array.isArray(raw)) return fallback;
+  type Raw = { id?: unknown; kind?: unknown; title?: unknown; days?: unknown; priority?: unknown; on?: unknown; time?: unknown; desc?: unknown };
+  const out: PlaybookStep[] = [], seen = new Set<string>();
+  for (const x of raw as Raw[]) {
+    if (!x || typeof x !== "object" || typeof x.title !== "string" || !x.title.trim()) continue;
+    const id = typeof x.id === "string" && x.id && !seen.has(x.id) ? x.id : `x-${out.length}-${Math.random().toString(36).slice(2, 6)}`;
+    seen.add(id);
+    const kind: StepKind = x.kind === "demanda" ? "demanda" : "tarefa", priority = x.priority === "alta" || x.priority === "baixa" ? x.priority : "media";
+    const days = typeof x.days === "number" && Number.isFinite(x.days) ? Math.max(0, Math.min(365, Math.round(x.days))) : 0;
+    out.push({ id, kind, title: x.title.trim().slice(0, 200), days, priority, on: x.on !== false, ...(typeof x.time === "string" && /^\d{2}:\d{2}$/.test(x.time) ? { time: x.time } : {}), ...(typeof x.desc === "string" && x.desc ? { desc: x.desc.slice(0, 500) } : {}) });
+  }
+  return out.length || (Array.isArray(raw) && raw.length === 0) ? out : fallback;
+}
+export const stepsKey = (playbookId: string) => `orion.playbook.${playbookId}.steps.v1`;

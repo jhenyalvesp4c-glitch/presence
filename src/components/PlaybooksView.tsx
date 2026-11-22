@@ -2,13 +2,13 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, CalendarClock, Check, CheckCircle2, ChevronDown, ClipboardList, FileText, FolderOpen, ListChecks, Loader2, Play, Rocket } from "lucide-react";
+import { Building2, CalendarClock, Check, CheckCircle2, ChevronDown, ClipboardList, FileText, FolderOpen, ListChecks, Loader2, Play, Plus, RotateCcw, Rocket, Trash2 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FinBackdrop, HeroPanel, OrbitArt, SectionTitle, Tilt } from "@/components/finance/fx";
 import { todayBR, dateBR } from "@/lib/clients";
 import { addDays } from "@/lib/central";
-import { PLAYBOOKS, buildPlan, summarizePlan, type Playbook, type PlaybookStep, type RunInput } from "@/lib/playbooks";
+import { PLAYBOOKS, buildPlan, sanitizeSteps, stepsKey, summarizePlan, type Playbook, type PlaybookStep, type RunInput, type StepKind } from "@/lib/playbooks";
 import { runPlaybook, type RunResult } from "@/lib/data/playbooks";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -42,11 +42,19 @@ export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { pro
 
 function RunDialog({ playbook, projectId, onClose, onOpenClients, onOpenLibrary }: { playbook: Playbook; projectId: string; onClose: () => void; onOpenClients: () => void; onOpenLibrary: () => void }) {
   const qc = useQueryClient();
-  const [input, setInput] = useState<RunInput>({ ...BLANK, start: todayBR() }), [steps, setSteps] = useState<PlaybookStep[]>(playbook.steps), [more, setMore] = useState(false), [editing, setEditing] = useState<string | null>(null);
+  const [input, setInput] = useState<RunInput>({ ...BLANK, start: todayBR() }), [more, setMore] = useState(false), [editing, setEditing] = useState<string | null>(null);
+  const [steps, setSteps] = useState<PlaybookStep[]>(() => { try { const raw = localStorage.getItem(stepsKey(playbook.id)); return raw ? sanitizeSteps(JSON.parse(raw), playbook.steps) : playbook.steps; } catch { return playbook.steps; } });
+  const [custom, setCustom] = useState(() => { try { return !!localStorage.getItem(stepsKey(playbook.id)); } catch { return false; } });
+  const [newTitle, setNewTitle] = useState(""), [newKind, setNewKind] = useState<StepKind>("tarefa");
+  // as edições viram o modelo da usuária (neste navegador) e valem para os próximos clientes
+  const change = (fn: (l: PlaybookStep[]) => PlaybookStep[]) => setSteps((l) => { const n = fn(l); try { localStorage.setItem(stepsKey(playbook.id), JSON.stringify(n)); setCustom(true); } catch { /* sem armazenamento */ } return n; });
+  const restore = () => { try { localStorage.removeItem(stepsKey(playbook.id)); } catch { /* sem armazenamento */ } setSteps(playbook.steps); setCustom(false); toast.success("Modelo original restaurado"); };
+  const addStep = () => { const t = newTitle.trim(); if (!t) return; change((l) => [...l, { id: `x-${Date.now().toString(36)}`, kind: newKind, title: t, days: (l.at(-1)?.days ?? 0) + 1, priority: "media", on: true }]); setNewTitle(""); };
   const [phase, setPhase] = useState<"form" | "running" | "done">("form"), [now, setNow] = useState(""), [result, setResult] = useState<RunResult | null>(null);
   const plan = useMemo(() => buildPlan(playbook, input, steps), [playbook, input, steps]), sum = summarizePlan(plan);
   const set = <K extends keyof RunInput>(k: K, v: RunInput[K]) => setInput((x) => ({ ...x, [k]: v }));
-  const upd = (id: string, patch: Partial<PlaybookStep>) => setSteps((l) => l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const upd = (id: string, patch: Partial<PlaybookStep>) => change((l) => l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const del = (id: string) => change((l) => l.filter((x) => x.id !== id));
   const ok = input.clientName.trim().length > 0 && !!input.start;
   const today = todayBR(), tomorrow = addDays(today, 1), monday = (() => { const d = new Date(`${today}T12:00:00`); const add = ((8 - d.getDay()) % 7) || 7; return addDays(today, add); })();
   const dateOf = (id: string) => plan.steps.find((x) => x.id === id)?.date;
@@ -95,20 +103,29 @@ function RunDialog({ playbook, projectId, onClose, onOpenClients, onOpenLibrary 
               </div>
 
               <div>
-                <p className="mono-caps mb-3">Linha do tempo · {sum.tarefas + sum.demandas} passos</p>
-                <ol className="relative space-y-0.5 pl-1">
-                  <span aria-hidden className="absolute bottom-3 left-[13px] top-3 w-px bg-gradient-to-b from-cyan/60 via-violet/40 to-transparent" />
-                  {steps.map((st, i) => (
-                    <li key={st.id} className="group relative flex items-center gap-3 rounded-xl py-1.5 pr-1 transition hover:bg-white/[0.04]" style={{ animation: `fin-rise .4s ${i * 0.03}s both` }}>
-                      <button onClick={() => upd(st.id, { on: !st.on })} role="checkbox" aria-checked={st.on} aria-label={`Incluir ${st.title}`} className={`relative z-10 grid h-[1.65rem] w-[1.65rem] shrink-0 place-items-center rounded-full border transition ${st.on ? "border-[var(--glow)] bg-[color-mix(in_oklab,var(--glow)_22%,transparent)] shadow-[0_0_16px_-3px_var(--glow)]" : "border-white/20 bg-background"}`} style={tint(st.kind === "demanda" ? "violet" : "cyan")}>{st.on && <Check size={12} className="text-[var(--glow)]" style={{ animation: "ex-tick .35s both" }} />}</button>
+                <div className="mb-3 flex items-center justify-between gap-3"><p className="mono-caps">Linha do tempo · {sum.tarefas + sum.demandas} passos</p>{custom && <button onClick={restore} className="flex items-center gap-1 text-[0.7rem] text-muted-foreground transition hover:text-foreground"><RotateCcw size={11} /> Restaurar original</button>}</div>
+                <ol>
+                  {steps.map((st, i) => { return (
+                    <li key={st.id} className="group relative flex items-center gap-3 rounded-xl py-1 pr-1 transition hover:bg-white/[0.04]" style={{ animation: `fin-rise .4s ${Math.min(i, 12) * 0.03}s both` }}>
+                      {/* conector só ENTRE as bolinhas (não passa por trás delas) */}
+                      {i < steps.length - 1 && <span aria-hidden className="absolute left-[13px] top-[calc(50%+0.85rem)] h-[calc(100%-1.7rem+0.25rem)] w-px bg-gradient-to-b from-cyan/50 to-violet/35" />}
+                      <button onClick={() => upd(st.id, { on: !st.on })} role="checkbox" aria-checked={st.on} aria-label={`Incluir ${st.title}`} className={`relative z-10 grid h-[1.65rem] w-[1.65rem] shrink-0 place-items-center rounded-full border transition ${st.on ? "border-[var(--glow)] bg-[color-mix(in_oklab,var(--glow)_26%,oklch(0.17_0.04_265))] shadow-[0_0_16px_-3px_var(--glow)]" : "border-white/20 bg-[oklch(0.17_0.04_265)]"}`} style={tint(st.kind === "demanda" ? "violet" : "cyan")}>{st.on && <Check size={12} className="text-[var(--glow)]" style={{ animation: "ex-tick .35s both" }} />}</button>
                       {editing === st.id ? <input autoFocus value={st.title} onChange={(e) => upd(st.id, { title: e.target.value })} onBlur={() => setEditing(null)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditing(null); }} aria-label="Título do passo" className="min-w-0 flex-1 border-b border-cyan/50 bg-transparent text-sm outline-none" />
                         : <button onClick={() => setEditing(st.id)} title="Clique para renomear" className={`min-w-0 flex-1 truncate text-left text-sm transition ${st.on ? "" : "text-muted-foreground/50 line-through"}`}>{st.title}</button>}
+                      <button onClick={() => upd(st.id, { kind: st.kind === "demanda" ? "tarefa" : "demanda" })} title={st.kind === "demanda" ? "Demanda (clique para virar tarefa)" : "Tarefa (clique para virar demanda)"} aria-label={`Tipo: ${st.kind}. Trocar`} className="hidden shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[0.62rem] text-muted-foreground transition hover:border-white/30 hover:text-foreground sm:block" style={{ color: st.kind === "demanda" ? "var(--violet)" : "var(--cyan)" }}>{st.kind === "demanda" ? "demanda" : "tarefa"}</button>
                       <span className="flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-1 text-[0.7rem] text-muted-foreground">
                         <button onClick={() => upd(st.id, { days: Math.max(0, st.days - 1) })} aria-label="Um dia antes" className="grid h-5 w-5 place-items-center rounded-full hover:text-foreground">−</button>
-                        <span className="min-w-[3.6rem] text-center tabular-nums" aria-label={`Dia ${st.days}`}>{st.on && dateOf(st.id) ? `${dateOf(st.id)!.slice(8)}/${dateOf(st.id)!.slice(5, 7)}` : `dia ${st.days}`}</span>
+                        <span className="min-w-[3.4rem] text-center tabular-nums" aria-label={`Dia ${st.days}`}>{st.on && dateOf(st.id) ? `${dateOf(st.id)!.slice(8)}/${dateOf(st.id)!.slice(5, 7)}` : `dia ${st.days}`}</span>
                         <button onClick={() => upd(st.id, { days: st.days + 1 })} aria-label="Um dia depois" className="grid h-5 w-5 place-items-center rounded-full hover:text-foreground">+</button></span>
-                    </li>))}
+                      <button onClick={() => del(st.id)} aria-label={`Excluir ${st.title}`} data-testid={`playbook-excluir-${i}`} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted-foreground/60 transition hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"><Trash2 size={12} /></button>
+                    </li>); })}
+                  {steps.length === 0 && <li className="py-3 text-center text-xs text-muted-foreground">Nenhum passo. Adicione abaixo.</li>}
                 </ol>
+                <form onSubmit={(e) => { e.preventDefault(); addStep(); }} className="mt-3 flex items-center gap-2 rounded-full border border-dashed border-white/15 px-3 py-1.5 transition focus-within:border-cyan/50">
+                  <Plus size={14} className="shrink-0 text-cyan" /><input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Adicionar passo…" aria-label="Novo passo" data-testid="playbook-novo-passo" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60" />
+                  <span className="flex shrink-0 rounded-full border border-white/10 p-0.5 text-[0.65rem]" role="radiogroup" aria-label="Tipo do novo passo">{(["tarefa", "demanda"] as StepKind[]).map((k) => <button key={k} type="button" role="radio" aria-checked={newKind === k} onClick={() => setNewKind(k)} className={`rounded-full px-2 py-0.5 transition ${newKind === k ? "bg-white/10 text-foreground" : "text-muted-foreground"}`}>{k}</button>)}</span>
+                  <button type="submit" disabled={!newTitle.trim()} aria-label="Adicionar" className="text-xs text-cyan disabled:opacity-40">Adicionar</button></form>
+                <p className="mt-2 text-[0.65rem] text-muted-foreground/70">Suas edições ficam salvas como o seu modelo neste navegador e valem para os próximos clientes.</p>
               </div>
 
               <div className="sticky -bottom-6 -mx-7 space-y-3 border-t border-white/10 bg-[oklch(0.14_0.035_265/0.92)] px-7 pb-5 pt-4 backdrop-blur-xl">

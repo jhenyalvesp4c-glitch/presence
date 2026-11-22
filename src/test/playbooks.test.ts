@@ -24,3 +24,20 @@ describe("playbooks", () => {
     expect(slugOf("Açaí & Cia!")).toBe("acai-cia");
   });
 });
+
+import { sanitizeSteps } from "@/lib/playbooks";
+describe("modelo editado pela usuária", () => {
+  const fb = PLAYBOOKS[0]!.steps;
+  it("aceita passos válidos e descarta lixo", () => {
+    const r = sanitizeSteps([{ id: "a", kind: "demanda", title: " Nova ", days: 5.6, on: false }, { title: "" }, 7, { id: "a", title: "Repetido", days: -3 }], fb);
+    expect(r).toHaveLength(2);
+    expect(r[0]).toMatchObject({ id: "a", kind: "demanda", title: "Nova", days: 6, on: false });
+    expect(r[1]!.id).not.toBe("a");
+    expect(r[1]!.days).toBe(0);
+  });
+  it("sem nada válido usa o padrão; lista vazia salva vale vazia", () => {
+    expect(sanitizeSteps("x", fb)).toBe(fb);
+    expect(sanitizeSteps([{ foo: 1 }], fb)).toBe(fb);
+    expect(sanitizeSteps([], fb)).toEqual([]);
+  });
+});
