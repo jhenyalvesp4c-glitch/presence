@@ -23,17 +23,20 @@ const dm = (iso: string) => iso.split("-").reverse().slice(0, 2).join("/");
 const tab = (on: boolean) => `flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition ${on ? "text-cyan shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--cyan)_45%,transparent),0_0_24px_-8px_var(--cyan)] bg-cyan/10" : "text-muted-foreground hover:text-foreground"}`;
 const THINK_MEETING = ["Lendo a conversa…", "Separando os assuntos…", "Achando as decisões…", "Descobrindo quem ficou de fazer o quê…"], THINK_GROUP = ["Lendo os grupos…", "Resumindo cada grupo…", "Transformando pedidos em ações…", "Montando as pendências…"];
 
-export function MeetingsPage() {
+export function MeetingsPage({ embedded = false, projectId }: { embedded?: boolean; projectId?: string } = {}) {
   const history = useMeetings(), acts = useMeetingActions();
-  const targets = useLinkTargets().data, polos = targets?.dossiers ?? [], clientes = targets?.clients ?? [];
-  const [link, setLink] = useState<{ dossierId: string | null; dossierProject: string | null; clientId: string | null }>({ dossierId: null, dossierProject: null, clientId: null });
+  const targets = useLinkTargets().data;
+  const polos = (targets?.dossiers ?? []).filter((d) => !embedded || !projectId || d.project === projectId), clientes = (targets?.clients ?? []).filter((c) => !embedded || !projectId || c.project === projectId);
+  const homeProject = embedded ? (projectId ?? null) : null;
+  const [onlyProject, setOnlyProject] = useState(true);
+  const [link, setLink] = useState<{ dossierId: string | null; dossierProject: string | null; clientId: string | null }>({ dossierId: null, dossierProject: embedded ? (projectId ?? null) : null, clientId: null });
   const poloName = polos.find((d) => d.id === link.dossierId && d.project === link.dossierProject)?.name;
   const dupNames = new Set(polos.map((d) => d.name).filter((n, i, l) => l.indexOf(n) !== i));
   /** Escolher o polo já marca o cliente ligado a ele (e vice-versa); salva na hora se a reunião já existe. */
     const changeLink = (v: string, who: "polo" | "cliente") => {
     let l = link;
-    if (who === "polo") { const [project, id] = v ? [v.slice(0, v.indexOf("|")), v.slice(v.indexOf("|") + 1)] : [null, null]; const c = id ? clientes.find((x) => x.dossierId === id && x.project === project) : undefined; l = { dossierId: id, dossierProject: project, clientId: c?.id ?? null }; }
-    else { const c = clientes.find((x) => x.id === v); l = c ? { dossierId: c.dossierId ?? link.dossierId, dossierProject: c.dossierId ? c.project : link.dossierProject, clientId: c.id } : { ...link, clientId: null }; }
+    if (who === "polo") { const [project, id] = v ? [v.slice(0, v.indexOf("|")), v.slice(v.indexOf("|") + 1)] : [homeProject, null]; const c = id ? clientes.find((x) => x.dossierId === id && x.project === project) : undefined; l = { dossierId: id, dossierProject: project, clientId: c?.id ?? null }; }
+    else { const c = clientes.find((x) => x.id === v); l = c ? { dossierId: c.dossierId ?? link.dossierId, dossierProject: c.dossierId ? c.project : (link.dossierProject ?? homeProject), clientId: c.id } : { ...link, clientId: null }; }
     setLink(l);
     if (cur?.id && !cur.demo) acts.link.mutate({ id: cur.id, link: l }, { onSuccess: () => toast.success(l.dossierId || l.clientId ? "Reunião vinculada: aparece na página do cliente" : "Vínculo removido"), onError: (e) => toast.error(`Não consegui vincular: ${e.message}`) });
   };
@@ -92,6 +95,9 @@ export function MeetingsPage() {
   const nSel = useMemo(() => [...selected].filter((i) => !sent.has(i)).length, [selected, sent]);
 
 
+  const clientIds = new Set(clientes.map((c) => c.id));
+  const shownHistory = (history.data ?? []).filter((m) => !embedded || !projectId || !onlyProject || m.dossierProject === projectId || (m.clientId !== null && clientIds.has(m.clientId)));
+  const Root = embedded ? "div" : "main";
   const LinkBar = (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 backdrop-blur" data-testid="reuniao-vinculo">
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Link2 size={13} className={link.dossierId || link.clientId ? "text-violet" : ""} /> Vincular a</span>
@@ -101,13 +107,13 @@ export function MeetingsPage() {
     </div>);
 
   return (
-    <main className="relative mx-auto min-h-screen max-w-[1500px] px-4 pb-40 pt-6 md:py-10" data-testid="reunioes"><FinBackdrop />
+    <Root className={embedded ? "relative" : "relative mx-auto min-h-screen max-w-[1500px] px-4 pb-40 pt-6 md:py-10"} data-testid="reunioes">{!embedded && <FinBackdrop />}
       {burst > 0 && <Burst key={burst} />}
-      <HeroPanel glow="var(--violet)"><div className="grid items-center gap-6 lg:grid-cols-[1.4fr_0.6fr]"><div>
+      {!embedded &&       <HeroPanel glow="var(--violet)"><div className="grid items-center gap-6 lg:grid-cols-[1.4fr_0.6fr]"><div>
         <p className="mono-caps flex items-center gap-3">Assistente de reuniões <LiveDot color="var(--emerald)" label="ata em segundos" /></p>
         <h1 className="mt-3 font-serif text-5xl leading-[0.95] tracking-tight md:text-7xl">Reuniões <span className="text-gradient inline-block pr-3 italic">sem esforço</span></h1>
         <p className="mt-3 max-w-xl text-sm text-muted-foreground">Cole a conversa do WhatsApp, grave a reunião ou traga os grupos. O Orion entrega a ata, as decisões, quem ficou de fazer o quê — e já manda as ações para a Central virarem demandas e lembretes.</p></div>
-        <div className="mx-auto"><OrbitArt size={190}><Mic size={32} className="text-violet drop-shadow-[0_0_14px_var(--violet)]" /></OrbitArt></div></div></HeroPanel>
+        <div className="mx-auto"><OrbitArt size={190}><Mic size={32} className="text-violet drop-shadow-[0_0_14px_var(--violet)]" /></OrbitArt></div></div></HeroPanel>}
 
       <div className="mt-5 flex gap-1 rounded-2xl border border-white/10 bg-black/20 p-1 sm:w-fit" role="tablist" aria-label="Área" data-testid="abas-reunioes">{([["reunioes", "Reuniões e grupos", FileText], ["demandas", "Demandas do WhatsApp", Radar]] as const).map(([k, l, I]) => <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} data-testid={`aba-${k}`} className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition sm:flex-none ${view === k ? "bg-cyan/10 text-cyan shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--cyan)_45%,transparent),0_0_24px_-8px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}><I size={15} />{l}</button>)}</div>
       {view === "demandas" ? <div className="mt-5"><WhatsAppDemands /></div> : <>
@@ -160,16 +166,16 @@ export function MeetingsPage() {
         <div ref={inboxRef} className="mt-5">{inbox && <InboxPanel incoming={inbox} onClose={() => setInbox(null)} onListen={() => undefined} listening={false} interim="" />}</div>
       </div>
 
-      <section className="mt-8" data-testid="reunioes-historico"><h3 className="mono-caps mb-3 flex items-center gap-2 !text-[0.68rem]"><Clock size={13} className="text-cyan" /> Reuniões anteriores<span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" /></h3>
+      <section className="mt-8" data-testid="reunioes-historico"><h3 className="mono-caps mb-3 flex items-center gap-2 !text-[0.68rem]"><Clock size={13} className="text-cyan" /> Reuniões anteriores<span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />{embedded && projectId && <span className="flex rounded-full border border-white/10 p-0.5 text-[0.68rem] normal-case tracking-normal" role="radiogroup" aria-label="Quais reuniões mostrar">{([[true, "Deste projeto"], [false, "Todas"]] as const).map(([v, l]) => <button key={l} type="button" role="radio" aria-checked={onlyProject === v} onClick={() => setOnlyProject(v)} data-testid={v ? "reunioes-deste-projeto" : "reunioes-todas"} className={`rounded-full px-3 py-1 transition ${onlyProject === v ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>)}</span>}</h3>
         {history.isPending && <div className="flex justify-center py-6"><Loader2 className="animate-spin text-cyan" /></div>}
-        {history.isSuccess && history.data.length === 0 && <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-muted-foreground">Nenhuma reunião ainda. A primeira análise fica guardada aqui.</p>}
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{(history.data ?? []).map((m, i) => (
+        {history.isSuccess && shownHistory.length === 0 && <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-muted-foreground">Nenhuma reunião ainda. A primeira análise fica guardada aqui.</p>}
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{shownHistory.map((m, i) => (
           <li key={m.id} className="ex-card group px-4 py-3" style={{ "--rail": m.mode === "grupo" ? "var(--emerald)" : "var(--violet)", animation: "fin-rise .5s both", animationDelay: `${Math.min(i, 8) * 50}ms` } as React.CSSProperties} data-testid="reuniao-item">
             <button type="button" onClick={() => open(m)} className="block w-full text-left"><span className="font-mono text-[0.62rem] uppercase tracking-wider text-muted-foreground">{dm(m.happenedOn)} · {m.mode === "grupo" ? "grupos" : m.source === "voz" ? "gravada" : m.source === "whatsapp" ? "whatsapp" : "texto"}</span>
               <b className="mt-0.5 block truncate font-display text-base">{m.title}</b><span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{m.analysis.resumo || m.analysis.grupos[0]?.resumo}</span>
               <span className="mt-2 flex gap-3 font-mono text-[0.62rem] text-muted-foreground"><span>{m.analysis.acoes.length} ações</span><span>{m.analysis.decisoes.length} decisões</span>{m.sent.length > 0 && <span className="text-emerald">{m.sent.filter((n) => n >= 0).length} enviadas</span>}</span></button>
             <button type="button" onClick={() => remove(m)} aria-label={`Apagar ${m.title}`} className="absolute right-3 top-3 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={13} /></button></li>))}</ul></section>
       </>}
-    </main>
+    </Root>
   );
 }

@@ -2,7 +2,7 @@ import { useShownPath } from "@/lib/shown-path";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { Brain, CalendarCheck, Calendar, ClipboardList, GraduationCap, Heart, Home, Sunrise, Lightbulb, ListChecks, Mic, Network, Settings, Sprout, Wallet } from "lucide-react";
+import { Brain, Calendar, ClipboardList, Heart, Home, ListChecks, Network, Settings, Sprout, Wallet } from "lucide-react";
 import { NavBadge } from "@/components/NavBadge";
 import { useNavBadges } from "@/lib/data/nav-badges";
 
@@ -11,17 +11,12 @@ export const hasOwnRail = (path: string) => path === "/" || path === "/treino";
 
 const items = [
   { Icon: Home, label: "Início", c: "cyan", to: "/assistente" },
-  { Icon: Sunrise, label: "Central do dia", c: "cyan", to: "/central" },
-  { Icon: CalendarCheck, label: "Planejamento", c: "cyan", to: "/planejamento" },
   { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/projetos" },
   { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" },
   { Icon: Wallet, label: "Financeiro", c: "emerald", to: "/financeiro" },
   { Icon: Calendar, label: "Calendário", c: "cyan", to: "/calendario" },
   { Icon: Sprout, label: "Hábitos", c: "emerald", to: "/habitos" },
   { Icon: Heart, label: "Saúde", c: "emerald", to: "/saude" },
-  { Icon: GraduationCap, label: "Cursos", c: "cyan", to: "/cursos" },
-  { Icon: Lightbulb, label: "Ideias", c: "violet", to: "/ideias" },
-  { Icon: Mic, label: "Reuniões", c: "violet", to: "/reunioes" },
   { Icon: Brain, label: "Segundo cérebro", c: "violet", to: "/cerebro" },
   { Icon: Network, label: "Mapa de conexões", c: "cyan", to: "/mapa" },
   { Icon: Settings, label: "Configurações", c: "cyan", to: "/configuracoes" },
@@ -33,9 +28,9 @@ const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 export function GlobalRail() {
   const path = useShownPath(), badges = useNavBadges();
   if (hasOwnRail(path)) return null;
-  const on = (to: string) => path === to || path.startsWith(`${to}/`) || (to === "/saude" && ["/hoje", "/dieta", "/medidas", "/treino"].some((p) => path.startsWith(p)));
+  const on = (to: string) => (to === "/projetos" && ["/cursos", "/ideias", "/reunioes"].some((p) => path.startsWith(p))) || path === to || path.startsWith(`${to}/`) || (to === "/saude" && ["/hoje", "/dieta", "/medidas", "/treino"].some((p) => path.startsWith(p)));
   return (
-    <aside data-testid="barra-lateral" className="fixed bottom-0 left-0 top-0 z-30 hidden w-16 flex-col items-center justify-center gap-[0.3rem] pb-[9.75rem] pl-3 pt-3 md:flex" style={{ "--rs": "clamp(1.65rem, calc((100svh - 10.5rem) / 15 - 0.3rem), 2.5rem)" } as CSSProperties}>
+    <aside data-testid="barra-lateral" className="fixed bottom-0 left-0 top-0 z-30 hidden w-16 flex-col items-center justify-center gap-[0.3rem] pb-[9.75rem] pl-3 pt-3 md:flex" style={{ "--rs": "clamp(1.65rem, calc((100svh - 10.5rem) / 11 - 0.3rem), 2.5rem)" } as CSSProperties}>
       {items.map(({ Icon, label, c, to }, i) => {
         const active = on(to);
         return (

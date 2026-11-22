@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { backdropProps } from "@/lib/backdrop";
+import { MeetingsPage } from "@/components/meetings/MeetingsPage";
+import { useMeetings } from "@/lib/data/meetings";
 import { DocsLibrary } from "@/components/DocsLibrary";
 import type { Project } from "@/lib/projects";
 import { nextCode, type DType, type Demand, type Hist, type Priority, type PoloExec, type Status } from "@/lib/demands";
@@ -29,7 +31,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type CSSProper
 import {
   ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
   Filter, Folder, FolderOpen, Globe, Hexagon, History, LayoutGrid, Layers, List, Loader, MapPin,
-  MessageSquare, MoreHorizontal, Network, Pencil, Plus, Search, Send, SquareCheck, StickyNote, Table2, Trash2, X,
+  Mic, MessageSquare, MoreHorizontal, Network, Pencil, Plus, Search, Send, SquareCheck, StickyNote, Table2, Trash2, X,
 } from "lucide-react";
 
 export const Route = createFileRoute("/demandas")({
@@ -134,7 +136,7 @@ function Demandas() {
   const tm = typeMetaFor(L);
   const [items, setItems, itemsReady] = useDbState<Demand[]>(pid, [], () => loadDemands(pid!), (p, n) => saveDemands(pid!, p, n));
   const ready = pid !== null && stReady && itemsReady;
-  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda">("overview");
+  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes">("overview");
   const [view, setView] = useState<"kanban" | "lista" | "matriz">("kanban");
   const [prioF, setPrioF] = useState<"todas" | Priority>("todas");
   const [statusF, setStatusF] = useState<"todos" | "pend" | Status>("todos");
@@ -311,15 +313,17 @@ function Demandas() {
   const pend = items.filter((i) => i.status !== "done").length;
   const done = items.length - pend;
 
+  const meetingsQ = useMeetings(), meetingCount = (meetingsQ.data ?? []).filter((m) => m.dossierProject === (pid ?? defaultProjectId())).length;
   const tabs = [
     { k: "overview" as const, label: "Visão geral", sub: "Todos os tipos", icon: LayoutGrid, color: "cyan", n: items.length },
     ...(["geral", "polo", "multi"] as DType[]).map((t) => ({ k: t, label: tm[t].short, sub: tm[t].sub, icon: tm[t].icon, color: tm[t].color, n: count(t) })),
     { k: "agenda" as const, label: "Calendário", sub: "Compromissos", icon: Calendar, color: "emerald", n: appts.length },
     { k: "dossies" as const, label: L.plural, sub: "Cadastro", icon: Folder, color: "pink", n: ds.dossiers.length },
     { k: "docs" as const, label: "Documentação", sub: "Biblioteca", icon: FolderOpen, color: "violet", n: 19 },
+    { k: "reunioes" as const, label: "Reuniões", sub: "Atas e decisões", icon: Mic, color: "violet", n: meetingCount },
     { k: "notas" as const, label: "Notas", sub: "Lembretes", icon: StickyNote, color: "amber", n: notes.length },
   ];
-  const filterBar = tab !== "notas" && tab !== "docs" && tab !== "dossies" && tab !== "agenda";
+  const filterBar = tab !== "notas" && tab !== "docs" && tab !== "dossies" && tab !== "agenda" && tab !== "reunioes";
   const boardItems = (t: typeof tab) => filtered.filter((i) => t === "overview" || i.type === t);
 
   return (
@@ -425,6 +429,8 @@ function Demandas() {
             <div className="glass grid place-items-center gap-3 rounded-3xl p-16 text-sm text-muted-foreground animate-rise" data-testid="carregando">
               <Loader size={22} className="animate-[spin_3s_linear_infinite] text-cyan" /> Carregando suas demandas…
             </div>
+          ) : tab === "reunioes" ? (
+            <MeetingsPage embedded projectId={pid ?? defaultProjectId()} />
           ) : tab === "docs" ? (
             <DocsLibrary projectId={pid ?? defaultProjectId()} />
           ) : tab === "agenda" ? (

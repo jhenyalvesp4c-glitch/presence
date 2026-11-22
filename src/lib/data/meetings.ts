@@ -9,7 +9,7 @@ export type Meeting = { id: string; title: string; source: Source; mode: Mode; r
 const KEY = ["meetings"] as const;
 /** Vínculo da reunião com um polo (dossiê) e/ou cliente: é o que faz ela aparecer na página do cliente. */
 export type MeetingLink = { dossierId: string | null; dossierProject?: string | null; clientId: string | null };
-const linkCols = (l?: MeetingLink) => (l ? { dossier_id: l.dossierId, dossier_project: l.dossierId ? (l.dossierProject ?? defaultProjectId()) : null, client_id: l.clientId } : {});
+const linkCols = (l?: MeetingLink) => (l ? { dossier_id: l.dossierId, dossier_project: l.dossierProject ?? (l.dossierId ? defaultProjectId() : null), client_id: l.clientId } : {});
 type Row = { id: string; title: string; source: Source; mode: Mode; raw: string; analysis: unknown; created: unknown; happened_on: string; created_at: string; dossier_id: string | null; dossier_project: string | null; client_id: string | null };
 const toMeeting = (r: Row): Meeting | null => { const a = cleanAnalysis(r.analysis); return a ? { id: r.id, title: r.title, source: r.source, mode: r.mode, raw: r.raw, analysis: a, sent: Array.isArray(r.created) ? (r.created as number[]).filter((n) => Number.isInteger(n)) : [], happenedOn: r.happened_on, createdAt: r.created_at, dossierId: r.dossier_id ?? null, dossierProject: r.dossier_project ?? null, clientId: r.client_id ?? null } : null; };
 

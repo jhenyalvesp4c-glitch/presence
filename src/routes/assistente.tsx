@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ArrowRight, AudioLines, BarChart3, Bookmark, Brain, Calendar, CalendarCheck, ClipboardList, Dumbbell, Heart, Home,
   Layers, Lightbulb, ListChecks, Mic, Puzzle, Settings, Sparkles, Sun, Sprout, SquarePlus, Wallet, CreditCard,
-  Workflow, X,
+  Sunrise, Workflow, X,
 } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
@@ -131,10 +131,13 @@ function Assistente() {
               <p className="mt-5 max-w-sm text-[0.95rem] leading-relaxed text-muted-foreground max-sm:hidden">
                 Organize sua rotina, acompanhe seus objetivos e conte com o Orion para facilitar seu dia.
               </p>
-              <Link to="/planejamento" className="glass group mt-7 inline-flex max-sm:hidden items-center gap-4 rounded-full px-6 py-3 text-sm transition hover:shadow-[0_0_30px_-8px_var(--cyan)]">
-                <Sparkles size={18} className="text-cyan" /> "Planeje meu dia de hoje"
-                <ArrowRight size={16} className="transition group-hover:translate-x-1" />
-              </Link>
+              <div className="mt-7 flex flex-wrap items-center gap-3 max-sm:hidden">
+                <Link to="/central" data-testid="abrir-central" className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-amber/40 bg-amber/10 px-6 py-3 text-sm text-amber shadow-[0_0_28px_-10px_var(--amber)] backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-amber/20 hover:shadow-[0_0_34px_-8px_var(--amber)] active:scale-95">
+                  <span aria-hidden className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition duration-700 group-hover:translate-x-full" />
+                  <Sunrise size={18} className="relative transition duration-300 group-hover:rotate-12 group-hover:scale-110" /> <span className="relative">Central do dia</span>
+                  <ArrowRight size={16} className="relative transition group-hover:translate-x-1" />
+                </Link>
+              </div>
             </div>
 
             <button onClick={voice.toggle} aria-label="Tocar para falar" data-testid="orbe"
@@ -148,7 +151,7 @@ function Assistente() {
             </button>
 
             <div className="mx-auto flex w-full max-w-xs animate-rise flex-col items-stretch gap-3 max-sm:-mx-[3%] max-sm:w-[calc(100%+6%)] max-sm:max-w-none max-sm:snap-x max-sm:flex-row max-sm:gap-2 max-sm:overflow-x-auto max-sm:px-[3%] max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-36 lg:w-40 sm:max-w-none sm:justify-self-start">
-              <Link to="/planejamento" className="glass flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[0.82rem] text-foreground/90 sm:hidden"><Sparkles size={16} className="text-cyan" /> Planeje meu dia</Link>
+              <Link to="/central" className="flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-amber/40 bg-amber/10 px-4 py-2.5 text-[0.82rem] text-amber sm:hidden"><Sunrise size={16} /> Central do dia</Link>
               {quick.map(({ Icon, label, c }, i) => {
                 const cls = "glass flex items-center justify-center gap-2.5 rounded-2xl px-3.5 py-3 text-left max-sm:shrink-0 max-sm:snap-start max-sm:rounded-full max-sm:py-2.5 text-[0.82rem] text-muted-foreground transition hover:text-foreground hover:shadow-[0_0_28px_-8px_var(--glow)] sm:justify-start sm:[&:nth-child(2)]:translate-x-5";
                 const st = { ...tint(c), animationDelay: `${0.3 + i * 0.1}s` };
