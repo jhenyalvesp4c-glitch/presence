@@ -439,11 +439,14 @@ function Demandas() {
             <Matrix items={boardItems(tab)} names={names} selId={selId} onOpen={openCard} onCell={cycleCell} />
           ) : tab === "overview" ? (
             <div className="grid gap-4 2xl:grid-cols-[1fr_270px]">
-              <section className="fin-frame glass relative overflow-hidden rounded-3xl p-4 animate-rise max-md:rounded-2xl max-md:p-3">
-                <div className="mb-4 flex flex-wrap items-center gap-3">
-                  <span className="icon-tile h-8 w-8" style={tint("cyan")}><Layers size={15} /></span>
+              <section className="fin-frame glass glass-clear relative overflow-hidden rounded-3xl p-4 animate-rise max-md:rounded-2xl max-md:p-3">
+                <div aria-hidden className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-[var(--violet)] opacity-20 blur-3xl" style={{ animation: "fin-aurora 20s ease-in-out infinite" }} />
+                <div aria-hidden className="pointer-events-none absolute -right-20 bottom-0 h-64 w-64 rounded-full bg-[var(--cyan)] opacity-[0.14] blur-3xl" style={{ animation: "fin-aurora 24s ease-in-out infinite reverse" }} />
+                <div className="relative mb-4 flex flex-wrap items-center gap-3">
+                  <span className="relative grid h-9 w-9 place-items-center"><span aria-hidden className="absolute inset-0 rounded-full border border-cyan/50" style={{ animation: "pulse-ring 2.6s ease-out infinite" }} /><span className="icon-tile h-9 w-9 !rounded-full shadow-[0_0_22px_-6px_var(--cyan)]" style={tint("cyan")}><Layers size={16} /></span></span>
                   <h2 className="font-display text-lg font-semibold">Demandas por tipo</h2>
                   <span className="tag" style={tint("violet")}>3 categorias · {filtered.length} demandas</span>
+                  {filtered.length > 0 && <span className="ml-auto flex items-center gap-2.5" data-testid="resumo-geral"><Ring pct={Math.round((filtered.filter((x) => x.status === "done").length / filtered.length) * 100)} color="var(--emerald)" size={44} thickness={5}><span className="text-[0.6rem] font-semibold tabular-nums">{Math.round((filtered.filter((x) => x.status === "done").length / filtered.length) * 100)}%</span></Ring><span className="hidden text-[0.68rem] leading-tight text-muted-foreground sm:block">concluído<br />no total</span></span>}
                 </div>
                 <div className={`grid items-start gap-4 max-md:-mx-4 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:gap-3 max-md:overflow-x-auto max-md:px-4 max-md:pb-2 max-md:pt-2 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden ${sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`} data-testid="carrossel-tipos">
                   {(["geral", "polo", "multi"] as DType[]).map((t) => (
@@ -857,35 +860,36 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
   const m = useTM()[type];
   const [st, setSt] = useState<Status>(() => firstStatus(items));
   return (
-    <div className="accent-card flex flex-col p-3 max-md:w-[88%] max-md:shrink-0 max-md:snap-center" style={tint(m.color)}>
+    <div className="ex-card ex-glass flex flex-col p-3 transition duration-300 hover:-translate-y-0.5 max-md:w-[88%] max-md:shrink-0 max-md:snap-center" style={{ ...tint(m.color), "--rail": "var(--glow)" } as CSSProperties}>
       <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent shadow-[0_0_14px_var(--glow)]" />
       <div className="flex items-center gap-3 px-1">
-        <span className="icon-tile h-11 w-11 !rounded-full shadow-[0_0_24px_-6px_var(--glow)]"><m.icon size={20} /></span>
+        <span className="relative grid h-11 w-11 shrink-0 place-items-center"><span aria-hidden className="absolute inset-0 rounded-full border border-[var(--glow)]/45" style={{ animation: "pulse-ring 2.8s ease-out infinite" }} /><span className="icon-tile h-11 w-11 !rounded-full shadow-[0_0_24px_-6px_var(--glow)]"><m.icon size={20} /></span></span>
         <div className="min-w-0 flex-1">
           <h3 className="font-display font-semibold">{m.label}</h3>
           <p className="text-[0.68rem] text-muted-foreground">{m.sub}</p>
         </div>
         <span className="tag !text-xs !tracking-normal">{items.length}</span>
       </div>
+      {items.length > 0 && <div className="mx-1 mt-2.5 h-1 overflow-hidden rounded-full bg-white/10" title={`${Math.round((items.filter((x) => x.status === "done").length / items.length) * 100)}% concluído`}><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.max(2, Math.round((items.filter((x) => x.status === "done").length / items.length) * 100))}%`, background: "linear-gradient(90deg, var(--glow), var(--emerald))", boxShadow: "0 0 10px var(--glow)" }} /></div>}
       <StatusTabs value={st} onChange={setSt} items={items} />
       <div className="mt-3 md:grid md:grid-cols-3 md:gap-2">
         {STATUSES.map((s) => {
           const col = items.filter((i) => i.status === s);
           return (
             <div key={s} className={`min-w-0 ${s === st ? "" : "max-md:hidden"}`} style={tint(statusMeta[s].color)}>
-              <div className="mb-2 flex items-center justify-between rounded-full max-md:hidden border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-[color-mix(in_oklab,var(--glow)_10%,transparent)] px-2 py-1 text-[0.6rem] text-[var(--glow)]">
+              <div className="mb-2 flex items-center justify-between rounded-full max-md:hidden border border-[color-mix(in_oklab,var(--glow)_40%,transparent)] bg-[color-mix(in_oklab,var(--glow)_12%,transparent)] px-2.5 py-1 text-[0.62rem] text-[var(--glow)] shadow-[inset_0_1px_0_rgba(255,255,255,.1)] backdrop-blur">
                 <span className="truncate">{statusMeta[s].label}</span><span className="font-mono">{col.length}</span>
               </div>
               <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1 max-md:max-h-[55vh] max-md:space-y-2.5" data-testid={`coluna-${type}-${s}`}>
                 {col.map((d, i) => <MiniCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
-                {!col.length && <div className="rounded-xl border border-dashed border-border py-2 text-center text-[0.6rem] text-muted-foreground/60">vazio</div>}
+                {!col.length && <div className="grid place-items-center gap-1 rounded-xl border border-dashed border-white/15 py-3 text-center text-[0.6rem] text-muted-foreground/70"><span aria-hidden className="relative grid h-6 w-6 place-items-center"><span className="absolute inset-0 rounded-full border border-[var(--glow)]/40" style={{ animation: "pulse-ring 3s ease-out infinite" }} /><span className="h-1.5 w-1.5 rounded-full bg-[var(--glow)] shadow-[0_0_10px_var(--glow)]" /></span>vazio</div>}
               </div>
             </div>
           );
         })}
       </div>
-      <button onClick={onCreate} className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] py-2 text-xs text-[var(--glow)] transition hover:bg-[color-mix(in_oklab,var(--glow)_10%,transparent)] hover:shadow-[0_0_24px_-8px_var(--glow)]">
-        <Plus size={13} /> Nova {m.label.toLowerCase().replace("demandas", "demanda").replace("gerais", "geral")}
+      <button onClick={onCreate} className="group/add mt-4 flex items-center justify-center gap-2 rounded-full border border-[color-mix(in_oklab,var(--glow)_35%,transparent)] bg-white/[0.03] py-2 text-xs text-[var(--glow)] backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-[color-mix(in_oklab,var(--glow)_12%,transparent)] hover:shadow-[0_0_26px_-8px_var(--glow)] active:scale-95">
+        <Plus size={13} className="transition duration-300 group-hover/add:rotate-90" /> Nova {m.label.toLowerCase().replace("demandas", "demanda").replace("gerais", "geral")}
       </button>
     </div>
   );
@@ -896,7 +900,7 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
   return (
     <div className="group/card relative">
     <button onClick={onClick} style={{ ...tint(typeBase[d.type].color), animationDelay: `${delay * 0.05}s` }}
-      className={`group card-sheen relative w-full overflow-hidden rounded-xl border bg-secondary/40 p-2 pl-3 text-left transition animate-rise max-md:rounded-2xl max-md:p-3.5 hover:-translate-y-1 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
+      className={`group card-sheen relative w-full overflow-hidden rounded-xl border border-white/12 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--glow)_11%,transparent),rgba(255,255,255,.02)_60%)] p-2 pl-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-md transition duration-300 animate-rise active:scale-[0.98] max-md:rounded-2xl max-md:p-3.5 hover:-translate-y-1 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
       <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" />
       {active && <span className="scanline absolute inset-0" />}
       <p className="font-mono text-[0.55rem] text-muted-foreground max-md:text-[0.65rem]">{d.id}</p>
