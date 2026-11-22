@@ -22,3 +22,7 @@ Tabelas: `clients`, `client_docs`, `client_log`, `client_access` (RLS só do don
 ## Importar dos dossiês e tudo ligado ao dossiê
 - **Importar dos dossiês** (botão em Clientes): lista os dossiês do projeto que ainda não têm cliente, com busca e marcação; cada marcado vira um cliente já ligado ao dossiê (`importDossiersAsClients`).
 - **A ficha puxa tudo do dossiê vinculado:** documentos das pastas da Biblioteca ligadas a ele, reuniões vinculadas ao dossiê, demandas (inclusive de vários dossiês, via `demand_executions`), registros e notas, e os logins da Documentação (só usuário/responsável; senhas ficam no navegador). Consulta em `useClientLinks` (`src/lib/data/clients.ts`).
+
+## Painel do topo
+Por padrão mostra a **Saúde da carteira** (`PortfolioHealth`): implantação média dos clientes ativos (anel), lista "quem precisa de você" (menos andado primeiro, com travados e dias sem contato) e três cartões (sem implantação iniciada, demandas abertas, sem contato há 30 dias). O seletor alterna para **Receita e vencimentos**, que fica guardado até a pessoa cadastrar valores e datas. Regras em `src/lib/portfolio.ts` (testadas em `src/test/portfolio.test.ts`).
+
