@@ -332,6 +332,13 @@ function Library({ projectId }: { projectId: string }) {
       {/* Orion */}
       <div className="animate-rise"><OrionPanel /></div>
 
+      <div className="relative">
+        <div aria-hidden className="pointer-events-none absolute -inset-x-10 -inset-y-6 -z-10 overflow-hidden rounded-[3rem]">
+          <span className="absolute -left-16 top-0 h-[26rem] w-[26rem] rounded-full bg-[var(--violet)] opacity-30 blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} />
+          <span className="absolute left-1/3 top-1/4 h-[24rem] w-[30rem] rounded-full bg-[var(--cyan)] opacity-[0.22] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} />
+          <span className="absolute -right-10 bottom-0 h-[24rem] w-[24rem] rounded-full bg-[var(--emerald)] opacity-[0.16] blur-3xl" style={{ animation: "fin-aurora 26s ease-in-out infinite" }} />
+          <div className="absolute inset-x-0 bottom-0 h-[55%] opacity-50"><div className="fin-floor h-full w-full" /></div>
+        </div>
       <div className="grid gap-4 xl:grid-cols-[280px_1fr_380px]">
         {/* árvore */}
         <aside className="glass glass-clear flex flex-col rounded-3xl p-4 animate-rise">
@@ -474,6 +481,7 @@ function Library({ projectId }: { projectId: string }) {
         {importing && <LoginImporter dossiers={dossiers} existing={logins.map((l) => (l.login?.user ?? "").toLowerCase())} onImport={importLogins} onClose={() => setImporting(false)} />}
         {editing && <LoginEditor initial={"id" in editing ? editing : null} preset={"preset" in editing ? editing.preset : ""} dossiers={dossiers} onSave={saveLogin} onClose={() => setEditing(null)} />}
         <DocDetail key={sel?.id} urls={urls} onEdit={() => { if (sel) editExisting(sel.id); }} onAi={(d, m) => (sel ? applyToDoc(sel.id, d, m) : Promise.resolve())} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
+      </div>
       </div>
     </div>
   );
