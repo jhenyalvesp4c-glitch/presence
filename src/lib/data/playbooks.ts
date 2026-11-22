@@ -89,7 +89,8 @@ export async function runPlaybook(projectId: string, plan: Plan, input: RunInput
 
   // 7) roteiro de implantação (passo a passo guiado)
   progress("Implantação");
-  created.implantacao = await seedSetup(clientId);
+  // não derruba o playbook se o roteiro não puder ser criado (ex.: tabela ainda não migrada); dá para criar depois pela ficha
+  try { created.implantacao = await seedSetup(clientId); } catch { reused.push("roteiro de implantação (não foi possível criar agora)"); }
 
   return { dossierId: dossier.id, dossierName: dossier.name, clientId, folderId, created, reused };
 }
