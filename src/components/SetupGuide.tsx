@@ -78,15 +78,14 @@ export function SetupGuide({ clientId, clientName, onClose }: { clientId: string
           </header>
 
           {q.isPending ? <div className="grid flex-1 place-items-center text-sm text-muted-foreground"><Loader2 className="animate-spin text-cyan" /></div> : (
-            <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[230px_minmax(0,1fr)_minmax(0,400px)] lg:overflow-hidden">
+            <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[250px_minmax(0,1fr)_minmax(0,400px)] lg:overflow-hidden">
               {/* trilha de fases */}
               <nav aria-label="Fases" className="border-b border-white/10 p-4 lg:overflow-y-auto lg:border-b-0 lg:border-r">
                 <ol className="relative space-y-1">
-                  <span aria-hidden className="absolute bottom-6 left-[21px] top-6 hidden w-px bg-gradient-to-b from-cyan/60 via-violet/40 to-transparent lg:block" />
-                  {prog.phases.map((p, i) => { const on = p.name === phase, ph = toneOfPhase(p.name); return (
-                    <li key={p.id}><button onClick={() => { setPhase(p.name); goTo(steps.filter((s) => s.phase === p.name).find((s) => !isFinished(s.status)) ?? steps.find((s) => s.phase === p.name)); }} data-testid={`fase-${i}`} aria-current={on ? "true" : undefined} className={`relative flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition ${on ? "bg-white/[0.07] shadow-[0_0_30px_-12px_var(--glow)]" : "hover:bg-white/[0.04]"}`} style={tint(ph)}>
-                      <Ring pct={p.pct} size={42} thickness={4} color={`var(--${ph})`}>{p.pct === 100 ? <Check size={14} className="text-emerald" /> : <span className="text-[0.65rem] font-semibold">{i + 1}</span>}</Ring>
-                      <span className="min-w-0 flex-1"><span className={`block truncate text-sm ${on ? "font-semibold" : ""}`}>{p.name}</span><span className="block text-[0.65rem] text-muted-foreground">{p.finished}/{p.total}{p.blocked > 0 && " · travado"}</span></span>
+                                    {prog.phases.map((p, i) => { const on = p.name === phase, ph = toneOfPhase(p.name); return (
+                    <li key={p.id} className="relative">{i < prog.phases.length - 1 && <span aria-hidden className="absolute left-[29px] top-1/2 z-0 h-[calc(100%+4px)] w-px bg-gradient-to-b from-cyan/55 to-violet/35" />}<button onClick={() => { setPhase(p.name); goTo(steps.filter((s) => s.phase === p.name).find((s) => !isFinished(s.status)) ?? steps.find((s) => s.phase === p.name)); }} data-testid={`fase-${i}`} aria-current={on ? "true" : undefined} className={`relative z-10 flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition ${on ? "bg-[oklch(0.2_0.04_265)] shadow-[0_0_30px_-12px_var(--glow)]" : "hover:bg-[oklch(0.16_0.035_265)]"}`} style={tint(ph)}>
+                      <span className="shrink-0 rounded-full bg-[oklch(0.1_0.03_265)]"><Ring pct={p.pct} size={42} thickness={4} color={`var(--${ph})`}>{p.pct === 100 ? <Check size={14} className="text-emerald" /> : <span className="text-[0.65rem] font-semibold">{i + 1}</span>}</Ring></span>
+                      <span className="min-w-0 flex-1"><span className={`line-clamp-2 break-words text-sm leading-tight ${on ? "font-semibold" : ""}`}>{p.name}</span><span className="block text-[0.65rem] text-muted-foreground">{p.finished}/{p.total}{p.blocked > 0 && " · travado"}</span></span>
                       {on && <ChevronRight size={14} className="text-[var(--glow)]" />}</button></li>); })}
                 </ol>
                 {newPhase === null ? <button onClick={() => setNewPhase("")} data-testid="fase-nova" className="mt-3 flex w-full items-center gap-2 rounded-2xl border border-dashed border-white/15 px-3 py-2 text-xs text-muted-foreground transition hover:border-cyan/50 hover:text-foreground"><Plus size={13} /> Nova fase</button>
