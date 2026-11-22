@@ -13,3 +13,6 @@ Tabela `client_setup` (migração `20261201000500_client_setup.sql`, RLS só do 
 
 ## Roteiro de implantação padrão do projeto
 Configure uma vez e todo cliente novo já nasce com o seu roteiro. Duas formas: **Documentação → Playbooks → "Roteiro de implantação" → Editar padrão** (fases, passos, "como fazer", ordem) ou, dentro do modo guiado de um cliente, **"Usar como padrão"** (copia o roteiro daquele cliente, sem status nem anotações). Tabela `setup_templates` (um padrão por projeto, migração `20261201000600`). O padrão vale para clientes **novos**; quem já tem roteiro não muda. Sem padrão salvo, vale o modelo inicial (`SETUP_TEMPLATE` em `src/lib/setup.ts`). Editor em `src/components/SetupTemplateEditor.tsx`, dados em `src/lib/data/setup-templates.ts`.
+
+## Falar ou escrever o passo a passo (Documentação → qualquer pasta)
+Caixa "Falar ou escrever o passo a passo" no alto de cada pasta (menos Logins): ela transcreve a voz (`transcribeAudio`) ou usa o texto, organiza com a IA em título, descrição, "antes de começar" e passos (infinitivo, na ordem, sem inventar nada) e mostra um rascunho editável; "Salvar na pasta" cria o documento. Sem IA no servidor (ou se falhar), organiza de forma simples por linhas/frases e avisa. Código: `src/lib/doc-organize.ts`, `src/lib/doc-organize.functions.ts`, `src/components/DocDictation.tsx`.

@@ -14,6 +14,8 @@ import {
 import { TrainingScripts } from "@/components/TrainingScripts";
 import { ClientsView } from "@/components/ClientsView";
 import { DossierHub } from "@/components/DossierHub";
+import { DocDictation, type DictationDoc } from "@/components/DocDictation";
+import { descOf } from "@/lib/doc-organize";
 import { PlaybooksView } from "@/components/PlaybooksView";
 import { matchDossier, parseLogins, prettySlug } from "@/lib/login-import";
 import { readLoginEmails } from "@/lib/login-emails.functions";
@@ -275,6 +277,14 @@ function Library({ projectId }: { projectId: string }) {
     setEditDoc(null);
     toast.success(editDoc.isNew ? "Documento criado" : "Documento salvo");
   };
+  /** Tutorial organizado a partir da fala/escrita: vira documento novo na pasta aberta. */
+  const createFromDictation = async (d: DictationDoc) => {
+    const doc: Doc = { id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, title: d.titulo.trim().slice(0, 200), desc: descOf(d), kind: d.kind, color: ({ Tutorial: "violet", Processo: "emerald", Guia: "cyan", Checklist: "emerald", Manual: "amber" } as Record<string, string>)[d.kind] ?? "violet", updated: todayLabel(), ...(d.antes.length ? { rules: d.antes } : {}), steps: d.passos };
+    await saveDocRow(docToRow(doc, folder.id));
+    setTouched((t) => new Set(t).add(doc.id));
+    setFolders((fs) => mapFolders(fs, folder.id, (f) => ({ ...f, docs: [doc, ...f.docs] })));
+    setCur(folder.id); setOpen((o) => ({ ...o, [folder.id]: true })); setSelId(doc.id); setQ("");
+  };
   const delDoc = (id: string) => {
     const d = docs.find((x) => x.id === id); if (!d) return;
     if (!window.confirm(`Excluir o documento "${d.title}"?${d.attachments?.length ? " Os arquivos anexados também serão apagados." : ""}`)) return;
@@ -372,6 +382,8 @@ function Library({ projectId }: { projectId: string }) {
                 logins={logins.filter((l) => groupOf(l).trim().toLowerCase() === key).map((l) => ({ id: l.id, title: l.title, user: l.login?.user ?? "", owner: l.login?.owner ?? "" }))}
                 onOpenDoc={(id) => setSelId(id)} onOpenLogin={(id) => { setCur("log"); setOpen((o) => ({ ...o, log: true })); setSelId(id); }} /></div>;
             })()}
+
+            {!q && folder.id !== "log" && <DocDictation folderName={folder.name} defaultKind={/tutor/i.test(folder.name) ? "Tutorial" : /process/i.test(folder.name) ? "Processo" : "Tutorial"} onSave={createFromDictation} />}
 
             <div className={`mt-4 grid gap-3 ${grid ? "sm:grid-cols-2" : ""}`}>
               {shown.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground sm:col-span-2">Pasta vazia. Crie o primeiro documento ✦</p>}
