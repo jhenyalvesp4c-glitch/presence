@@ -11,7 +11,7 @@ const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((
 
 function Card({ title, Icon, color = "var(--cyan)", n = 0, children, testId }: { title: string; Icon: typeof FileText; color?: string; n?: number; children: React.ReactNode; testId?: string }) {
   return (
-    <section className="ex-card px-5 py-5 sm:px-6" style={{ "--rail": color, animation: "fin-rise .6s both", animationDelay: `${n * 90}ms` } as React.CSSProperties} data-testid={testId}>
+    <section className="ex-card ex-glass px-5 py-5 transition duration-300 hover:-translate-y-0.5 sm:px-6" style={{ "--rail": color, animation: "fin-rise .6s both", animationDelay: `${n * 90}ms` } as React.CSSProperties} data-testid={testId}>
       <span aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full opacity-[0.1] blur-3xl" style={{ background: color }} />
       <h3 className="relative mb-3 flex items-center gap-2.5"><Icon size={14} style={{ color }} /><span className="mono-caps !text-[0.68rem]">{title}</span><span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" /></h3>
       <div className="relative">{children}</div>

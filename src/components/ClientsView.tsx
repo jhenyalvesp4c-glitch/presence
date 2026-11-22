@@ -7,6 +7,9 @@ import { Link } from "@tanstack/react-router";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
 import { useMeeting } from "@/lib/data/meetings";
 import { toast } from "sonner";
+import { ClipboardCopy, Gavel, ListChecks, MessagesSquare, Mic } from "lucide-react";
+import { copyText } from "@/lib/clipboard";
+import { analysisToMarkdown } from "@/lib/meetings";
 import { Building2, CalendarClock, Check, ClipboardList, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -311,16 +314,50 @@ function DocsTab({ client, docs, acts, err }: { client: Client; docs: import("@/
 /** Reunião inteira (ata, decisões, quem faz o quê) numa janela flutuante, sem sair da ficha do cliente. */
 function MeetingViewer({ id, onClose }: { id: string; onClose: () => void }) {
   const q = useMeeting(id), m = q.data;
+  const a = m?.analysis;
+  const chips = a ? [
+    { I: Users, v: a.participantes.length, l: "participantes", c: "var(--cyan)" },
+    { I: Gavel, v: a.decisoes.length, l: "decisões", c: "var(--violet)" },
+    { I: ListChecks, v: a.acoes.length, l: "ações", c: "var(--emerald)" },
+    { I: MessagesSquare, v: a.topicos.length || a.grupos.length, l: m?.mode === "grupo" ? "grupos" : "tópicos", c: "var(--amber)" },
+  ] : [];
+  const copiar = async () => { if (!a || !m) return; if (await copyText(analysisToMarkdown(a, m.happenedOn))) toast.success("Ata copiada"); else toast.error("Não consegui copiar."); };
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.88)] p-5 backdrop-blur-2xl sm:p-6" data-testid="reuniao-janela" aria-describedby={undefined}>
-        <DialogHeader>
-          <p className="mono-caps !text-[0.62rem]">{m ? `${dateBR(m.happenedOn)} · ${m.mode === "grupo" ? "resumo de grupos" : "reunião"}` : "Reunião"}</p>
-          <DialogTitle className="font-display text-xl font-semibold">{m?.title ?? (q.isPending ? "Carregando…" : "Reunião não encontrada")}</DialogTitle>
-        </DialogHeader>
-        {q.isPending && <div className="grid place-items-center py-10"><Loader2 className="animate-spin text-cyan" /></div>}
-        {m && <MeetingResult a={m.analysis} selected={new Set()} sent={new Set()} onToggle={() => undefined} onSelectAll={() => undefined} readOnly />}
-        {m && <Link to="/reunioes" className="block text-center text-xs text-cyan hover:underline">Editar vínculo ou criar demandas em Reuniões</Link>}
+      <DialogContent className="max-h-[92vh] max-w-3xl gap-0 overflow-hidden rounded-[2rem] border-white/15 bg-[oklch(0.13_0.04_268/0.82)] p-0 shadow-[0_40px_120px_-30px_var(--violet)] backdrop-blur-2xl" data-testid="reuniao-janela" aria-describedby={undefined}>
+        {/* fundo vivo da janela */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <span className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[var(--violet)] opacity-30 blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} />
+          <span className="absolute -right-20 top-1/3 h-72 w-72 rounded-full bg-[var(--cyan)] opacity-[0.16] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} />
+          <div className="absolute inset-0 opacity-[0.35]" style={{ backgroundImage: "linear-gradient(rgba(140,200,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(140,200,255,.08) 1px, transparent 1px)", backgroundSize: "44px 44px", maskImage: "linear-gradient(180deg, black, transparent 70%)", WebkitMaskImage: "linear-gradient(180deg, black, transparent 70%)" }} />
+          {Array.from({ length: 24 }, (_, i) => <span key={i} className="absolute rounded-full bg-white" style={{ left: `${(i * 41 + 7) % 100}%`, top: `${(i * 29 + 5) % 100}%`, width: 1 + (i % 2), height: 1 + (i % 2), opacity: 0.6, animation: `fin-twinkle ${3 + (i % 4)}s ease-in-out ${i % 5}s infinite` }} />)}
+        </div>
+        <div className="relative max-h-[92vh] overflow-y-auto p-5 sm:p-7">
+          <DialogHeader className="space-y-0 text-left">
+            <div className="flex items-start gap-4">
+              <span className="relative grid h-14 w-14 shrink-0 place-items-center">
+                <span aria-hidden className="absolute inset-0 rounded-2xl border border-violet/50" style={{ animation: "pulse-ring 2.4s ease-out infinite" }} />
+                <span className="icon-tile h-14 w-14 !rounded-2xl shadow-[0_0_30px_-6px_var(--violet)]" style={tint("violet")}><Mic size={22} /></span>
+              </span>
+              <div className="min-w-0 flex-1 pr-8">
+                <p className="mono-caps flex flex-wrap items-center gap-2 !text-[0.62rem]">{m ? `${dateBR(m.happenedOn)} · ${m.mode === "grupo" ? "resumo de grupos" : "reunião"}` : "Reunião"}<LiveDot color="var(--emerald)" label="ata do Orion" /></p>
+                <DialogTitle className="mt-1.5 font-display text-2xl font-semibold leading-tight sm:text-3xl"><span className="text-gradient">{m?.title ?? (q.isPending ? "Carregando…" : "Reunião não encontrada")}</span></DialogTitle>
+              </div>
+            </div>
+            {chips.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{chips.map((c, i) => (
+              <span key={c.l} className="group inline-flex items-center gap-2 rounded-full border bg-white/[0.04] px-3 py-1.5 text-xs backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08]" style={{ borderColor: `color-mix(in oklab, ${c.c} 35%, transparent)`, animation: `fin-rise .5s ${0.1 + i * 0.06}s both` }}>
+                <c.I size={13} className="transition group-hover:scale-125" style={{ color: c.c }} /><b className="tabular-nums">{c.v}</b><span className="text-muted-foreground">{c.l}</span>
+              </span>))}</div>}
+          </DialogHeader>
+          <div className="mt-5 space-y-3">
+            {q.isPending && <div className="grid place-items-center py-10"><Loader2 className="animate-spin text-cyan" /></div>}
+            {m && <MeetingResult a={m.analysis} selected={new Set()} sent={new Set()} onToggle={() => undefined} onSelectAll={() => undefined} readOnly />}
+          </div>
+          {m && <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5 border-t border-white/10 pt-4">
+            <button onClick={() => void copiar()} data-testid="reuniao-copiar" className="inline-flex items-center gap-2 rounded-full border border-cyan/40 bg-cyan/10 px-5 py-2 text-sm text-cyan shadow-[0_0_26px_-10px_var(--cyan)] transition hover:-translate-y-0.5 hover:bg-cyan/20 active:scale-95"><ClipboardCopy size={14} /> Copiar ata</button>
+            <Link to="/reunioes" className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2 text-sm text-muted-foreground transition hover:-translate-y-0.5 hover:border-violet/50 hover:text-foreground active:scale-95">Editar vínculo ou criar demandas</Link>
+          </div>}
+        </div>
       </DialogContent>
     </Dialog>
   );
