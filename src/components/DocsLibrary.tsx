@@ -400,7 +400,7 @@ function Library({ projectId }: { projectId: string }) {
                 const on = d.id === selId;
                 return (
                   <button key={d.id} onClick={() => setSelId(d.id)} style={{ ...tint(d.color), "--rail": `var(--${d.color})`, animationDelay: `${i * 0.05}s` } as CSSProperties}
-                    className={`ex-card group relative flex items-start gap-3 p-4 text-left animate-rise ${on ? "!border-[color-mix(in_oklab,var(--cyan)_60%,transparent)] shadow-[0_0_40px_-12px_var(--cyan)]" : ""}`}>
+                    className={`ex-card ex-glass group relative flex items-start gap-3 p-4 text-left animate-rise ${on ? "!border-[color-mix(in_oklab,var(--cyan)_60%,transparent)] shadow-[0_0_40px_-12px_var(--cyan)]" : ""}`}>
                     <span className="icon-tile h-11 w-11 shrink-0 transition group-hover:scale-110 group-hover:rotate-3">{d.login ? <KeyRound size={18} /> : <FileText size={18} />}</span>
                     <span className="min-w-0 flex-1">
                       <span className="line-clamp-2 break-words text-sm font-semibold">{d.title}</span>
