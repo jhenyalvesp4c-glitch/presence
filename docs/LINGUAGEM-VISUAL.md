@@ -14,6 +14,12 @@
 9. **Responsivo e sem vazar:** `min-w-0`, `[overflow-wrap:anywhere]`, `line-clamp-*` (não combine com `block`), nada de largura fixa que estoure no painel estreito.
 10. **Um padrão só:** barra lateral é só a `GlobalRail`; não desenhe outra. Textos em português do Brasil.
 
+## Interação e acabamento (também obrigatório)
+11. **Janelas e botões flutuantes sempre que for viável:** detalhes, formulários e visualizações abrem em janela flutuante (`Dialog` com vidro `bg-[oklch(0.14_0.035_265/0.88)] backdrop-blur-2xl`, cantos `rounded-[2rem]`) em cima da tela atual, **sem redirecionar** para outra página (ex.: reunião aberta dentro da ficha do cliente, caixa de IA dentro do documento). Ações principais em botões flutuantes/arredondados com brilho. Só leve para outra rota quando for inevitável.
+12. **Movimento ao passar o mouse em tudo que é clicável:** elevar/escalar de leve (`hover:scale-*`, `hover:-translate-y-*`), borda que acende na cor do item, brilho que varre (`card-sheen`), ícone que gira/cresce (`group-hover`), `Tilt` nos destaques. Todo clique tem resposta (`active:scale-95`, transição suave de 200–400 ms). Respeite `prefers-reduced-motion`.
+13. **Impecável em cada detalhe, cada coisinha:** alinhamento e espaçamento consistentes, nada cortado ou vazando (veja item 9), estados de carregando/vazio/erro desenhados, textos curtos em português do Brasil, foco por teclado visível, `aria-label` em botões só de ícone, mensagens de confirmação (`toast`) claras. Antes de entregar, confira a tela em largura estreita e larga e passe o mouse por tudo.
+14. **Não entregue "só funciona":** se a funcionalidade ficou certa mas feia ou seca, ainda não está pronta.
+
 ## Onde estão as peças
 | Peça | Onde |
 |---|---|
