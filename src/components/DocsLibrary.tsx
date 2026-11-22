@@ -14,7 +14,7 @@ import {
 import { TrainingScripts } from "@/components/TrainingScripts";
 import { ClientsView } from "@/components/ClientsView";
 import { DossierHub } from "@/components/DossierHub";
-import { DocDictation, type DictationDoc } from "@/components/DocDictation";
+import { DocAi, type ApplyMode, type DictationDoc } from "@/components/DocAi";
 import { descOf } from "@/lib/doc-organize";
 import { PlaybooksView } from "@/components/PlaybooksView";
 import { matchDossier, parseLogins, prettySlug } from "@/lib/login-import";
@@ -132,6 +132,7 @@ function applyRows(base: FolderT[], rows: { docs: DocRow[]; folders: FolderRow[]
   return out;
 }
 
+const defaultKindOf = (name: string) => (/tutor/i.test(name) ? "Tutorial" : /process/i.test(name) ? "Processo" : "Tutorial");
 const allDocs = (fs: FolderT[]): (Doc & { folder: string })[] =>
   fs.flatMap((f) => [...f.docs.map((d) => ({ ...d, folder: f.name })), ...allDocs(f.subs ?? []).map((d) => d)]);
 const countDocs = (f: FolderT): number => f.docs.length + (f.subs ?? []).reduce((a, s) => a + countDocs(s), 0);
@@ -277,6 +278,16 @@ function Library({ projectId }: { projectId: string }) {
     setEditDoc(null);
     toast.success(editDoc.isNew ? "Documento criado" : "Documento salvo");
   };
+  /** A IA organizou o passo a passo: coloca NO documento aberto (substitui ou acrescenta os passos). */
+  const applyToDoc = async (id: string, d: DictationDoc, mode: ApplyMode) => {
+    const doc = allDocs(folders).find((x) => x.id === id), fid = folderIdOf(folders, id); if (!doc || !fid) throw new Error("Documento não encontrado.");
+    const steps = mode === "append" ? [...(doc.steps ?? []), ...d.passos] : d.passos;
+    const rules = d.antes.length ? (mode === "append" ? [...new Set([...(doc.rules ?? []), ...d.antes])] : d.antes) : doc.rules;
+    const next: Doc = { ...doc, steps, ...(rules?.length ? { rules } : {}), ...(!doc.desc.trim() && d.descricao.trim() ? { desc: d.descricao.trim() } : {}), updated: todayLabel() };
+    await saveDocRow(docToRow(next, fid));
+    setTouched((t) => new Set(t).add(id));
+    setFolders((fs) => mapFolders(fs, fid, (f) => ({ ...f, docs: f.docs.map((x) => (x.id === id ? next : x)) })));
+  };
   /** Tutorial organizado a partir da fala/escrita: vira documento novo na pasta aberta. */
   const createFromDictation = async (d: DictationDoc) => {
     const doc: Doc = { id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, title: d.titulo.trim().slice(0, 200), desc: descOf(d), kind: d.kind, color: ({ Tutorial: "violet", Processo: "emerald", Guia: "cyan", Checklist: "emerald", Manual: "amber" } as Record<string, string>)[d.kind] ?? "violet", updated: todayLabel(), ...(d.antes.length ? { rules: d.antes } : {}), steps: d.passos };
@@ -383,10 +394,8 @@ function Library({ projectId }: { projectId: string }) {
                 onOpenDoc={(id) => setSelId(id)} onOpenLogin={(id) => { setCur("log"); setOpen((o) => ({ ...o, log: true })); setSelId(id); }} /></div>;
             })()}
 
-            {!q && folder.id !== "log" && <DocDictation folderName={folder.name} defaultKind={/tutor/i.test(folder.name) ? "Tutorial" : /process/i.test(folder.name) ? "Processo" : "Tutorial"} onSave={createFromDictation} />}
-
             <div className={`mt-4 grid gap-3 ${grid ? "sm:grid-cols-2" : ""}`}>
-              {shown.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground sm:col-span-2">Pasta vazia. Crie o primeiro documento ✦</p>}
+              {shown.length === 0 && <div className="sm:col-span-2"><p className="py-6 text-center text-sm text-muted-foreground">Pasta vazia. Crie o primeiro documento ✦</p>{!q && folder.id !== "log" && <DocAi create folderName={folder.name} defaultKind={defaultKindOf(folder.name)} onApply={async (d) => createFromDictation(d)} />}</div>}
               {shown.map((d, i) => {
                 const on = d.id === selId;
                 return (
@@ -464,7 +473,7 @@ function Library({ projectId }: { projectId: string }) {
           initial={{ title: editDoc.doc.title, desc: editDoc.doc.desc, kind: editDoc.doc.kind, color: editDoc.doc.color, rules: editDoc.doc.rules ?? [], steps: editDoc.doc.steps ?? [], attachments: editDoc.doc.attachments ?? [], summary: editDoc.doc.summary ?? "" }} />}
         {importing && <LoginImporter dossiers={dossiers} existing={logins.map((l) => (l.login?.user ?? "").toLowerCase())} onImport={importLogins} onClose={() => setImporting(false)} />}
         {editing && <LoginEditor initial={"id" in editing ? editing : null} preset={"preset" in editing ? editing.preset : ""} dossiers={dossiers} onSave={saveLogin} onClose={() => setEditing(null)} />}
-        <DocDetail key={sel?.id} urls={urls} onEdit={() => { if (sel) editExisting(sel.id); }} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
+        <DocDetail key={sel?.id} urls={urls} onEdit={() => { if (sel) editExisting(sel.id); }} onAi={(d, m) => (sel ? applyToDoc(sel.id, d, m) : Promise.resolve())} {...(sel ? { d: sel } : {})} onEditLogin={() => { if (sel?.login) setEditing(sel); }} onFav={() => { if (sel) toggleFav(sel.id); }} onDelete={() => { if (sel) delDoc(sel.id); }} />
       </div>
     </div>
   );
@@ -545,7 +554,7 @@ function Cred({ label, value, onCopy, copied, extra, testid }: { label: string; 
   );
 }
 
-function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, urls }: { d?: Doc & { folder: string }; onFav: () => void; onDelete: () => void; onEditLogin: () => void; onEdit: () => void; urls: Record<string, { view: string; download: string }> }) {
+function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, onAi, urls }: { d?: Doc & { folder: string }; onAi: (d: DictationDoc, m: ApplyMode) => Promise<void>; onFav: () => void; onDelete: () => void; onEditLogin: () => void; onEdit: () => void; urls: Record<string, { view: string; download: string }> }) {
   const [menu, setMenu] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [done, setDone] = useState<number[]>([]);
@@ -575,6 +584,7 @@ function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, urls }: { d?: Doc 
 
       <DocArt d={d} />
 
+      {!d.login && <DocAi folderName={d.folder} docTitle={d.title} hasSteps={!!d.steps?.length} defaultKind={d.kind} onApply={onAi} />}
       <h4 className="mt-4 font-semibold">Descrição</h4>
       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.desc}</p>
 

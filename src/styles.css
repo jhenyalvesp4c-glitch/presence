@@ -604,3 +604,19 @@ html, body { max-width: 100%; overflow-x: clip; }
 }
 @keyframes demand-ping { 0% { transform: scale(.8); opacity: .7; } 100% { transform: scale(2.2); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .card-sheen::after { transition: none !important; } }
+
+/* Caixa da IA dentro dos documentos: borda de luz que gira, ondas de voz e brilho de carregamento. */
+@property --ai-a { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes ai-rot { to { --ai-a: 360deg; } }
+@keyframes ai-wave { 0%, 100% { transform: scaleY(0.25); } 50% { transform: scaleY(1); } }
+@keyframes ai-shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+@keyframes ai-ring { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.9); opacity: 0; } }
+.ai-border { position: relative; border-radius: 1.25rem; }
+.ai-border::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: conic-gradient(from var(--ai-a), transparent 0 55%, var(--cyan) 72%, var(--violet) 88%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: ai-rot 7s linear infinite;
+}
+.ai-shimmer { background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--cyan) 30%, transparent), transparent); background-size: 200% 100%; animation: ai-shimmer 1.6s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .ai-border::before, .ai-shimmer { animation: none; } }
