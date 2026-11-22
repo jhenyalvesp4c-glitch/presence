@@ -79,5 +79,31 @@ export function missingRows(template: SetupPhaseDef[], existingKeys: Iterable<st
   template.forEach((ph, pi) => ph.steps.forEach((s, si) => { if (!have.has(s.key)) out.push({ key: s.key, phase: ph.name, phase_position: pi, position: si, title: s.title, hint: s.hint }); }));
   return out;
 }
-export const toneOfPhase = (name: string): SetupPhaseDef["tone"] => SETUP_TEMPLATE.find((p) => p.name === name)?.tone ?? "cyan";
+export const toneOfPhase = (name: string, index = 0): SetupPhaseDef["tone"] => SETUP_TEMPLATE.find((p) => p.name === name)?.tone ?? (["cyan", "violet", "emerald", "amber", "pink"] as const)[index % 5]!;
 export const goalOfPhase = (name: string) => SETUP_TEMPLATE.find((p) => p.name === name)?.goal ?? "";
+
+const TONES = ["cyan", "violet", "emerald", "amber", "pink"] as const;
+const rk = () => Math.random().toString(36).slice(2, 7);
+/** Valida um modelo salvo: cada fase precisa de nome e ao menos um passo com título; gera chaves únicas. `null` = inválido/vazio (usa o modelo de fábrica). */
+export function sanitizeTemplate(raw: unknown): SetupPhaseDef[] | null {
+  if (!Array.isArray(raw)) return null;
+  type P = { id?: unknown; name?: unknown; goal?: unknown; steps?: unknown }; type S = { key?: unknown; title?: unknown; hint?: unknown };
+  const out: SetupPhaseDef[] = [], keys = new Set<string>();
+  for (const ph of (raw as P[]).slice(0, 30)) {
+    if (!ph || typeof ph !== "object" || typeof ph.name !== "string" || !ph.name.trim() || !Array.isArray(ph.steps)) continue;
+    const steps: SetupStepDef[] = [];
+    for (const st of (ph.steps as S[]).slice(0, 60)) {
+      if (!st || typeof st !== "object" || typeof st.title !== "string" || !st.title.trim()) continue;
+      let key = typeof st.key === "string" && st.key.trim() ? st.key.trim().slice(0, 60) : `t-${rk()}`; while (keys.has(key)) key = `t-${rk()}`;
+      keys.add(key); steps.push({ key, title: st.title.trim().slice(0, 200), hint: typeof st.hint === "string" ? st.hint.slice(0, 1000) : "" });
+    }
+    if (steps.length) out.push({ id: typeof ph.id === "string" && ph.id ? ph.id : `p-${out.length}`, name: ph.name.trim().slice(0, 80), tone: TONES[out.length % TONES.length]!, goal: typeof ph.goal === "string" ? ph.goal.slice(0, 200) : "", steps });
+  }
+  return out.length ? out : null;
+}
+/** Transforma o roteiro de um cliente em modelo (mantém fases, ordem, títulos e "como fazer"; sem status nem anotações). */
+export function templateFromSteps(steps: SetupStep[]): SetupPhaseDef[] {
+  const phases = new Map<string, SetupStep[]>(), order: string[] = [];
+  for (const s of [...steps].sort((a, b) => a.phaseIndex - b.phaseIndex || a.position - b.position)) { if (!phases.has(s.phase)) { phases.set(s.phase, []); order.push(s.phase); } phases.get(s.phase)!.push(s); }
+  return order.map((name, i) => ({ id: `p-${i}`, name, tone: TONES[i % TONES.length]!, goal: goalOfPhase(name), steps: phases.get(name)!.map((s) => ({ key: s.key.startsWith("custom-") ? `t-${rk()}` : s.key, title: s.title, hint: s.hint })) }));
+}

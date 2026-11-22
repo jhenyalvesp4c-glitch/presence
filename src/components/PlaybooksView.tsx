@@ -2,7 +2,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Building2, CalendarClock, Check, CheckCircle2, ChevronDown, ClipboardList, FileText, FolderOpen, ListChecks, Loader2, Play, Plus, RotateCcw, Rocket, Trash2 } from "lucide-react";
+import { Building2, CalendarClock, Check, CheckCircle2, ChevronDown, ClipboardList, FileText, FolderOpen, ListChecks, Loader2, Pencil, Play, Plus, RotateCcw, Rocket, Trash2 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FinBackdrop, HeroPanel, OrbitArt, SectionTitle, Tilt } from "@/components/finance/fx";
@@ -10,12 +10,15 @@ import { todayBR, dateBR } from "@/lib/clients";
 import { addDays } from "@/lib/central";
 import { PLAYBOOKS, buildPlan, sanitizeSteps, stepsKey, summarizePlan, type Playbook, type PlaybookStep, type RunInput, type StepKind } from "@/lib/playbooks";
 import { runPlaybook, type RunResult } from "@/lib/data/playbooks";
+import { SetupTemplateEditor } from "@/components/SetupTemplateEditor";
+import { useSetupTemplate } from "@/lib/data/setup-templates";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 const BLANK: RunInput = { clientName: "", contactName: "", email: "", phone: "", monthlyValue: 0, contractEnd: null, start: todayBR() };
 
 export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { projectId: string; onOpenClients: () => void; onOpenLibrary: () => void }) {
-  const [run, setRun] = useState<Playbook | null>(null);
+  const [run, setRun] = useState<Playbook | null>(null), [editTpl, setEditTpl] = useState(false), tpl = useSetupTemplate(projectId);
+  const nPh = tpl.data?.phases.length ?? 7, nSt = (tpl.data?.phases ?? []).reduce((a, p) => a + p.steps.length, 0) || 29;
   return (
     <div className="relative space-y-5" data-testid="playbooks"><FinBackdrop />
       <HeroPanel glow="var(--cyan)">
@@ -33,8 +36,16 @@ export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { pro
               <p className="mt-4 flex items-center gap-2 text-sm text-cyan"><Play size={14} /> Executar playbook</p>
             </button>
           </Tilt>); })}
+        <Tilt max={8}>
+          <button onClick={() => setEditTpl(true)} data-testid="implantacao-editar-padrao" className="ex-card block w-full p-5 text-left" style={{ "--rail": "var(--violet)" } as CSSProperties}>
+            <div className="flex items-start gap-4"><span className="icon-tile h-14 w-14 shrink-0 !rounded-2xl shadow-[0_0_28px_-6px_var(--glow)]" style={tint("violet")}><ListChecks size={24} /></span><div className="min-w-0"><p className="mono-caps">{tpl.data?.custom ? "Padrão do projeto" : "Modelo inicial"}</p><h3 className="font-display text-xl font-semibold">Roteiro de implantação</h3><p className="mt-1 text-xs text-muted-foreground">As fases e passos que todo cliente novo recebe (horário, assinatura, fluxo de atendimento, Kanban…). Configure uma vez.</p></div></div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-center">{[["Fases", nPh], ["Passos", nSt]].map(([l, n]) => <div key={String(l)} className="rounded-xl border border-white/10 bg-black/20 py-2"><p className="font-display text-lg font-semibold tabular-nums">{String(n)}</p><p className="text-[0.6rem] text-muted-foreground">{String(l)}</p></div>)}</div>
+            <p className="mt-4 flex items-center gap-2 text-sm text-violet"><Pencil size={14} /> Editar padrão</p>
+          </button>
+        </Tilt>
         <div className="grid min-h-[12rem] place-items-center rounded-[1.25rem] border border-dashed border-white/15 p-5 text-center text-xs text-muted-foreground">Novos playbooks (fechamento do mês, renovação, projeto…) entram aqui.<br />Diga o processo e eu monto o roteiro.</div>
       </div>
+      {editTpl && <SetupTemplateEditor projectId={projectId} onClose={() => setEditTpl(false)} />}
       {run && <RunDialog key={run.id} playbook={run} projectId={projectId} onClose={() => setRun(null)} onOpenClients={() => { setRun(null); onOpenClients(); }} onOpenLibrary={() => { setRun(null); onOpenLibrary(); }} />}
     </div>
   );

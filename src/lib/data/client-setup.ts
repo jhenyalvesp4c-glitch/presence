@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { SETUP_TEMPLATE, missingRows, type SetupStatus, type SetupStep } from "../setup";
+import { loadSetupTemplate } from "./setup-templates";
 import { must, supabase } from "./db";
 
 type Row = { id: string; client_id: string; key: string; phase: string; phase_position: number; position: number; title: string; hint: string; status: SetupStatus; note: string; done_at: string | null };
@@ -28,19 +29,21 @@ export const useSetupSummaries = () => useQuery({
 });
 
 /** Cria os passos que faltam do modelo (idempotente). Usado pelo botão "Criar roteiro" e pelo playbook. */
-export async function seedSetup(clientId: string): Promise<number> {
+export async function seedSetup(clientId: string, projectId: string): Promise<number> {
   const have = (must(await supabase.from("client_setup").select("key").eq("client_id", clientId)) as { key: string }[]).map((r) => r.key);
   // só cria o modelo num cliente sem roteiro: quem já tem (e editou, apagou ou acrescentou passos) não recebe de volta o que apagou
   if (have.length) return 0;
-  const rows = missingRows(SETUP_TEMPLATE, have).map((r) => ({ ...r, client_id: clientId }));
+  // o padrão do projeto (se a usuária configurou) vale no lugar do modelo de fábrica
+  const template = (await loadSetupTemplate(projectId).catch(() => null)) ?? SETUP_TEMPLATE;
+  const rows = missingRows(template, have).map((r) => ({ ...r, client_id: clientId }));
   if (rows.length) must(await supabase.from("client_setup").insert(rows).select("id"));
   return rows.length;
 }
 
-export function useSetupActions(clientId: string) {
+export function useSetupActions(clientId: string, projectId: string) {
   const qc = useQueryClient(), refresh = () => Promise.all([qc.invalidateQueries({ queryKey: KEY }), qc.invalidateQueries({ queryKey: ["central"] })]);
   return {
-    seed: useMutation({ mutationFn: () => seedSetup(clientId), onSuccess: refresh }),
+    seed: useMutation({ mutationFn: () => seedSetup(clientId, projectId), onSuccess: refresh }),
     setStatus: useMutation({ mutationFn: async (v: { id: string; status: SetupStatus }) => { must(await supabase.from("client_setup").update({ status: v.status, done_at: v.status === "done" ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq("id", v.id).select("id")); }, onSuccess: refresh }),
     setNote: useMutation({ mutationFn: async (v: { id: string; note: string }) => { must(await supabase.from("client_setup").update({ note: v.note.slice(0, 2000), updated_at: new Date().toISOString() }).eq("id", v.id).select("id")); }, onSuccess: refresh }),
     addStep: useMutation({ mutationFn: async (v: { phase: string; phaseIndex: number; title: string; position: number }) => { must(await supabase.from("client_setup").insert({ client_id: clientId, key: `custom-${Date.now().toString(36)}`, phase: v.phase, phase_position: v.phaseIndex, position: v.position, title: v.title.trim().slice(0, 200) }).select("id")); }, onSuccess: refresh }),

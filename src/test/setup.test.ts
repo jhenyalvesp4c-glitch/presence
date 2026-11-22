@@ -28,3 +28,24 @@ describe("implantação", () => {
     expect(missingRows(SETUP_TEMPLATE, ["contrato", "kickoff"]).length).toBe(all.length - 2);
   });
 });
+
+import { sanitizeTemplate, templateFromSteps } from "@/lib/setup";
+describe("modelo padrão do projeto", () => {
+  it("valida e gera chaves únicas", () => {
+    const t = sanitizeTemplate([{ name: " Base ", steps: [{ title: "Contrato", key: "a" }, { title: "Dados", key: "a" }, { title: "" }] }, { name: "Vazia", steps: [] }, 5]);
+    expect(t).toHaveLength(1);
+    expect(t![0]!.name).toBe("Base");
+    expect(t![0]!.steps.map((s) => s.title)).toEqual(["Contrato", "Dados"]);
+    expect(new Set(t![0]!.steps.map((s) => s.key)).size).toBe(2);
+    expect(sanitizeTemplate("x")).toBeNull();
+    expect(sanitizeTemplate([])).toBeNull();
+  });
+  it("transforma o roteiro de um cliente em modelo, sem status", () => {
+    const steps = [mk({ key: "c1", title: "B", phase: "Fase 2", phaseIndex: 1, status: "done", note: "x" }), mk({ key: "custom-abc", title: "A", phase: "Fase 1", phaseIndex: 0, hint: "dica" })];
+    const t = templateFromSteps(steps);
+    expect(t.map((p) => p.name)).toEqual(["Fase 1", "Fase 2"]);
+    expect(t[0]!.steps[0]).toMatchObject({ title: "A", hint: "dica" });
+    expect(t[0]!.steps[0]!.key).toMatch(/^t-/);
+    expect(t[1]!.steps[0]!.key).toBe("c1");
+  });
+});

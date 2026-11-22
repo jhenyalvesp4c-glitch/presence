@@ -10,14 +10,15 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Meter, Ring } from "@/components/finance/charts";
 import { LiveDot } from "@/components/finance/fx";
 import { useClientSetup, useSetupActions } from "@/lib/data/client-setup";
-import { STATUS_LABEL, isFinished, progressOf, toneOfPhase, goalOfPhase, type SetupStatus, type SetupStep } from "@/lib/setup";
+import { useSetupTemplate, useSetupTemplateActions } from "@/lib/data/setup-templates";
+import { STATUS_LABEL, isFinished, progressOf, templateFromSteps, toneOfPhase, goalOfPhase, type SetupStatus, type SetupStep } from "@/lib/setup";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 const STATUS_TONE: Record<SetupStatus, string> = { todo: "muted-foreground", doing: "cyan", done: "emerald", blocked: "destructive", na: "muted-foreground" };
 
 /** Resumo na ficha do cliente. */
-export function SetupSummary({ clientId, clientName }: { clientId: string; clientName: string }) {
-  const q = useClientSetup(clientId), acts = useSetupActions(clientId), [open, setOpen] = useState(false);
+export function SetupSummary({ clientId, clientName, projectId }: { clientId: string; clientName: string; projectId: string }) {
+  const q = useClientSetup(clientId), acts = useSetupActions(clientId, projectId), tpl = useSetupTemplate(projectId), [open, setOpen] = useState(false);
   const steps = q.data ?? [], prog = useMemo(() => progressOf(steps), [steps]);
   if (q.isPending) return <p className="py-6 text-center text-sm text-muted-foreground"><Loader2 size={14} className="mr-2 inline animate-spin" />Carregando…</p>;
   if (q.isError) return <p className="py-4 text-center text-sm text-muted-foreground">Não consegui carregar a implantação agora.</p>;
@@ -25,22 +26,22 @@ export function SetupSummary({ clientId, clientName }: { clientId: string; clien
     <div className="space-y-3 rounded-2xl border border-dashed border-cyan/30 p-5 text-center" data-testid="implantacao-vazia">
       <span className="icon-tile mx-auto h-12 w-12 !rounded-2xl" style={tint("cyan")}><Rocket size={20} /></span>
       <p className="font-display text-base font-semibold">Roteiro de implantação</p>
-      <p className="text-xs text-muted-foreground">Passo a passo para colocar o sistema do cliente no ar: horário de funcionamento, assinatura do usuário, fluxo de atendimento, Kanban e mais. 7 fases, 29 passos.</p>
+      <p className="text-xs text-muted-foreground">Passo a passo para colocar o sistema do cliente no ar. {tpl.data?.custom ? "Usa o padrão que você configurou neste projeto" : "Modelo inicial"}: {tpl.data?.phases.length ?? 7} fases, {(tpl.data?.phases ?? []).reduce((a, p) => a + p.steps.length, 0)} passos.</p>
       <button onClick={() => acts.seed.mutate(undefined, { onSuccess: () => toast.success("Roteiro criado"), onError: (e) => toast.error(`Não consegui criar: ${(e as Error).message}`) })} disabled={acts.seed.isPending} data-testid="implantacao-criar" className="rounded-full bg-gradient-to-r from-cyan to-violet px-5 py-2 text-sm font-semibold text-background disabled:opacity-50">{acts.seed.isPending ? "Criando…" : "Criar roteiro de implantação"}</button>
     </div>);
   return (
     <div className="space-y-4" data-testid="implantacao-resumo">
       <div className="flex items-center gap-4"><Ring pct={prog.pct} size={84} thickness={8} color="var(--cyan)"><span className="text-sm font-semibold tabular-nums">{prog.pct}%</span></Ring>
         <div className="min-w-0 flex-1"><p className="mono-caps">Implantação</p><p className="font-display text-base font-semibold">{prog.finished} de {prog.total} passos</p>{prog.next ? <p className="truncate text-xs text-muted-foreground">Próximo: {prog.next.title}</p> : <p className="text-xs text-emerald">Tudo concluído</p>}</div></div>
-      <div className="space-y-1.5">{prog.phases.map((p) => <div key={p.id} className="flex items-center gap-2.5 text-xs"><span className="w-32 shrink-0 truncate text-muted-foreground sm:w-40">{p.name}</span><div className="min-w-0 flex-1"><Meter pct={p.pct} color={`var(--${toneOfPhase(p.name)})`} height={5} warn={false} /></div><b className="w-9 text-right tabular-nums">{p.pct}%</b>{p.blocked > 0 && <AlertTriangle size={11} className="text-destructive" />}</div>)}</div>
+      <div className="space-y-1.5">{prog.phases.map((p) => <div key={p.id} className="flex items-center gap-2.5 text-xs"><span className="w-32 shrink-0 truncate text-muted-foreground sm:w-40">{p.name}</span><div className="min-w-0 flex-1"><Meter pct={p.pct} color={`var(--${toneOfPhase(p.name, prog.phases.findIndex((x) => x.name === p.name))})`} height={5} warn={false} /></div><b className="w-9 text-right tabular-nums">{p.pct}%</b>{p.blocked > 0 && <AlertTriangle size={11} className="text-destructive" />}</div>)}</div>
       <button onClick={() => setOpen(true)} data-testid="implantacao-abrir" className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan to-violet py-2.5 text-sm font-semibold text-background shadow-[0_0_28px_-8px_var(--cyan)] transition active:scale-[0.98]"><Rocket size={15} /> Abrir modo guiado</button>
-      {open && <SetupGuide clientId={clientId} clientName={clientName} onClose={() => setOpen(false)} />}
+      {open && <SetupGuide clientId={clientId} clientName={clientName} projectId={projectId} onClose={() => setOpen(false)} />}
     </div>
   );
 }
 
-export function SetupGuide({ clientId, clientName, onClose }: { clientId: string; clientName: string; onClose: () => void }) {
-  const q = useClientSetup(clientId), acts = useSetupActions(clientId);
+export function SetupGuide({ clientId, clientName, projectId, onClose }: { clientId: string; clientName: string; projectId: string; onClose: () => void }) {
+  const q = useClientSetup(clientId), acts = useSetupActions(clientId, projectId), tplActs = useSetupTemplateActions(projectId);
   const steps = q.data ?? [], prog = useMemo(() => progressOf(steps), [steps]);
   const [selId, setSelId] = useState<string | null>(null), [phase, setPhase] = useState<string | null>(null), [draft, setDraft] = useState(""), [adding, setAdding] = useState("");
   const [titleDraft, setTitleDraft] = useState(""), [hintDraft, setHintDraft] = useState(""), [editHint, setEditHint] = useState(false), [renamingPhase, setRenamingPhase] = useState<string | null>(null), [phaseName, setPhaseName] = useState(""), [newPhase, setNewPhase] = useState<string | null>(null);
@@ -49,7 +50,8 @@ export function SetupGuide({ clientId, clientName, onClose }: { clientId: string
   const sel = steps.find((s) => s.id === selId) ?? null;
   useEffect(() => { setDraft(sel?.note ?? ""); setTitleDraft(sel?.title ?? ""); setHintDraft(sel?.hint ?? ""); setEditHint(false); }, [sel?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const err = (e: unknown) => toast.error(`Não consegui salvar: ${(e as Error).message}`);
-  const phaseSteps = steps.filter((s) => s.phase === phase), tone = toneOfPhase(phase ?? "");
+  const toneAt = (name: string) => toneOfPhase(name, prog.phases.findIndex((x) => x.name === name));
+  const phaseSteps = steps.filter((s) => s.phase === phase), tone = toneAt(phase ?? "");
   const ordered = useMemo(() => [...steps].sort((a, b) => a.phaseIndex - b.phaseIndex || a.position - b.position), [steps]);
   const goTo = (s: SetupStep | undefined) => { if (s) { setSelId(s.id); setPhase(s.phase); } };
   const nextAfter = (id: string) => { const i = ordered.findIndex((s) => s.id === id); return ordered.slice(i + 1).find((s) => !isFinished(s.status)) ?? ordered.find((s) => s.id !== id && !isFinished(s.status)); };
@@ -74,6 +76,7 @@ export function SetupGuide({ clientId, clientName, onClose }: { clientId: string
           <header className="flex flex-wrap items-center gap-4 border-b border-white/10 px-5 py-4 sm:px-7">
             <Ring pct={prog.pct} size={72} thickness={7} color={complete ? "var(--emerald)" : "var(--cyan)"}><span className="text-sm font-semibold tabular-nums">{prog.pct}%</span></Ring>
             <div className="mr-auto min-w-0"><div className="flex items-center gap-2.5"><p className="mono-caps">Missão · Implantação</p><LiveDot color={complete ? "var(--emerald)" : "var(--cyan)"} label={complete ? "concluída" : "em andamento"} /></div><DialogTitle className="truncate font-serif text-3xl leading-tight sm:text-4xl">{clientName}</DialogTitle><p className="text-xs text-muted-foreground">{prog.finished} de {prog.total} passos{prog.blocked.length > 0 && <span className="text-destructive"> · {prog.blocked.length} travado{prog.blocked.length === 1 ? "" : "s"}</span>}</p></div>
+            <button onClick={() => { if (!window.confirm("Usar o roteiro deste cliente como padrão do projeto? Os próximos clientes começam com estas fases, passos e \"como fazer\" (sem status nem anotações).")) return; tplActs.save.mutate(templateFromSteps(steps), { onSuccess: () => toast.success("Padrão do projeto salvo. Os próximos clientes já começam com ele."), onError: (e) => toast.error(`Não consegui salvar o padrão: ${(e as Error).message}`) }); }} disabled={tplActs.save.isPending || steps.length === 0} data-testid="implantacao-salvar-padrao" className="flex items-center gap-1.5 rounded-full border border-cyan/50 px-3.5 py-1.5 text-xs text-cyan transition hover:bg-cyan/10 disabled:opacity-50"><Sparkles size={12} /> Usar como padrão</button>
             <button onClick={onClose} aria-label="Fechar modo guiado" className="grid h-9 w-9 place-items-center rounded-xl border border-white/15 text-muted-foreground hover:text-foreground"><X size={16} /></button>
           </header>
 
@@ -82,7 +85,7 @@ export function SetupGuide({ clientId, clientName, onClose }: { clientId: string
               {/* trilha de fases */}
               <nav aria-label="Fases" className="border-b border-white/10 p-4 lg:overflow-y-auto lg:border-b-0 lg:border-r">
                 <ol className="relative space-y-1">
-                                    {prog.phases.map((p, i) => { const on = p.name === phase, ph = toneOfPhase(p.name); return (
+                                    {prog.phases.map((p, i) => { const on = p.name === phase, ph = toneAt(p.name); return (
                     <li key={p.id} className="relative">{i < prog.phases.length - 1 && <span aria-hidden className="absolute left-[29px] top-1/2 z-0 h-[calc(100%+4px)] w-px bg-gradient-to-b from-cyan/55 to-violet/35" />}<button onClick={() => { setPhase(p.name); goTo(steps.filter((s) => s.phase === p.name).find((s) => !isFinished(s.status)) ?? steps.find((s) => s.phase === p.name)); }} data-testid={`fase-${i}`} aria-current={on ? "true" : undefined} className={`relative z-10 flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition ${on ? "bg-[oklch(0.2_0.04_265)] shadow-[0_0_30px_-12px_var(--glow)]" : "hover:bg-[oklch(0.16_0.035_265)]"}`} style={tint(ph)}>
                       <span className="shrink-0 rounded-full bg-[oklch(0.1_0.03_265)]"><Ring pct={p.pct} size={42} thickness={4} color={`var(--${ph})`}>{p.pct === 100 ? <Check size={14} className="text-emerald" /> : <span className="text-[0.65rem] font-semibold">{i + 1}</span>}</Ring></span>
                       <span className="min-w-0 flex-1"><span className={`line-clamp-2 break-words text-sm leading-tight ${on ? "font-semibold" : ""}`}>{p.name}</span><span className="block text-[0.65rem] text-muted-foreground">{p.finished}/{p.total}{p.blocked > 0 && " · travado"}</span></span>
@@ -120,7 +123,7 @@ export function SetupGuide({ clientId, clientName, onClose }: { clientId: string
               <aside className="border-t border-white/10 p-4 sm:p-6 lg:overflow-y-auto lg:border-l lg:border-t-0" aria-label="Passo em foco" data-testid="passo-foco">
                 {sel ? (
                   <div className="space-y-4" key={sel.id} style={{ animation: "fin-rise .35s both" }}>
-                    <p className="mono-caps" style={{ color: `var(--${toneOfPhase(sel.phase)})` }}>{sel.phase}</p>
+                    <p className="mono-caps" style={{ color: `var(--${toneAt(sel.phase)})` }}>{sel.phase}</p>
                     <textarea value={titleDraft} rows={2} onChange={(e) => setTitleDraft(e.target.value.replace(/\n/g, " "))} onBlur={saveTitle} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }} aria-label="Título do passo" data-testid="passo-titulo" className="w-full resize-none rounded-lg border border-transparent bg-transparent px-1 py-0.5 font-display text-xl font-semibold leading-snug outline-none transition hover:border-white/15 focus:border-cyan/60" />
                     <div className="rounded-2xl border border-cyan/25 bg-cyan/[0.05] p-4"><div className="mb-1 flex items-center justify-between"><p className="flex items-center gap-2 text-xs font-semibold text-cyan"><Lightbulb size={13} /> Como fazer</p>{!editHint && <button onClick={() => setEditHint(true)} aria-label="Editar como fazer" data-testid="passo-editar-como" className="text-muted-foreground transition hover:text-foreground"><Pencil size={12} /></button>}</div>
                       {editHint ? <textarea autoFocus value={hintDraft} onChange={(e) => setHintDraft(e.target.value)} onBlur={saveHint} rows={4} aria-label="Como fazer" className="w-full rounded-xl border border-cyan/40 bg-black/30 p-2.5 text-sm outline-none" /> : <p className="text-sm leading-relaxed text-muted-foreground">{sel.hint || "Clique no lápis para escrever como fazer este passo."}</p>}</div>
