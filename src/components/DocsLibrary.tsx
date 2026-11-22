@@ -334,7 +334,7 @@ function Library({ projectId }: { projectId: string }) {
 
       <div className="grid gap-4 xl:grid-cols-[280px_1fr_380px]">
         {/* árvore */}
-        <aside className="glass flex flex-col rounded-3xl p-4 animate-rise">
+        <aside className="glass glass-clear flex flex-col rounded-3xl p-4 animate-rise">
           <div className="flex items-start gap-3">
             <span className="icon-tile h-11 w-11 shrink-0 !rounded-2xl shadow-[0_0_24px_-6px_var(--glow)]" style={tint("violet")}><FileText size={20} /></span>
             <div>
@@ -363,7 +363,7 @@ function Library({ projectId }: { projectId: string }) {
 
         {/* centro */}
         <section className="space-y-4">
-          <div className="glass rounded-3xl p-4 animate-rise" style={{ animationDelay: ".05s" }}>
+          <div className="glass glass-clear rounded-3xl p-4 animate-rise" style={{ animationDelay: ".05s" }}>
             <p className="mono-caps flex items-center gap-2"><Folder size={11} /> Documentação <ChevronRight size={10} /> <span className="text-foreground">{q ? "Resultados" : folder.name}</span></p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <span className="icon-tile h-12 w-12 !rounded-2xl" style={tint(folder.color)}><FolderOpen size={22} /></span>
@@ -418,7 +418,7 @@ function Library({ projectId }: { projectId: string }) {
           </div>
 
           {/* Logins */}
-          <div className="glass rounded-3xl p-4 animate-rise" style={{ animationDelay: ".1s" }}>
+          <div className="glass glass-clear rounded-3xl p-4 animate-rise" style={{ animationDelay: ".1s" }}>
             <div className="flex flex-wrap items-center gap-3">
               <span className="icon-tile h-11 w-11 !rounded-2xl" style={tint("violet")}><KeyRound size={19} /></span>
               <div className="mr-auto">
@@ -558,9 +558,9 @@ function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, onAi, urls }: { d?
   const [menu, setMenu] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [done, setDone] = useState<number[]>([]);
-  if (!d) return <aside className="glass grid place-items-center rounded-3xl p-8 text-sm text-muted-foreground">Selecione um documento</aside>;
+  if (!d) return <aside className="glass glass-clear grid place-items-center rounded-3xl p-8 text-sm text-muted-foreground">Selecione um documento</aside>;
   return (
-    <aside className="glass relative overflow-hidden rounded-3xl p-5 animate-rise xl:sticky xl:top-4 xl:self-start" style={{ animationDelay: ".15s" }}>
+    <aside className="glass glass-clear relative overflow-hidden rounded-3xl p-5 animate-rise xl:sticky xl:top-4 xl:self-start" style={{ animationDelay: ".15s" }}>
       <div className="pointer-events-none absolute -right-20 -top-20 h-60 w-60 rounded-full bg-violet/20 blur-3xl" />
       <div className="relative flex items-start gap-3">
         <span className="icon-tile h-12 w-12 shrink-0 !rounded-2xl shadow-[0_0_24px_-6px_var(--glow)]" style={tint(d.color)}>{d.login ? <KeyRound size={20} /> : <FileText size={20} />}</span>

@@ -592,6 +592,12 @@ html, body { max-width: 100%; overflow-x: clip; }
   }
   &:hover { border-color: color-mix(in oklab, var(--rail, var(--cyan)) 28%, transparent); }
 }
+/* Painel de vidro bem transparente (Documentação): deixa o fundo estrelado aparecer. */
+@utility glass-clear {
+  background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.012) 45%, rgba(255,255,255,.03)) !important;
+  border: 1px solid rgba(255,255,255,.12) !important; backdrop-filter: blur(10px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 24px 60px -36px rgba(0,0,0,.7);
+}
 /* Cartão de vidro transparente: reflexo diagonal + tom da cor do trilho (usado nos documentos). */
 @utility ex-glass {
   background: linear-gradient(135deg, color-mix(in oklab, var(--rail, var(--cyan)) 13%, transparent), rgba(255,255,255,.015) 55%, color-mix(in oklab, var(--rail, var(--cyan)) 5%, transparent)) !important;
