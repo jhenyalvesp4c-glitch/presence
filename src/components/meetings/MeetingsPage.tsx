@@ -11,11 +11,9 @@ import { demoAnalysis } from "@/lib/meetings-demo";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
 import { WhatsAppDemands } from "@/components/meetings/WhatsAppDemands";
 import { WhatsAppPicker } from "@/components/meetings/WhatsAppPicker";
-import { useMeetingActions, useMeetings, type Meeting } from "@/lib/data/meetings";
+import { useLinkTargets, useMeetingActions, useMeetings, type Meeting } from "@/lib/data/meetings";
 import { actionsToInboxText, analysisToMarkdown, type Analysis, type Mode, type Source } from "@/lib/meetings";
 import { analyzeMeeting } from "@/lib/meetings.functions";
-import { useClients, useProjectDossiers } from "@/lib/data/clients";
-import { defaultProjectId } from "@/lib/dossiers";
 import { Link2 } from "lucide-react";
 import { useLiveRecorder } from "@/lib/use-live-recorder";
 
@@ -27,17 +25,19 @@ const THINK_MEETING = ["Lendo a conversa…", "Separando os assuntos…", "Achan
 
 export function MeetingsPage() {
   const history = useMeetings(), acts = useMeetingActions();
-  const pid = defaultProjectId(), polos = useProjectDossiers(pid).data ?? [], clientes = useClients(pid).data ?? [];
-  const [link, setLink] = useState<{ dossierId: string | null; clientId: string | null }>({ dossierId: null, clientId: null });
-  const poloName = polos.find((d) => d.id === link.dossierId)?.name;
+  const targets = useLinkTargets().data, polos = targets?.dossiers ?? [], clientes = targets?.clients ?? [];
+  const [link, setLink] = useState<{ dossierId: string | null; dossierProject: string | null; clientId: string | null }>({ dossierId: null, dossierProject: null, clientId: null });
+  const poloName = polos.find((d) => d.id === link.dossierId && d.project === link.dossierProject)?.name;
+  const dupNames = new Set(polos.map((d) => d.name).filter((n, i, l) => l.indexOf(n) !== i));
   /** Escolher o polo já marca o cliente ligado a ele (e vice-versa); salva na hora se a reunião já existe. */
-  const changeLink = (next: { dossierId: string | null; clientId: string | null }, who: "polo" | "cliente") => {
-    let l = next;
-    if (who === "polo") { const c = clientes.find((x) => x.dossierId === next.dossierId); l = { dossierId: next.dossierId, clientId: next.dossierId ? (c?.id ?? null) : null }; }
-    else { const c = clientes.find((x) => x.id === next.clientId); l = { dossierId: c?.dossierId ?? link.dossierId, clientId: next.clientId }; }
+    const changeLink = (v: string, who: "polo" | "cliente") => {
+    let l = link;
+    if (who === "polo") { const [project, id] = v ? [v.slice(0, v.indexOf("|")), v.slice(v.indexOf("|") + 1)] : [null, null]; const c = id ? clientes.find((x) => x.dossierId === id && x.project === project) : undefined; l = { dossierId: id, dossierProject: project, clientId: c?.id ?? null }; }
+    else { const c = clientes.find((x) => x.id === v); l = c ? { dossierId: c.dossierId ?? link.dossierId, dossierProject: c.dossierId ? c.project : link.dossierProject, clientId: c.id } : { ...link, clientId: null }; }
     setLink(l);
     if (cur?.id && !cur.demo) acts.link.mutate({ id: cur.id, link: l }, { onSuccess: () => toast.success(l.dossierId || l.clientId ? "Reunião vinculada: aparece na página do cliente" : "Vínculo removido"), onError: (e) => toast.error(`Não consegui vincular: ${e.message}`) });
   };
+
   const [view, setView] = useState<"reunioes" | "demandas">(() => (typeof location !== "undefined" && new URLSearchParams(location.search).get("aba") === "demandas" ? "demandas" : "reunioes"));
   const [mode, setMode] = useState<Mode>("reuniao"), [src, setSrc] = useState<"texto" | "voz" | "whatsapp">("texto"), [text, setText] = useState(""), [title, setTitle] = useState(""), [me, setMe] = useState(() => ls.get("orion:reunioes:eu"));
   const [busy, setBusy] = useState(false), [a, setA] = useState<Analysis | null>(null), [cur, setCur] = useState<{ id: string | null; title: string; date: string; raw: string; source: Source; mode: Mode; demo?: boolean } | null>(null);
@@ -74,7 +74,7 @@ export function MeetingsPage() {
     } catch (e) { toast.error(`Não consegui analisar: ${(e as Error).message}`); }
     setBusy(false);
   };
-  const open = (m: Meeting) => { setLink({ dossierId: m.dossierId, clientId: m.clientId }); setA(m.analysis); setCur({ id: m.id, title: m.title, date: m.happenedOn, raw: m.raw, source: m.source, mode: m.mode }); setSelected(new Set(m.analysis.acoes.map((_, i) => i).filter((i) => !m.sent.includes(i)))); setSent(new Set(m.sent)); setInbox(null); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); };
+  const open = (m: Meeting) => { setLink({ dossierId: m.dossierId, dossierProject: m.dossierProject, clientId: m.clientId }); setA(m.analysis); setCur({ id: m.id, title: m.title, date: m.happenedOn, raw: m.raw, source: m.source, mode: m.mode }); setSelected(new Set(m.analysis.acoes.map((_, i) => i).filter((i) => !m.sent.includes(i)))); setSent(new Set(m.sent)); setInbox(null); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); };
   const showDemo = (m: Mode) => { const an = demoAnalysis(m); setMode(m); setA(an); setCur({ id: null, title: an.titulo, date: isoOf(), raw: "", source: "texto", mode: m, demo: true }); setSelected(new Set(an.acoes.map((_, i) => i))); setSent(new Set()); setInbox(null); setBurst((n) => n + 1); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
   const sendToCentral = () => {
     if (!a || !cur) return;
@@ -95,8 +95,8 @@ export function MeetingsPage() {
   const LinkBar = (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 backdrop-blur" data-testid="reuniao-vinculo">
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Link2 size={13} className={link.dossierId || link.clientId ? "text-violet" : ""} /> Vincular a</span>
-      <select value={link.dossierId ?? ""} onChange={(e) => changeLink({ dossierId: e.target.value || null, clientId: link.clientId }, "polo")} aria-label="Polo (dossiê)" data-testid="reuniao-polo" className="max-w-[11rem] rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs outline-none focus:border-violet/60"><option value="">Sem polo</option>{polos.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-      <select value={link.clientId ?? ""} onChange={(e) => changeLink({ dossierId: link.dossierId, clientId: e.target.value || null }, "cliente")} aria-label="Cliente" data-testid="reuniao-cliente" className="max-w-[11rem] rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs outline-none focus:border-violet/60"><option value="">Sem cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      <select value={link.dossierId ? `${link.dossierProject}|${link.dossierId}` : ""} onChange={(e) => changeLink(e.target.value, "polo")} aria-label="Polo (dossiê)" data-testid="reuniao-polo" className="max-w-[11rem] rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs outline-none focus:border-violet/60"><option value="">Sem polo</option>{polos.map((d) => <option key={`${d.project}|${d.id}`} value={`${d.project}|${d.id}`}>{dupNames.has(d.name) ? `${d.name} · ${d.projectName}` : d.name}</option>)}</select>
+      <select value={link.clientId ?? ""} onChange={(e) => changeLink(e.target.value, "cliente")} aria-label="Cliente" data-testid="reuniao-cliente" className="max-w-[11rem] rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs outline-none focus:border-violet/60"><option value="">Sem cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
       {(link.dossierId || link.clientId) && <span className="text-[0.68rem] text-violet">aparece na página do cliente · as demandas criadas vão para o polo</span>}
     </div>);
 
