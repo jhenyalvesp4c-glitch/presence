@@ -26,3 +26,20 @@ describe("saúde da carteira", () => {
     expect(portfolioHealth({ clients: [], setups: [], lastContact: {}, openDemands: {} }, TODAY).avgPct).toBe(0);
   });
 });
+
+import { planReplace, type SetupPhaseDef } from "@/lib/setup";
+describe("trocar roteiro antigo pelo novo", () => {
+  const tpl: SetupPhaseDef[] = [{ id: "a", name: "Fase A", tone: "cyan", goal: "", steps: [{ key: "k1", title: "Novo 1", hint: "" }, { key: "k2", title: "Novo 2", hint: "" }] }];
+  it("mantém andamento, cria o que falta e só apaga o antigo intocado", () => {
+    const p = planReplace(tpl, [
+      { id: "1", key: "k1", status: "done", note: "" },
+      { id: "2", key: "velho", status: "todo", note: "" },
+      { id: "3", key: "velho2", status: "doing", note: "" },
+      { id: "4", key: "custom-x", status: "todo", note: "" },
+      { id: "5", key: "velho3", status: "todo", note: "anotei" },
+    ]);
+    expect(p.update.map((u) => u.id)).toEqual(["1"]);
+    expect(p.insert.map((i) => i.key)).toEqual(["k2"]);
+    expect(p.remove).toEqual(["2"]);
+  });
+});

@@ -107,3 +107,19 @@ export function templateFromSteps(steps: SetupStep[]): SetupPhaseDef[] {
   for (const s of [...steps].sort((a, b) => a.phaseIndex - b.phaseIndex || a.position - b.position)) { if (!phases.has(s.phase)) { phases.set(s.phase, []); order.push(s.phase); } phases.get(s.phase)!.push(s); }
   return order.map((name, i) => ({ id: `p-${i}`, name, tone: TONES[i % TONES.length]!, goal: goalOfPhase(name), steps: phases.get(name)!.map((s) => ({ key: s.key.startsWith("custom-") ? `t-${rk()}` : s.key, title: s.title, hint: s.hint })) }));
 }
+
+export type SetupExisting = { id: string; key: string; status: SetupStatus; note: string };
+/** Troca o roteiro antigo pelo modelo atual sem perder andamento: mantém status/anotação dos passos que continuam,
+ *  cria os novos e apaga só os antigos que ninguém mexeu (a fazer, sem anotação, não criados à mão). */
+export function planReplace(template: SetupPhaseDef[], existing: SetupExisting[]) {
+  const byKey = new Map(existing.map((e) => [e.key, e])), keys = new Set<string>();
+  const update: { id: string; phase: string; phase_position: number; position: number; title: string; hint: string }[] = [];
+  const insert: { key: string; phase: string; phase_position: number; position: number; title: string; hint: string }[] = [];
+  template.forEach((ph, pi) => ph.steps.forEach((s, si) => {
+    keys.add(s.key);
+    const row = { phase: ph.name, phase_position: pi, position: si, title: s.title, hint: s.hint }, e = byKey.get(s.key);
+    if (e) update.push({ id: e.id, ...row }); else insert.push({ key: s.key, ...row });
+  }));
+  const remove = existing.filter((e) => !keys.has(e.key) && e.status === "todo" && !e.note.trim() && !e.key.startsWith("custom-")).map((e) => e.id);
+  return { update, insert, remove };
+}

@@ -1,7 +1,7 @@
 /** Roteiro de implantação do cliente (client_setup): passos com status e anotação. Só as linhas do dono. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { SETUP_TEMPLATE, missingRows, type SetupStatus, type SetupStep } from "../setup";
+import { SETUP_TEMPLATE, missingRows, planReplace, type SetupStatus, type SetupStep } from "../setup";
 import { loadSetupTemplate } from "./setup-templates";
 import { must, supabase } from "./db";
 
@@ -40,11 +40,23 @@ export async function seedSetup(clientId: string, projectId: string): Promise<nu
   return rows.length;
 }
 
-/** Aplica o roteiro padrão do projeto em todos os clientes que ainda não têm roteiro (quem já tem não é tocado). */
-export async function seedAllSetups(clientIds: string[], projectId: string): Promise<{ created: number; skipped: number; failed: number }> {
-  const out = { created: 0, skipped: 0, failed: 0 };
+/** Troca o roteiro de UM cliente pelo modelo padrão atual, preservando o andamento dos passos que continuam. */
+export async function replaceSetup(clientId: string, projectId: string): Promise<"criado" | "atualizado"> {
+  const existing = must(await supabase.from("client_setup").select("id, key, status, note").eq("client_id", clientId)) as { id: string; key: string; status: SetupStatus; note: string }[];
+  if (!existing.length) { await seedSetup(clientId, projectId); return "criado"; }
+  const template = (await loadSetupTemplate(projectId).catch(() => null)) ?? SETUP_TEMPLATE;
+  const plan = planReplace(template, existing);
+  await Promise.all(plan.update.map(async ({ id, ...v }) => { must(await supabase.from("client_setup").update({ ...v, updated_at: new Date().toISOString() }).eq("id", id).select("id")); }));
+  if (plan.insert.length) must(await supabase.from("client_setup").insert(plan.insert.map((r) => ({ ...r, client_id: clientId }))).select("id"));
+  if (plan.remove.length) must(await supabase.from("client_setup").delete().in("id", plan.remove).select("id"));
+  return "atualizado";
+}
+
+/** Aplica o roteiro padrão atual em todos os clientes: cria onde não há e atualiza onde há o antigo. */
+export async function applyDefaultToAll(clientIds: string[], projectId: string): Promise<{ created: number; updated: number; failed: number }> {
+  const out = { created: 0, updated: 0, failed: 0 };
   for (const id of clientIds) {
-    try { const n = await seedSetup(id, projectId); if (n > 0) out.created += 1; else out.skipped += 1; } catch { out.failed += 1; }
+    try { (await replaceSetup(id, projectId)) === "criado" ? (out.created += 1) : (out.updated += 1); } catch { out.failed += 1; }
   }
   return out;
 }
