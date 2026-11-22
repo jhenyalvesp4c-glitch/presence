@@ -65,8 +65,9 @@ export function analysisToMarkdown(a: Analysis, dateIso: string): string {
   return L.join("\n").trim();
 }
 /** Texto entregue à Central de entrada: o que virou ação e a próxima reunião, para ela classificar em demanda, lembrete, tarefa e compromisso. */
-export function actionsToInboxText(title: string, dateIso: string, acoes: MAction[], proxima: Analysis["proxima"]): string {
+export function actionsToInboxText(title: string, dateIso: string, acoes: MAction[], proxima: Analysis["proxima"], polo?: string): string {
   const L = [`Da reunião "${title}" de ${dm(dateIso)}. Crie demandas para o trabalho de projeto e lembretes/tarefas para o resto:`];
+  if (polo) L.push(`Todas as demandas são do polo/dossiê "${polo}": vincule cada demanda a ele.`);
   for (const x of acoes) L.push(`- ${x.tipo === "lembrete" ? "Lembrete" : x.tipo === "tarefa" ? "Tarefa" : "Demanda"} (${x.quem}): ${x.oQue}${x.prazo ? `. Prazo: ${dm(x.prazo)}` : ""}. Prioridade ${PR[x.prioridade]}.${x.contexto ? ` Contexto: ${x.contexto}` : ""}`);
   if (proxima?.data) L.push(`- Compromisso: próxima reunião em ${dm(proxima.data)}${proxima.hora ? ` às ${proxima.hora}` : ""}${proxima.assunto ? ` — ${proxima.assunto}` : ""}`);
   return L.join("\n");
