@@ -47,3 +47,9 @@ export const useLinkTargets = () => useQuery({
     };
   },
 });
+
+/** Uma reunião inteira (ata, decisões, ações, texto) para abrir dentro de outra tela, como a ficha do cliente. */
+export const useMeeting = (id: string | null) => useQuery({
+  queryKey: [...KEY, "one", id], enabled: !!id,
+  queryFn: async (): Promise<Meeting | null> => { const r = must(await supabase.from("meetings").select("id, title, source, mode, raw, analysis, created, happened_on, created_at, dossier_id, dossier_project, client_id").eq("id", id!).maybeSingle()) as Row | null; return r ? toMeeting(r) : null; },
+});

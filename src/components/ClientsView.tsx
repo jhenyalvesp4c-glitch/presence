@@ -4,6 +4,8 @@
  */
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
+import { MeetingResult } from "@/components/meetings/MeetingResult";
+import { useMeeting } from "@/lib/data/meetings";
 import { toast } from "sonner";
 import { Building2, CalendarClock, Check, ClipboardList, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
 
@@ -306,14 +308,33 @@ function DocsTab({ client, docs, acts, err }: { client: Client; docs: import("@/
   );
 }
 
+/** Reunião inteira (ata, decisões, quem faz o quê) numa janela flutuante, sem sair da ficha do cliente. */
+function MeetingViewer({ id, onClose }: { id: string; onClose: () => void }) {
+  const q = useMeeting(id), m = q.data;
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.88)] p-5 backdrop-blur-2xl sm:p-6" data-testid="reuniao-janela" aria-describedby={undefined}>
+        <DialogHeader>
+          <p className="mono-caps !text-[0.62rem]">{m ? `${dateBR(m.happenedOn)} · ${m.mode === "grupo" ? "resumo de grupos" : "reunião"}` : "Reunião"}</p>
+          <DialogTitle className="font-display text-xl font-semibold">{m?.title ?? (q.isPending ? "Carregando…" : "Reunião não encontrada")}</DialogTitle>
+        </DialogHeader>
+        {q.isPending && <div className="grid place-items-center py-10"><Loader2 className="animate-spin text-cyan" /></div>}
+        {m && <MeetingResult a={m.analysis} selected={new Set()} sent={new Set()} onToggle={() => undefined} onSelectAll={() => undefined} readOnly />}
+        {m && <Link to="/reunioes" className="block text-center text-xs text-cyan hover:underline">Editar vínculo ou criar demandas em Reuniões</Link>}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MeetingsTab({ client, meets, acts, err }: { client: Client; meets: { id: string; title: string; happenedOn: string; summary: string }[]; acts: Acts; err: (e: unknown) => void }) {
-  const free = useFreeMeetings().data ?? [], [pick, setPick] = useState("");
+  const free = useFreeMeetings().data ?? [], [pick, setPick] = useState(""), [view, setView] = useState<string | null>(null);
   return (
     <div className="space-y-2">
       {meets.length === 0 && <p className="py-3 text-center text-sm text-muted-foreground">Nenhuma reunião vinculada.</p>}
-      {meets.map((m) => <div key={m.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--violet)" } as CSSProperties}><span className="icon-tile h-9 w-9 shrink-0 !rounded-lg font-mono text-[0.6rem]" style={tint("violet")}>ATA</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{m.title}</p><p className="truncate text-xs text-muted-foreground">{dateBR(m.happenedOn)}{m.summary && ` · ${m.summary}`}</p></div><Link to="/reunioes" className="shrink-0 text-[0.7rem] text-violet hover:underline">Abrir</Link><button onClick={() => acts.linkMeeting.mutate({ meetingId: m.id, clientId: null }, { onError: err })} aria-label="Desvincular reunião" className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><X size={13} /></button></div>)}
+      {meets.map((m) => <div key={m.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--violet)" } as CSSProperties}><span className="icon-tile h-9 w-9 shrink-0 !rounded-lg font-mono text-[0.6rem]" style={tint("violet")}>ATA</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{m.title}</p><p className="truncate text-xs text-muted-foreground">{dateBR(m.happenedOn)}{m.summary && ` · ${m.summary}`}</p></div><button onClick={() => setView(m.id)} data-testid={`reuniao-abrir-${m.id}`} className="shrink-0 text-[0.7rem] text-violet hover:underline">Abrir</button><button onClick={() => acts.linkMeeting.mutate({ meetingId: m.id, clientId: null }, { onError: err })} aria-label="Desvincular reunião" className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><X size={13} /></button></div>)}
       {free.length > 0 && <div className="flex gap-2"><select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Reunião para vincular" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs"><option value="">Vincular uma reunião…</option>{free.map((m) => <option key={m.id} value={m.id}>{dateBR(m.happened_on)} · {m.title}</option>)}</select><button disabled={!pick} onClick={() => { acts.linkMeeting.mutate({ meetingId: pick, clientId: client.id }, { onSuccess: () => setPick(""), onError: err }); }} className="rounded-full border border-cyan/60 px-4 text-xs text-cyan disabled:opacity-40">Vincular</button></div>}
       <Link to="/reunioes" className="block text-center text-xs text-cyan hover:underline">Abrir Reuniões</Link>
+      {view && <MeetingViewer id={view} onClose={() => setView(null)} />}
     </div>
   );
 }

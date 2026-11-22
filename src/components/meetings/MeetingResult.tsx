@@ -19,7 +19,7 @@ function Card({ title, Icon, color = "var(--cyan)", n = 0, children, testId }: {
   );
 }
 
-export function MeetingResult({ a, selected, sent, onToggle, onSelectAll }: { a: Analysis; selected: Set<number>; sent: Set<number>; onToggle: (i: number) => void; onSelectAll: (on: boolean) => void }) {
+export function MeetingResult({ a, selected, sent, onToggle, onSelectAll, readOnly = false }: { a: Analysis; selected: Set<number>; sent: Set<number>; onToggle: (i: number) => void; onSelectAll: (on: boolean) => void; readOnly?: boolean }) {
   const people = byPerson(a.acoes), pending = a.acoes.map((_, i) => i).filter((i) => !sent.has(i));
   let n = 0;
   return (
@@ -40,12 +40,14 @@ export function MeetingResult({ a, selected, sent, onToggle, onSelectAll }: { a:
       {a.decisoes.length > 0 && <Card title="Decisões" Icon={Gavel} color="var(--violet)" n={n++} testId="decisoes"><ul className="space-y-2">{a.decisoes.map((d, i) => <li key={d} className="flex items-start gap-2.5 text-sm" style={{ animation: "fin-rise .5s both", animationDelay: `${i * 60}ms` }}><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-violet" />{d}</li>)}</ul></Card>}
 
       {a.acoes.length > 0 && <Card title="Quem faz o quê" Icon={ListChecks} color="var(--emerald)" n={n++} testId="acoes">
+        {!readOnly && <>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-muted-foreground">{a.acoes.length} ação(ões) · {selected.size} marcada(s) para virar demanda/lembrete{sent.size ? ` · ${sent.size} já enviada(s)` : ""}</span>
           <span className="flex gap-3"><button type="button" onClick={() => onSelectAll(true)} className="text-emerald underline-offset-2 hover:underline" data-testid="marcar-todas">Marcar todas</button><button type="button" onClick={() => onSelectAll(false)} className="text-muted-foreground underline-offset-2 hover:underline">Limpar</button></span></div>
+        </>}
         <div className="grid gap-3 lg:grid-cols-2">{people.map((p, pi) => (
           <article key={p.quem} className={`rounded-2xl border p-3 ${p.minha ? "border-emerald/40 bg-emerald/[0.06]" : "border-white/10 bg-black/20"}`} style={{ animation: "fin-rise .5s both", animationDelay: `${pi * 70}ms` }}>
             <header className="mb-2 flex items-center gap-2.5"><span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-cyan to-violet font-mono text-[0.7rem] font-bold text-[#04121a]">{initials(p.quem)}</span><b className="min-w-0 flex-1 truncate text-sm">{p.quem}</b>{p.minha && <span className="rounded-full bg-emerald/20 px-2 py-0.5 text-[0.6rem] uppercase tracking-wider text-emerald">você</span>}<span className="font-mono text-[0.65rem] text-muted-foreground">{p.itens.length}</span></header>
-            <ul className="space-y-1.5">{p.itens.map(({ a: x, i }) => <ActionRow key={i} x={x} on={selected.has(i)} sent={sent.has(i)} onToggle={() => onToggle(i)} />)}</ul>
+            <ul className="space-y-1.5">{p.itens.map(({ a: x, i }) => <ActionRow key={i} x={x} on={selected.has(i)} sent={sent.has(i)} onToggle={() => onToggle(i)} readOnly={readOnly} />)}</ul>
           </article>))}</div>
         {pending.length === 0 && <p className="mt-3 text-center text-xs text-emerald">Tudo já foi enviado para a Central.</p>}
       </Card>}
@@ -57,11 +59,11 @@ export function MeetingResult({ a, selected, sent, onToggle, onSelectAll }: { a:
   );
 }
 
-function ActionRow({ x, on, sent, onToggle }: { x: MAction; on: boolean; sent: boolean; onToggle: () => void }) {
+function ActionRow({ x, on, sent, onToggle, readOnly = false }: { x: MAction; on: boolean; sent: boolean; onToggle: () => void; readOnly?: boolean }) {
   const k = KIND[x.tipo], pr = PR[x.prioridade];
   return (
-    <li><button type="button" onClick={onToggle} disabled={sent} aria-pressed={on} data-testid="acao" className={`flex w-full items-start gap-2.5 rounded-xl border px-2.5 py-2 text-left transition active:scale-[0.99] ${sent ? "border-white/5 opacity-55" : on ? "border-emerald/50 bg-emerald/10 shadow-[0_0_18px_-8px_var(--emerald)]" : "border-white/10 hover:border-white/25"}`}>
-      <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border ${on || sent ? "border-emerald bg-emerald/30 text-emerald" : "border-white/25"}`}>{(on || sent) && <Check size={11} strokeWidth={3} />}</span>
+    <li><button type="button" onClick={onToggle} disabled={sent || readOnly} aria-pressed={on} data-testid="acao" className={`flex w-full items-start gap-2.5 rounded-xl border px-2.5 py-2 text-left transition active:scale-[0.99] ${readOnly ? "border-white/10 cursor-default" : sent ? "border-white/5 opacity-55" : on ? "border-emerald/50 bg-emerald/10 shadow-[0_0_18px_-8px_var(--emerald)]" : "border-white/10 hover:border-white/25"}`}>
+      {!readOnly && <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border ${on || sent ? "border-emerald bg-emerald/30 text-emerald" : "border-white/25"}`}>{(on || sent) && <Check size={11} strokeWidth={3} />}</span>}
       <span className="min-w-0 flex-1"><span className="block text-[0.82rem] leading-snug">{x.oQue}</span>
         <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[0.62rem]"><span className="inline-flex items-center gap-1" style={{ color: k.c }}><k.I size={10} />{k.l}</span>{x.prazo && <span className="text-muted-foreground">até {dm(x.prazo)}</span>}<span className="inline-flex items-center gap-1" style={{ color: pr.c }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: pr.c, boxShadow: `0 0 6px ${pr.c}` }} />{pr.l}</span>{sent && <span className="text-emerald">enviada</span>}</span></span></button></li>
   );
