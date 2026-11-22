@@ -5,12 +5,13 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Building2, CalendarClock, Check, ClipboardList, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
+import { Building2, CalendarClock, Check, ClipboardList, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, SectionTitle, Tilt } from "@/components/finance/fx";
 import { ClientsPreview } from "@/components/ClientsPreview";
+import { SetupSummary } from "@/components/SetupGuide";
 import { MAX_PENDING, readPending, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { signedUrls } from "@/lib/data/brain";
 import { useClientActions, useClientExtras, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
@@ -23,7 +24,7 @@ const ini = (n: string) => n.split(" ").filter((w) => w.length > 2).slice(0, 2).
 const cssColor = (tone: string) => `var(--${tone})`;
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-type Tab = "docs" | "reun" | "dem" | "ace" | "lin";
+type Tab = "docs" | "reun" | "dem" | "ace" | "lin" | "imp";
 const BLANK: Omit<Client, "id" | "projectId"> = { dossierId: null, name: "", segment: "", contactName: "", email: "", phone: "", docNumber: "", status: "ativo", plan: "", monthlyValue: 0, contractEnd: null, notes: "" };
 
 function StatusTag({ s }: { s: ClientStatus }) { return <span className="tag whitespace-nowrap !py-0.5 !text-[0.7rem]" style={tint(STATUS_TONE[s])}>{STATUS_LABEL[s]}</span>; }
@@ -187,7 +188,7 @@ function Ficha({ client: c, tab, setTab, onClose, onEdit, onDelete, dossierName,
   const docs = (extras?.docs ?? []).filter((d) => d.clientId === c.id), log = (extras?.log ?? []).filter((l) => l.clientId === c.id), access = (extras?.access ?? []).filter((a) => a.clientId === c.id);
   const meets = (extras?.meetings ?? []).filter((m) => m.clientId === c.id), dem = (extras?.demands ?? []).filter((d) => d.clientId === c.id);
   const [confirm, setConfirm] = useState(false), tone = colorOf(c.id);
-  const tabs: [Tab, string, typeof FileText][] = [["docs", `Documentos (${docs.length})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["ace", "Acessos", KeyRound], ["lin", "Histórico", Sparkles]];
+  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["ace", "Acessos", KeyRound], ["lin", "Histórico", Sparkles]];
   return (
     <aside className="glass space-y-4 rounded-3xl p-5 animate-rise xl:sticky xl:top-4 xl:self-start" data-testid="cliente-ficha">
       <div className="flex items-start gap-3">
@@ -202,6 +203,7 @@ function Ficha({ client: c, tab, setTab, onClose, onEdit, onDelete, dossierName,
         {c.notes && <div className="col-span-2"><dt className="mono-caps">Observações</dt><dd className="whitespace-pre-wrap text-xs text-muted-foreground">{c.notes}</dd></div>}
       </dl>
       <div role="tablist" className="flex flex-wrap gap-x-1 border-b border-white/10">{tabs.map(([k, l, I]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs transition ${tab === k ? "border-cyan text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}><I size={12} /> {l}</button>)}</div>
+      {tab === "imp" && <SetupSummary clientId={c.id} clientName={c.name} />}
       {tab === "docs" && <DocsTab client={c} docs={docs} acts={acts} err={err} />}
       {tab === "reun" && <MeetingsTab client={c} meets={meets} acts={acts} err={err} />}
       {tab === "dem" && <div className="space-y-2">{!c.dossierId ? <p className="rounded-xl border border-dashed border-white/15 p-4 text-center text-xs text-muted-foreground">Vincule um dossiê a este cliente (botão de editar) e as demandas dele aparecem aqui.</p> : dem.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma demanda neste dossiê.</p> : dem.map((d) => <button key={d.code} onClick={() => acts.setDemand.mutate({ code: d.code, status: d.status === "done" ? "todo" : "done" }, { onError: err })} className="ex-card flex w-full items-center gap-3 p-3 text-left" style={{ "--rail": "var(--emerald)" } as CSSProperties}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${d.status === "done" ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{d.status === "done" && <Check size={12} />}</span><div className="min-w-0"><p className={`truncate text-sm font-medium ${d.status === "done" ? "text-muted-foreground line-through" : ""}`}>{d.title}</p><p className="text-xs text-muted-foreground">{d.code}{d.deadline && ` · prazo ${d.deadline}`}</p></div></button>)}<Link to="/demandas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as demandas</Link></div>}

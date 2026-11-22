@@ -3,18 +3,19 @@ import type { Dossier } from "../dossiers";
 import { nextCode, type Demand } from "../demands";
 import { deadlineLabel, type Plan, type RunInput } from "../playbooks";
 import { createList } from "./checklists";
+import { seedSetup } from "./client-setup";
 import { loadDemands, loadProjectState, saveDemands, saveDossiers } from "./project-data";
 import { saveDocRow, saveFolderRow } from "./library";
 import { createTaskRow } from "./tasks";
 import { must, supabase } from "./db";
 
-export type RunResult = { dossierId: string; dossierName: string; clientId: string; folderId: string; created: { dossie: boolean; cliente: boolean; pasta: boolean; docs: number; tarefas: number; demandas: number; checklist: boolean }; reused: string[] };
+export type RunResult = { dossierId: string; dossierName: string; clientId: string; folderId: string; created: { dossie: boolean; cliente: boolean; pasta: boolean; docs: number; tarefas: number; demandas: number; checklist: boolean; implantacao: number }; reused: string[] };
 export type Progress = (label: string) => void;
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const rid = () => Math.random().toString(36).slice(2, 7);
 
 export async function runPlaybook(projectId: string, plan: Plan, input: RunInput, progress: Progress = () => undefined): Promise<RunResult> {
-  const created = { dossie: false, cliente: false, pasta: false, docs: 0, tarefas: 0, demandas: 0, checklist: false }, reused: string[] = [];
+  const created = { dossie: false, cliente: false, pasta: false, docs: 0, tarefas: 0, demandas: 0, checklist: false, implantacao: 0 }, reused: string[] = [];
 
   // 1) dossiê
   progress("Dossiê");
@@ -85,6 +86,10 @@ export async function runPlaybook(projectId: string, plan: Plan, input: RunInput
   const lists = must(await supabase.from("checklists").select("id").eq("title", plan.checklistTitle).limit(1)) as { id: string }[];
   if (lists[0]) reused.push("checklist");
   else { await createList(plan.checklistTitle, plan.checklist.map((texto) => ({ texto, grupo: "Onboarding" }))); created.checklist = true; }
+
+  // 7) roteiro de implantação (passo a passo guiado)
+  progress("Implantação");
+  created.implantacao = await seedSetup(clientId);
 
   return { dossierId: dossier.id, dossierName: dossier.name, clientId, folderId, created, reused };
 }

@@ -4,12 +4,13 @@
  */
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowUpRight, Building2, CalendarClock, Check, ClipboardList, Droplets, Dumbbell, HeartPulse, Mic, Repeat, Sparkles, Sprout, Utensils, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Building2, Rocket, CalendarClock, Check, ClipboardList, Droplets, Dumbbell, HeartPulse, Mic, Repeat, Sparkles, Sprout, Utensils, Wallet } from "lucide-react";
 
 import { Meter, Ring, useCountUp } from "@/components/finance/charts";
 import { FinBackdrop, HeroPanel, LiveDot } from "@/components/finance/fx";
 import { dayProgress, daysBetween, greeting } from "@/lib/central";
 import { useCentralContracts, useCentralDemands, useCentralDiet, useCentralMeetings, useCentralMoney } from "@/lib/data/central";
+import { useSetupSummaries } from "@/lib/data/client-setup";
 import { useFixedActions, useFixedDone, useFixedTasks } from "@/lib/data/fixed-tasks";
 import { useHabitCompletions, useHabits, useToggleHabit } from "@/lib/data/habits";
 import { useTasks, useToggleTask } from "@/lib/data/tasks";
@@ -44,7 +45,7 @@ export function CentralDoDia() {
   const tasksQ = useTasks(), toggleTask = useToggleTask();
   const fixedQ = useFixedTasks(), doneQ = useFixedDone(today, today), fixedActs = useFixedActions();
   const habitsQ = useHabits(), compQ = useHabitCompletions(), toggleHabit = useToggleHabit();
-  const splitQ = useSplit(), demandsQ = useCentralDemands(today), meetQ = useCentralMeetings(today), dietQ = useCentralDiet(today), moneyQ = useCentralMoney(today), contractsQ = useCentralContracts(today);
+  const setupQ = useSetupSummaries(), splitQ = useSplit(), demandsQ = useCentralDemands(today), meetQ = useCentralMeetings(today), dietQ = useCentralDiet(today), moneyQ = useCentralMoney(today), contractsQ = useCentralContracts(today);
 
   const tasks = tasksQ.data ?? [], overdue = tasks.filter((t) => !t.done && t.due_date && t.due_date < today), todays = tasks.filter((t) => t.due_date === today);
   const agenda = todays.filter((t) => t.due_time).sort((a, b) => (a.due_time ?? "").localeCompare(b.due_time ?? ""));
@@ -121,6 +122,10 @@ export function CentralDoDia() {
 
         <Section title="Clientes" tone="amber" icon={Building2} to="/projetos" count={(contractsQ.data ?? []).length}>
           {contractsQ.isError ? <Failed /> : (contractsQ.data ?? []).length === 0 ? <Empty>Nenhum contrato vencendo nos próximos 30 dias.</Empty> : <ul className="space-y-2">{(contractsQ.data ?? []).map((c) => { const d = daysBetween(today, c.contractEnd); return <li key={c.id}><div className="flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate">{c.name}</span><span className={`shrink-0 text-xs tabular-nums ${d < 0 ? "text-destructive" : d <= 7 ? "text-amber" : "text-muted-foreground"}`}>{d < 0 ? `venceu há ${-d} d` : d === 0 ? "vence hoje" : `em ${d} d`}</span></div><Meter pct={d < 0 ? 100 : Math.max(5, 100 - (d / 30) * 100)} color={d < 0 ? "var(--destructive)" : d <= 7 ? "var(--amber)" : "var(--cyan)"} height={4} warn={false} /></li>; })}</ul>}
+        </Section>
+
+        <Section title="Implantações" tone="cyan" icon={Rocket} to="/projetos" count={(setupQ.data ?? []).filter((x) => x.finished < x.total).length}>
+          {setupQ.isError ? <Failed /> : (setupQ.data ?? []).filter((x) => x.finished < x.total).length === 0 ? <Empty>Nenhuma implantação em andamento.</Empty> : <ul className="space-y-3">{(setupQ.data ?? []).filter((x) => x.finished < x.total).map((x) => <li key={x.clientId}><div className="flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-medium">{x.client}</span><span className="shrink-0 text-xs tabular-nums text-muted-foreground">{x.finished}/{x.total}{x.blocked > 0 && <span className="text-destructive"> · {x.blocked} travado</span>}</span></div><Meter pct={Math.round((x.finished / x.total) * 100)} color="var(--cyan)" height={4} warn={false} />{x.next && <p className="mt-1 truncate text-[0.7rem] text-muted-foreground">Próximo: {x.next}</p>}</li>)}</ul>}
         </Section>
 
         <Section title="Reuniões de hoje" tone="violet" icon={Mic} to="/reunioes" count={(meetQ.data ?? []).length}>
