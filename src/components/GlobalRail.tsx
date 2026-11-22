@@ -35,13 +35,13 @@ export function GlobalRail() {
   if (hasOwnRail(path)) return null;
   const on = (to: string) => path === to || path.startsWith(`${to}/`) || (to === "/saude" && ["/hoje", "/dieta", "/medidas", "/treino"].some((p) => path.startsWith(p)));
   return (
-    <aside data-testid="barra-lateral" className="fixed bottom-0 left-0 top-0 z-30 hidden w-16 flex-col items-center justify-center gap-1.5 pl-3 md:flex">
+    <aside data-testid="barra-lateral" className="fixed bottom-0 left-0 top-0 z-30 hidden w-16 flex-col items-center justify-center gap-[0.3rem] pb-[9.75rem] pl-3 pt-3 md:flex" style={{ "--rs": "clamp(1.65rem, calc((100svh - 10.5rem) / 15 - 0.3rem), 2.5rem)" } as CSSProperties}>
       {items.map(({ Icon, label, c, to }, i) => {
         const active = on(to);
         return (
           <div key={label} className="rail-float" style={{ animationDelay: `${(i % 5) * 0.7}s` }}>
             <Link to={to} aria-label={label} style={tint(c)}
-              className={`group relative grid h-10 w-10 place-items-center rounded-full transition duration-500 hover:-translate-y-0.5 hover:scale-[1.14] ${active ? "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)] text-[color:var(--glow)]" : "text-muted-foreground/55 hover:text-[color:var(--glow)]"}`}>
+              className={`group relative grid h-[var(--rs)] w-[var(--rs)] place-items-center rounded-full transition duration-500 hover:-translate-y-0.5 hover:scale-[1.14] ${active ? "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)] text-[color:var(--glow)]" : "text-muted-foreground/55 hover:text-[color:var(--glow)]"}`}>
               <span aria-hidden className={`rail-halo transition-opacity duration-500 ${active ? "opacity-75" : "opacity-0 group-hover:opacity-100"}`} />
               <span aria-hidden className={`rail-ring transition-opacity duration-700 ${active ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
               <Icon size={19} className="relative z-10 transition duration-500 group-hover:-rotate-6" />
