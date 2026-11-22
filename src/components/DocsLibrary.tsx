@@ -334,12 +334,12 @@ function Library({ projectId }: { projectId: string }) {
 
       <div className="relative">
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-          <span className="absolute left-[8%] top-[22%] h-[28rem] w-[28rem] rounded-full bg-[var(--violet)] opacity-[0.16] blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} />
+          <span className="absolute left-[4%] top-[18%] h-[18rem] w-[18rem] rounded-full bg-[var(--violet)] opacity-[0.12] blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} />
           <span className="absolute left-[38%] top-[30%] h-[26rem] w-[32rem] rounded-full bg-[var(--cyan)] opacity-[0.13] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} />
           <span className="absolute right-[4%] bottom-[6%] h-[24rem] w-[24rem] rounded-full bg-[var(--emerald)] opacity-[0.09] blur-3xl" style={{ animation: "fin-aurora 26s ease-in-out infinite" }} />
           <div className="absolute inset-x-[-20%] bottom-[-10%] h-[45%] opacity-40"><div className="fin-floor h-full w-full" /></div>
-          <div className="absolute inset-0 opacity-[0.35]" style={{ backgroundImage: "linear-gradient(rgba(140,200,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(140,200,255,.12) 1px, transparent 1px)", backgroundSize: "56px 56px", maskImage: "radial-gradient(ellipse at 50% 40%, black 30%, transparent 80%)", WebkitMaskImage: "radial-gradient(ellipse at 50% 40%, black 30%, transparent 80%)" }} />
-          {Array.from({ length: 40 }, (_, i) => <span key={i} className="absolute rounded-full bg-white" style={{ left: `${(i * 37) % 100}%`, top: `${(i * 53 + 11) % 100}%`, width: 1 + (i % 3), height: 1 + (i % 3), opacity: 0.55, animation: `fin-twinkle ${3 + (i % 5)}s ease-in-out ${(i % 6)}s infinite` }} />)}
+          <div className="absolute inset-0 opacity-[0.5]" style={{ backgroundImage: "linear-gradient(rgba(140,200,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(140,200,255,.12) 1px, transparent 1px)", backgroundSize: "56px 56px", maskImage: "linear-gradient(black, black)" }} />
+          {Array.from({ length: 110 }, (_, i) => <span key={i} className="absolute rounded-full bg-white" style={{ left: `${(i * 37 + (i % 7) * 11) % 100}%`, top: `${(i * 53 + 11) % 100}%`, width: 1 + (i % 3), height: 1 + (i % 3), opacity: 0.8, animation: `fin-twinkle ${3 + (i % 5)}s ease-in-out ${(i % 6)}s infinite` }} />)}
         </div>
       <div className="grid gap-4 xl:grid-cols-[280px_1fr_380px]">
         {/* árvore */}
