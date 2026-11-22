@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
 import { PortfolioHealth } from "@/components/PortfolioHealth";
 import { portfolioHealth } from "@/lib/portfolio";
-import { useSetupSummaries } from "@/lib/data/client-setup";
+import { useQueryClient } from "@tanstack/react-query";
+import { seedAllSetups, useSetupSummaries } from "@/lib/data/client-setup";
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, SectionTitle, Tilt } from "@/components/finance/fx";
 import { ClientsPreview } from "@/components/ClientsPreview";
 import { SetupSummary } from "@/components/SetupGuide";
@@ -56,6 +57,18 @@ export function ClientsView({ projectId }: { projectId: string }) {
 
   const docs = ex?.docs ?? [], demands = ex?.demands ?? [];
   const setupsQ = useSetupSummaries(), [painel, setPainel] = useState<"saude" | "receita">(() => { try { return localStorage.getItem("presence.clientes.painel") === "receita" ? "receita" : "saude"; } catch { return "saude"; } });
+  const qc = useQueryClient(), [aplicando, setAplicando] = useState(false);
+  const semRoteiro = clients.filter((c) => !(setupsQ.data ?? []).some((x) => x.clientId === c.id));
+  const aplicarRoteiro = async () => {
+    if (!semRoteiro.length) return toast.message("Todos os clientes já têm o roteiro de implantação.");
+    if (!window.confirm(`Aplicar o roteiro de implantação padrão em ${semRoteiro.length} cliente(s) que ainda não têm? Quem já tem roteiro não é alterado.`)) return;
+    setAplicando(true);
+    try {
+      const r = await seedAllSetups(semRoteiro.map((c) => c.id), projectId);
+      await Promise.all([qc.invalidateQueries({ queryKey: ["client-setup"] }), qc.invalidateQueries({ queryKey: ["central"] })]);
+      if (r.failed) toast.error(`${r.created} cliente(s) receberam o roteiro; ${r.failed} falharam. Tente de novo.`); else toast.success(`Roteiro aplicado em ${r.created} cliente(s).`);
+    } finally { setAplicando(false); }
+  };
   const trocar = (v: "saude" | "receita") => { setPainel(v); try { localStorage.setItem("presence.clientes.painel", v); } catch { /* sem armazenamento */ } };
   const sel = clients.find((c) => c.id === selId) ?? null;
   const shown = useMemo(() => { const n = norm(q.trim()); return clients.filter((c) => (filtro === "todos" || c.status === filtro) && (!n || norm([c.name, c.contactName, c.segment, c.email, ...docs.filter((d) => d.clientId === c.id).map((d) => d.title)].join(" ")).includes(n))); }, [clients, filtro, q, docs]);
@@ -137,6 +150,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
           <label className="glass flex min-w-[200px] items-center gap-2 rounded-xl px-3 py-2"><Search size={13} className="text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente, contato, documento…" aria-label="Buscar" className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground" />{q && <button onClick={() => setQ("")} aria-label="Limpar"><X size={11} /></button>}</label>
           <div className="glass flex rounded-xl p-1">{([["cards", "Cards", LayoutGrid], ["tab", "Tabela", List], ["pas", "Pastas", FolderOpen]] as const).map(([k, l, I]) => <button key={k} onClick={() => setVista(k)} aria-pressed={vista === k} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition ${vista === k ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}><I size={13} /> {l}</button>)}</div>
           <button onClick={() => setImporting(true)} data-testid="clientes-importar" className="flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-muted-foreground transition hover:border-violet/50 hover:text-foreground"><Link2 size={14} /> Importar dos dossiês</button>
+          <button onClick={aplicarRoteiro} disabled={aplicando} data-testid="clientes-aplicar-roteiro" title="Cria o roteiro de implantação padrão nos clientes que ainda não têm" className="flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-muted-foreground transition hover:border-cyan/50 hover:text-foreground disabled:opacity-60">{aplicando ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />} Aplicar roteiro padrão{semRoteiro.length > 0 && <span className="tag !py-0 !text-[0.65rem]" style={tint("cyan")}>{semRoteiro.length}</span>}</button>
           <button onClick={() => setForm({ edit: null })} data-testid="cliente-novo" className="flex items-center gap-1.5 rounded-full border border-cyan/60 px-4 py-2 text-sm text-cyan shadow-[0_0_24px_-10px_var(--cyan)] transition hover:bg-cyan/10"><Plus size={15} /> Novo cliente</button>
         </div>
 

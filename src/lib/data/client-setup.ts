@@ -40,6 +40,15 @@ export async function seedSetup(clientId: string, projectId: string): Promise<nu
   return rows.length;
 }
 
+/** Aplica o roteiro padrão do projeto em todos os clientes que ainda não têm roteiro (quem já tem não é tocado). */
+export async function seedAllSetups(clientIds: string[], projectId: string): Promise<{ created: number; skipped: number; failed: number }> {
+  const out = { created: 0, skipped: 0, failed: 0 };
+  for (const id of clientIds) {
+    try { const n = await seedSetup(id, projectId); if (n > 0) out.created += 1; else out.skipped += 1; } catch { out.failed += 1; }
+  }
+  return out;
+}
+
 export function useSetupActions(clientId: string, projectId: string) {
   const qc = useQueryClient(), refresh = () => Promise.all([qc.invalidateQueries({ queryKey: KEY }), qc.invalidateQueries({ queryKey: ["central"] })]);
   return {
