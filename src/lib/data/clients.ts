@@ -71,7 +71,7 @@ export function useClientActions(projectId: string) {
 }
 
 /** Tudo que está ligado ao DOSSIÊ do cliente (pasta da Documentação, reuniões do dossiê, demandas de vários dossiês, registros e notas). */
-export type ClientLinks = { libDocs: { id: string; title: string; kind: string; updated: string; folder: string }[]; meetings: { id: string; title: string; happenedOn: string }[]; demands: ClientDemand[]; records: { id: string; kind: "registro" | "nota"; title: string; text: string; date: string }[] };
+export type ClientLinks = { libDocs: { id: string; title: string; kind: string; updated: string; folder: string }[]; meetings: { id: string; title: string; happenedOn: string; summary: string }[]; demands: ClientDemand[]; records: { id: string; kind: "registro" | "nota"; title: string; text: string; date: string }[] };
 export function useClientLinks(projectId: string, clients: Client[]) {
   const key = clients.map((c) => `${c.id}:${c.dossierId ?? ""}`).join(",");
   return useQuery({
@@ -82,7 +82,7 @@ export function useClientLinks(projectId: string, clients: Client[]) {
       const nameById = new Map(dnames.map((d) => [d.id, d.name])), names = dnames.map((d) => d.name);
       const [folders, meets, execs, brain, notes] = await Promise.all([
         supabase.from("library_folders").select("id, name, dossier_id").in("dossier_id", dossierIds),
-        supabase.from("meetings").select("id, title, happened_on, dossier_id").eq("dossier_project", projectId).in("dossier_id", dossierIds).order("happened_on", { ascending: false }),
+        supabase.from("meetings").select("id, title, happened_on, dossier_id, analysis").eq("dossier_project", projectId).in("dossier_id", dossierIds).order("happened_on", { ascending: false }),
         names.length ? supabase.from("demand_executions").select("code, dossier_name, status").eq("project_id", projectId).in("dossier_name", names) : Promise.resolve({ data: [], error: null }),
         names.length ? supabase.from("brain_entries").select("id, title, text, entry_date, dossier_names").overlaps("dossier_names", names).order("entry_date", { ascending: false }).limit(300) : Promise.resolve({ data: [], error: null }),
         supabase.from("project_notes").select("id, text, date_label, dossier_id").eq("project_id", projectId).in("dossier_id", dossierIds).limit(300),
@@ -97,7 +97,7 @@ export function useClientLinks(projectId: string, clients: Client[]) {
         const did = c.dossierId!, dname = nameById.get(did) ?? "";
         out[c.id] = {
           libDocs: libDocs.filter((d) => folderRows.find((f) => f.id === d.folder_id)?.dossier_id === did).map((d) => ({ id: d.id, title: d.title, kind: d.kind, updated: d.updated_label, folder: folderRows.find((f) => f.id === d.folder_id)?.name ?? "" })),
-          meetings: (must(meets) as { id: string; title: string; happened_on: string; dossier_id: string }[]).filter((m) => m.dossier_id === did).map((m) => ({ id: m.id, title: m.title, happenedOn: m.happened_on })),
+          meetings: (must(meets) as { id: string; title: string; happened_on: string; dossier_id: string; analysis: { resumo?: string; summary?: string } | null }[]).filter((m) => m.dossier_id === did).map((m) => ({ id: m.id, title: m.title, happenedOn: m.happened_on, summary: m.analysis?.resumo ?? m.analysis?.summary ?? "" })),
           demands: execRows.filter((e) => e.dossier_name === dname && byCode.has(e.code)).map((e) => ({ code: e.code, title: byCode.get(e.code)!.title, status: e.status, deadline: byCode.get(e.code)!.deadline ?? "" })),
           records: [
             ...(must(brain) as { id: string; title: string; text: string; entry_date: string; dossier_names: string[] | null }[]).filter((b) => (b.dossier_names ?? []).includes(dname)).map((b) => ({ id: `b${b.id}`, kind: "registro" as const, title: b.title || b.text.slice(0, 70), text: b.text, date: b.entry_date })),
