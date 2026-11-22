@@ -5,7 +5,7 @@
  * - Sem login ou sem rede: continua funcionando com a cópia local, e avisa no indicador.
  */
 import { supabase } from "../supabase";
-import { diffRows, emptyRows, fromRows, hasData, TABLES, toRows, type Row, type RowDiff, type Rows, type TableName } from "./db-map";
+import { cleanCatDefs, diffRows, emptyRows, fromRows, hasData, TABLES, toRows, type Row, type RowDiff, type Rows, type TableName } from "./db-map";
 import { LocalFinanceRepo, type FinanceRepo } from "./repo";
 import { EMPTY_STATE, type FinanceState } from "./types";
 
@@ -18,7 +18,7 @@ const BACKUP_KEY = "presence.financeiro.v1.migrado";
 /** Grava no Supabase só o que mudou (usado pelo navegador e pela voz no servidor). */
 async function writeDiff(d: RowDiff, next: Rows): Promise<void> {
   const now = new Date().toISOString();
-  if (d.settings) { const { error } = await supabase.from("fin_settings").upsert({ onboarded: next.settings.onboarded, mock: next.settings.mock, updated_at: now }, { onConflict: "user_id" }); if (error) throw new Error(error.message); }
+  if (d.settings) { const { error } = await supabase.from("fin_settings").upsert({ onboarded: next.settings.onboarded, mock: next.settings.mock, categories: next.settings.categories, updated_at: now }, { onConflict: "user_id" }); if (error) throw new Error(error.message); }
   for (const t of TABLES) {
     for (let i = 0; i < d.upserts[t].length; i += CHUNK) {
       const rows = d.upserts[t].slice(i, i + CHUNK).map((r) => ({ ...r, updated_at: now }));
@@ -65,11 +65,11 @@ export class CloudFinanceRepo implements ObservableRepo {
   }
 
   private async fetchRows(): Promise<{ rows: Rows; hasSettings: boolean }> {
-    const [settings, ...lists] = await Promise.all([supabase.from("fin_settings").select("onboarded, mock").maybeSingle(), ...TABLES.map((t) => this.fetchAll(t))]);
+    const [settings, ...lists] = await Promise.all([supabase.from("fin_settings").select("onboarded, mock, categories").maybeSingle(), ...TABLES.map((t) => this.fetchAll(t))]);
     if (settings.error) throw new Error(settings.error.message);
     const rows = emptyRows();
     TABLES.forEach((t, i) => { rows[t] = lists[i] as Row[]; });
-    if (settings.data) rows.settings = { onboarded: !!settings.data.onboarded, mock: !!settings.data.mock };
+    if (settings.data) rows.settings = { onboarded: !!settings.data.onboarded, mock: !!settings.data.mock, categories: cleanCatDefs(settings.data.categories) };
     return { rows, hasSettings: !!settings.data };
   }
 

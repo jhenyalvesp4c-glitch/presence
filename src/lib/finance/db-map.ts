@@ -1,3 +1,4 @@
+import type { CatDef } from "./categories";
 /**
  * Tradução entre o estado do app (FinanceState) e as linhas das tabelas `fin_*` do Supabase.
  * Sem acesso a rede: só funções puras, para testar à parte. A gravação envia apenas o que mudou (`diffRows`).
@@ -8,7 +9,7 @@ import { EMPTY_STATE } from "./types";
 export const TABLES = ["fin_accounts", "fin_cards", "fin_plans", "fin_recurring", "fin_transactions", "fin_goals"] as const;
 export type TableName = (typeof TABLES)[number];
 export type Row = Record<string, unknown> & { id: string };
-export type Rows = Record<TableName, Row[]> & { settings: { onboarded: boolean; mock: boolean } };
+export type Rows = Record<TableName, Row[]> & { settings: { onboarded: boolean; mock: boolean; categories: CatDef[] } };
 
 const n = (v: unknown): number => { const x = typeof v === "number" ? v : Number(v); return Number.isFinite(x) ? x : 0; };
 const nn = (v: unknown): number | undefined => (v === null || v === undefined ? undefined : n(v));
@@ -24,9 +25,22 @@ const recurringRow = (r: Recurring): Row => ({ id: r.id, kind: r.kind, descripti
 const txRow = (t: Transaction): Row => ({ id: t.id, kind: t.kind, description: t.desc, amount: t.amount, date: t.date, method: t.method, account_id: nul(t.accountId), card_id: nul(t.cardId), category: t.category, in_limit: !!t.inLimit, shared: nul(t.shared) });
 const goalRow = (g: Goal): Row => ({ id: g.id, kind: g.kind, title: g.title, target: g.target, current_amount: g.current, deadline: nul(g.deadline), category: nul(g.category), card_id: nul(g.cardId), monthly: nul(g.monthly) });
 
+/** Ajustes de categoria vindos do banco/navegador: só campos conhecidos e do tipo certo. */
+export function cleanCatDefs(v: unknown): CatDef[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<string>();
+  return v.flatMap((x): CatDef[] => {
+    const o = x as Record<string, unknown>;
+    if (!o || typeof o["id"] !== "string" || !o["id"] || seen.has(o["id"])) return [];
+    seen.add(o["id"]);
+    const str = (k: string, max = 80) => (typeof o[k] === "string" && (o[k] as string).trim() ? { [k]: (o[k] as string).trim().slice(0, max) } : {});
+    return [{ id: o["id"].slice(0, 40), ...str("name", 40), ...str("color", 60), ...str("icon", 40), ...(Array.isArray(o["words"]) ? { words: (o["words"] as unknown[]).filter((w): w is string => typeof w === "string").map((w) => w.trim().slice(0, 40)).filter(Boolean).slice(0, 60) } : {}), ...(o["hidden"] === true ? { hidden: true } : {}), ...(o["custom"] === true ? { custom: true } : {}), ...(o["income"] === true ? { income: true } : {}) }];
+  }).slice(0, 80);
+}
+
 export function toRows(st: FinanceState): Rows {
   return {
-    settings: { onboarded: st.onboarded, mock: st.mock },
+    settings: { onboarded: st.onboarded, mock: st.mock, categories: st.categories ?? [] },
     fin_accounts: st.accounts.map(accountRow), fin_cards: st.cards.map(cardRow), fin_plans: st.plans.map(planRow),
     fin_recurring: st.recurring.map(recurringRow), fin_transactions: st.transactions.map(txRow), fin_goals: st.goals.map(goalRow),
   };
@@ -41,7 +55,7 @@ const adjustments = (v: unknown): Record<string, number> => { const out: Record<
 /** Linhas do banco → estado do app (tolerante a campos nulos e números que chegam como texto). */
 export function fromRows(r: Rows): FinanceState {
   return {
-    version: 1, onboarded: !!r.settings.onboarded, mock: !!r.settings.mock,
+    version: 1, onboarded: !!r.settings.onboarded, mock: !!r.settings.mock, categories: cleanCatDefs(r.settings.categories),
     accounts: r.fin_accounts.map((x): Account => ({ id: x.id, name: String(x["name"]), kind: x["kind"] as Account["kind"], tone: x["tone"] as Account["tone"], balanceBase: n(x["balance_base"]), baseDate: String(x["base_date"]) })),
     cards: r.fin_cards.map((x): Card => ({ id: x.id, name: String(x["name"]), brand: x["brand"] as Card["brand"], last4: String(x["last4"] ?? ""), tone: x["tone"] as Card["tone"], limit: n(x["limit_amount"]), availableBase: n(x["available_base"]), baseDate: String(x["base_date"]), closingDay: n(x["closing_day"]), dueDay: n(x["due_day"]), adjustments: adjustments(x["adjustments"]), declared: Object.keys(adjustments(x["declared"])).length ? adjustments(x["declared"]) : undefined, payAfterClose: cleanPayAfter(x["pay_after_close"]) })),
     plans: r.fin_plans.map((x): Plan => ({ id: x.id, desc: String(x["description"]), cardId: String(x["card_id"]), total: n(x["total"]), count: n(x["installments"]), per: n(x["per_amount"]), purchaseYm: String(x["purchase_ym"]), first: String(x["first_ym"]), category: String(x["category"]), paidManual: nn(x["paid_manual"]), createdAt: String(x["created_on"]), inLimit: x["in_limit"] ? true : undefined, shared: shared(x["shared"]) })),
@@ -63,7 +77,7 @@ export function diffRows(prev: Rows, next: Rows): RowDiff {
     deletes[t] = [...before.keys()].filter((id) => !after.has(id));
     if (upserts[t].length || deletes[t].length) empty = false;
   }
-  const settings = prev.settings.onboarded !== next.settings.onboarded || prev.settings.mock !== next.settings.mock;
+  const settings = prev.settings.onboarded !== next.settings.onboarded || prev.settings.mock !== next.settings.mock || JSON.stringify(prev.settings.categories) !== JSON.stringify(next.settings.categories);
   return { upserts, deletes, settings, empty: empty && !settings };
 }
 

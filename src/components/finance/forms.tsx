@@ -1,8 +1,9 @@
 import { BrandTile, brandOf, brandsFor } from "./brands";
+import { CategoryEditor } from "./CategoryEditor";
 import { useMemo, useState, type ReactNode } from "react";
-import { Banknote, Landmark, PiggyBank, Wallet } from "lucide-react";
+import { Banknote, Landmark, PiggyBank, Plus, Wallet } from "lucide-react";
 import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, fixedCoverage, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
-import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory } from "@/lib/finance/categories";
+import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory, hasCat } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
 import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Shared, Tone, Transaction, TxKind } from "@/lib/finance/types";
 import { useSettlements } from "@/lib/finance/settle-data";
@@ -23,18 +24,25 @@ export function TonePicker({ value, onChange }: { value: Tone; onChange: (t: Ton
   );
 }
 
-/** Seletor de categoria com ícones. */
+/** Seletor de categoria com ícones (e acesso ao editor de categorias). */
 export function CategoryPicker({ value, onChange, income = false }: { value: string; onChange: (id: string) => void; income?: boolean }) {
-  const list = income ? INCOME_CATS : EXPENSE_CATS;
+  const list = income ? INCOME_CATS : EXPENSE_CATS, [editor, setEditor] = useState(false);
+  const shown = list.some((c) => c.id === value) || !hasCat(value) ? list : [...list, catOf(value)];
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Categoria">
-      {list.map((c) => { const on = c.id === value; return (
-        <button key={c.id} type="button" role="radio" aria-checked={on} onClick={() => onChange(c.id)}
-          className="flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-2.5 text-[0.72rem] transition"
-          style={{ borderColor: `color-mix(in oklab, ${c.color} ${on ? 70 : 14}%, transparent)`, background: on ? `color-mix(in oklab, ${c.color} 18%, transparent)` : "transparent", color: on ? c.color : undefined, boxShadow: on ? `0 8px 24px -14px ${c.color}` : undefined }}>
-          <span style={{ color: c.color }}><CatIcon id={c.id} size={18} /></span>{c.name}
-        </button>); })}
-    </div>
+    <>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Categoria">
+        {shown.map((c) => { const on = c.id === value; return (
+          <button key={c.id} type="button" role="radio" aria-checked={on} onClick={() => onChange(c.id)}
+            className="group flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-2.5 text-[0.72rem] transition duration-300 hover:-translate-y-0.5 active:scale-95"
+            style={{ borderColor: `color-mix(in oklab, ${c.color} ${on ? 70 : 14}%, transparent)`, background: on ? `color-mix(in oklab, ${c.color} 18%, transparent)` : "transparent", color: on ? c.color : undefined, boxShadow: on ? `0 8px 24px -14px ${c.color}` : undefined }}>
+            <span style={{ color: c.color }} className="transition duration-300 group-hover:scale-110"><CatIcon id={c.id} size={18} /></span>{c.name}
+          </button>); })}
+        <button type="button" onClick={() => setEditor(true)} data-testid="fin-editar-categorias" className="flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-white/20 px-2 py-2.5 text-[0.72rem] text-muted-foreground transition duration-300 hover:-translate-y-0.5 hover:border-cyan/50 hover:text-cyan active:scale-95">
+          <Plus size={18} />Editar / criar
+        </button>
+      </div>
+      {editor && <CategoryEditor open onClose={() => setEditor(false)} income={income} />}
+    </>
   );
 }
 

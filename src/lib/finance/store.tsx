@@ -3,6 +3,8 @@ import { syncSettlementLinks } from "./settle-link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { migrateInvoiceTotals, migratePaidManual } from "./calc";
 import { makeMock } from "./mock";
+import { applyCategories, type CatDef } from "./categories";
+import { saveCategoryDefs } from "./category-edit";
 import { cloudFinanceRepo as financeRepo, type SyncStatus } from "./cloud-repo";
 import { EMPTY_STATE, type Account, type Card, type FinanceState, type Goal, type Plan, type Recurring, type Transaction } from "./types";
 
@@ -18,6 +20,8 @@ export type Finance = {
   upsertRecurring: (r: Recurring) => void; removeRecurring: (id: string) => void;
   upsertTx: (t: Transaction) => void; removeTx: (id: string) => void;
   upsertGoal: (g: Goal) => void; removeGoal: (id: string) => void;
+  /** Salva os ajustes de categoria; as apagadas levam seus lançamentos para "Outros"/"Renda extra". */
+  saveCategories: (defs: CatDef[], removed?: { id: string; income: boolean }[]) => void;
   finishOnboarding: () => void; startOnboarding: () => void; loadMock: () => void; resetAll: () => void;
 };
 
@@ -64,6 +68,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("visibilitychange", onShow);
   }, []);
 
+  // categorias da pessoa valem em todas as telas: as listas vivas são reescritas antes de qualquer filho desenhar
+  applyCategories(state.categories);
   const m = useCallback((fn: (s: FinanceState) => FinanceState) => setState((s) => fn(s)), []);
   const value = useMemo<Finance>(() => ({
     state, ready, today, sync,
@@ -80,9 +86,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     removeTx: (id) => m((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== id) })),
     upsertGoal: (g) => m((s) => ({ ...s, goals: upsert(s.goals, g) })),
     removeGoal: (id) => m((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) })),
+    saveCategories: (defs, removed) => m((s) => saveCategoryDefs(s, defs, removed)),
     finishOnboarding: () => m((s) => ({ ...s, onboarded: true })),
     startOnboarding: () => m((s) => ({ ...s, onboarded: false })),
-    loadMock: () => setState(makeMock(new Date())),
+    loadMock: () => setState((cur) => ({ ...makeMock(new Date()), categories: cur.categories })),
     resetAll: () => { void financeRepo.reset(); setState(structuredClone(EMPTY_STATE)); },
   }), [state, ready, today, sync, m]);
 

@@ -1,3 +1,4 @@
+import type { CatDef } from "./categories";
 /** Tipos do módulo financeiro. Tudo é local por enquanto; a forma dos dados já é a que irá para o Supabase. */
 export type AccountKind = "banco" | "carteira" | "dinheiro" | "investimento";
 export type CardBrand = "visa" | "mastercard" | "elo" | "amex" | "outro";
@@ -59,8 +60,10 @@ export type Goal = {
 export type FinanceState = {
   version: 1; onboarded: boolean; mock: boolean;
   accounts: Account[]; cards: Card[]; plans: Plan[]; recurring: Recurring[]; transactions: Transaction[]; goals: Goal[];
+  /** Categorias que a pessoa ajustou ou criou (valem em cartão, débito, assinaturas… tudo). Vazio = só as de fábrica. */
+  categories: CatDef[];
 };
-export const EMPTY_STATE: FinanceState = { version: 1, onboarded: false, mock: false, accounts: [], cards: [], plans: [], recurring: [], transactions: [], goals: [] };
+export const EMPTY_STATE: FinanceState = { version: 1, onboarded: false, mock: false, accounts: [], cards: [], plans: [], recurring: [], transactions: [], goals: [], categories: [] };
 
 /** Um gasto ou ganho já "materializado" para um mês (compra, parcela ou recorrente). */
 export type Entry = { id: string; kind: TxKind; desc: string; amount: number; date: string; category: string; method: Method; accountId?: string | undefined; cardId?: string | undefined; source: "tx" | "parcela" | "recorrente" | "compartilhada"; planId?: string | undefined; parcel?: string | undefined; /** compartilhada: de quem é a parte a receber. */ person?: string | undefined };

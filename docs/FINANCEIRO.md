@@ -71,3 +71,6 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 - Ferramenta `acerto` (`src/lib/voice/settle-tool.ts`): listar, ver, extrato, criar, lançar (várias linhas de um print), contas da casa, pix, editar, excluir, divisão padrão, quitar/reabrir e excluir acerto. Excluir sempre pede confirmação. Compras repetidas não duplicam.
 - Ferramenta `financeiro` ganhou `dividir` e os campos `dividir_com`/`percentual_dela` ao lançar, cadastrar parcelada/fixa e detalhar.
 - Regra do Orion: nunca adivinhar de quem é cada compra nem em qual cartão foi; pergunta só o que faltar e usa a explicação escrita junto do print.
+
+## Categorias editáveis
+A pessoa renomeia, troca cor/ícone/palavras-chave, oculta e cria categorias (botão "Editar / criar" no seletor de categoria de qualquer formulário). Os ajustes ficam em `fin_settings.categories` (jsonb; `FinanceState.categories`) e valem em cartão, débito, fixas, assinaturas, metas e filtros. Código: `src/lib/finance/categories.ts` (listas vivas `CATS`/`EXPENSE_CATS`/`INCOME_CATS` reescritas por `applyCategories` no `FinanceProvider`), `category-edit.ts` (uso e apagar → "Outros"/"Renda extra"), `src/components/finance/CategoryEditor.tsx`. "Outros" e "Renda extra" nunca somem. A voz e o MCP (servidor) ainda enxergam só as categorias de fábrica; um id desconhecido cai em "Outros".

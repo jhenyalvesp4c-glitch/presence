@@ -3,6 +3,7 @@
  * Para ligar ao Supabase depois, basta criar um `SupabaseFinanceRepo` com a mesma interface (tabelas por user_id = owner_id(),
  * como no resto do Orion) e trocar o `financeRepo` abaixo: as telas não conhecem o armazenamento.
  */
+import { cleanCatDefs } from "./db-map";
 import { EMPTY_STATE, type FinanceState } from "./types";
 
 export interface FinanceRepo {
@@ -22,6 +23,7 @@ export function normalizeState(raw: unknown): FinanceState {
     version: 1, onboarded: !!r.onboarded, mock: !!r.mock,
     accounts: arr(r.accounts), cards: arr<FinanceState["cards"][number]>(r.cards).map((c) => ({ ...c, adjustments: c.adjustments ?? {} })),
     plans: arr(r.plans), recurring: arr(r.recurring), transactions: arr(r.transactions), goals: arr(r.goals),
+    categories: cleanCatDefs(r.categories),
   };
 }
 

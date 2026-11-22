@@ -77,5 +77,5 @@ export function makeMock(today: Date = new Date()): FinanceState {
     { id: "goal-rest", kind: "limite_categoria", title: "Limite de Restaurantes", target: 600, current: 0, category: "restaurantes" },
     { id: "goal-cartao", kind: "quitar_cartao", title: "Quitar o cartão Nubank", target: 3000, current: 1200, cardId: "card-nubank", deadline: `${addMonths(ym0, 4)}-05` },
   ];
-  return { version: 1, onboarded: true, mock: true, accounts, cards, plans, recurring, transactions: txs, goals };
+  return { version: 1, onboarded: true, mock: true, accounts, cards, plans, recurring, transactions: txs, goals, categories: [] };
 }
