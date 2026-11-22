@@ -30,6 +30,8 @@ export const useSetupSummaries = () => useQuery({
 /** Cria os passos que faltam do modelo (idempotente). Usado pelo botão "Criar roteiro" e pelo playbook. */
 export async function seedSetup(clientId: string): Promise<number> {
   const have = (must(await supabase.from("client_setup").select("key").eq("client_id", clientId)) as { key: string }[]).map((r) => r.key);
+  // só cria o modelo num cliente sem roteiro: quem já tem (e editou, apagou ou acrescentou passos) não recebe de volta o que apagou
+  if (have.length) return 0;
   const rows = missingRows(SETUP_TEMPLATE, have).map((r) => ({ ...r, client_id: clientId }));
   if (rows.length) must(await supabase.from("client_setup").insert(rows).select("id"));
   return rows.length;
@@ -43,6 +45,11 @@ export function useSetupActions(clientId: string) {
     setNote: useMutation({ mutationFn: async (v: { id: string; note: string }) => { must(await supabase.from("client_setup").update({ note: v.note.slice(0, 2000), updated_at: new Date().toISOString() }).eq("id", v.id).select("id")); }, onSuccess: refresh }),
     addStep: useMutation({ mutationFn: async (v: { phase: string; phaseIndex: number; title: string; position: number }) => { must(await supabase.from("client_setup").insert({ client_id: clientId, key: `custom-${Date.now().toString(36)}`, phase: v.phase, phase_position: v.phaseIndex, position: v.position, title: v.title.trim().slice(0, 200) }).select("id")); }, onSuccess: refresh }),
     rename: useMutation({ mutationFn: async (v: { id: string; title: string }) => { must(await supabase.from("client_setup").update({ title: v.title.trim().slice(0, 200), updated_at: new Date().toISOString() }).eq("id", v.id).select("id")); }, onSuccess: refresh }),
+    setHint: useMutation({ mutationFn: async (v: { id: string; hint: string }) => { must(await supabase.from("client_setup").update({ hint: v.hint.slice(0, 1000), updated_at: new Date().toISOString() }).eq("id", v.id).select("id")); }, onSuccess: refresh }),
+    move: useMutation({ mutationFn: async (v: { a: { id: string; position: number }; b: { id: string; position: number } }) => { must(await supabase.from("client_setup").update({ position: v.b.position }).eq("id", v.a.id).select("id")); must(await supabase.from("client_setup").update({ position: v.a.position }).eq("id", v.b.id).select("id")); }, onSuccess: refresh }),
+    renamePhase: useMutation({ mutationFn: async (v: { from: string; to: string }) => { must(await supabase.from("client_setup").update({ phase: v.to.trim().slice(0, 80) }).eq("client_id", clientId).eq("phase", v.from).select("id")); }, onSuccess: refresh }),
+    removePhase: useMutation({ mutationFn: async (phase: string) => { must(await supabase.from("client_setup").delete().eq("client_id", clientId).eq("phase", phase).select("id")); }, onSuccess: refresh }),
+    addPhase: useMutation({ mutationFn: async (v: { name: string; phaseIndex: number }) => { must(await supabase.from("client_setup").insert({ client_id: clientId, key: `custom-${Date.now().toString(36)}`, phase: v.name.trim().slice(0, 80), phase_position: v.phaseIndex, position: 0, title: "Primeiro passo", hint: "Descreva aqui como fazer este passo." }).select("id")); }, onSuccess: refresh }),
     remove: useMutation({ mutationFn: async (id: string) => { must(await supabase.from("client_setup").delete().eq("id", id).select("id")); }, onSuccess: refresh }),
   };
 }
