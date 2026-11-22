@@ -40,3 +40,8 @@ export async function removeFiles(paths: string[]) {
 export async function saveFolderRow(f: FolderRow) {
   must(await supabase.from("library_folders").upsert({ user_id: ownerId(), ...f }, { onConflict: "user_id,id" }).select("id"));
 }
+
+/** Apaga a pasta do banco (os documentos dela são apagados antes, um a um, por removeDocRow). */
+export async function removeFolderRow(id: string) {
+  must(await supabase.from("library_folders").delete().eq("id", id).select("id"));
+}

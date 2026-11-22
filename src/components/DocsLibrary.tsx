@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { signedUrls, syncMirrors, type Attachment, type Mirror } from "@/lib/data/brain";
-import { loadLibraryRows, removeDocRow, removeFiles, saveDocRow, saveFolderRow, type DocRow, type FolderRow } from "@/lib/data/library";
+import { loadLibraryRows, removeDocRow, removeFiles, removeFolderRow, saveDocRow, saveFolderRow, type DocRow, type FolderRow } from "@/lib/data/library";
 import { DocEditor, type EditableDoc } from "@/components/library-doc-editor";
 import { fieldsOf } from "@/lib/library-doc-fields";
 import { toast } from "sonner";
@@ -100,6 +100,12 @@ async function copyText(v: string): Promise<boolean> {
 const newId = () => `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
 const SEED_IDS = new Set(seedFolders.flatMap(function ids(f: FolderT): string[] { return [...f.docs.map((d) => d.id), ...(f.subs ?? []).flatMap(ids)]; }));
+/** Pastas de exemplo do app que a usuária apagou: guardadas neste navegador (não existem no banco). */
+const HIDDEN_KEY = "presence.docs.hiddenFolders.v1";
+const hiddenSeeds = (): string[] => { try { const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; } };
+const hideSeedFolder = (id: string) => { try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...new Set([...hiddenSeeds(), id])])); } catch { /* sem armazenamento */ } };
+const withoutHidden = (fs: FolderT[]): FolderT[] => { const h = hiddenSeeds(); return h.length ? fs.filter((f) => !h.includes(f.id)) : fs; };
+const PROTECTED_FOLDERS = new Set(["log", "ger"]);
 const todayLabel = () => new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
 
 const docToRow = (d: Doc, folderId: string, deleted = false): DocRow => ({
@@ -161,7 +167,7 @@ export function DocsLibrary({ projectId }: { projectId: string }) {
 }
 
 function Library({ projectId }: { projectId: string }) {
-  const [folders, setFolders] = useState(seedFolders);
+  const [folders, setFolders] = useState(() => withoutHidden(seedFolders));
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [cur, setCur] = useState("tut");
   const [selId, setSelId] = useState("d1");
@@ -185,7 +191,7 @@ function Library({ projectId }: { projectId: string }) {
     if (saved) setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: saved })));
     setLoaded(true);
     loadLibraryRows().then((rows) => {
-      setFolders((fs) => applyRows(fs, rows));
+      setFolders((fs) => withoutHidden(applyRows(fs, rows)));
       setTouched(new Set(rows.docs.filter((d) => !d.deleted).map((d) => d.id)));
     }).catch((e: Error) => toast.error(`Não consegui carregar a Documentação: ${e.message}`));
     loadProjectState(projectId).then((st) => { setDossiers(st.ds.dossiers.map((d) => d.name)); setDossierList(st.ds.dossiers.map((d) => ({ id: d.id, name: d.name }))); }).catch(() => undefined);
@@ -315,6 +321,17 @@ function Library({ projectId }: { projectId: string }) {
     saveFolderRow({ id, name: newFolder.trim(), color: "cyan", position: folders.length, dossier_id: dossierId }).catch((e: Error) => toast.error(`Não consegui salvar a pasta: ${e.message}`));
     setCur(id); setNewFolder(null); setNewFolderDossier("");
   };
+  const deleteFolder = (f: FolderT) => {
+    if (PROTECTED_FOLDERS.has(f.id)) return;
+    const mine = f.docs.filter((d) => !d.login);
+    if (!window.confirm(`Apagar a pasta "${f.name}"?${mine.length ? ` Os ${mine.length} documento(s) dentro dela também serão apagados (e os arquivos anexados).` : ""} Esta ação não pode ser desfeita.`)) return;
+    mine.forEach((d) => { removeDocRow(docToRow(d, f.id), SEED_IDS.has(d.id)).catch((e: Error) => toast.error(`Não consegui excluir "${d.title}": ${e.message}`)); });
+    if (seedFolders.some((x) => x.id === f.id)) hideSeedFolder(f.id);
+    removeFolderRow(f.id).catch(() => undefined);
+    setFolders((fs) => fs.filter((x) => x.id !== f.id));
+    setCur(folders.find((x) => x.id !== f.id)?.id ?? "ger"); setQ("");
+    toast.success(`Pasta "${f.name}" apagada`);
+  };
   const linkFolder = (f: FolderT, dossierId: string | null) => {
     setFolders((fs) => mapFolders(fs, f.id, (x) => ({ ...x, dossierId })));
     saveFolderRow({ id: f.id, name: f.name, color: f.color, position: Math.max(0, folders.findIndex((x) => x.id === f.id)), dossier_id: dossierId }).then(() => toast.success(dossierId ? "Pasta vinculada ao dossiê" : "Vínculo removido")).catch((e: Error) => toast.error(`Não consegui vincular: ${e.message}`));
@@ -382,6 +399,7 @@ function Library({ projectId }: { projectId: string }) {
               </div>
               {!q && <label className="glass flex items-center gap-2 rounded-xl px-3 py-2" title="Ligue a pasta a um dossiê para ver a página dele"><Link2 size={13} className={folder.dossierId ? "text-violet" : "text-muted-foreground"} />
                 <select value={folder.dossierId ?? ""} onChange={(e) => linkFolder(folder, e.target.value || null)} aria-label="Dossiê vinculado à pasta" data-testid="pasta-vincular" className="max-w-[9.5rem] bg-transparent text-xs outline-none"><option value="">Sem dossiê</option>{dossierList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}
+              {!q && !PROTECTED_FOLDERS.has(folder.id) && <button onClick={() => deleteFolder(folder)} data-testid="pasta-apagar" title="Apagar esta pasta" aria-label="Apagar pasta" className="glass grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:text-destructive"><Trash2 size={14} /></button>}
               <label className="glass flex items-center gap-2 rounded-xl px-3 py-2">
                 <Search size={13} className="text-muted-foreground" />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar documentos…" className="w-36 bg-transparent text-xs outline-none placeholder:text-muted-foreground" />
@@ -411,9 +429,9 @@ function Library({ projectId }: { projectId: string }) {
                   <button key={d.id} onClick={() => setSelId(d.id)} style={{ ...tint(d.color), "--rail": `var(--${d.color})`, animationDelay: `${i * 0.05}s` } as CSSProperties}
                     className={`ex-card ex-glass group relative flex items-start gap-3 p-4 text-left animate-rise ${on ? "!border-[color-mix(in_oklab,var(--cyan)_60%,transparent)] shadow-[0_0_40px_-12px_var(--cyan)]" : ""}`}>
                     <span className="icon-tile h-11 w-11 shrink-0 transition group-hover:scale-110 group-hover:rotate-3">{d.login ? <KeyRound size={18} /> : <FileText size={18} />}</span>
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 overflow-hidden">
                       <span className="line-clamp-2 break-words text-sm font-semibold">{d.title}</span>
-                      <span className={`mt-1 block text-[0.72rem] leading-snug text-muted-foreground ${grid ? "line-clamp-2" : "truncate"}`}>{d.desc}</span>
+                      <span className={`mt-1 text-[0.72rem] leading-snug text-muted-foreground [overflow-wrap:anywhere] ${grid ? "line-clamp-3" : "block truncate"}`}>{d.desc}</span>
                       <span className="tag mt-2 inline-block">{d.kind}</span>
                     </span>
                     <span role="button" onClick={(e) => { e.stopPropagation(); toggleFav(d.id); }} className="transition hover:scale-125">
@@ -596,7 +614,7 @@ function DocDetail({ d, onFav, onDelete, onEditLogin, onEdit, onAi, urls }: { d?
 
       {!d.login && <DocAi folderName={d.folder} docTitle={d.title} hasSteps={!!d.steps?.length} defaultKind={d.kind} onApply={onAi} />}
       <h4 className="mt-4 font-semibold">Descrição</h4>
-      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.desc}</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{d.desc}</p>
 
       {d.login && (
         <div className="mt-4 space-y-1">
