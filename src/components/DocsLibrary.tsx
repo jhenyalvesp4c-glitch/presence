@@ -159,7 +159,7 @@ export function DocsLibrary({ projectId }: { projectId: string }) {
 
 function Library({ projectId }: { projectId: string }) {
   const [folders, setFolders] = useState(seedFolders);
-  const [open, setOpen] = useState<Record<string, boolean>>({ tut: true, log: true });
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   const [cur, setCur] = useState("tut");
   const [selId, setSelId] = useState("d1");
   const [grid, setGrid] = useState(true);
