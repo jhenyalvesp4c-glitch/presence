@@ -20,8 +20,12 @@ const STATUS_TONE: Record<SetupStatus, string> = { todo: "muted-foreground", doi
 export function SetupSummary({ clientId, clientName, projectId }: { clientId: string; clientName: string; projectId: string }) {
   const q = useClientSetup(clientId), acts = useSetupActions(clientId, projectId), tpl = useSetupTemplate(projectId), [open, setOpen] = useState(false);
   const steps = q.data ?? [], prog = useMemo(() => progressOf(steps), [steps]);
+  // cliente sem roteiro (recém-criado ou importado): já cria a partir do padrão do projeto, sem precisar clicar
+  const tried = useRef(false);
+  useEffect(() => { if (q.isSuccess && steps.length === 0 && !tried.current && !tpl.isPending) { tried.current = true; acts.seed.mutate(undefined, { onError: () => undefined }); } }, [q.isSuccess, steps.length, tpl.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
   if (q.isPending) return <p className="py-6 text-center text-sm text-muted-foreground"><Loader2 size={14} className="mr-2 inline animate-spin" />Carregando…</p>;
   if (q.isError) return <p className="py-4 text-center text-sm text-muted-foreground">Não consegui carregar a implantação agora.</p>;
+  if (steps.length === 0 && acts.seed.isPending) return <p className="py-6 text-center text-sm text-muted-foreground"><Loader2 size={14} className="mr-2 inline animate-spin" />Montando o roteiro do projeto…</p>;
   if (steps.length === 0) return (
     <div className="space-y-3 rounded-2xl border border-dashed border-cyan/30 p-5 text-center" data-testid="implantacao-vazia">
       <span className="icon-tile mx-auto h-12 w-12 !rounded-2xl" style={tint("cyan")}><Rocket size={20} /></span>
