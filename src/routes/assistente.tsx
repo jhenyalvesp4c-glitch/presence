@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ArrowRight, AudioLines, BarChart3, Bookmark, Brain, Calendar, CalendarCheck, ClipboardList, Dumbbell, Heart, Home,
   Layers, Lightbulb, ListChecks, Mic, Puzzle, Settings, Sparkles, Sun, Sprout, SquarePlus, Wallet, CreditCard,
-  Sunrise, Workflow, X,
+  GraduationCap, Sunrise, Workflow, X,
 } from "lucide-react";
 import { LivingOrb } from "@/components/LivingOrb";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
@@ -137,6 +137,16 @@ function Assistente() {
                   <Sunrise size={18} className="relative transition duration-300 group-hover:rotate-12 group-hover:scale-110" /> <span className="relative">Central do dia</span>
                   <ArrowRight size={16} className="relative transition group-hover:translate-x-1" />
                 </Link>
+                <Link to="/cursos" data-testid="abrir-cursos" className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-cyan/40 bg-cyan/10 px-6 py-3 text-sm text-cyan shadow-[0_0_28px_-10px_var(--cyan)] backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-cyan/20 hover:shadow-[0_0_34px_-8px_var(--cyan)] active:scale-95">
+                  <span aria-hidden className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition duration-700 group-hover:translate-x-full" />
+                  <GraduationCap size={18} className="relative transition duration-300 group-hover:-rotate-12 group-hover:scale-110" /> <span className="relative">Cursos</span>
+                  <ArrowRight size={16} className="relative transition group-hover:translate-x-1" />
+                </Link>
+                <Link to="/ideias" data-testid="abrir-ideias" className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-violet/40 bg-violet/10 px-6 py-3 text-sm text-violet shadow-[0_0_28px_-10px_var(--violet)] backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-violet/20 hover:shadow-[0_0_34px_-8px_var(--violet)] active:scale-95">
+                  <span aria-hidden className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition duration-700 group-hover:translate-x-full" />
+                  <Lightbulb size={18} className="relative transition duration-300 group-hover:rotate-12 group-hover:scale-110" /> <span className="relative">Ideias</span>
+                  <ArrowRight size={16} className="relative transition group-hover:translate-x-1" />
+                </Link>
               </div>
             </div>
 
@@ -152,6 +162,8 @@ function Assistente() {
 
             <div className="mx-auto flex w-full max-w-xs animate-rise flex-col items-stretch gap-3 max-sm:-mx-[3%] max-sm:w-[calc(100%+6%)] max-sm:max-w-none max-sm:snap-x max-sm:flex-row max-sm:gap-2 max-sm:overflow-x-auto max-sm:px-[3%] max-sm:pb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-36 lg:w-40 sm:max-w-none sm:justify-self-start">
               <Link to="/central" className="flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-amber/40 bg-amber/10 px-4 py-2.5 text-[0.82rem] text-amber sm:hidden"><Sunrise size={16} /> Central do dia</Link>
+              <Link to="/cursos" className="flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-cyan/40 bg-cyan/10 px-4 py-2.5 text-[0.82rem] text-cyan sm:hidden"><GraduationCap size={16} /> Cursos</Link>
+              <Link to="/ideias" className="flex shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-violet/40 bg-violet/10 px-4 py-2.5 text-[0.82rem] text-violet sm:hidden"><Lightbulb size={16} /> Ideias</Link>
               {quick.map(({ Icon, label, c }, i) => {
                 const cls = "glass flex items-center justify-center gap-2.5 rounded-2xl px-3.5 py-3 text-left max-sm:shrink-0 max-sm:snap-start max-sm:rounded-full max-sm:py-2.5 text-[0.82rem] text-muted-foreground transition hover:text-foreground hover:shadow-[0_0_28px_-8px_var(--glow)] sm:justify-start sm:[&:nth-child(2)]:translate-x-5";
                 const st = { ...tint(c), animationDelay: `${0.3 + i * 0.1}s` };

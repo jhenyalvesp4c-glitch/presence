@@ -28,7 +28,7 @@ const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 export function GlobalRail() {
   const path = useShownPath(), badges = useNavBadges();
   if (hasOwnRail(path)) return null;
-  const on = (to: string) => (to === "/projetos" && ["/cursos", "/ideias", "/reunioes"].some((p) => path.startsWith(p))) || path === to || path.startsWith(`${to}/`) || (to === "/saude" && ["/hoje", "/dieta", "/medidas", "/treino"].some((p) => path.startsWith(p)));
+  const on = (to: string) => (to === "/projetos" && path.startsWith("/reunioes")) || (to === "/assistente" && ["/cursos", "/ideias", "/central"].some((p) => path.startsWith(p))) || path === to || path.startsWith(`${to}/`) || (to === "/saude" && ["/hoje", "/dieta", "/medidas", "/treino"].some((p) => path.startsWith(p)));
   return (
     <aside data-testid="barra-lateral" className="fixed bottom-0 left-0 top-0 z-30 hidden w-16 flex-col items-center justify-center gap-[0.3rem] pb-[9.75rem] pl-3 pt-3 md:flex" style={{ "--rs": "clamp(1.65rem, calc((100svh - 10.5rem) / 11 - 0.3rem), 2.5rem)" } as CSSProperties}>
       {items.map(({ Icon, label, c, to }, i) => {

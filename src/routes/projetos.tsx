@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { backdropProps } from "@/lib/backdrop";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, CalendarClock, FolderKanban, GraduationCap, Lightbulb, Pencil, Pin, Plus, Sparkles, Trash2, Target, X, Zap } from "lucide-react";
+import { ArrowUpRight, CalendarClock, FolderKanban, Pencil, Plus, Sparkles, Trash2, Target, X, Zap } from "lucide-react";
 import { PlanShell, Panel, colorVar, tint } from "@/components/PlanShell";
 import type { Project } from "@/lib/projects";
 import { loadProjects, saveProjects } from "@/lib/data/project-data";
@@ -150,32 +150,6 @@ function ProjetosPage() {
           <button key={f} onClick={() => setFilter(f)} className={`tag !px-4 !py-1.5 transition ${filter === f ? "shadow-[0_0_16px_-4px_var(--glow)]" : "opacity-60 hover:opacity-100"}`} style={tint(filter === f ? "cyan" : "violet")}>{f}</button>
         ))}
       </div>
-
-      <section aria-label="Projetos fixos" data-testid="projetos-fixos">
-        <p className="mono-caps mb-3 flex items-center gap-2"><Pin size={12} className="text-cyan" /> Projetos fixos</p>
-        <div className="grid gap-5 sm:grid-cols-2">
-          {([
-            { to: "/cursos", Icon: GraduationCap, name: "Cursos", desc: "Meta Academy: trilhas, aulas, simulado, flashcards e laboratório.", c: "cyan", tags: ["Trilhas", "Simulado", "Flashcards"] },
-            { to: "/ideias", Icon: Lightbulb, name: "Ideias", desc: "Seu banco de ideias: capture, organize e transforme em projeto.", c: "violet", tags: ["Capturar", "Organizar", "Priorizar"] },
-          ] as const).map(({ to, Icon, name, desc, c, tags }, i) => (
-            <Link key={to} to={to} data-testid={`fixo-${name.toLowerCase()}`} className="ex-card ex-glass group block p-5 transition duration-300 hover:-translate-y-1 active:scale-[0.99] animate-rise" style={{ ["--rail" as string]: colorVar(c), ["--glow" as string]: colorVar(c), animationDelay: `${i * 0.08}s` }}>
-              <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-30 blur-3xl transition group-hover:opacity-60" style={{ background: colorVar(c) }} />
-              <div className="relative flex items-start gap-4">
-                <span className="relative grid h-14 w-14 shrink-0 place-items-center">
-                  <span aria-hidden className="absolute inset-0 rounded-2xl border" style={{ borderColor: colorVar(c), animation: "pulse-ring 2.8s ease-out infinite" }} />
-                  <span className="icon-tile h-14 w-14 !rounded-2xl shadow-[0_0_28px_-6px_var(--glow)] transition duration-300 group-hover:rotate-3 group-hover:scale-110"><Icon size={24} /></span>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><h3 className="font-display text-xl font-semibold">{name}</h3><span className="tag !py-0 !text-[0.6rem]" style={tint(c)}>Fixo</span></div>
-                  <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((t) => <span key={t} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-[0.68rem] text-muted-foreground">{t}</span>)}</div>
-                </div>
-                <ArrowUpRight size={18} className="shrink-0 text-muted-foreground transition duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
 
       {!ready && <p className="text-sm text-muted-foreground" data-testid="carregando">Carregando seus projetos…</p>}
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
