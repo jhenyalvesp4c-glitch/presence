@@ -5,6 +5,7 @@ import { brl, dateBR, isPaused, isSubscription, monthLabel, nextCharge, pauseNot
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Recurring, Tone } from "@/lib/finance/types";
+import { BrandTile, brandOf } from "./brands";
 import { Donut, Money } from "./charts";
 import { RecurringForm } from "./forms";
 import { HeroPanel, SectionTitle, Tilt } from "./fx";
@@ -17,16 +18,16 @@ const initials = (name: string) => name.replace(/[^\p{L}\p{N} ]/gu, "").split(/\
 
 function SubCard({ r, index, onToggle, onEdit, onDelete }: { r: Recurring; index: number; onToggle: (r: Recurring) => void; onEdit: (r: Recurring) => void; onDelete: (r: Recurring) => void }) {
   const { state, today } = useFinance(), paused = isPaused(r), t = TONES[toneOf(r.desc)];
-  const card = state.cards.find((c) => c.id === r.cardId), acc = state.accounts.find((a) => a.id === r.accountId);
+  const brand = brandOf(r.desc), glow = brand?.glow ?? t.glow, card = state.cards.find((c) => c.id === r.cardId), acc = state.accounts.find((a) => a.id === r.accountId);
   const next = paused ? null : nextCharge(r, today), since = pausedSince(r), future = since && since > ymOf(today);
   return (
     <Tilt max={7} style={{ animation: `fin-pop .5s ${Math.min(index, 8) * 0.06}s both` }}>
-      <article className={`glass group relative h-full overflow-hidden rounded-[1.6rem] p-5 transition duration-500 ${paused ? "opacity-80" : ""}`} style={{ boxShadow: paused ? undefined : `inset 0 1px 0 oklch(1 0 0 / 6%), 0 22px 50px -34px ${t.glow}` }} data-testid="fin-assinatura">
-        <span aria-hidden className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full blur-3xl transition-opacity duration-500" style={{ background: t.glow, opacity: paused ? 0.06 : 0.25 }} />
-        {!paused && <span aria-hidden className="pointer-events-none absolute inset-x-6 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${t.glow}, transparent)` }} />}
+      <article className={`glass group relative h-full overflow-hidden rounded-[1.6rem] p-5 transition duration-500 ${paused ? "opacity-80" : ""}`} style={{ boxShadow: paused ? undefined : `inset 0 1px 0 oklch(1 0 0 / 6%), 0 22px 50px -34px ${glow}` }} data-testid="fin-assinatura">
+        <span aria-hidden className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full blur-3xl transition-opacity duration-500" style={{ background: glow, opacity: paused ? 0.06 : 0.25 }} />
+        {!paused && <span aria-hidden className="pointer-events-none absolute inset-x-6 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${glow}, transparent)` }} />}
         <div className="relative flex items-start gap-4">
-          <span className={`relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl font-display text-lg font-bold text-white transition ${paused ? "grayscale" : ""}`} style={{ background: t.bg, boxShadow: paused ? undefined : `0 10px 28px -10px ${t.glow}` }}>
-            {initials(r.desc)}
+          <span className="relative shrink-0">
+            {brand ? <BrandTile brand={brand} size={56} paused={paused} className="group-hover:scale-105 group-hover:-rotate-3" /> : <span className={`grid h-14 w-14 place-items-center rounded-2xl font-display text-lg font-bold text-white transition ${paused ? "grayscale" : ""}`} style={{ background: t.bg, boxShadow: paused ? undefined : `0 10px 28px -10px ${glow}` }}>{initials(r.desc)}</span>}
             {!paused && <span aria-hidden className="absolute -right-1 -top-1 grid h-3.5 w-3.5 place-items-center"><span className="absolute h-3.5 w-3.5 rounded-full bg-emerald" style={{ animation: "fin-pulse 2s ease-out infinite" }} /><span className="h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald" /></span>}
           </span>
           <div className="min-w-0 flex-1">
