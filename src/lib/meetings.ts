@@ -4,9 +4,16 @@ export type ActionKind = "demanda" | "lembrete" | "tarefa";
 export type MAction = { quem: string; oQue: string; prazo: string | null; prioridade: Priority; tipo: ActionKind; contexto: string; minha: boolean };
 export type Topic = { assunto: string; pontos: string[] };
 export type GroupSummary = { nome: string; resumo: string; destaques: string[]; pedidos: string[] };
+/** Tipo da gravação: muda o que o Orion procura (entrevista: salário, benefícios, vaga; treinamento: o que ficou de enviar…). */
+export type MeetingKind = "reuniao" | "entrevista" | "treinamento" | "livre";
+export const KIND_LABEL: Record<MeetingKind, string> = { reuniao: "Reunião", entrevista: "Entrevista", treinamento: "Treinamento", livre: "Livre" };
+/** Fato exato dito na conversa (valor, data, cargo, regra…). `confirmar` = ficou ambíguo ou foi corrigido: vale conferir. */
+export type Fact = { rotulo: string; valor: string; confirmar: boolean };
+export type Section = { titulo: string; itens: string[] };
 export type Analysis = {
   titulo: string; resumo: string; topicos: Topic[]; decisoes: string[]; acoes: MAction[]; pendencias: string[]; participantes: string[];
   proxima: { data: string | null; hora: string | null; assunto: string } | null; grupos: GroupSummary[];
+  tipo: MeetingKind; fatos: Fact[]; secoes: Section[]; expectativas: string[]; lembrar: string[]; perguntas: string[];
 };
 export type Mode = "reuniao" | "grupo";
 export type Source = "texto" | "voz" | "whatsapp";
@@ -25,12 +32,15 @@ export function cleanAnalysis(raw: unknown): Analysis | null {
     const tipo = x["tipo"] === "lembrete" || x["tipo"] === "tarefa" ? (x["tipo"] as ActionKind) : "demanda", pr = x["prioridade"];
     return [{ quem: str(x["quem"], 80) || "A definir", oQue, prazo: date(x["prazo"]), prioridade: pr === "alta" || pr === "baixa" ? pr : "media", tipo, contexto: str(x["contexto"], 300), minha: x["minha"] === true }];
   }).slice(0, 60);
-  const topicos = (Array.isArray(o["topicos"]) ? (o["topicos"] as unknown[]) : []).flatMap((t): Topic[] => { const x = t as Record<string, unknown> | null, a = str(x?.["assunto"], 160); return x && a ? [{ assunto: a, pontos: strs(x["pontos"], 12) }] : []; }).slice(0, 20);
+  const topicos = (Array.isArray(o["topicos"]) ? (o["topicos"] as unknown[]) : []).flatMap((t): Topic[] => { const x = t as Record<string, unknown> | null, a = str(x?.["assunto"], 160); return x && a ? [{ assunto: a, pontos: strs(x["pontos"], 30, 500) }] : []; }).slice(0, 30);
   const grupos = (Array.isArray(o["grupos"]) ? (o["grupos"] as unknown[]) : []).flatMap((g): GroupSummary[] => { const x = g as Record<string, unknown> | null, n = str(x?.["nome"], 120); return x && n ? [{ nome: n, resumo: str(x["resumo"], 1200), destaques: strs(x["destaques"], 10), pedidos: strs(x["pedidos"], 12) }] : []; }).slice(0, 12);
   const p = o["proxima"] as Record<string, unknown> | null | undefined;
   const proxima = p && typeof p === "object" && (date(p["data"]) || str(p["assunto"], 200)) ? { data: date(p["data"]), hora: time(p["hora"]), assunto: str(p["assunto"], 200) } : null;
-  const a: Analysis = { titulo: str(o["titulo"], 160) || "Reunião", resumo: str(o["resumo"], 3000), topicos, decisoes: strs(o["decisoes"], 30), acoes, pendencias: strs(o["pendencias"], 20), participantes: strs(o["participantes"], 40, 80), proxima, grupos };
-  return a.resumo || a.acoes.length || a.topicos.length || a.decisoes.length || a.grupos.length ? a : null;
+  const fatos = (Array.isArray(o["fatos"]) ? (o["fatos"] as unknown[]) : []).flatMap((f): Fact[] => { const x = f as Record<string, unknown> | null, r = str(x?.["rotulo"], 80), v = str(x?.["valor"], 400); return x && r && v ? [{ rotulo: r, valor: v, confirmar: x["confirmar"] === true }] : []; }).slice(0, 120);
+  const secoes = (Array.isArray(o["secoes"]) ? (o["secoes"] as unknown[]) : []).flatMap((c): Section[] => { const x = c as Record<string, unknown> | null, t = str(x?.["titulo"], 100), itens = strs(x?.["itens"], 40, 600); return x && t && itens.length ? [{ titulo: t, itens }] : []; }).slice(0, 14);
+  const tipo: MeetingKind = o["tipo"] === "entrevista" || o["tipo"] === "treinamento" || o["tipo"] === "livre" ? o["tipo"] : "reuniao";
+  const a: Analysis = { titulo: str(o["titulo"], 160) || "Reunião", resumo: str(o["resumo"], 8000), topicos, decisoes: strs(o["decisoes"], 40, 600), acoes, pendencias: strs(o["pendencias"], 30, 600), participantes: strs(o["participantes"], 40, 80), proxima, grupos, tipo, fatos, secoes, expectativas: strs(o["expectativas"], 40, 600), lembrar: strs(o["lembrar"], 40, 600), perguntas: strs(o["perguntas"], 30, 600) };
+  return a.resumo || a.acoes.length || a.topicos.length || a.decisoes.length || a.grupos.length || a.fatos.length || a.secoes.length ? a : null;
 }
 
 /* ───────────── WhatsApp → texto ───────────── */
@@ -56,11 +66,16 @@ const PR: Record<Priority, string> = { alta: "alta", media: "normal", baixa: "ba
 export function analysisToMarkdown(a: Analysis, dateIso: string): string {
   const L: string[] = [`# ${a.titulo}`, `_${dm(dateIso)}_${a.participantes.length ? ` · Participantes: ${a.participantes.join(", ")}` : ""}`, ""];
   if (a.resumo) L.push("## Resumo", a.resumo, "");
+  if (a.fatos.length) L.push("## Fatos e números", ...a.fatos.map((f) => `- **${f.rotulo}:** ${f.valor}${f.confirmar ? " _(confirmar)_" : ""}`), "");
+  for (const sc of a.secoes) L.push(`## ${sc.titulo}`, ...sc.itens.map((i) => `- ${i}`), "");
+  if (a.expectativas.length) L.push("## O que esperam de você", ...a.expectativas.map((i) => `- ${i}`), "");
+  if (a.lembrar.length) L.push("## Para não esquecer", ...a.lembrar.map((i) => `- ${i}`), "");
   for (const t of a.topicos) L.push(`### ${t.assunto}`, ...t.pontos.map((p) => `- ${p}`), "");
   for (const g of a.grupos) L.push(`## Grupo: ${g.nome}`, g.resumo, ...g.destaques.map((d) => `- ${d}`), ...(g.pedidos.length ? ["", "Pedidos:", ...g.pedidos.map((p) => `- ${p}`)] : []), "");
   if (a.decisoes.length) L.push("## Decisões", ...a.decisoes.map((d) => `- ${d}`), "");
   if (a.acoes.length) { L.push("## Quem faz o quê"); for (const x of a.acoes) L.push(`- **${x.quem}**: ${x.oQue}${x.prazo ? ` (até ${dm(x.prazo)})` : ""} — prioridade ${PR[x.prioridade]}`); L.push(""); }
   if (a.pendencias.length) L.push("## Pendências em aberto", ...a.pendencias.map((d) => `- ${d}`), "");
+  if (a.perguntas.length) L.push("## Perguntas sem resposta", ...a.perguntas.map((d) => `- ${d}`), "");
   if (a.proxima) L.push("## Próxima reunião", `${a.proxima.data ? dm(a.proxima.data) : "A definir"}${a.proxima.hora ? ` às ${a.proxima.hora}` : ""}${a.proxima.assunto ? ` — ${a.proxima.assunto}` : ""}`, "");
   return L.join("\n").trim();
 }
