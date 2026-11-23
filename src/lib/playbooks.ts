@@ -73,3 +73,34 @@ export function sanitizeSteps(raw: unknown, fallback: PlaybookStep[]): PlaybookS
   return out.length || (Array.isArray(raw) && raw.length === 0) ? out : fallback;
 }
 export const stepsKey = (playbookId: string) => `orion.playbook.${playbookId}.steps.v1`;
+
+
+/* ───────────── playbooks da pessoa (editar, excluir, criar) ───────────── */
+export type PlaybookRow = { id: string; name: string; tagline: string; tone: string; docs: unknown; checklist: unknown; steps: unknown; deleted: boolean; position: number };
+const TONES: Playbook["tone"][] = ["cyan", "violet", "emerald", "amber"];
+
+export function sanitizeDocs(raw: unknown): StarterDoc[] {
+  if (!Array.isArray(raw)) return [];
+  const strs = (v: unknown, n: number) => (Array.isArray(v) ? v.map((x) => String(x ?? "").trim().slice(0, 300)).filter(Boolean).slice(0, n) : []);
+  return (raw as Record<string, unknown>[]).flatMap((d): StarterDoc[] => {
+    const title = typeof d?.["title"] === "string" ? d["title"].trim().slice(0, 200) : "";
+    if (!title) return [];
+    const rules = strs(d["rules"], 12), steps = strs(d["steps"], 20);
+    return [{ kind: String(d["kind"] ?? "Documento").trim().slice(0, 40) || "Documento", title, desc: String(d["desc"] ?? "").trim().slice(0, 600), ...(rules.length ? { rules } : {}), ...(steps.length ? { steps } : {}) }];
+  }).slice(0, 20);
+}
+const sanitizeLines = (raw: unknown) => (Array.isArray(raw) ? raw.map((x) => String(x ?? "").trim().slice(0, 200)).filter(Boolean).slice(0, 40) : []);
+
+/** O que a pessoa vê: os modelos do Orion (menos os excluídos, com as edições dela por cima) e os playbooks que ela criou. */
+export function mergePlaybooks(builtins: Playbook[], rows: PlaybookRow[]): Playbook[] {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const fromRow = (r: PlaybookRow, base?: Playbook): Playbook => ({
+    id: r.id, name: r.name, tagline: r.tagline, tone: TONES.includes(r.tone as Playbook["tone"]) ? (r.tone as Playbook["tone"]) : (base?.tone ?? "cyan"),
+    docs: sanitizeDocs(r.docs), checklist: sanitizeLines(r.checklist), steps: sanitizeSteps(r.steps, base?.steps ?? []),
+  });
+  const out: { p: Playbook; pos: number }[] = [];
+  builtins.forEach((b, i) => { const r = byId.get(b.id); if (r?.deleted) return; out.push({ p: r ? fromRow(r, b) : b, pos: r ? r.position : i - 1000 }); });
+  for (const r of rows) if (!r.deleted && !builtins.some((b) => b.id === r.id)) out.push({ p: fromRow(r), pos: r.position });
+  return out.sort((a, b) => a.pos - b.pos).map((x) => x.p);
+}
+export const newPlaybookId = (name: string) => `${slugOf(name).slice(0, 40)}-${Math.random().toString(36).slice(2, 6)}`;

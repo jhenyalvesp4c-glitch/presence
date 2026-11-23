@@ -8,9 +8,11 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FinBackdrop, HeroPanel, OrbitArt, SectionTitle, Tilt } from "@/components/finance/fx";
 import { todayBR, dateBR } from "@/lib/clients";
 import { addDays } from "@/lib/central";
-import { PLAYBOOKS, buildPlan, sanitizeSteps, stepsKey, summarizePlan, type Playbook, type PlaybookStep, type RunInput, type StepKind } from "@/lib/playbooks";
+import { buildPlan, sanitizeSteps, stepsKey, summarizePlan, type Playbook, type PlaybookStep, type RunInput, type StepKind } from "@/lib/playbooks";
 import { runPlaybook, type RunResult } from "@/lib/data/playbooks";
 import { SetupTemplateEditor } from "@/components/SetupTemplateEditor";
+import { PlaybookEditor } from "@/components/PlaybookEditor";
+import { usePlaybooks } from "@/lib/data/user-playbooks";
 import { useSetupTemplate } from "@/lib/data/setup-templates";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -18,6 +20,7 @@ const BLANK: RunInput = { clientName: "", contactName: "", email: "", phone: "",
 
 export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { projectId: string; onOpenClients: () => void; onOpenLibrary: () => void }) {
   const [run, setRun] = useState<Playbook | null>(null), [editTpl, setEditTpl] = useState(false), tpl = useSetupTemplate(projectId);
+  const pbs = usePlaybooks().data ?? [], [edit, setEdit] = useState<Playbook | "novo" | null>(null);
   const nPh = tpl.data?.phases.length ?? 7, nSt = (tpl.data?.phases ?? []).reduce((a, p) => a + p.steps.length, 0) || 29;
   return (
     <div className="relative space-y-5" data-testid="playbooks"><FinBackdrop />
@@ -28,13 +31,16 @@ export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { pro
         </div>
       </HeroPanel>
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {PLAYBOOKS.map((p) => { const sum = summarizePlan(buildPlan(p, { ...BLANK, clientName: "x" })); return (
+        {pbs.map((p) => { const sum = summarizePlan(buildPlan(p, { ...BLANK, clientName: "x" })); return (
           <Tilt key={p.id} max={8}>
+            <div className="relative">
+              <button type="button" onClick={() => setEdit(p)} aria-label={`Editar ${p.name}`} data-testid={`playbook-editar-${p.id}`} className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full border border-white/15 bg-background/70 text-muted-foreground backdrop-blur transition hover:scale-110 hover:border-violet/50 hover:text-violet active:scale-95"><Pencil size={14} /></button>
             <button onClick={() => setRun(p)} data-testid={`playbook-${p.id}`} className="ex-card block w-full p-5 text-left" style={{ "--rail": `var(--${p.tone})` } as CSSProperties}>
               <div className="flex items-start gap-4"><span className="icon-tile h-14 w-14 shrink-0 !rounded-2xl shadow-[0_0_28px_-6px_var(--glow)]" style={tint(p.tone)}><Rocket size={24} /></span><div className="min-w-0"><p className="mono-caps">Processo</p><h3 className="font-display text-xl font-semibold">{p.name}</h3><p className="mt-1 text-xs text-muted-foreground">{p.tagline}</p></div></div>
               <div className="mt-4 grid grid-cols-4 gap-2 text-center">{[["Tarefas", sum.tarefas, ClipboardList], ["Demandas", sum.demandas, CalendarClock], ["Documentos", sum.documentos, FileText], ["Checklist", sum.checklist, ListChecks]].map(([l, n, I]) => { const Ic = I as typeof Check; return <div key={String(l)} className="rounded-xl border border-white/10 bg-black/20 py-2"><Ic size={13} className="mx-auto text-cyan" /><p className="font-display text-lg font-semibold tabular-nums">{String(n)}</p><p className="text-[0.6rem] text-muted-foreground">{String(l)}</p></div>; })}</div>
               <p className="mt-4 flex items-center gap-2 text-sm text-cyan"><Play size={14} /> Executar playbook</p>
             </button>
+            </div>
           </Tilt>); })}
         <Tilt max={8}>
           <button onClick={() => setEditTpl(true)} data-testid="implantacao-editar-padrao" className="ex-card block w-full p-5 text-left" style={{ "--rail": "var(--violet)" } as CSSProperties}>
@@ -43,8 +49,9 @@ export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { pro
             <p className="mt-4 flex items-center gap-2 text-sm text-violet"><Pencil size={14} /> Editar padrão</p>
           </button>
         </Tilt>
-        <div className="grid min-h-[12rem] place-items-center rounded-[1.25rem] border border-dashed border-white/15 p-5 text-center text-xs text-muted-foreground">Novos playbooks (fechamento do mês, renovação, projeto…) entram aqui.<br />Diga o processo e eu monto o roteiro.</div>
+        <button type="button" onClick={() => setEdit("novo")} data-testid="playbook-novo" className="group grid min-h-[12rem] place-items-center rounded-[1.25rem] border border-dashed border-white/15 p-5 text-center text-xs text-muted-foreground transition hover:-translate-y-0.5 hover:border-cyan/50 hover:text-foreground active:scale-[.99]"><span><span className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full border border-white/15 text-cyan transition group-hover:scale-110 group-hover:shadow-[0_0_20px_-4px_var(--cyan)]"><Plus size={18} /></span><b className="block text-sm text-foreground">Novo playbook</b>Fechamento do mês, renovação, projeto… Monte o seu, ou diga o processo ao Orion.</span></button>
       </div>
+      {edit && <PlaybookEditor key={edit === "novo" ? "novo" : edit.id} playbook={edit === "novo" ? null : edit} onClose={() => setEdit(null)} />}
       {editTpl && <SetupTemplateEditor projectId={projectId} onClose={() => setEditTpl(false)} />}
       {run && <RunDialog key={run.id} playbook={run} projectId={projectId} onClose={() => setRun(null)} onOpenClients={() => { setRun(null); onOpenClients(); }} onOpenLibrary={() => { setRun(null); onOpenLibrary(); }} />}
     </div>
