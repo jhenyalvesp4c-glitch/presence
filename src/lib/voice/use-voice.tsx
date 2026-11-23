@@ -495,11 +495,20 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setTimeout(() => { if (wakeRec.current === r && !heardAny) toRecorded("O navegador não está reconhecendo voz."); }, 25000);
   }, [activate, startRecWake, stopWake]);
   const setWake = useCallback((on: boolean) => { setWakeEnabled(on); setWakeState(on); if (!on) setWakeInfo({ modo: "", estado: "desligado", ouvido: "" }); }, []);
+  // ditado em outro lugar (ex.: "Ditar" na Central de entrada): solta o microfone da escuta de "Orion" e da conversa enquanto dura
+  const [dictating, setDictating] = useState(false);
+  const stopRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    const h = (e: Event) => { const on = (e as CustomEvent<boolean>).detail === true; setDictating(on); if (on && activeRef.current) stopRef.current(); };
+    window.addEventListener("orion:ditado", h);
+    return () => window.removeEventListener("orion:ditado", h);
+  }, []);
+  useEffect(() => { stopRef.current = stop; }, [stop]);
   useEffect(() => { setWakeState(wakeEnabled()); }, []);
   useEffect(() => {
-    if (wake && !active) startWake(); else stopWake();
+    if (wake && !active && !dictating) startWake(); else stopWake();
     return () => stopWake();
-  }, [wake, active, wakeTick, startWake, stopWake]);
+  }, [wake, active, dictating, wakeTick, startWake, stopWake]);
 
   /** Fala uma frase de teste para o usuário conferir se o som está chegando. */
   const testVoice = useCallback(() => {
