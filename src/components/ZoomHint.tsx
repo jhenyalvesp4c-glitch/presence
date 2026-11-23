@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
-type Info = { zoom50: boolean; desktopMode: boolean; w: number; screen: number; scale: number; widest: string[] };
+type Info = { standalone: boolean; zoom50: boolean; desktopMode: boolean; w: number; screen: number; scale: number; widest: string[] };
 
 /** Elementos que chegam mais longe à direita (os que fazem a página ficar mais larga que a tela). */
 const widest = (): string[] => {
@@ -33,8 +33,12 @@ export function ZoomHint() {
       if (force || (phone && window.innerWidth >= 700 && scale < 0.9)) {
         const desktopMode = /Macintosh|X11|Windows NT/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
         // tentativa de consertar sozinho: pede de novo a largura do aparelho (só quando não é o modo computador)
-        if (!desktopMode) document.querySelector('meta[name="viewport"]')?.setAttribute("content", "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover");
-        setInfo({ zoom50: !desktopMode && scale <= 0.65 && window.innerWidth / Math.min(screen.width, screen.height) >= 1.5, desktopMode, w: window.innerWidth, screen: Math.min(screen.width, screen.height), scale: Math.round(scale * 100) / 100, widest: widest() });
+        if (!desktopMode) {
+          // refaz a configuração de largura (trocar o elemento força o iPhone a recalcular)
+          document.querySelector('meta[name="viewport"]')?.remove();
+          const m = document.createElement("meta"); m.name = "viewport"; m.content = "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"; document.head.appendChild(m);
+        }
+        setInfo({ standalone: (navigator as unknown as { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches, zoom50: !desktopMode && scale <= 0.65 && window.innerWidth / Math.min(screen.width, screen.height) >= 1.5, desktopMode, w: window.innerWidth, screen: Math.min(screen.width, screen.height), scale: Math.round(scale * 100) / 100, widest: widest() });
       }
     } catch { /* sem armazenamento ou sem visualViewport */ }
   }, []);
@@ -51,7 +55,7 @@ export function ZoomHint() {
           : <>O navegador aumentou a largura da página para caber tudo, então tudo aparece pequeno. Mande um print deste aviso: os números abaixo mostram o que está estourando.</>}
       </p>
       <p className="mt-2 font-mono text-[0.62rem] leading-relaxed text-muted-foreground">
-        largura da página {info.w}px · tela {info.screen}px · zoom {info.scale} · {info.desktopMode ? "modo computador" : "modo celular"}
+        largura da página {info.w}px · tela {info.screen}px · zoom {info.scale} · {info.desktopMode ? "modo computador" : "modo celular"} · {info.standalone ? "app instalado" : "no navegador"}
         {info.widest.map((x) => <span key={x} className="block break-all">{x}</span>)}
       </p>
     </div>

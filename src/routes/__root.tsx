@@ -129,6 +129,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 /** Se o app não terminar de carregar em 12 s (erro de configuração, sem internet, versão antiga guardada), mostra o motivo em vez de ficar parado na tela de abertura. */
+/** App instalado (tela inicial): trava a escala em 100%. Sem isso o iPhone "encolhe" a página (zoom ~50%) e o layout de computador aparece. */
+const STANDALONE_FIT = `(function(){try{var s=window.navigator.standalone===true||(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);if(!s)return;var m=document.querySelector('meta[name="viewport"]');var c="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";if(m){m.setAttribute("content",c)}else{m=document.createElement("meta");m.name="viewport";m.content=c;document.head.appendChild(m)}}catch(e){}})();`;
+
 const BOOT_WATCHDOG = `(function(){var err="";window.addEventListener("error",function(e){if(!err&&e&&e.message)err=String(e.message)});window.addEventListener("unhandledrejection",function(e){if(!err&&e&&e.reason)err=String(e.reason&&e.reason.message||e.reason)});
 setTimeout(function(){if(window.__orionOk)return;var d=document.createElement("div");d.setAttribute("role","alert");d.setAttribute("data-testid","boot-watchdog");
 d.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;max-width:min(560px,92vw);padding:16px 18px;border-radius:16px;border:1px solid rgba(255,255,255,.18);background:rgba(8,10,20,.96);color:#e8ecf5;font:14px/1.5 system-ui,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.6)";
@@ -144,6 +147,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="pt-BR">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: STANDALONE_FIT }} />
       </head>
       <body>
         <script dangerouslySetInnerHTML={{ __html: BOOT_WATCHDOG }} />
