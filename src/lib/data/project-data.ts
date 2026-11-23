@@ -139,14 +139,15 @@ export async function saveNotesDb(pid: string, prev: Note[], next: Note[]) {
 
 /* ───────────── Demandas ───────────── */
 export async function loadDemands(pid: string): Promise<Demand[]> {
-  const [d, e, h, n] = await Promise.all([
+  const [d, e, h, n, k] = await Promise.all([
     supabase.from("project_demands").select("project_id, code, type, title, description, priority, status, deadline, dossier_name").eq("project_id", pid).order("created_at", { ascending: false }).order("code", { ascending: false }),
     supabase.from("demand_executions").select("project_id, code, dossier_name, status, done_on, note, position").eq("project_id", pid),
     supabase.from("demand_history").select("project_id, code, label, text, status, position").eq("project_id", pid),
     supabase.from("demand_notes").select("project_id, code, text, position").eq("project_id", pid),
+    supabase.from("demand_checklist").select("project_id, code, text, done, position").eq("project_id", pid),
   ]);
   return rowsToDemands(
-    must(d) as DemandRows["demand"][], must(e) as DemandRows["executions"], must(h) as DemandRows["history"], must(n) as DemandRows["notes"],
+    must(d) as DemandRows["demand"][], must(e) as DemandRows["executions"], must(h) as DemandRows["history"], must(n) as DemandRows["notes"], must(k) as DemandRows["checklist"],
   );
 }
 

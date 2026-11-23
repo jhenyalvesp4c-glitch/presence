@@ -157,3 +157,17 @@ async function removeFolder(folder: string) {
   const paths = (list.data ?? []).filter((o) => o.id).map((o) => `${folder}/${o.name}`);
   if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
 }
+
+/** Demandas juntadas numa só: os arquivos e o texto de anexos das absorvidas passam para a que ficou (nada se perde). */
+export async function moveMaterials(projectId: string, toCode: string, fromCodes: string[]): Promise<void> {
+  for (const from of fromCodes) {
+    must(await supabase.from("demand_files").update({ code: toCode }).eq("project_id", projectId).eq("code", from).select("id"));
+    const old = (must(await supabase.from("demand_materials").select("body").eq("project_id", projectId).eq("code", from).limit(1)) as { body: string }[])[0]?.body ?? "";
+    if (old.trim()) {
+      const cur = (must(await supabase.from("demand_materials").select("body").eq("project_id", projectId).eq("code", toCode).limit(1)) as { body: string }[])[0]?.body ?? "";
+      must(await supabase.from("demand_materials").upsert({ project_id: projectId, code: toCode, body: `${cur}${cur.trim() ? "\n\n" : ""}— de ${from}:\n${old}`.slice(0, 50000) }, { onConflict: "project_id,code" }).select("code"));
+    }
+    must(await supabase.from("demand_materials").delete().eq("project_id", projectId).eq("code", from).select("code"));
+  }
+  notify(materialsKey(projectId, toCode));
+}

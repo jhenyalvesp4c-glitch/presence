@@ -22,11 +22,13 @@ import { importAppointments, unlinkDossierAppointments, useDeleteCalendarItem, u
 import { useCategories, useTasks, useToggleTask } from "@/lib/data/tasks";
 import { useQueryClient } from "@tanstack/react-query";
 import { FinBackdrop, Tilt } from "@/components/finance/fx";
+import { applyMerges, findMergeGroups, mergeGroup, type MergeGroup } from "@/lib/demand-merge";
 import { Ring, useCountUp } from "@/components/finance/charts";
 import { toast } from "sonner";
 import { DemandCalendar } from "@/components/demand-calendar";
 import { DemandMaterials, NewDemandMaterials } from "@/components/demand-materials";
-import { EMPTY_MATERIALS, deleteMaterials, materialsKey, putMaterials, type Materials } from "@/lib/demand-materials";
+import { EMPTY_MATERIALS, deleteMaterials, materialsKey, moveMaterials, putMaterials, type Materials } from "@/lib/demand-materials";
+import { createPortal } from "react-dom";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
@@ -265,6 +267,17 @@ function Demandas() {
     setTab("overview"); setTypeF((cur) => (cur === "todos" || cur === f.type ? cur : "todos"));
     setSelId(d.id);
   };
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const mergeGroups = useMemo(() => findMergeGroups(items), [items]);
+  const doMerge = async (groups: MergeGroup[]) => {
+    setMergeOpen(false);
+    try {
+      if (pid) for (const g of groups) await moveMaterials(pid, g.items[0]!.id, g.items.slice(1).map((x) => x.id));
+      setItems((xs) => applyMerges(xs, groups));
+      setSelId((c) => (c && groups.some((g) => g.items.slice(1).some((x) => x.id === c)) ? null : c));
+      toast.success(`${groups.length} ${groups.length === 1 ? "grupo juntado" : "grupos juntados"}: o checklist está dentro da demanda`);
+    } catch (e) { toast.error(`Não consegui juntar: ${(e as Error).message}`); }
+  };
   const remove = (id: string) => { dropMaterials([id]); setItems((xs) => xs.filter((x) => x.id !== id)); setSelId((c) => (c === id ? null : c)); };
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -459,6 +472,7 @@ function Demandas() {
                   <span className="relative grid h-9 w-9 place-items-center"><span aria-hidden className="absolute inset-0 rounded-full border border-cyan/50" style={{ animation: "pulse-ring 2.6s ease-out infinite" }} /><span className="icon-tile h-9 w-9 !rounded-full shadow-[0_0_22px_-6px_var(--cyan)]" style={tint("cyan")}><Layers size={16} /></span></span>
                   <h2 className="font-display text-lg font-semibold">Demandas por tipo</h2>
                   <span className="tag" style={tint("violet")}>{typeF === "todos" ? "3 categorias" : tm[typeF].short} · {filtered.length} demandas</span>
+                  {mergeGroups.length > 0 && <button onClick={() => setMergeOpen(true)} data-testid="juntar-demandas" className="tag inline-flex items-center gap-1 transition hover:-translate-y-0.5 hover:brightness-125 active:scale-95" style={tint("cyan")}><CheckSquare size={11} /> Juntar do mesmo {L.singular.toLowerCase()} ({mergeGroups.length})</button>}
                   {filtered.length > 0 && <span className="ml-auto flex items-center gap-2.5" data-testid="resumo-geral"><Ring pct={Math.round((filtered.filter((x) => x.status === "done").length / filtered.length) * 100)} color="var(--emerald)" size={44} thickness={5}><span className="text-[0.6rem] font-semibold tabular-nums">{Math.round((filtered.filter((x) => x.status === "done").length / filtered.length) * 100)}%</span></Ring><span className="hidden text-[0.68rem] leading-tight text-muted-foreground sm:block">concluído<br />no total</span></span>}
                 </div>
                 <div className={`grid items-start gap-4 max-md:-mx-4 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:gap-3 max-md:overflow-x-auto max-md:px-4 max-md:pb-2 max-md:pt-2 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden ${typeF !== "todos" ? "lg:grid-cols-1" : sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`} data-testid="carrossel-tipos">
@@ -476,6 +490,8 @@ function Demandas() {
 
         {ready && tab === "overview" && <NotesStrip {...noteProps} onMore={() => setTab("notas")} />}
       </div>
+
+      {mergeOpen && <MergeDialog groups={mergeGroups} label={L.singular.toLowerCase()} onCancel={() => setMergeOpen(false)} onConfirm={(g) => void doMerge(g)} />}
 
       <DetailPanel
         key={`${sel?.id ?? "none"}-${editOnOpen}`} demand={sel} autoEdit={editOnOpen} storageKey={pid && sel ? materialsKey(pid, sel.id) : null} dossiers={names} onClose={() => setSelId(null)}
@@ -846,6 +862,7 @@ function Pick({ label, value, onChange, options }: { label: string; value: strin
 
 /* ---------------- quadros ---------------- */
 function progress(d: Demand) {
+  if (d.checklist?.length && !d.polos?.length) return Math.round((d.checklist.filter((c) => c.done).length / d.checklist.length) * 100);
   if (!d.polos?.length) return d.status === "done" ? 100 : d.status === "doing" ? 50 : 0;
   return Math.round((d.polos.filter((p) => p.status === "done").length / d.polos.length) * 100);
 }
@@ -922,6 +939,12 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
       <p className="mt-1.5 flex items-start gap-1 break-words text-[0.6rem] leading-tight text-muted-foreground max-md:text-xs [&>svg]:mt-px [&>svg]:shrink-0">
         {d.type === "geral" ? <><Calendar size={9} /> {d.deadline}</> : d.type === "polo" ? <><MapPin size={9} /> {d.polo}</> : <><Network size={9} /> {d.polos!.length} {L.plural.toLowerCase()} · {progress(d)}%</>}
       </p>
+      {!!d.checklist?.length && (() => { const n = d.checklist!.length, k = d.checklist!.filter((c) => c.done).length; return (
+        <span className="mt-1.5 flex items-center gap-1.5" data-testid="card-checklist">
+          <CheckSquare size={9} className="shrink-0 text-[var(--glow)]" />
+          <span className="h-1 flex-1 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--glow)] transition-all duration-500" style={{ width: `${(k / n) * 100}%`, boxShadow: "0 0 8px var(--glow)" }} /></span>
+          <span className="font-mono text-[0.55rem] text-muted-foreground max-md:text-xs">{k}/{n}</span>
+        </span>); })()}
     </button>
     <CardActions id={d.id} />
     </div>
@@ -1269,6 +1292,72 @@ function NoteDialog({ note, dossiers, onClose, onSave }: {
 }
 
 /* ---------------- painel lateral ---------------- */
+/** Confirma juntar as demandas do mesmo dossiê: mostra o que vira o quê antes de mexer. */
+function MergeDialog({ groups, label, onCancel, onConfirm }: { groups: MergeGroup[]; label: string; onCancel: () => void; onConfirm: (g: MergeGroup[]) => void }) {
+  const [on, setOn] = useState<Set<string>>(() => new Set(groups.map((g) => g.dossier)));
+  const chosen = groups.filter((g) => on.has(g.dossier));
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); }; document.addEventListener("keydown", k); return () => document.removeEventListener("keydown", k); }, [onCancel]);
+  return createPortal(
+    <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-background/70 p-3 backdrop-blur-md" onClick={onCancel} data-testid="juntar-dialogo">
+      <div role="dialog" aria-label="Juntar demandas" onClick={(e) => e.stopPropagation()} className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[oklch(0.14_0.035_265/0.92)] shadow-[0_40px_120px_-30px_var(--cyan)] backdrop-blur-2xl" style={{ animation: "vp-in .45s cubic-bezier(.2,.8,.2,1) both" }}>
+        <header className="flex items-start gap-3 px-6 pb-3 pt-6">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan/15 text-cyan"><CheckSquare size={20} /></span>
+          <div className="min-w-0 flex-1"><p className="mono-caps !text-[0.6rem]">Organizar</p><h2 className="font-serif text-2xl"><span className="text-gradient">Juntar demandas do mesmo {label}</span></h2>
+            <p className="mt-1 text-xs text-muted-foreground">Cada grupo vira uma demanda só, com um checklist dos passos para você ir riscando. O texto, as observações, o histórico e os anexos das demandas absorvidas vêm junto.</p></div>
+          <button onClick={onCancel} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition hover:rotate-90 hover:text-foreground"><X size={16} /></button>
+        </header>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 pb-4">
+          {groups.map((g) => { const m = mergeGroup(g); const sel = on.has(g.dossier); return (
+            <label key={g.dossier} className={`block cursor-pointer rounded-2xl border p-3 transition ${sel ? "border-cyan/50 bg-cyan/[0.07]" : "border-white/10 bg-white/[0.03] opacity-70"}`}>
+              <span className="flex items-center gap-2.5">
+                <input type="checkbox" checked={sel} onChange={() => setOn((s) => { const n = new Set(s); if (n.has(g.dossier)) n.delete(g.dossier); else n.add(g.dossier); return n; })} className="h-4 w-4 accent-[var(--cyan)]" />
+                <MapPin size={14} className="text-cyan" /><span className="font-medium">{g.dossier}</span><span className="tag ml-auto">{g.items.length} demandas → 1</span>
+              </span>
+              <ul className="mt-2 space-y-1 pl-6 text-xs">
+                {m.merged.checklist!.filter((c) => !c.text.startsWith("   ")).map((c, i) => <li key={i} className="flex gap-2 text-muted-foreground"><Circle size={12} className="mt-0.5 shrink-0" /><span className="min-w-0 break-words">{c.text}</span></li>)}
+              </ul>
+            </label>); })}
+        </div>
+        <footer className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-3">
+          <button onClick={onCancel} className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs transition hover:border-cyan/40 active:scale-95">Cancelar</button>
+          <button disabled={!chosen.length} onClick={() => onConfirm(chosen)} data-testid="juntar-confirmar" className="rounded-full border border-cyan/50 bg-cyan/15 px-5 py-1.5 text-xs font-medium text-cyan transition hover:-translate-y-0.5 hover:bg-cyan/25 active:scale-95 disabled:opacity-40">Juntar {chosen.length ? `(${chosen.length})` : ""}</button>
+        </footer>
+      </div>
+    </div>, document.body);
+}
+
+/** Checklist da demanda: marcar (risca), adicionar, tirar e limpar o que já foi feito. */
+function ChecklistBlock({ items, onChange }: { items: { text: string; done: boolean }[]; onChange: (next: { text: string; done: boolean }[]) => void }) {
+  const [text, setText] = useState("");
+  const done = items.filter((c) => c.done).length, pct = items.length ? Math.round((done / items.length) * 100) : 0;
+  return (
+    <Block title="Checklist" right={items.length ? <span className="text-xs text-muted-foreground" data-testid="checklist-contagem"><b className="text-foreground">{done}</b> de <b className="text-foreground">{items.length}</b> · {pct}%</span> : <CheckSquare size={14} className="text-muted-foreground" />}>
+      {!!items.length && (
+        <div className="relative mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(90deg,var(--cyan),var(--emerald))", boxShadow: "0 0 12px var(--cyan)" }} />
+        </div>
+      )}
+      <ul className="space-y-1.5" data-testid="checklist">
+        {items.map((c, i) => (
+          <li key={i} className="group flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-2 transition hover:border-cyan/40 hover:bg-white/[0.06]">
+            <button onClick={() => onChange(items.map((x, k) => (k === i ? { ...x, done: !x.done } : x)))} aria-label={c.done ? "Desmarcar" : "Marcar como feito"} aria-pressed={c.done} className="mt-0.5 shrink-0 transition active:scale-90">
+              {c.done ? <CheckCircle2 size={18} className="text-emerald drop-shadow-[0_0_6px_var(--emerald)]" /> : <Circle size={18} className="text-muted-foreground transition group-hover:text-cyan" />}
+            </button>
+            <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words text-xs leading-snug transition ${c.done ? "text-muted-foreground line-through decoration-emerald/60" : "text-foreground"}`}>{c.text}</span>
+            <button onClick={() => onChange(items.filter((_, k) => k !== i))} aria-label="Tirar do checklist" className="shrink-0 text-muted-foreground opacity-0 transition hover:text-pink group-hover:opacity-100 max-md:opacity-100"><X size={13} /></button>
+          </li>
+        ))}
+        {!items.length && <li className="text-xs text-muted-foreground">Sem passos ainda. Adicione abaixo, ou peça ao Orion para juntar demandas do mesmo dossiê.</li>}
+      </ul>
+      <form onSubmit={(e) => { e.preventDefault(); const t = text.trim(); if (t) { onChange([...items, { text: t.slice(0, 500), done: false }]); setText(""); } }} className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-1.5">
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Adicionar passo…" data-testid="checklist-novo" className="flex-1 bg-transparent text-xs outline-none" />
+        <button className="text-cyan transition hover:scale-110" aria-label="Adicionar passo"><Plus size={14} /></button>
+      </form>
+      {done > 0 && <button onClick={() => onChange(items.filter((c) => !c.done))} className="mt-2 text-[0.65rem] text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline">Limpar os {done} já feitos</button>}
+    </Block>
+  );
+}
+
 function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onStatus, onPolo, onAddPolos, onPoloNote, onEdit, onNote, onDelete }: {
   demand: Demand | null; autoEdit: boolean; storageKey: string | null; dossiers: string[]; onClose: () => void; onStatus: (s: Status) => void; onPolo: (p: string) => void;
   onAddPolos: (names: string[]) => void; onPoloNote: (p: string, t: string) => void;
@@ -1408,6 +1497,9 @@ function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onSta
               <p className="mt-2 text-[0.6rem] text-muted-foreground">Toque em um item para avançar o status dele; o ícone ao lado guarda uma observação só dele.</p>
             </Block>
           )}
+
+          {/* checklist */}
+          <ChecklistBlock items={d.checklist ?? []} onChange={(checklist) => onEdit({ checklist })} />
 
           {/* observações */}
           <Block title="Observações" right={<MessageSquare size={14} className="text-muted-foreground" />}>

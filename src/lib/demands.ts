@@ -8,9 +8,12 @@ export type Priority = "alta" | "media" | "baixa";
 export type DType = "geral" | "polo" | "multi";
 export type PoloExec = { name: string; status: Status; date?: string | undefined; note?: string | undefined };
 export type Hist = { d: string; text: string; s: Status };
+/** Passo do checklist de uma demanda (para ir riscando). */
+export type CheckItem = { text: string; done: boolean };
 export type Demand = {
   id: string; type: DType; title: string; desc: string; priority: Priority; status: Status;
   deadline: string; polo?: string | undefined; polos?: PoloExec[] | undefined; history: Hist[]; notes: string[];
+  checklist?: CheckItem[] | undefined;
 };
 
 const PREFIX: Record<DType, string> = { geral: "G", polo: "P", multi: "M" };
@@ -32,6 +35,7 @@ export type DemandRows = {
   executions: { project_id: string; code: string; dossier_name: string; status: Status; done_on: string | null; note: string; position: number }[];
   history: { project_id: string; code: string; label: string; text: string; status: Status; position: number }[];
   notes: { project_id: string; code: string; text: string; position: number }[];
+  checklist: { project_id: string; code: string; text: string; done: boolean; position: number }[];
 };
 
 /** Uma demanda da tela -> linhas das 4 tabelas. */
@@ -47,6 +51,7 @@ export function demandToRows(projectId: string, d: Demand): DemandRows {
     })),
     history: d.history.map((h, i) => ({ ...key, label: h.d.slice(0, 20), text: h.text.slice(0, 500), status: h.s, position: i })),
     notes: d.notes.map((text, i) => ({ ...key, text: text.slice(0, 2000), position: i })),
+    checklist: (d.checklist ?? []).filter((c) => c.text.trim()).map((c, i) => ({ ...key, text: c.text.trim().slice(0, 500), done: !!c.done, position: i })),
   };
 }
 
@@ -54,14 +59,14 @@ type DemandRow = DemandRows["demand"];
 
 /** Linhas das tabelas -> demandas da tela (na ordem recebida). */
 export function rowsToDemands(
-  demands: DemandRow[], executions: DemandRows["executions"], history: DemandRows["history"], notes: DemandRows["notes"],
+  demands: DemandRow[], executions: DemandRows["executions"], history: DemandRows["history"], notes: DemandRows["notes"], checklist: DemandRows["checklist"] = [],
 ): Demand[] {
   const by = <T extends { code: string }>(list: T[]) => {
     const m = new Map<string, T[]>();
     for (const r of list) (m.get(r.code) ?? m.set(r.code, []).get(r.code)!).push(r);
     return m;
   };
-  const ex = by(executions), hi = by(history), no = by(notes);
+  const ex = by(executions), hi = by(history), no = by(notes), ck = by(checklist);
   const sorted = <T extends { position: number }>(l: T[] | undefined) => [...(l ?? [])].sort((a, b) => a.position - b.position);
   return demands.map((r): Demand => {
     const e = sorted(ex.get(r.code));
@@ -71,6 +76,7 @@ export function rowsToDemands(
       polos: r.type === "multi" ? e.map((x) => ({ name: x.dossier_name, status: x.status, date: x.done_on ?? undefined, note: x.note || undefined })) : undefined,
       history: sorted(hi.get(r.code)).map((h) => ({ d: h.label, text: h.text, s: h.status })),
       notes: sorted(no.get(r.code)).map((n) => n.text),
+      ...(ck.get(r.code)?.length ? { checklist: sorted(ck.get(r.code)).map((c) => ({ text: c.text, done: c.done })) } : {}),
     };
   });
 }

@@ -38,9 +38,10 @@ export type VoiceEvent =
   | { t: "ferramenta"; estado: Record<string, unknown>[]; chamadas: { id: string; nome: string; args: Record<string, unknown> }[] }
   | { t: "fim" };
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
+const strList = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.map((x) => String(x ?? "").trim()).filter(Boolean) : undefined);
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", cadastros: "Mexendo nos seus cadastros…", documentacao: "Mexendo na Documentação…", ler_documento: "Lendo o documento…", gravar_reuniao: "Abrindo as reuniões…", habitos: "Olhando seus hábitos…", treino: "Mexendo no seu treino…", dieta: "Olhando a sua dieta…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", ideias: "Mexendo na sua caixa de ideias…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", cadastros: "Mexendo nos seus cadastros…", juntar_demandas: "Juntando as demandas…", documentacao: "Mexendo na Documentação…", ler_documento: "Lendo o documento…", gravar_reuniao: "Abrindo as reuniões…", habitos: "Olhando seus hábitos…", treino: "Mexendo no seu treino…", dieta: "Olhando a sua dieta…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", ideias: "Mexendo na sua caixa de ideias…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -97,6 +98,7 @@ Regras de fala:
 - TREINO: "cria uma ficha de treino de pernas", "tira o agachamento da ficha A", "muda a série do supino para 4 x 10", "segunda é treino de costas", "quero treinar 4 vezes por semana" → ferramenta treino, na hora. Ao criar ficha, monte você mesmo bons exercícios com séries/repetições.
 - DIETA: "o que eu como hoje", "marca o almoço", "tomei 500 de água", "uso a opção 2 hoje", "muda minha meta de proteína para 120" → ferramenta dieta, na hora. Criar um plano novo do zero é na tela de Dieta (abra com abrir_pagina).
 - DOCUMENTAR E BUSCAR: "documenta isso", "anota que…", "registra no segundo cérebro" → documentar, com TÍTULO e texto completo e organizado (não resuma demais: guarde todos os detalhes que ela falou). "cria um tutorial/processo/passo a passo de…" → documentacao (criar) numa pasta. Perguntas sobre algo que ela documentou, anotou, combinou ou que está em reunião, cliente, documento, demanda ou na Documentação → SEMPRE buscar_no_orion primeiro; se o trecho for curto ou ela pedir detalhes, ler_documento com o id. Responda com o que achou e diga de onde veio (documentação, reunião, cliente). Só diga que não achou depois de buscar, tentando também termos parecidos.
+- JUNTAR DEMANDAS: "junta as demandas do mesmo dossiê/polo", "tem demanda repetida de Lauro, junta" → juntar_demandas (com dossie se ela citou; sem citar, mostre a previa e peça o ok). Cada grupo vira UMA demanda com checklist. Checklist de uma demanda: atualizar_demanda com checklist_adicionar/marcar/desmarcar/remover (ex.: "marca o passo da fila como feito").
 - GRAVAR REUNIÃO: "grava a reunião", "vou entrar numa entrevista, grava", "começa a gravar o treinamento" → use gravar_reuniao com o tipo certo; a conversa por voz termina e a gravação começa sozinha.
 - CADASTROS (projetos, dossiês e clientes): "cria o dossiê X em Clientes", "cadastra o cliente X", "muda o status do cliente", "coloca o roteiro de implantação no cliente", "registra que falei com o cliente", "cria/edita/exclui projeto ou dossiê" → use a ferramenta cadastros e faça na hora. Cliente novo já ganha o dossiê ligado e o roteiro padrão. Excluir pede confirmação. Nunca use pedir_melhoria para isso.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
@@ -134,6 +136,9 @@ export const TOOLS = [
     prazo: { type: "string", description: "AAAA-MM-DD ou dd/mm." }, nota: { type: "string", description: "Observação a acrescentar." },
     excluir: { type: "boolean", description: "true para excluir a demanda (pede confirmação)." },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
+    checklist_adicionar: { type: "array", items: { type: "string" }, description: "Passos novos para o checklist da demanda." },
+    checklist_marcar: { type: "array", items: { type: "string" }, description: "Passos do checklist para marcar como feitos (nomes aproximados; 'todos' marca tudo)." },
+    checklist_desmarcar: { type: "array", items: { type: "string" } }, checklist_remover: { type: "array", items: { type: "string" } },
   }, required: ["demanda"] }),
   fn("gerenciar_tarefa", "Conclui, reabre, edita ou exclui uma tarefa, lembrete ou compromisso que já existe (para criar um novo use registrar). Identifique pelo título aproximado.", { type: "object", properties: {
     item: { type: "string", description: "Título (aproximado) do item." },
@@ -225,6 +230,9 @@ export const TOOLS = [
   fn("dieta", "DIETA do dia (Saúde → Dieta): ver o plano de hoje, marcar/desmarcar refeições feitas, registrar água, escolher a opção do dia e mudar as metas. Ações: hoje; marcar_refeicao / desmarcar_refeicao (alvo = nome da refeição ou 'todas'); agua (ml, pode ser negativo para corrigir); escolher_opcao (alvo = nome da opção); metas (kcal, proteina_g, carbo_g, gordura_g; sem valores só mostra).", { type: "object", properties: {
     acao: { type: "string", enum: ["hoje", "marcar_refeicao", "desmarcar_refeicao", "agua", "escolher_opcao", "metas"] }, alvo: { type: "string" }, ml: { type: "number" },
     kcal: { type: "number" }, proteina_g: { type: "number" }, carbo_g: { type: "number" }, gordura_g: { type: "number" },
+  }, required: ["acao"] }),
+  fn("juntar_demandas", "JUNTA demandas do MESMO dossiê/polo (as 'por dossiê' ainda abertas) numa demanda só, com um CHECKLIST dos passos para ela ir riscando. Ex.: 'junta as demandas de Lauro', 'junte as que são do mesmo polo'. Ações: previa (só mostra os grupos que dá para juntar) e juntar (executa). Com dossie citado, juntar executa na hora; sem dossie, pede confirmação (precisa_confirmar) antes. Opcional: titulo da demanda nova, projeto. As demandas absorvidas ficam dentro da nova (texto, histórico, observações e anexos).", { type: "object", properties: {
+    acao: { type: "string", enum: ["previa", "juntar"] }, dossie: { type: "string", description: "Nome do dossiê/polo (ex.: Lauro de Freitas, Maceió); vazio = todos." }, projeto: { type: "string" }, titulo: { type: "string" }, confirmado: { type: "boolean" },
   }, required: ["acao"] }),
   fn("lista", "Cria e ajusta LISTAS/CHECKLISTS salvas (o que levar para a praia, compras, preparar uma viagem, passos de algo). Ações: criar (com titulo e itens agrupados), adicionar, remover, marcar (feito), desmarcar, mostrar, listar, renomear, excluir. Em criar/adicionar/mostrar passe sempre `sugestoes` com 4 a 6 ideias úteis que ainda NÃO estão na lista. Quando ela pedir uma lista sem dizer os itens, monte você mesmo uma lista completa e bem pensada, agrupada por tema.", { type: "object", properties: {
     acao: { type: "string", enum: ["criar", "adicionar", "remover", "marcar", "desmarcar", "mostrar", "listar", "renomear", "excluir"] },
@@ -389,6 +397,7 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
         titulo: args["titulo"] as string | undefined, descricao: args["descricao"] as string | undefined, prioridade: args["prioridade"] as "alta" | "media" | "baixa" | undefined,
         prazo: args["prazo"] as string | undefined, nota: args["nota"] as string | undefined, dossie: args["dossie"] as string | undefined,
         excluir: args["excluir"] === true, confirmado: args["confirmado"] === true,
+        checklistAdicionar: strList(args["checklist_adicionar"]), checklistMarcar: strList(args["checklist_marcar"]), checklistDesmarcar: strList(args["checklist_desmarcar"]), checklistRemover: strList(args["checklist_remover"]),
       }).catch((e): Record<string, unknown> => ({ ok: false, erro: e instanceof Error ? e.message : "Não consegui alterar a demanda." }));
       if (r["ok"]) emit({ t: "painel", p: { titulo: r["acao"] === "excluida" ? "Demanda excluída" : "Demanda atualizada", secoes: [{ titulo: String(r["acao"] === "excluida" ? "Excluída" : (r["status_agora"] ?? "Atualizada")), itens: [{ rotulo: String(r["demanda"]), detalhe: Array.isArray(r["mudou"]) ? (r["mudou"] as string[]).join(" · ") : undefined, link: r["acao"] === "excluida" ? undefined : "/demandas" }] }] } });
       return r;
@@ -468,6 +477,13 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
     case "dieta": {
       const { runDietTool } = await import("./diet-tool");
       const out = await runDietTool(args, ctx.today).catch((e): { result: Record<string, unknown> } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer na dieta." } }));
+      return out.result;
+    }
+
+    case "juntar_demandas": {
+      const { runMergeTool } = await import("./merge-tool");
+      const out = await runMergeTool(args).catch((e): { result: Record<string, unknown>; panel?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui juntar as demandas." } }));
+      if (out.panel) emit({ t: "painel", p: out.panel });
       return out.result;
     }
 

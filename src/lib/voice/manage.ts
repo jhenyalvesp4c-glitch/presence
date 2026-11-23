@@ -68,6 +68,7 @@ async function loadAllDemands(): Promise<Loaded[]> {
 export type DemandChange = {
   demanda: string; status?: Status | undefined; titulo?: string | undefined; descricao?: string | undefined; prioridade?: Priority | undefined;
   prazo?: string | undefined; nota?: string | undefined; dossie?: string | undefined; excluir?: boolean | undefined; confirmado?: boolean | undefined;
+  checklistAdicionar?: string[] | undefined; checklistMarcar?: string[] | undefined; checklistDesmarcar?: string[] | undefined; checklistRemover?: string[] | undefined;
 };
 
 /** Muda, edita ou exclui uma demanda existente. Exclusão pede confirmação (evita confundir "excluir" com "concluir" na fala). */
@@ -98,6 +99,19 @@ export async function changeDemand(c: DemandChange): Promise<Record<string, unkn
   if (c.prioridade) { n = { ...n, priority: c.prioridade }; feito.push(`prioridade ${c.prioridade}`); }
   if (c.prazo !== undefined) { n = { ...n, deadline: deadlineText(c.prazo) }; feito.push("prazo"); }
   if (c.nota?.trim()) { n = { ...n, notes: [...n.notes, c.nota.trim()], history: [...n.history, { d: today(), text: "Observação adicionada", s: n.status }] }; feito.push("observação"); }
+  // checklist da demanda (passos para riscar)
+  if (c.checklistAdicionar?.length || c.checklistMarcar?.length || c.checklistDesmarcar?.length || c.checklistRemover?.length) {
+    let list = [...(n.checklist ?? [])];
+    const acharPor = (q: string) => list.map((x, i) => ({ x, i })).filter(({ x }) => /^(todos?|tudo)$/i.test(q) || normalize(x.text).includes(normalize(q)));
+    const faltou: string[] = [];
+    for (const t of c.checklistAdicionar ?? []) if (!list.some((x) => normalize(x.text) === normalize(t))) list.push({ text: t.slice(0, 500), done: false });
+    for (const q of c.checklistMarcar ?? []) { const h = acharPor(q); if (!h.length) faltou.push(q); list = list.map((x, i) => (h.some((y) => y.i === i) ? { ...x, done: true } : x)); }
+    for (const q of c.checklistDesmarcar ?? []) { const h = acharPor(q); if (!h.length) faltou.push(q); list = list.map((x, i) => (h.some((y) => y.i === i) ? { ...x, done: false } : x)); }
+    for (const q of c.checklistRemover ?? []) { const h = acharPor(q); if (!h.length) faltou.push(q); list = list.filter((_, i) => !h.some((y) => y.i === i)); }
+    n = { ...n, checklist: list };
+    feito.push(`checklist (${list.filter((x) => x.done).length}/${list.length})`);
+    if (faltou.length) return { ok: false, erro: `Não achei no checklist: ${faltou.join("; ")}.`, opcoes: (d.checklist ?? []).map((x) => x.text).slice(0, 8) };
+  }
   if (!feito.length) return { ok: false, erro: "Nada para mudar. Diga o que alterar (status, título, prazo, prioridade, descrição ou observação)." };
   await saveDemands(pid, all, all.map((x) => (x.id === d.id ? n : x)));
   return { ok: true, acao: "atualizada", demanda: `${n.id} ${n.title}`, projeto: project, status_agora: STATUS_LABEL[n.status], mudou: feito };
