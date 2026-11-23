@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { cloudFinanceRepo } from "../finance/cloud-repo";
-import { invoiceAlerts, parseDeadline, deadlineBucket, addDays, type Bucket, type InvoiceAlert } from "../central";
+import { invoiceAlerts, parseDeadline, deadlineBucket, addDays, subscriptionRenewals, type Bucket, type InvoiceAlert, type Renewal } from "../central";
 import { openInvoice, round2 } from "../finance/calc";
 import { must, supabase } from "./db";
 
@@ -23,13 +23,13 @@ export const useCentralDiet = (today: string) => useQuery({
   queryFn: async () => { const r = must(await supabase.from("diet_day_logs").select("meals_done, water_ml").eq("log_date", today).limit(1)) as { meals_done: string[] | null; water_ml: number | null }[]; return r[0] ? { meals: (r[0].meals_done ?? []).length, water: r[0].water_ml ?? 0 } : null; },
 });
 
-export type CentralMoney = { alerts: InvoiceAlert[]; open: { card: string; total: number; due: string }[] };
+export type CentralMoney = { alerts: InvoiceAlert[]; renewals: Renewal[]; open: { card: string; total: number; due: string }[] };
 export const useCentralMoney = (today: string) => useQuery({
   queryKey: ["central", "money", today],
   queryFn: async (): Promise<CentralMoney | null> => {
     const s = await cloudFinanceRepo.readCloud(); if (!s) return null;
     const now = new Date(`${today}T12:00:00`);
-    return { alerts: invoiceAlerts(s.cards.map((c) => ({ name: c.name, closingDay: c.closingDay, dueDay: c.dueDay })), today, 7), open: s.cards.map((c) => { const i = openInvoice(s, c, now); return { card: c.name, total: round2(i.mine), due: i.due }; }).filter((x) => x.total > 0) };
+    return { renewals: subscriptionRenewals(s, today, 30), alerts: invoiceAlerts(s.cards.map((c) => ({ name: c.name, closingDay: c.closingDay, dueDay: c.dueDay })), today, 7), open: s.cards.map((c) => { const i = openInvoice(s, c, now); return { card: c.name, total: round2(i.mine), due: i.due }; }).filter((x) => x.total > 0) };
   },
 });
 

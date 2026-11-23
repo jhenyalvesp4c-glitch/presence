@@ -7,6 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ArrowUpRight, Building2, Rocket, CalendarClock, Check, ClipboardList, Droplets, Dumbbell, HeartPulse, Mic, Repeat, Sparkles, Sprout, Utensils, Wallet } from "lucide-react";
 
 import { Meter, Ring, useCountUp } from "@/components/finance/charts";
+import { BrandTile, brandOf } from "@/components/finance/brands";
 import { FinBackdrop, HeroPanel, LiveDot } from "@/components/finance/fx";
 import { dayProgress, daysBetween, greeting } from "@/lib/central";
 import { useCentralContracts, useCentralDemands, useCentralDiet, useCentralMeetings, useCentralMoney } from "@/lib/data/central";
@@ -40,6 +41,9 @@ const Box = ({ on, onClick, label, sub, time, late }: { on: boolean; onClick: ()
 );
 const Failed = () => <p className="text-xs text-muted-foreground">Não consegui carregar esta parte agora.</p>;
 
+const money = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const when = (d: number) => (d === 0 ? "hoje" : d === 1 ? "amanhã" : `em ${d} dias`);
+
 export function CentralDoDia() {
   const now = useMemo(() => new Date(), []), today = isoLocal(now), tomorrow = isoLocal(new Date(now.getTime() + 864e5));
   const tasksQ = useTasks(), toggleTask = useToggleTask();
@@ -59,7 +63,7 @@ export function CentralDoDia() {
   const prog = dayProgress([{ done: todays.filter((t) => t.done).length, total: todays.length + overdue.length }, { done: fixed.filter((f) => f.done).length, total: fixed.length }, { done: habits.filter((h) => habitDone.has(h.id)).length, total: habits.length }]);
   const pct = useCountUp(prog.pct, 900);
   const dateLabel = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(now);
-  const attention = overdue.length + demands.filter((d) => d.bucket === "late").length + (contractsQ.data ?? []).length + (moneyQ.data?.alerts.filter((a) => a.inDays <= 2).length ?? 0);
+  const attention = overdue.length + demands.filter((d) => d.bucket === "late").length + (contractsQ.data ?? []).length + (moneyQ.data?.alerts.filter((a) => a.inDays <= 2).length ?? 0) + (moneyQ.data?.renewals.filter((r) => r.inDays <= 3).length ?? 0);
 
   return (
     <main className="relative mx-auto min-h-screen max-w-[1500px] px-4 pb-32 pt-6 md:py-8" data-testid="central-do-dia"><FinBackdrop />
@@ -84,6 +88,7 @@ export function CentralDoDia() {
               {demands.filter((d) => d.bucket === "late").slice(0, 3).map((d) => <li key={d.code}>Demanda atrasada: <b>{d.title}</b> <span className="text-muted-foreground">(prazo {dateBR(d.deadline)})</span></li>)}
               {(contractsQ.data ?? []).slice(0, 3).map((c) => <li key={c.id}>Contrato de <b>{c.name}</b> {daysBetween(today, c.contractEnd) < 0 ? "venceu" : "vence"} em {dateBR(c.contractEnd)}</li>)}
               {(moneyQ.data?.alerts ?? []).filter((a) => a.inDays <= 2).map((a) => <li key={`${a.card}${a.kind}`}>Fatura {a.card} {a.kind === "fecha" ? "fecha" : "vence"} {a.inDays === 0 ? "hoje" : a.inDays === 1 ? "amanhã" : `em ${a.inDays} dias`}</li>)}
+              {(moneyQ.data?.renewals ?? []).filter((r) => r.inDays <= 3).map((r) => <li key={`ren${r.id}`}>Assinatura <b>{r.name}</b> renova {when(r.inDays)} <span className="text-muted-foreground">({money(r.amount)})</span></li>)}
             </ul>
           </section>)}
 
@@ -117,6 +122,17 @@ export function CentralDoDia() {
         <Section title="Dinheiro" tone="emerald" icon={Wallet} to="/financeiro">
           {moneyQ.isError ? <Failed /> : !moneyQ.data ? <Empty>Financeiro ainda sem dados.</Empty> : <div className="space-y-3">
             {moneyQ.data.alerts.length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma fatura fecha ou vence nos próximos 7 dias.</p> : <ul className="space-y-1.5">{moneyQ.data.alerts.map((a) => <li key={`${a.card}${a.kind}`} className="flex items-center justify-between gap-3 text-sm"><span>{a.card} <span className="text-muted-foreground">{a.kind === "fecha" ? "fecha" : "vence"}</span></span><span className={`text-xs tabular-nums ${a.inDays <= 2 ? "font-semibold text-amber" : "text-muted-foreground"}`}>{a.inDays === 0 ? "hoje" : a.inDays === 1 ? "amanhã" : `em ${a.inDays} dias`}</span></li>)}</ul>}
+            {moneyQ.data.renewals.length > 0 && (
+              <div className="space-y-2 border-t border-white/10 pt-3" data-testid="central-renovacoes">
+                <p className="mono-caps flex items-center justify-between gap-2"><span className="flex items-center gap-1.5 whitespace-nowrap"><Repeat size={11} className="text-violet" /> Renovações</span><span className="whitespace-nowrap normal-case tracking-normal text-muted-foreground">{money(moneyQ.data.renewals.reduce((n, r) => n + r.amount, 0))} em 30 dias</span></p>
+                <ul className="space-y-1.5">{moneyQ.data.renewals.slice(0, 6).map((r) => { const b = brandOf(r.name), soon = r.inDays <= 3; return (
+                  <li key={r.id} className="group flex items-center gap-2.5 rounded-xl px-1.5 py-1 transition duration-300 hover:bg-white/[0.05]" data-testid="central-renovacao" style={soon ? { boxShadow: "inset 0 0 0 1px color-mix(in oklab, var(--amber) 45%, transparent)", background: "color-mix(in oklab, var(--amber) 8%, transparent)" } : undefined}>
+                    {b ? <BrandTile brand={b} size={30} className="!rounded-lg transition duration-300 group-hover:scale-110" /> : <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[0.7rem] font-bold">{r.name.slice(0, 1).toUpperCase()}</span>}
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm">{r.name}</span><span className="block truncate text-[0.62rem] text-muted-foreground">{dateBR(r.date)}{r.where ? ` · ${r.where}` : ""}</span></span>
+                    <span className="shrink-0 text-right"><b className="block text-sm tabular-nums">{money(r.amount)}</b><span className={`block text-[0.62rem] ${soon ? "font-semibold text-amber" : "text-muted-foreground"}`}>{when(r.inDays)}</span></span>
+                  </li>); })}</ul>
+                {moneyQ.data.renewals.length > 6 && <p className="text-[0.65rem] text-muted-foreground">+ {moneyQ.data.renewals.length - 6} nos próximos 30 dias</p>}
+              </div>)}
             {moneyQ.data.open.length > 0 && <div className="space-y-1.5 border-t border-white/10 pt-3"><p className="mono-caps">Fatura aberta (só a minha parte)</p>{moneyQ.data.open.map((o) => <div key={o.card} className="flex items-center justify-between text-sm"><span>{o.card}</span><b className="tabular-nums">{brl(o.total)}</b></div>)}</div>}</div>}
         </Section>
 

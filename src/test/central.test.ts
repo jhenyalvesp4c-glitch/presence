@@ -30,3 +30,21 @@ describe("central do dia", () => {
   });
   it("progresso soma as partes", () => { expect(dayProgress([{ done: 2, total: 4 }, { done: 1, total: 1 }, { done: 0, total: 0 }])).toEqual({ done: 3, total: 5, pct: 60 }); });
 });
+
+import { subscriptionRenewals } from "@/lib/central";
+import { EMPTY_STATE, type FinanceState } from "@/lib/finance/types";
+
+describe("assinaturas renovando na Central", () => {
+  const rec = (o: Record<string, unknown>) => ({ id: "r", kind: "despesa", desc: "Netflix", amount: 55.9, day: 25, category: "assinaturas", method: "credito", startYm: "2026-01", subscription: true, ...o });
+  const st = (recurring: unknown[]): FinanceState => ({ ...structuredClone(EMPTY_STATE), cards: [{ id: "c1", name: "Nubank", last4: "4821" }] as FinanceState["cards"], recurring: recurring as FinanceState["recurring"] });
+  it("lista as que cobram nos próximos 30 dias, da mais próxima para a mais distante", () => {
+    const out = subscriptionRenewals(st([rec({ id: "a", desc: "Spotify", day: 28, cardId: "c1" }), rec({ id: "b", desc: "Netflix", day: 24 })]), "2026-11-22");
+    expect(out.map((r) => [r.name, r.inDays, r.date])).toEqual([["Netflix", 2, "2026-11-24"], ["Spotify", 6, "2026-11-28"]]);
+    expect(out[1]!.where).toBe("Nubank •••• 4821");
+  });
+  it("ignora pausadas, despesas que não são assinatura e as que só cobram depois dos 30 dias", () => {
+    const out = subscriptionRenewals(st([rec({ id: "p", pauses: [{ from: "2026-10" }] }), rec({ id: "x", desc: "Aluguel", subscription: false, category: "moradia" }), rec({ id: "l", desc: "Anual", day: 22, startYm: "2027-01" })]), "2026-11-22");
+    expect(out).toEqual([]);
+  });
+  it("cobra hoje conta como 0 dias", () => { expect(subscriptionRenewals(st([rec({ day: 22 })]), "2026-11-22")[0]!.inDays).toBe(0); });
+});

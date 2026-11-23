@@ -369,7 +369,7 @@ function Demandas() {
         </header>
 
         {/* abas de tipo */}
-        <nav className="mt-4 animate-rise max-md:sticky max-md:top-0 max-md:z-30 max-md:-mx-4 max-md:flex max-md:snap-x max-md:gap-2 max-md:overflow-x-auto max-md:border-b max-md:border-white/5 max-md:bg-background/95 max-md:px-4 max-md:py-2.5 max-md:backdrop-blur-xl max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden md:mt-6 md:grid md:grid-cols-3 md:gap-3 lg:grid-cols-4 2xl:grid-cols-8" style={{ animationDelay: ".05s" }} data-testid="abas-demandas">
+        <nav className="mt-4 animate-rise max-md:sticky max-md:top-0 max-md:z-30 max-md:-mx-4 max-md:flex max-md:snap-x max-md:gap-2 max-md:overflow-x-auto max-md:border-b max-md:border-white/5 max-md:bg-background/95 max-md:px-4 max-md:py-2.5 max-md:backdrop-blur-xl max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden md:mt-6 md:grid md:grid-cols-3 md:gap-3" style={{ animationDelay: ".05s" }} data-testid="abas-demandas">
           {tabs.map((t) => {
             const on = tab === t.k;
             return (

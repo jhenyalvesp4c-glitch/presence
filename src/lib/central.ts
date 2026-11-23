@@ -1,3 +1,6 @@
+import { isPaused, isSubscription, nextCharge } from "./finance/calc";
+import type { FinanceState } from "./finance/types";
+
 /** Central do dia: regras puras (saudação, prazos de demandas, faturas que fecham, progresso do dia). Sem rede. */
 export const greeting = (hour: number) => (hour < 5 ? "Boa madrugada" : hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite");
 
@@ -45,5 +48,18 @@ export function invoiceAlerts(cards: { name: string; closingDay: number; dueDay:
 export function dayProgress(parts: { done: number; total: number }[]) {
   const done = parts.reduce((a, p) => a + p.done, 0), total = parts.reduce((a, p) => a + p.total, 0);
   return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+}
+export type Renewal = { id: string; name: string; amount: number; date: string; inDays: number; where: string };
+/** Assinaturas ativas que renovam (cobram) nos próximos `within` dias, da mais próxima para a mais distante. Pausadas ficam de fora. */
+export function subscriptionRenewals(state: FinanceState, today: string, within = 30): Renewal[] {
+  const now = new Date(`${today}T12:00:00`), out: Renewal[] = [];
+  for (const r of state.recurring) {
+    if (!isSubscription(r) || isPaused(r)) continue;
+    const date = nextCharge(r, now); if (!date) continue;
+    const inDays = daysBetween(today, date); if (inDays < 0 || inDays > within) continue;
+    const card = state.cards.find((c) => c.id === r.cardId), acc = state.accounts.find((a) => a.id === r.accountId);
+    out.push({ id: r.id, name: r.desc, amount: r.amount, date, inDays, where: card ? `${card.name} •••• ${card.last4}` : acc?.name ?? "" });
+  }
+  return out.sort((a, b) => a.inDays - b.inDays || a.name.localeCompare(b.name));
 }
 export { addDays };
