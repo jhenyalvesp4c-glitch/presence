@@ -6,6 +6,7 @@ import { PlanShell, Panel, colorVar, tint } from "@/components/PlanShell";
 import type { Project } from "@/lib/projects";
 import { loadProjects, saveProjects } from "@/lib/data/project-data";
 import { useDbState } from "@/lib/data/use-db-state";
+import { FinBackdrop, Tilt } from "@/components/finance/fx";
 
 export const Route = createFileRoute("/projetos")({
   head: () => ({
@@ -107,9 +108,9 @@ function ProjetosPage() {
   const shown = filter === "Todos" ? projects : projects.filter((p) => p.status === filter);
 
   return (
-    <PlanShell active={2}>
+    <PlanShell active={2} backdrop={<FinBackdrop />}>
       <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <Panel c="cyan" className="scan-line overflow-hidden">
+        <Panel c="cyan" className="glass-clear scan-line overflow-hidden">
           <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 h-24 w-full opacity-40"
             style={{ background: "radial-gradient(60% 100% at 30% 100%, color-mix(in oklab, var(--violet) 18%, transparent), transparent 70%)" }} />
           <p className="mono-caps relative">Central de projetos</p>
@@ -120,8 +121,8 @@ function ProjetosPage() {
               { l: "Projetos", v: projects.length, I: FolderKanban, c: "cyan", s: 1 },
               { l: "Demandas", v: stats.total, I: Target, c: "violet", s: 2 },
               { l: "Concluídas", v: stats.done, I: Zap, c: "emerald", s: 3 },
-            ].map(({ l, v, I, c, s }) => (
-              <div key={l} className="accent-card p-4" style={tint(c)}>
+            ].map(({ l, v, I, c, s }, i) => (
+              <Tilt key={l} max={8} className="rounded-3xl"><div className="accent-card card-sheen h-full p-4 animate-rise" style={{ ...tint(c), animationDelay: `${0.1 + i * 0.08}s` }}>
                 <div className="flex items-center justify-between">
                   <span className="icon-tile h-9 w-9"><I size={17} /></span>
                   <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: colorVar(c), boxShadow: `0 0 10px ${colorVar(c)}`, animation: "pulse-ring 2.2s ease-in-out infinite" }} />
@@ -129,16 +130,17 @@ function ProjetosPage() {
                 <p className="mt-3 font-display text-3xl font-semibold">{v}</p>
                 <p className="mono-caps !text-[0.6rem]">{l}</p>
                 <MiniSpark seed={s} color={colorVar(c)} />
-              </div>
+              </div></Tilt>
             ))}
           </div>
           <button onClick={() => setOpen(true)} disabled={!ready} className="shine relative mt-6 disabled:opacity-60 inline-flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-3 font-medium text-primary-foreground shadow-[0_0_30px_-6px_var(--cyan)] transition hover:scale-105">
             <Plus size={18} /> Novo projeto
           </button>
         </Panel>
-        <Panel c="violet" className="flex flex-col items-center justify-center gap-4">
-          <Orbit projects={projects} />
-          <div className="text-center">
+        <Panel c="violet" className="glass-clear flex flex-col items-center justify-center gap-4 overflow-hidden">
+          <div aria-hidden className="pointer-events-none absolute inset-0 m-auto h-3/4 w-3/4 rounded-full opacity-25 blur-3xl" style={{ background: "radial-gradient(circle, var(--violet), transparent 65%)" }} />
+          <div className="relative w-full"><Orbit projects={projects} /></div>
+          <div className="relative text-center">
             <p className="mono-caps">Progresso médio</p>
             <p className="font-display text-3xl font-semibold text-gradient">{stats.avg}%</p>
           </div>
@@ -156,7 +158,8 @@ function ProjetosPage() {
         {shown.map((p, i) => {
           const col = colorVar(p.color);
           return (
-            <Link key={p.id} to="/demandas" search={{ projeto: p.id }} className="accent-card group block p-5 animate-rise" style={{ ["--glow" as string]: col, animationDelay: `${i * 0.08}s` }}>
+            <Tilt key={p.id} max={6} className="rounded-3xl">
+            <Link to="/demandas" search={{ projeto: p.id }} className="accent-card ex-glass group block h-full p-5 animate-rise active:scale-[0.99]" style={{ ["--glow" as string]: col, ["--rail" as string]: col, animationDelay: `${i * 0.08}s` }}>
               <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-30 blur-3xl transition group-hover:opacity-60" style={{ background: col }} />
               <div className="relative flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -174,7 +177,7 @@ function ProjetosPage() {
                 <button type="button" aria-label="Excluir projeto" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (confirm(`Excluir o projeto "${p.name}"?`)) update(projects.filter((x) => x.id !== p.id)); }} className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background/70 text-muted-foreground backdrop-blur transition hover:scale-110 hover:text-destructive"><Trash2 size={14} /></button>
               </div>
               <div className="relative mt-4"><Spark seed={i + 1} color={col} /></div>
-              <div className="relative mt-3 flex items-center justify-between text-sm text-muted-foreground">
+              <div className="relative mt-3 flex items-center justify-between gap-2 text-sm text-muted-foreground transition-[padding] duration-300 group-hover:pr-10 max-sm:pr-10">
                 <span className="flex items-center gap-1.5"><Target size={14} style={{ color: col }} /> {p.done}/{p.demands} demandas</span>
                 <span className="flex items-center gap-1.5"><CalendarClock size={14} /> {new Date(p.due + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>
               </div>
@@ -182,9 +185,10 @@ function ProjetosPage() {
                 <ArrowUpRight size={16} className="text-primary-foreground" />
               </span>
             </Link>
+            </Tilt>
           );
         })}
-        <button onClick={() => setOpen(true)} disabled={!ready} className="glass group relative grid min-h-[230px] disabled:opacity-60 place-items-center overflow-hidden rounded-3xl border-dashed transition hover:shadow-[0_0_40px_-12px_var(--cyan)]">
+        <button onClick={() => setOpen(true)} disabled={!ready} className="glass glass-clear group relative grid min-h-[230px] rounded-3xl transition hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-60 place-items-center overflow-hidden !border-dashed hover:shadow-[0_0_40px_-12px_var(--cyan)]">
           <span aria-hidden className="pointer-events-none absolute inset-0 m-auto h-44 w-44 rounded-full border border-dashed opacity-25 transition group-hover:opacity-60"
             style={{ borderColor: "color-mix(in oklab, var(--cyan) 45%, transparent)", animation: "rail-spin 24s linear infinite" }} />
           <span aria-hidden className="pointer-events-none absolute inset-0 m-auto h-28 w-28 rounded-full border border-dashed opacity-20 transition group-hover:opacity-50"
@@ -215,7 +219,7 @@ function NewProject({ onClose, onCreate, initial }: { onClose: () => void; onCre
         e.preventDefault();
         if (!name.trim()) return;
         onCreate(initial ? { ...initial, name: name.trim(), desc: desc.trim() || initial.desc, color, status, due: due || initial.due } : { id: crypto.randomUUID(), name: name.trim(), desc: desc.trim() || "Novo projeto", color, status, progress: 0, demands: 0, done: 0, due: due || new Date().toISOString().slice(0, 10) });
-      }} className="glass w-full max-w-md rounded-3xl p-6 animate-rise" style={tint(color)}>
+      }} className="glass w-full max-w-md rounded-[2rem] !bg-[oklch(0.14_0.035_265/0.88)] p-6 backdrop-blur-2xl animate-rise" style={tint(color)}>
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display text-xl font-semibold"><Sparkles size={18} className="text-[color:var(--glow)]" /> {initial ? "Editar projeto" : "Novo projeto"}</h2>
           <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X /></button>
