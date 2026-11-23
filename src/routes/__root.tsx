@@ -19,6 +19,7 @@ import { WhatsAppWatcher } from "@/components/whatsapp/WhatsAppWatcher";
 import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { TouchTargets } from "@/components/TouchTargets";
+import { ScaleFrame } from "@/components/ScaleFrame";
 import { ModalGuard } from "@/components/ModalGuard";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { ZoomHint } from "@/components/ZoomHint";
@@ -164,6 +165,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ScaleFrame>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <ServiceWorkerRegistration />
       <AuthProvider><AuthGate><BriefingProvider>
@@ -185,6 +187,7 @@ function RootComponent() {
         <BriefingFlow />
       </BriefingProvider></AuthGate></AuthProvider>
       <Toaster position="top-center" theme="dark" />
+      </ScaleFrame>
     </QueryClientProvider>
   );
 }
