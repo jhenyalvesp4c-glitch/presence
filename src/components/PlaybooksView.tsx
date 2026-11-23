@@ -81,9 +81,9 @@ function RunDialog({ playbook, projectId, onClose, onOpenClients, onOpenLibrary 
   };
   return (
     <Dialog open onOpenChange={(o) => { if (!o && phase !== "running") onClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-[34rem] overflow-hidden rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.82)] p-0 shadow-[0_40px_120px_-30px_var(--violet)] backdrop-blur-2xl [&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-white/10 [&>button]:p-1.5" data-testid="playbook-dialog" aria-describedby={undefined}>
+      <DialogContent className="max-h-[92dvh] max-w-[34rem] overflow-hidden rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.82)] p-0 shadow-[0_40px_120px_-30px_var(--violet)] backdrop-blur-2xl [&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-white/10 [&>button]:p-1.5" data-testid="playbook-dialog" aria-describedby={undefined}>
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden"><span className="absolute -left-24 -top-24 h-64 w-64 rounded-full bg-[var(--cyan)] opacity-[0.16] blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} /><span className="absolute -bottom-28 -right-20 h-64 w-64 rounded-full bg-[var(--violet)] opacity-[0.2] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} /><div className="fin-dots absolute inset-0 opacity-25 [mask-image:radial-gradient(ellipse_at_top,#000,transparent_70%)]" /></div>
-        <div className="relative max-h-[92vh] overflow-y-auto px-7 pb-6 pt-7 scroll-neon">
+        <div className="relative max-h-[92dvh] overflow-y-auto px-7 pb-6 pt-7 scroll-neon">
           <DialogTitle className="sr-only">{playbook.name}</DialogTitle>
           {phase === "done" && result ? (
             <div className="space-y-6 py-2 text-center" data-testid="playbook-resultado">

@@ -27,11 +27,11 @@ function MiniOrb({ phase, onClick }: { phase: Phase; onClick: () => void }) {
   const c = COLOR[phase];
   return (
     <button onClick={onClick} aria-label={phase === "idle" ? "Falar com o Orion" : "Parar ou interromper"} data-testid={phase === "idle" ? "voz-abrir" : "voz-esfera"}
-      className="group relative grid h-16 w-16 place-items-center rounded-full outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-cyan">
+      className="group relative grid h-16 w-16 max-md:h-[3.25rem] max-md:w-[3.25rem] place-items-center rounded-full outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-cyan">
       <span className="absolute inset-0 rounded-full blur-xl transition-colors duration-700" style={{ background: `color-mix(in oklab, ${c} 45%, transparent)`, opacity: phase === "idle" ? 0.45 : 0.9 }} />
       {phase !== "idle" && <span className="absolute inset-0 animate-ping rounded-full" style={{ border: `1.5px solid ${c}`, animationDuration: phase === "listening" ? "1.8s" : phase === "speaking" ? "0.9s" : "2.6s" }} />}
       <span className="absolute inset-1.5 rounded-full border border-dashed opacity-70" style={{ borderColor: c, animation: `spin ${phase === "thinking" ? 1.1 : 12}s linear infinite` }} />
-      <span className="relative grid h-11 w-11 place-items-center rounded-full shadow-[inset_0_0_14px_rgba(255,255,255,.25)] transition-all duration-500"
+      <span className="relative grid h-11 w-11 max-md:h-9 max-md:w-9 place-items-center rounded-full shadow-[inset_0_0_14px_rgba(255,255,255,.25)] transition-all duration-500"
         style={{ background: `radial-gradient(circle at 35% 30%, ${c}, color-mix(in oklab, var(--violet) 70%, black))`, boxShadow: `0 0 26px -2px ${c}`, transform: phase === "speaking" ? "scale(1.12)" : phase === "listening" ? "scale(.94)" : "scale(1)" }}>
         {phase === "idle" || phase === "listening" ? <Mic size={18} className="text-white/90" /> : phase === "thinking" ? <span className="h-3 w-3 animate-pulse rounded-full bg-white/90" /> : <Bars on color="rgba(255,255,255,.95)" />}
       </span>

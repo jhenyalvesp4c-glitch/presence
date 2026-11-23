@@ -126,7 +126,7 @@ export function OrionChat({ autoFocus = false }: { autoFocus?: boolean }) {
       <input ref={fileInput} type="file" multiple hidden accept="image/*,application/pdf,text/*,.md,.csv,.json,.txt" data-testid="conversa-arquivo" onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ""; }} />
       {dragOver && <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-2xl border-2 border-dashed border-cyan bg-background/80 text-sm text-cyan backdrop-blur-sm"><span className="flex items-center gap-2"><Paperclip size={15} /> Solte para anexar</span></div>}
 
-      <div className="max-h-[55vh] min-h-24 space-y-3 overflow-y-auto pr-1" data-testid="conversa-mensagens" aria-live="polite">
+      <div className="max-h-[55dvh] min-h-24 space-y-3 overflow-y-auto pr-1" data-testid="conversa-mensagens" aria-live="polite">
         {bubbles.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
             <p className="flex items-center gap-2 font-medium text-foreground"><Sparkles size={14} className="text-cyan" /> Pode falar comigo por aqui.</p>

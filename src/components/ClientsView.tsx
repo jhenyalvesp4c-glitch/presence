@@ -215,8 +215,8 @@ function ImportDossiers({ dossiers, existing, onClose, onImport, busy }: { dossi
   const toggle = (id: string) => setSel((x) => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
-      <DialogContent className="max-h-[88vh] max-w-lg overflow-hidden rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.9)] p-0 backdrop-blur-2xl" data-testid="clientes-importar-dialogo" aria-describedby={undefined}>
-        <div className="flex max-h-[88vh] flex-col px-6 pb-5 pt-6">
+      <DialogContent className="max-h-[88dvh] max-w-lg overflow-hidden rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.9)] p-0 backdrop-blur-2xl" data-testid="clientes-importar-dialogo" aria-describedby={undefined}>
+        <div className="flex max-h-[88dvh] flex-col px-6 pb-5 pt-6">
           <div className="mb-3 flex items-center gap-3"><span className="icon-tile h-10 w-10 shrink-0 !rounded-full" style={tint("violet")}><Link2 size={16} /></span><div><p className="mono-caps">Clientes</p><DialogTitle className="font-display text-lg font-semibold">Importar dos dossiês</DialogTitle></div></div>
           {free.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Todos os dossiês deste projeto já têm cliente.</p> : <>
             <p className="mb-3 text-xs text-muted-foreground">Cada dossiê marcado vira um cliente, já ligado a ele. Você completa contato, valor e contrato depois.</p>
@@ -324,7 +324,7 @@ function MeetingViewer({ id, onClose }: { id: string; onClose: () => void }) {
   const copiar = async () => { if (!a || !m) return; if (await copyText(analysisToMarkdown(a, m.happenedOn))) toast.success("Ata copiada"); else toast.error("Não consegui copiar."); };
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-3xl gap-0 overflow-hidden rounded-[2rem] border-white/15 bg-[oklch(0.13_0.04_268/0.82)] p-0 shadow-[0_40px_120px_-30px_var(--violet)] backdrop-blur-2xl" data-testid="reuniao-janela" aria-describedby={undefined}>
+      <DialogContent className="max-h-[92dvh] max-w-3xl gap-0 overflow-hidden rounded-[2rem] border-white/15 bg-[oklch(0.13_0.04_268/0.82)] p-0 shadow-[0_40px_120px_-30px_var(--violet)] backdrop-blur-2xl" data-testid="reuniao-janela" aria-describedby={undefined}>
         {/* fundo vivo da janela */}
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
           <span className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[var(--violet)] opacity-30 blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} />
@@ -332,7 +332,7 @@ function MeetingViewer({ id, onClose }: { id: string; onClose: () => void }) {
           <div className="absolute inset-0 opacity-[0.35]" style={{ backgroundImage: "linear-gradient(rgba(140,200,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(140,200,255,.08) 1px, transparent 1px)", backgroundSize: "44px 44px", maskImage: "linear-gradient(180deg, black, transparent 70%)", WebkitMaskImage: "linear-gradient(180deg, black, transparent 70%)" }} />
           {Array.from({ length: 24 }, (_, i) => <span key={i} className="absolute rounded-full bg-white" style={{ left: `${(i * 41 + 7) % 100}%`, top: `${(i * 29 + 5) % 100}%`, width: 1 + (i % 2), height: 1 + (i % 2), opacity: 0.6, animation: `fin-twinkle ${3 + (i % 4)}s ease-in-out ${i % 5}s infinite` }} />)}
         </div>
-        <div className="relative max-h-[92vh] overflow-y-auto p-5 sm:p-7">
+        <div className="relative max-h-[92dvh] overflow-y-auto p-5 sm:p-7">
           <DialogHeader className="space-y-0 text-left">
             <div className="flex items-start gap-4">
               <span className="relative grid h-14 w-14 shrink-0 place-items-center">
@@ -408,7 +408,7 @@ function ClientForm({ initial, dossiers, busy, onClose, onSave }: { initial: Cli
   const lab = (t: string, node: React.ReactNode) => <label className="block space-y-1"><span className="mono-caps">{t}</span>{node}</label>;
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto border-white/10 bg-background" data-testid="cliente-form">
+      <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto border-white/10 bg-background" data-testid="cliente-form">
         <DialogHeader><DialogTitle className="font-display">{initial ? "Editar cliente" : "Novo cliente"}</DialogTitle></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">{lab("Nome do cliente", <input autoFocus value={f.name} onChange={(e) => set("name", e.target.value)} className={inp} data-testid="cliente-nome" maxLength={160} />)}</div>

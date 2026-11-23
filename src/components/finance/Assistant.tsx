@@ -19,7 +19,7 @@ export function FinanceAssistant({ defaultOpen = false }: { defaultOpen?: boolea
       <Head icon={Sparkles} title="Orion do financeiro" sub="Mande prints, PDFs ou escreva (com uma explicação, se quiser). Ele lança, edita, divide e exclui por você."
         right={<button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={open ? "Recolher" : "Abrir"} data-testid="fin-orion-abrir" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:text-foreground"><ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} /></button>} />
       {open ? (
-        <div className="max-h-[75vh] overflow-y-auto" data-testid="fin-orion-chat"><OrionChat /></div>
+        <div className="max-h-[75dvh] overflow-y-auto" data-testid="fin-orion-chat"><OrionChat /></div>
       ) : (
         <ul className="space-y-1.5 text-xs text-muted-foreground">
           {EXEMPLOS.map((e) => <li key={e} className="rounded-xl border border-white/8 bg-black/15 px-3 py-2">“{e}”</li>)}

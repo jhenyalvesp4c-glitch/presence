@@ -53,7 +53,7 @@ export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: 
   return createPortal(
     <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-background/70 p-3 backdrop-blur-md sm:p-6" onClick={onClose} data-testid="voz-painel">
       <div role="dialog" aria-label={panel.titulo} onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[oklch(0.15_0.03_265/0.94)] shadow-[0_40px_120px_-30px_var(--violet),0_0_0_1px_color-mix(in_oklab,var(--cyan)_18%,transparent)]"
+        className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[oklch(0.15_0.03_265/0.94)] shadow-[0_40px_120px_-30px_var(--violet),0_0_0_1px_color-mix(in_oklab,var(--cyan)_18%,transparent)]"
         style={{ animation: "vp-in .55s cubic-bezier(.2,.8,.2,1) both" }}>
         {/* aurora e brilho */}
         <div aria-hidden className="pointer-events-none absolute -left-24 -top-28 h-72 w-72 rounded-full bg-[var(--violet)] opacity-30 blur-3xl" style={{ animation: "vp-aurora 12s ease-in-out infinite" }} />

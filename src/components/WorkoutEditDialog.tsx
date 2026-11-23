@@ -23,7 +23,7 @@ export function WorkoutEditDialog({ workouts, exercises, split, goal, currentId,
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" {...backdropProps(onClose)}>
-      <div onClick={(e) => e.stopPropagation()} className="glass flex max-h-[90vh] w-full max-w-2xl flex-col gap-4 overflow-hidden rounded-3xl p-6 animate-rise">
+      <div onClick={(e) => e.stopPropagation()} className="glass flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-hidden rounded-3xl p-6 animate-rise">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold">Editar treino</h3>
           <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={18} /></button>

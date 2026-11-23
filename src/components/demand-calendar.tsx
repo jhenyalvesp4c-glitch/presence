@@ -327,7 +327,7 @@ function AppointmentDialog({ appt, date: startDate, dossiers, label, saving, onC
     <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => { e.preventDefault(); if (ok) onSave({ title, date, time: allDay ? undefined : time, end: allDay ? undefined : end, place, notes, color, dossierId }); }}
-        className="glass relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label={appt ? "Editar compromisso" : "Novo compromisso"}>
+        className="glass relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95" role="dialog" aria-label={appt ? "Editar compromisso" : "Novo compromisso"}>
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[var(--glow)] shadow-[0_0_16px_var(--glow)]" style={tint(color)} />
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10 transition" style={tint(color)}><CalendarDays size={18} /></span>

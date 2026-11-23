@@ -60,7 +60,7 @@ function KindPicker({ value, onChange }: { value: string; onChange: (k: string) 
       {open && createPortal(
         <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-background/70 p-3 backdrop-blur-md sm:p-6" onClick={() => setOpen(false)} data-testid="doc-tipo-painel">
           <div role="dialog" aria-label="Escolher o tipo de documento" onClick={(e) => e.stopPropagation()}
-            className="relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[oklch(0.15_0.03_265/0.96)] shadow-[0_40px_120px_-30px_var(--violet)]" style={{ animation: "vp-in .45s cubic-bezier(.2,.8,.2,1) both" }}>
+            className="relative flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[oklch(0.15_0.03_265/0.96)] shadow-[0_40px_120px_-30px_var(--violet)]" style={{ animation: "vp-in .45s cubic-bezier(.2,.8,.2,1) both" }}>
             <div aria-hidden className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-[var(--violet)] opacity-25 blur-3xl" />
             <header className="relative flex items-start gap-3 px-6 pb-3 pt-6">
               <div className="min-w-0 flex-1">

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#070a1d"><title>Orion · sem conexão</title>
+<style>
+html,body{height:100%;margin:0;background:radial-gradient(80% 60% at 50% 30%,#14193f 0%,#070a1d 70%);color:#e8ecf5;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{min-height:100%;display:grid;place-items:center;text-align:center;padding:24px;padding-bottom:max(24px,env(safe-area-inset-bottom))}
+.orb{width:96px;height:96px;margin:0 auto 22px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#d9faff,#5fe3ff 20%,#2b8cff 45%,#6d3df0 72%,#2a1070);box-shadow:0 0 60px rgba(70,170,255,.5),inset -8px -10px 20px rgba(20,8,70,.6);animation:p 3.2s ease-in-out infinite}
+@keyframes p{50%{transform:scale(1.06);box-shadow:0 0 80px rgba(110,120,255,.65),inset -8px -10px 20px rgba(20,8,70,.6)}}
+h1{font-size:1.5rem;margin:0 0 8px;font-weight:600}
+p{margin:0 auto 22px;max-width:22rem;color:#9aa3bd}
+button{font:inherit;font-weight:600;color:#04121a;border:0;border-radius:999px;padding:14px 28px;min-height:48px;background:linear-gradient(90deg,#22d3ee,#a78bfa);box-shadow:0 10px 34px -10px #22d3ee}
+button:active{transform:scale(.96)}
+</style></head>
+<body><main><div><div class="orb" aria-hidden="true"></div><h1>Sem conexão</h1><p>O Orion precisa de internet para trazer as suas informações. Confira o sinal e tente de novo.</p><button onclick="location.reload()">Tentar de novo</button></div></main></body></html>

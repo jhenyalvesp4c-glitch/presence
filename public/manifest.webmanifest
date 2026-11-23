@@ -1,0 +1,26 @@
+{
+  "name": "Orion · Assistente pessoal",
+  "short_name": "Orion",
+  "description": "Seu assistente pessoal: rotina, saúde, foco, finanças e clientes num só lugar.",
+  "id": "/",
+  "start_url": "/assistente",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070a1d",
+  "theme_color": "#070a1d",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["productivity", "lifestyle", "finance"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Central do dia", "short_name": "Central", "url": "/central", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tarefas", "url": "/tarefas", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Financeiro", "url": "/financeiro", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Reuniões", "url": "/reunioes", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

@@ -563,7 +563,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in max-sm:place-items-end max-sm:p-0 sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials }); }}
-        className="glass relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]" role="dialog" aria-label="Nova demanda">
+        className="glass relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]" role="dialog" aria-label="Nova demanda">
         <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" />
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10" style={tint("cyan")}><Plus size={18} /></span>
@@ -888,7 +888,7 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
               <div className="mb-2 flex items-center justify-between rounded-full max-md:hidden border border-[color-mix(in_oklab,var(--glow)_40%,transparent)] bg-[color-mix(in_oklab,var(--glow)_12%,transparent)] px-2.5 py-1 text-[0.62rem] text-[var(--glow)] shadow-[inset_0_1px_0_rgba(255,255,255,.1)] backdrop-blur">
                 <span className="truncate">{statusMeta[s].label}</span><span className="font-mono">{col.length}</span>
               </div>
-              <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1 max-md:max-h-[55vh] max-md:space-y-2.5" data-testid={`coluna-${type}-${s}`}>
+              <div className="max-h-[26rem] space-y-2 overflow-y-auto overscroll-contain pr-1 max-md:max-h-[55dvh] max-md:space-y-2.5" data-testid={`coluna-${type}-${s}`}>
                 {col.map((d, i) => <MiniCard key={d.id} d={d} active={selId === d.id} onClick={() => onOpen(d.id)} delay={i} />)}
                 {!col.length && <div className="grid place-items-center gap-1 rounded-xl border border-dashed border-white/15 py-3 text-center text-[0.6rem] text-muted-foreground/70"><span aria-hidden className="relative grid h-6 w-6 place-items-center"><span className="absolute inset-0 rounded-full border border-[var(--glow)]/40" style={{ animation: "pulse-ring 3s ease-out infinite" }} /><span className="h-1.5 w-1.5 rounded-full bg-[var(--glow)] shadow-[0_0_10px_var(--glow)]" /></span>vazio</div>}
               </div>

@@ -25,9 +25,9 @@ function Editor({ initial, custom, onClose, save, reset, busy }: { initial: Setu
   const fld = "min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50";
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
-      <DialogContent className="max-h-[92vh] max-w-[38rem] overflow-hidden rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.84)] p-0 shadow-[0_40px_120px_-30px_var(--violet)] backdrop-blur-2xl [&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-white/10 [&>button]:p-1.5" data-testid="implantacao-modelo" aria-describedby={undefined}>
+      <DialogContent className="max-h-[92dvh] max-w-[38rem] overflow-hidden rounded-[2rem] border-white/10 bg-[oklch(0.14_0.035_265/0.84)] p-0 shadow-[0_40px_120px_-30px_var(--violet)] backdrop-blur-2xl [&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-white/10 [&>button]:p-1.5" data-testid="implantacao-modelo" aria-describedby={undefined}>
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden"><span className="absolute -left-24 -top-24 h-64 w-64 rounded-full bg-[var(--cyan)] opacity-[0.14] blur-3xl" style={{ animation: "fin-aurora 18s ease-in-out infinite" }} /><span className="absolute -bottom-28 -right-20 h-64 w-64 rounded-full bg-[var(--violet)] opacity-[0.18] blur-3xl" style={{ animation: "fin-aurora 22s ease-in-out infinite reverse" }} /></div>
-        <div className="relative max-h-[92vh] overflow-y-auto px-7 pb-6 pt-7 scroll-neon">
+        <div className="relative max-h-[92dvh] overflow-y-auto px-7 pb-6 pt-7 scroll-neon">
           <div className="mb-5 flex items-center gap-3"><span className="icon-tile h-10 w-10 shrink-0 !rounded-full shadow-[0_0_28px_-6px_var(--glow)]" style={tint("cyan")}><Rocket size={16} /></span><div className="min-w-0"><p className="mono-caps">{custom ? "Padrão do projeto" : "Modelo inicial"}</p><DialogTitle className="font-display text-lg font-semibold">Roteiro de implantação</DialogTitle></div></div>
           <p className="mb-5 text-xs leading-relaxed text-muted-foreground">Monte uma vez. Todo cliente novo (pelo playbook ou pela ficha) já começa com estas fases e passos, e você só ajusta o que for diferente. {phases.length} fases · {total} passos.</p>
 

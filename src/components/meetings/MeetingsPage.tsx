@@ -112,9 +112,9 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
       {burst > 0 && <Burst key={burst} />}
       {!embedded &&       <HeroPanel glow="var(--violet)"><div className="grid items-center gap-6 lg:grid-cols-[1.4fr_0.6fr]"><div>
         <p className="mono-caps flex items-center gap-3">Assistente de reuniões <LiveDot color="var(--emerald)" label="ata em segundos" /></p>
-        <h1 className="mt-3 font-serif text-5xl leading-[0.95] tracking-tight md:text-7xl">Reuniões <span className="text-gradient inline-block pr-3 italic">sem esforço</span></h1>
+        <h1 className="mt-3 font-serif text-4xl leading-[0.95] tracking-tight sm:text-5xl md:text-7xl">Reuniões <span className="text-gradient inline-block pr-3 italic">sem esforço</span></h1>
         <p className="mt-3 max-w-xl text-sm text-muted-foreground">Cole a conversa do WhatsApp, grave a reunião ou traga os grupos. O Orion entrega a ata, as decisões, quem ficou de fazer o quê — e já manda as ações para a Central virarem demandas e lembretes.</p></div>
-        <div className="mx-auto"><OrbitArt size={190}><Mic size={32} className="text-violet drop-shadow-[0_0_14px_var(--violet)]" /></OrbitArt></div></div></HeroPanel>}
+        <div className="mx-auto max-sm:hidden"><OrbitArt size={190}><Mic size={32} className="text-violet drop-shadow-[0_0_14px_var(--violet)]" /></OrbitArt></div></div></HeroPanel>}
 
       <div className="mt-5 flex gap-1 rounded-2xl border border-white/10 bg-black/20 p-1 sm:w-fit" role="tablist" aria-label="Área" data-testid="abas-reunioes">{([["reunioes", "Reuniões e grupos", FileText], ["demandas", "Demandas do WhatsApp", Radar]] as const).map(([k, l, I]) => <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} data-testid={`aba-${k}`} className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm transition sm:flex-none ${view === k ? "bg-cyan/10 text-cyan shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--cyan)_45%,transparent),0_0_24px_-8px_var(--cyan)]" : "text-muted-foreground hover:text-foreground"}`}><I size={15} />{l}</button>)}</div>
       {view === "demandas" ? <div className="mt-5"><WhatsAppDemands /></div> : <>

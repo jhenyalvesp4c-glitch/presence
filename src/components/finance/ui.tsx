@@ -120,7 +120,7 @@ export function Modal({ open, onClose, title, subtitle, children, width = "max-w
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[80] grid place-items-end overflow-y-auto bg-background/70 p-0 backdrop-blur-md sm:place-items-center sm:p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }} data-testid="fin-modal">
-      <div role="dialog" aria-modal="true" aria-labelledby={id} className={`relative flex max-h-[92vh] w-full ${width} flex-col overflow-hidden rounded-t-[2rem] border border-white/10 bg-[oklch(0.15_0.03_265/0.96)] shadow-[0_40px_120px_-30px_var(--violet)] sm:rounded-[2rem]`} style={{ animation: "fin-modal .45s cubic-bezier(.2,.8,.2,1) both" }}>
+      <div role="dialog" aria-modal="true" aria-labelledby={id} className={`relative flex max-h-[92dvh] w-full ${width} flex-col overflow-hidden rounded-t-[2rem] border border-white/10 bg-[oklch(0.15_0.03_265/0.96)] shadow-[0_40px_120px_-30px_var(--violet)] sm:rounded-[2rem]`} style={{ animation: "fin-modal .45s cubic-bezier(.2,.8,.2,1) both" }}>
         <span aria-hidden className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-[var(--violet)] opacity-25 blur-3xl" style={{ animation: "fin-aurora 12s ease-in-out infinite" }} />
         <span aria-hidden className="pointer-events-none absolute -bottom-28 -right-16 h-64 w-64 rounded-full bg-[var(--cyan)] opacity-15 blur-3xl" style={{ animation: "fin-aurora 15s ease-in-out infinite reverse" }} />
         <header className="relative flex items-start justify-between gap-4 px-6 pb-3 pt-6">
@@ -128,7 +128,7 @@ export function Modal({ open, onClose, title, subtitle, children, width = "max-w
           <button onClick={onClose} aria-label="Fechar" className={btn.icon}><X size={16} /></button>
         </header>
         <div className="relative min-h-0 flex-1 overflow-y-auto px-6 pb-5">{children}</div>
-        {footer && <footer className="relative flex flex-wrap items-center justify-end gap-2 border-t border-white/10 px-6 py-4">{footer}</footer>}
+        {footer && <footer className="relative flex flex-wrap items-center justify-end gap-2 border-t border-white/10 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">{footer}</footer>}
       </div>
     </div>, document.body);
 }

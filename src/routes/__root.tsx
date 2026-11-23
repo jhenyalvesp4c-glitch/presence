@@ -18,6 +18,8 @@ import { UpdateWatcher } from "@/components/UpdateWatcher";
 import { WhatsAppWatcher } from "@/components/whatsapp/WhatsAppWatcher";
 import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { TouchTargets } from "@/components/TouchTargets";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { ZoomHint } from "@/components/ZoomHint";
 import { VoiceProvider } from "@/lib/voice/use-voice";
 import { AuthProvider } from "@/lib/auth";
@@ -89,6 +91,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover" },
+      { name: "theme-color", content: "#070a1d" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Orion" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black" },
+      { name: "format-detection", content: "telephone=no" },
       { title: "Orion · Assistente pessoal" },
       { name: "description", content: "Orion, seu assistente pessoal para rotina, saúde, foco e finanças." },
       { property: "og:title", content: "Orion · Assistente pessoal" },
@@ -97,6 +105,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/icon-192.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -149,12 +160,16 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <ServiceWorkerRegistration />
       <AuthProvider><AuthGate><BriefingProvider>
       <VoiceProvider>
         <GlobalRail />
         <MobileTabBar />
         <ZoomHint />
         <div className={railPad}><HealthPreviewProvider><Outlet /></HealthPreviewProvider></div>
+        {/* espaço no fim da página: o conteúdo rola até acima dos botões flutuantes */}
+        <div aria-hidden className="h-16 md:hidden" />
+        <TouchTargets />
         <OrionDock />
         <VoiceDock />
         <ReminderWatcher />

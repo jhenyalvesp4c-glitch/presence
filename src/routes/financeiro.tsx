@@ -87,16 +87,17 @@ function FinancePage() {
       ) : (
         <>
           {/* a moldura de luz fica numa caixa fixa; só o miolo rola (senão a borda rola junto e "acaba" antes das últimas abas) */}
-          <div className="glass fin-frame sticky top-3 z-20 mb-7 rounded-2xl">
-          <nav ref={tabsRef} aria-label="Seções do financeiro" className="scroll-thin flex gap-1 overflow-x-auto rounded-2xl p-1.5" role="tablist" data-testid="fin-abas">
+          <div className="glass fin-frame sticky top-3 z-20 mb-7 flex items-center gap-1 rounded-2xl">
+          <nav ref={tabsRef} aria-label="Seções do financeiro" className="scroll-thin flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-2xl p-1.5" role="tablist" data-testid="fin-abas">
             {TABS.map((t) => { const M = TAB_META[t], on = t === tab; return (
               <button key={t} role="tab" aria-selected={on} onClick={() => go(t)} data-testid={`fin-aba-${t}`}
                 className={`relative flex shrink-0 items-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-sm transition ${on ? "text-cyan shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--cyan)_45%,transparent),0_0_28px_-6px_var(--cyan)]" : "text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"}`}>
                 {on && <span aria-hidden className="absolute inset-0 bg-gradient-to-br from-cyan/20 via-cyan/5 to-violet/20" style={{ animation: "fin-fade .35s both" }} />}
                 {on && <span aria-hidden className="absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan to-transparent" />}
                 <M.icon size={16} className="relative" /><span className="relative">{M.label}</span></button>); })}
-            <button className="sticky right-0 ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-brand text-[#04121a] shadow-[0_8px_24px_-8px_var(--cyan)] md:hidden" onClick={() => open()} aria-label="Adicionar movimentação (atalho)" data-testid="fin-adicionar-rapido"><Plus size={18} /></button>
+
           </nav>
+          <button className="mr-1.5 grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-brand text-[#04121a] shadow-[0_8px_24px_-8px_var(--cyan)] md:hidden" onClick={() => open()} aria-label="Adicionar movimentação (atalho)" data-testid="fin-adicionar-rapido"><Plus size={18} /></button>
           </div>
           <div key={tab + (item ?? "")} style={{ animation: "fin-rise .5s both" }}>
             {tab === "visao" && <Dashboard onOpenCard={(id) => go("contas", `card:${id}`)} onOpenAccount={(id) => go("contas", `acc:${id}`)} onAdd={() => open()} onTab={(t) => go(t as Tab)} onDraft={(d) => open(d)} />}
