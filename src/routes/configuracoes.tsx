@@ -9,6 +9,7 @@ import { useVoice } from "@/lib/voice/use-voice";
 import { listImprovements, STATUS_LABEL, type Improvement } from "@/lib/data/improvements";
 import { avg, onPerf, perfSamples, type PerfSample } from "@/lib/voice/perf";
 import { toast } from "sonner";
+import { PushSettings } from "@/components/PushSettings";
 import { directEnabled, enableDirect, startBridge, waGet, waPost, waPrefs, type WaStatus } from "@/lib/whatsapp/client";
 
 export const Route = createFileRoute("/configuracoes")({ component: Configuracoes, head: () => ({ meta: [{ title: "Configurações · Orion" }] }) });
@@ -255,6 +256,8 @@ function Configuracoes() {
       </section>
 
       <ChamarPorVoz />
+
+      <PushSettings />
 
       <PedidosMelhoria />
 

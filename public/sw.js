@@ -2,7 +2,7 @@
  * - Páginas: sempre da rede (dados sempre atuais); sem internet, mostra /offline.html.
  * - Arquivos do app (/assets/*, com nome que muda a cada versão): guardados para abrir mais rápido.
  * - Nada de API, Supabase, voz ou login passa por aqui. */
-const VERSION = "orion-v1";
+const VERSION = "orion-v2";
 const SHELL = ["/offline.html", "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -31,4 +31,23 @@ self.addEventListener("fetch", (e) => {
       return res;
     }));
   }
+});
+
+/* Avisos (Web Push): o servidor manda { title, body, url, tag }; aqui vira uma notificação. */
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Orion", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Orion", {
+    body: d.body || "", icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", tag: d.tag || undefined,
+    data: { url: d.url || "/assistente" }, renotify: false,
+  }));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "/assistente";
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ("focus" in c) { c.navigate(url).catch(() => undefined); return c.focus(); } }
+    return self.clients.openWindow(url);
+  }));
 });

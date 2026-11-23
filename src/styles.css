@@ -655,3 +655,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   /* Botões Salvar/Cancelar das janelas do Financeiro ficam presos no pé: alcançáveis mesmo com o teclado aberto */
   .fin-modal-body .fin-actions { position: sticky; bottom: 0; z-index: 10; margin-left: -1.5rem; margin-right: -1.5rem; padding: .75rem 1.5rem calc(.75rem + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.1); background: oklch(0.15 0.03 265 / .96); backdrop-filter: blur(12px); }
 }
+
+/* Janelas centralizadas (grid + place-items-center): se forem mais altas que a tela (teclado aberto), rolam em vez de cortar o fim. */
+@media (max-width: 767px) {
+  .fixed.inset-0[class*="place-items-center"] { overflow-y: auto; align-items: safe center; overscroll-behavior: contain; }
+}

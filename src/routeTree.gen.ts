@@ -51,6 +51,9 @@ import { Route as SaudeTreinoRouteImport } from './routes/saude_.treino'
 import { Route as TreinoExerciciosRouteImport } from './routes/treino_.exercicios'
 import { Route as TreinoNovaRouteImport } from './routes/treino_.nova'
 import { Route as ApiMcpTokenRouteImport } from './routes/api.mcp.$token'
+import { Route as ApiPushChaveRouteImport } from './routes/api.push.chave'
+import { Route as ApiPushCronRouteImport } from './routes/api.push.cron'
+import { Route as ApiPushTesteRouteImport } from './routes/api.push.teste'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -262,6 +265,21 @@ const ApiMcpTokenRoute = ApiMcpTokenRouteImport.update({
   path: '/$token',
   getParentRoute: () => ApiMcpRoute,
 } as any)
+const ApiPushChaveRoute = ApiPushChaveRouteImport.update({
+  id: '/api/push/chave',
+  path: '/api/push/chave',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushCronRoute = ApiPushCronRouteImport.update({
+  id: '/api/push/cron',
+  path: '/api/push/cron',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushTesteRoute = ApiPushTesteRouteImport.update({
+  id: '/api/push/teste',
+  path: '/api/push/teste',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -306,6 +324,9 @@ export interface FileRoutesByFullPath {
   '/treino/exercicios': typeof TreinoExerciciosRoute
   '/treino/nova': typeof TreinoNovaRoute
   '/api/mcp/$token': typeof ApiMcpTokenRoute
+  '/api/push/chave': typeof ApiPushChaveRoute
+  '/api/push/cron': typeof ApiPushCronRoute
+  '/api/push/teste': typeof ApiPushTesteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -350,6 +371,9 @@ export interface FileRoutesByTo {
   '/treino/exercicios': typeof TreinoExerciciosRoute
   '/treino/nova': typeof TreinoNovaRoute
   '/api/mcp/$token': typeof ApiMcpTokenRoute
+  '/api/push/chave': typeof ApiPushChaveRoute
+  '/api/push/cron': typeof ApiPushCronRoute
+  '/api/push/teste': typeof ApiPushTesteRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -395,6 +419,9 @@ export interface FileRoutesById {
   '/treino_/exercicios': typeof TreinoExerciciosRoute
   '/treino_/nova': typeof TreinoNovaRoute
   '/api/mcp/$token': typeof ApiMcpTokenRoute
+  '/api/push/chave': typeof ApiPushChaveRoute
+  '/api/push/cron': typeof ApiPushCronRoute
+  '/api/push/teste': typeof ApiPushTesteRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -441,6 +468,9 @@ export interface FileRouteTypes {
     | '/treino/exercicios'
     | '/treino/nova'
     | '/api/mcp/$token'
+    | '/api/push/chave'
+    | '/api/push/cron'
+    | '/api/push/teste'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -485,6 +515,9 @@ export interface FileRouteTypes {
     | '/treino/exercicios'
     | '/treino/nova'
     | '/api/mcp/$token'
+    | '/api/push/chave'
+    | '/api/push/cron'
+    | '/api/push/teste'
   id:
     | '__root__'
     | '/'
@@ -529,6 +562,9 @@ export interface FileRouteTypes {
     | '/treino_/exercicios'
     | '/treino_/nova'
     | '/api/mcp/$token'
+    | '/api/push/chave'
+    | '/api/push/cron'
+    | '/api/push/teste'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -572,6 +608,9 @@ export interface RootRouteChildren {
   SaudeTreinoRoute: typeof SaudeTreinoRoute
   TreinoExerciciosRoute: typeof TreinoExerciciosRoute
   TreinoNovaRoute: typeof TreinoNovaRoute
+  ApiPushChaveRoute: typeof ApiPushChaveRoute
+  ApiPushCronRoute: typeof ApiPushCronRoute
+  ApiPushTesteRoute: typeof ApiPushTesteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -870,6 +909,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMcpTokenRouteImport
       parentRoute: typeof ApiMcpRoute
     }
+    '/api/push/chave': {
+      id: '/api/push/chave'
+      path: '/api/push/chave'
+      fullPath: '/api/push/chave'
+      preLoaderRoute: typeof ApiPushChaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push/cron': {
+      id: '/api/push/cron'
+      path: '/api/push/cron'
+      fullPath: '/api/push/cron'
+      preLoaderRoute: typeof ApiPushCronRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push/teste': {
+      id: '/api/push/teste'
+      path: '/api/push/teste'
+      fullPath: '/api/push/teste'
+      preLoaderRoute: typeof ApiPushTesteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -935,6 +995,9 @@ const rootRouteChildren: RootRouteChildren = {
   SaudeTreinoRoute: SaudeTreinoRoute,
   TreinoExerciciosRoute: TreinoExerciciosRoute,
   TreinoNovaRoute: TreinoNovaRoute,
+  ApiPushChaveRoute: ApiPushChaveRoute,
+  ApiPushCronRoute: ApiPushCronRoute,
+  ApiPushTesteRoute: ApiPushTesteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
