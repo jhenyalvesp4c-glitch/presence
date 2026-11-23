@@ -2,7 +2,7 @@
  * - Páginas: sempre da rede (dados sempre atuais); sem internet, mostra /offline.html.
  * - Arquivos do app (/assets/*, com nome que muda a cada versão): guardados para abrir mais rápido.
  * - Nada de API, Supabase, voz ou login passa por aqui. */
-const VERSION = "orion-v2b";
+const VERSION = "orion-v2c";
 const SHELL = ["/offline.html", "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
