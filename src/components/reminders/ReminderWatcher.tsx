@@ -75,7 +75,7 @@ export function ReminderWatcher() {
       const mine = claimed ? due.filter((d) => claimed.has(d.id)) : due;
       if (!mine.length) return;
       if ("Notification" in window && Notification.permission === "granted") {
-        for (const d of mine) { try { new Notification("Lembrete", { body: `${d.title}\n${hhmm(d.at)}`, tag: `lembrete-${d.id}`, requireInteraction: true }); } catch { /* sem notificação */ } }
+        for (const d of mine) { try { new Notification("Lembrete", { body: `${d.title}\n${hhmm(d.at)}`, tag: `lembrete-${d.id}`, requireInteraction: true, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png" }); } catch { /* sem notificação */ } }
       }
       speakSoon(mine);
     } finally { busy.current = false; }

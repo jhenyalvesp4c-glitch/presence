@@ -349,6 +349,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     const say = (chunks: string[]) => chunks.forEach((c) => sp.enqueue(c));
     // se a resposta está demorando e ainda não veio nada, avisa em voz alta (nunca fica em silêncio)
     let gotAny = false;
+    let panelNow = false; // este pedido já trouxe um painel?
     const slow = greeting ? undefined : setTimeout(() => { if (turn.current === my && !gotAny) say([SLOW_FILLER]); }, SLOW_AFTER_MS);
     const calm = () => { gotAny = true; if (slow) clearTimeout(slow); };
     try {
@@ -362,6 +363,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         const box: { tools: Extract<VoiceEvent, { t: "ferramenta" }> | null } = { tools: null };
         const handle = (e: VoiceEvent) => {
           if (turn.current !== my) return;
+          if (e.t === "painel") panelNow = true;
           if (e.t !== "fim") calm();
           if (e.t === "status") setStatus(e.m);
           else if (e.t === "texto") {
@@ -371,7 +373,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
             const t = takeSentences(buffer, { first });
             buffer = t.rest; first = t.first; say(t.chunks);
           } else if (e.t === "acao") {
-            if (e.a.tipo === "navegar") router.history.push(e.a.para); else if (e.a.tipo === "atualizar") window.dispatchEvent(new Event("orion:financeiro-atualizado")); else endAfter.current = true;
+            if (e.a.tipo === "navegar") { if (!panelNow) setPanel(null); router.history.push(e.a.para); } // abrir outra página tira o que estava na tela, a menos que este pedido tenha trazido um painel novo else if (e.a.tipo === "atualizar") window.dispatchEvent(new Event("orion:financeiro-atualizado")); else endAfter.current = true;
           } else if (e.t === "painel") setPanel(e.p);
           else if (e.t === "ferramenta") { box.tools = e; cur.tools = true; }
           else if (e.t === "erro") { said = said || e.m; say([e.m]); }

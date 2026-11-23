@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { useVoice } from "@/lib/voice/use-voice";
@@ -65,8 +66,8 @@ export function WhatsAppWatcher() {
       }
       for (const m of fresh) {
         const title = `${who(m)} ${reasonText(m.why)} ${where(m)}`;
-        toast(title, { description: clip(m.text || `(${m.kind})`, 200), duration: 15_000 });
-        if ("Notification" in window && Notification.permission === "granted") { try { new Notification(title, { body: clip(m.text || `(${m.kind})`, 200), tag: `wa-${m.chat}-${m.id}` }); } catch { /* sem notificação */ } }
+        toast(title, { description: clip(m.text || `(${m.kind})`, 200), duration: 15_000, icon: <MessageCircle size={18} />, className: "orion-toast-wa" });
+        if ("Notification" in window && Notification.permission === "granted") { try { new Notification(title, { body: clip(m.text || `(${m.kind})`, 200), tag: `wa-${m.chat}-${m.id}`, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png" }); } catch { /* sem notificação */ } }
       }
       if (fresh.length) {
         pending.current.push(...fresh);

@@ -679,3 +679,28 @@ html[data-lock="1"] { height: 100%; overflow-x: hidden; }
 @keyframes hud-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hud-fade-out { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .hud-card { animation: none !important; } }
+
+/* ───────── Avisos (toasts) com a cara do Orion: vidro, brilho na cor do tipo, linha de luz ───────── */
+[data-sonner-toast] {
+  --orion-tone: var(--cyan);
+  position: relative; overflow: hidden;
+  border-radius: 1.15rem !important;
+  border: 1px solid color-mix(in oklab, var(--orion-tone) 40%, transparent) !important;
+  background: linear-gradient(135deg, oklch(0.22 0.055 280 / .94), oklch(0.15 0.04 255 / .92)) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  color: var(--foreground) !important;
+  box-shadow: 0 22px 60px -22px var(--orion-tone), 0 0 0 1px rgb(255 255 255 / .04), inset 0 1px 0 rgb(255 255 255 / .1) !important;
+  padding: .95rem 1.05rem !important; gap: .75rem !important;
+}
+[data-sonner-toast]::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: linear-gradient(90deg, transparent, var(--orion-tone), transparent); background-size: 60% 100%; background-repeat: no-repeat; animation: vp-sweep 3.2s ease-in-out infinite; opacity: .9; }
+[data-sonner-toast]::after { content: ""; position: absolute; inset-block: .9rem; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--orion-tone); box-shadow: 0 0 14px var(--orion-tone); }
+[data-sonner-toast] [data-title] { font-weight: 600; letter-spacing: .005em; color: var(--foreground) !important; }
+[data-sonner-toast] [data-description] { color: color-mix(in oklab, var(--foreground) 72%, transparent) !important; line-height: 1.35; }
+[data-sonner-toast] [data-icon] { color: var(--orion-tone); filter: drop-shadow(0 0 8px var(--orion-tone)); }
+[data-sonner-toast] [data-close-button] { background: oklch(0.2 0.04 265) !important; border-color: rgb(255 255 255 / .15) !important; color: var(--foreground) !important; }
+[data-sonner-toast] [data-button] { border-radius: 999px !important; background: linear-gradient(90deg, var(--cyan), var(--violet)) !important; color: oklch(0.15 0.03 265) !important; font-weight: 600; }
+[data-sonner-toast][data-type="success"] { --orion-tone: var(--emerald); }
+[data-sonner-toast][data-type="error"] { --orion-tone: oklch(0.72 0.18 10); }
+[data-sonner-toast][data-type="warning"] { --orion-tone: oklch(0.82 0.15 75); }
+[data-sonner-toast].orion-toast-wa { --orion-tone: oklch(0.78 0.19 150); }
+@media (prefers-reduced-motion: reduce) { [data-sonner-toast]::before { animation: none; } }

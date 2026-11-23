@@ -44,7 +44,7 @@ export function HudPanel({ panel, leaving, onClose, onOpen }: { panel: Panel; le
 
   return createPortal(
     <div className={`pointer-events-none fixed inset-0 z-[70] ${leaving ? "hud-leave" : ""}`} data-testid="voz-painel" role="dialog" aria-label={panel.titulo}>
-      <div aria-hidden className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 38%, transparent 30%, oklch(0.08 0.03 265 / .55) 100%)", animation: leaving ? "hud-fade-out .45s ease both" : "hud-fade .6s ease both" }} />
+      <div aria-hidden className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 38%, oklch(0.1 0.03 265 / .12) 25%, oklch(0.08 0.03 265 / .5) 100%)", backdropFilter: "blur(2.5px) brightness(.9) saturate(1.05)", WebkitBackdropFilter: "blur(2.5px) brightness(.9) saturate(1.05)", animation: leaving ? "hud-fade-out .45s ease both" : "hud-fade .6s ease both" }} />
 
       <div className="absolute inset-x-0 top-[5dvh] mx-auto flex max-h-[90dvh] w-full max-w-6xl flex-col items-center gap-4 px-3 sm:px-6">
         {/* cabeçalho flutuante */}

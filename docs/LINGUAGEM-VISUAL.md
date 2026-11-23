@@ -35,3 +35,8 @@
 
 ## HUD do Orion (o que a voz mostra na tela)
 Painéis da voz usam `HudPanel` (`src/components/voice/HudPanel.tsx`): cartões de vidro **flutuantes** (não bloqueiam a tela) com cantos de mira, varredura de luz, entrada de lados diferentes com desfoque, flutuação lenta, troca automática de página a cada 8 s (pausa com o mouse), pontos de navegação e saída animada. Fecham sozinhos quando a pessoa agradece ou dispensa ("obrigada", "pode fechar", "não preciso mais" — `src/lib/voice/dismiss.ts`). Painéis de confirmação e conversa do WhatsApp continuam em janela (`VoicePanel`, `WhatsChat`). Animações `hud-*` em `styles.css`.
+
+## Avisos (toasts) e HUD
+- Todo aviso (`sonner`) segue a identidade do Orion por CSS global (`[data-sonner-toast]` em `styles.css`): vidro escuro azul-violeta, borda e brilho na cor do tipo (ciano padrão, esmeralda sucesso, rosa erro, âmbar aviso, **verde WhatsApp** com `className: "orion-toast-wa"`), linha de luz animada e barra lateral. Nunca estilize um toast à mão: use `toast(...)`.
+- Notificações do sistema (`new Notification`) levam o ícone da esfera (`/icons/icon-192.png`).
+- O HUD da voz escurece e desfoca o fundo só um pouco (profundidade 3D) e some quando o Orion abre outra página.
