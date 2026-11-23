@@ -39,11 +39,12 @@ export async function executeRecord(r: Resolved, ctx: Ctx): Promise<Created[]> {
       const items = await demandsOf(pid!);
       const type = r.escopo === "geral" ? "geral" : r.escopo === "polo" ? "polo" : "multi";
       const code = nextCode(items, type);
-      const desc = [r.descricao?.trim(), r.responsavel ? `Responsável: ${r.responsavel}` : "", r.checklist?.length ? `Checklist:\n${r.checklist.map((c) => `- [ ] ${c}`).join("\n")}` : ""].filter(Boolean).join("\n\n") || "Sem descrição.";
+      const desc = [r.descricao?.trim(), r.responsavel ? `Responsável: ${r.responsavel}` : ""].filter(Boolean).join("\n\n") || "Sem descrição.";
       const d: Demand = {
         id: code, type, title: r.titulo.trim(), desc, priority: r.prioridade ?? "media", status: "todo", deadline: deadlineLabel(r.prazo),
         history: [{ d: ddmm(ctx.now), text: type === "multi" ? `Demanda criada pelo assistente (MCP) para ${r._dossies!.length} polo${r._dossies!.length === 1 ? "" : "s"}` : "Demanda criada pelo assistente (MCP)", s: "todo" }],
         notes: [],
+        ...(r.checklist?.length ? { checklist: r.checklist.map((c) => c.trim()).filter(Boolean).map((text) => ({ text: text.slice(0, 500), done: false })) } : {}),
         ...(type === "polo" ? { polo: r._dossie!.name } : {}),
         ...(type === "multi" ? { polos: r._dossies!.map((x) => ({ name: x.name, status: "todo" as const })) } : {}),
       };

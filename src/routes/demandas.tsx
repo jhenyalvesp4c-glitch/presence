@@ -29,6 +29,7 @@ import { DemandCalendar } from "@/components/demand-calendar";
 import { DemandMaterials, NewDemandMaterials } from "@/components/demand-materials";
 import { EMPTY_MATERIALS, deleteMaterials, materialsKey, moveMaterials, putMaterials, type Materials } from "@/lib/demand-materials";
 import { createPortal } from "react-dom";
+import { DictateButton, appendSpoken } from "@/components/DictateButton";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
@@ -251,12 +252,13 @@ function Demandas() {
   });
   const setPoloNote = (id: string, name: string, note: string) => update(id, (d) => ({ ...d, polos: d.polos?.map((p) => (p.name === name ? { ...p, note } : p)) }));
   const dropMaterials = (codes: Iterable<string>) => { if (pid) for (const c of codes) deleteMaterials(materialsKey(pid, c)).catch(() => undefined); };
-  const createDemand = (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials }) => {
+  const createDemand = (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials; checklist?: string[] }) => {
     const multi = f.type === "multi";
     const d: Demand = {
       id: nextCode(items, f.type), type: f.type, title: f.title, desc: f.desc || "Sem descrição.", priority: f.priority, status: f.status,
       deadline: f.deadline || "—", polo: f.type === "polo" ? f.targets[0] : undefined,
       polos: multi ? f.targets.map((name) => ({ name, status: "todo" as Status })) : undefined,
+      ...(f.checklist?.length ? { checklist: f.checklist.map((text) => ({ text: text.slice(0, 500), done: false })) } : {}),
       history: [{ d: today(), text: multi ? `Demanda criada para ${f.targets.length} ${f.targets.length === 1 ? sing : L.plural.toLowerCase()}` : "Demanda criada", s: "todo" }], notes: [],
     };
     setItems((xs) => [d, ...xs]);
@@ -567,13 +569,13 @@ function TargetPicker({ names, value, onChange, single }: { names: string[]; val
 
 function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   start: { type: DType; status: Status }; dossiers: string[]; onClose: () => void;
-  onCreate: (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials }) => void;
+  onCreate: (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials; checklist?: string[] }) => void;
 }) {
   const [materials, setMaterials] = useState<Materials>(EMPTY_MATERIALS);
   const tm = useTM();
   const [type, setType] = useState<DType>(start.type);
   const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
+  const [desc, setDesc] = useState(""), [steps, setSteps] = useState("");
   const [priority, setPriority] = useState<Priority>("media");
   const [date, setDate] = useState("");
   const [targets, setTargets] = useState<string[]>([]);
@@ -583,7 +585,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in max-sm:place-items-end max-sm:p-0 sm:p-4" {...backdropProps(onClose)}>
-      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials }); }}
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials, checklist: steps.split("\n").map((x) => x.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim()).filter(Boolean) }); }}
         className="glass relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:pb-[var(--sab)]" role="dialog" aria-label="Nova demanda">
         <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" />
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
@@ -600,8 +602,14 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
           </label>
           <label className="block">
             <span className="mono-caps">Descrição</span>
-            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="Detalhes (opcional)"
-              className="mt-1 w-full resize-none rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
+            <div className="relative"><textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="Detalhes (opcional) — ou toque no microfone e fale"
+              className="mt-1 w-full resize-none rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60 pr-12" /><DictateButton onText={(t) => setDesc((x) => appendSpoken(x, t, "\n"))} label="Detalhes" /></div>
+            <div className="relative">
+              <span className="mono-caps flex items-center gap-1.5"><CheckSquare size={11} /> Checklist <span className="normal-case tracking-normal text-muted-foreground">(um passo por linha, opcional)</span></span>
+              <textarea value={steps} onChange={(e) => setSteps(e.target.value)} rows={3} placeholder={"Tudo o que precisa ser feito, um passo por linha\nex.: Criar o usuário Maria no polo Niterói\n       Fazer o disparo do template renegociação"} data-testid="nova-checklist"
+                className="mt-1 w-full resize-y rounded-xl border border-border bg-secondary/40 px-3 py-2 pr-12 text-sm outline-none focus:border-cyan/60" />
+              <DictateButton onText={(t) => setSteps((x) => appendSpoken(x, t, "\n"))} label="Checklist" className="right-2 top-8" />
+            </div>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -1412,7 +1420,7 @@ function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onSta
             <button onClick={onClose} className="self-start rounded-full p-1.5 text-muted-foreground transition hover:rotate-90 hover:bg-secondary hover:text-foreground" aria-label="Fechar"><X size={18} /></button>
           </div>
           {editing ? (
-            <textarea value={d.desc} onChange={(e) => onEdit({ desc: e.target.value })} rows={3} className="w-full rounded-xl border border-border bg-secondary/60 p-2 text-sm outline-none" />
+            <div className="relative"><textarea value={d.desc} onChange={(e) => onEdit({ desc: e.target.value })} rows={3} className="w-full rounded-xl border border-border bg-secondary/60 p-2 pr-12 text-sm outline-none" /><DictateButton onText={(t) => onEdit({ desc: appendSpoken(d.desc, t, "\n") })} label="Descrição" /></div>
           ) : <p className="text-sm leading-relaxed text-muted-foreground">{d.desc}</p>}
 
           {/* meta */}

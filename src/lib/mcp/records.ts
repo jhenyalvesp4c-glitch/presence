@@ -25,7 +25,7 @@ export const demandaSchema = z.object({
   dossie: z.string().max(120).optional().describe("Nome exato do polo/dossiê (escopo polo)."),
   dossies: z.array(z.string().max(120)).max(60).optional().describe("Nomes exatos dos polos/dossiês (escopo multipolo)."),
   titulo: z.string().min(1).max(300), descricao: z.string().max(5000).optional(), prioridade: prio.optional(),
-  prazo: date.optional(), checklist: z.array(z.string().min(1).max(300)).max(40).optional().describe("Itens a cumprir; entram na descrição."),
+  prazo: date.optional(), checklist: z.array(z.string().min(1).max(400)).max(40).optional().describe("TUDO o que precisa ser feito, um item por ação concreta e detalhada; vira o checklist da demanda (para riscar)."),
   responsavel: z.string().max(120).optional(),
 });
 export const compromissoSchema = z.object({

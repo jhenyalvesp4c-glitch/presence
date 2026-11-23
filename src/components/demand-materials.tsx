@@ -1,3 +1,4 @@
+import { DictateButton, appendSpoken } from "@/components/DictateButton";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { backdropProps } from "@/lib/backdrop";
@@ -218,9 +219,12 @@ export function DemandMaterials({ storageKey }: { storageKey: string | null }) {
           </div>
           {editing || (!m.body && ready) ? (
             <div>
-              <textarea value={m.body} onChange={(e) => update((x) => ({ ...x, body: e.target.value }))} rows={editing ? 8 : 3} autoFocus={editing}
-                placeholder="Cole aqui o texto que te mandaram (ex.: o corpo do template)…"
-                className="w-full resize-y rounded-xl border border-border bg-secondary/40 p-2.5 text-xs leading-relaxed outline-none focus:border-cyan/60" />
+              <div className="relative">
+                <textarea value={m.body} onChange={(e) => update((x) => ({ ...x, body: e.target.value }))} rows={editing ? 8 : 3} autoFocus={editing}
+                  placeholder="Cole aqui o texto que te mandaram (ex.: o corpo do template) — ou toque no microfone e fale"
+                  className="w-full resize-y rounded-xl border border-border bg-secondary/40 p-2.5 pr-12 text-xs leading-relaxed outline-none focus:border-cyan/60" />
+                <DictateButton onText={(t) => update((x) => ({ ...x, body: appendSpoken(x.body, t, "\n") }))} label="Conteúdo" />
+              </div>
               {editing && <button type="button" onClick={() => setEditing(false)} className="mt-1 flex items-center gap-1 text-[0.7rem] text-cyan"><Check size={12} /> Pronto</button>}
             </div>
           ) : m.body ? (
@@ -250,8 +254,11 @@ export function NewDemandMaterials({ value, onChange }: { value: Materials; onCh
   return (
     <div className="space-y-2">
       <span className="mono-caps flex items-center gap-1.5"><Paperclip size={11} /> Conteúdo e anexos <span className="normal-case tracking-normal text-muted-foreground">(opcional)</span></span>
-      <textarea value={value.body} onChange={(e) => onChange({ ...value, body: e.target.value })} rows={3} placeholder="Corpo do texto (ex.: o texto do template que te mandaram)"
-        className="w-full resize-y rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
+      <div className="relative">
+        <textarea value={value.body} onChange={(e) => onChange({ ...value, body: e.target.value })} rows={3} placeholder="Corpo do texto (ex.: o texto do template que te mandaram) — ou toque no microfone e fale"
+          className="w-full resize-y rounded-xl border border-border bg-secondary/40 px-3 py-2 pr-12 text-sm outline-none focus:border-cyan/60" />
+        <DictateButton onText={(t) => onChange({ ...value, body: appendSpoken(value.body, t, "\n") })} label="Conteúdo" />
+      </div>
       <FileTiles files={value.files} onRemove={(id) => onChange({ ...value, files: value.files.filter((f) => f.id !== id) })} />
       <FileDropZone onAdd={add} pasteAnywhere />
     </div>

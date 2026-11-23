@@ -41,3 +41,7 @@ Variáveis novas só valem depois de **republicar** (Redeploy). A chamada usa `r
 - **Anotações exigem projeto** (as notas do Orion são por projeto).
 - **Lembretes não notificam** (o Orion não tem notificações): o lembrete é um registro com data e hora.
 - **Testado:** fluxo completo no navegador com um servidor de IA **simulado** (que também confere o formato da chamada: endereço `/v1/responses`, chave, modelo e imagem como `input_image`) (prints, cartões por destino, pendências, edição, mover, remover, copiar, confirmar, desfazer) e a validação/gravação reais no banco. **A leitura real de prints/PDFs pela OpenAI só foi conferida contra a documentação oficial, não com a chave real; o nome do modelo padrão também não pôde ser verificado na sua conta.**
+
+## Demanda com checklist de verdade e microfone nos campos
+- A IA da Central (e a voz, `registrar`) devolve em `checklist` **todas as ações** da demanda (um item por ação, detalhado) e em `descricao` só o resumo. Ao confirmar, `execute.ts` grava o checklist **real** da demanda (riscável na janela da demanda), em vez de colar texto na descrição.
+- Criar demanda em Demandas: campo **Checklist** (um passo por linha) e microfone (`DictateButton`) em Detalhes, Checklist e "Conteúdo e anexos"; o mesmo microfone existe na descrição e no Material da demanda aberta.
