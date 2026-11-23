@@ -6,6 +6,7 @@ const body = z.object({
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(6000) })).min(1).max(24),
   // Conversa escrita (tela): texto, imagens, PDFs e arquivos de texto anexados à última mensagem.
   modo: z.enum(["voz", "chat"]).optional(),
+  finalizar: z.boolean().optional(),
   anexos: z.array(z.object({ name: z.string().min(1).max(200), mime: z.string().min(1).max(100), data: z.string().max(4_200_000) })).max(6).optional()
     .refine((l) => !l || l.reduce((n, f) => n + f.data.length, 0) <= 4_000_000, "Arquivos grandes demais (máx. ~3 MB no total)."),
   // Continuação depois que o navegador executou ferramentas (WhatsApp): o estado da rodada + os resultados.
@@ -57,7 +58,7 @@ export const Route = createFileRoute("/api/voz")({
         const stream = new ReadableStream<Uint8Array>({
           async start(controller) {
             const emit = (e: unknown) => { if (!closed) { try { controller.enqueue(enc.encode(`${JSON.stringify(e)}\n`)); } catch { closed = true; } } };
-            await runAgent(parsed.messages, emit, parsed.continuar, { modo: parsed.modo ?? "voz", anexos: parsed.anexos ?? [] });
+            await runAgent(parsed.messages, emit, parsed.continuar, { modo: parsed.modo ?? "voz", anexos: parsed.anexos ?? [], finalizar: parsed.finalizar === true });
             if (!closed) { try { controller.close(); } catch { /* já fechado */ } }
           },
         });

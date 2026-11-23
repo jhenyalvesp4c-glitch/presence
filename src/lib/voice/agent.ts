@@ -633,7 +633,7 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
 /* ───────────── conversa ───────────── */
 const CHAT_MODE = `MODO CONVERSA ESCRITA: ela está digitando na tela (texto, imagens, arquivos) e LÊ a resposta; não está ouvindo. Aqui vale responder de forma completa e organizada (listas curtas, passos), sem a regra de frases curtas faladas. Se ela mandar imagem, PDF ou arquivo, analise o conteúdo de verdade e responda sobre ele. Se o pedido for algo que nenhuma ferramenta sua faz (ex.: um print de um erro, uma tela para mudar, uma função nova), use pedir_melhoria: o Claude NÃO vê a imagem, então descreva no pedido, com detalhes, o que aparece nela (tela, textos, valores, o que está errado ou o que ela quer) e o que precisa mudar.`;
 
-export type AgentOpts = { modo?: "voz" | "chat"; anexos?: Anexo[] };
+export type AgentOpts = { modo?: "voz" | "chat"; anexos?: Anexo[]; /** última rodada: responde com o que já tem, sem chamar mais ferramentas */ finalizar?: boolean };
 export async function runAgent(history: Turn[], emit: Emit, resume?: Resume, opts: AgentOpts = {}): Promise<void> {
   if (!process.env["OPENAI_API_KEY"]) { emit({ t: "erro", m: "A conversa por voz precisa da OPENAI_API_KEY no servidor." }); return; }
   const model = process.env["OPENAI_VOICE_MODEL"]?.trim() || process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
@@ -664,7 +664,10 @@ export async function runAgent(history: Turn[], emit: Emit, resume?: Resume, opt
   try {
     let spoke = false; // já falou algo neste pedido? (aí não repete o aviso de "estou verificando")
     for (let round = 0; round < 5; round++) {
-      const { text, calls } = await streamChat({ model, messages, tools: TOOLS, tool_choice: "auto", max_completion_tokens: chat ? 2000 : 700, reasoning_effort: "low" }, (d) => { if (d.trim()) spoke = true; emit({ t: "texto", d }); });
+      // última rodada (ou pedido de encerrar): sem ferramentas, só responde com o que já tem — nunca fica mudo
+      const noTools = opts.finalizar === true || round === 4;
+      if (noTools) messages.push({ role: "system", content: "Responda AGORA, em uma ou duas frases, com o que já descobriu. Se algo não deu certo (por exemplo a ponte do WhatsApp não respondeu), diga em poucas palavras o que faltou e que ela pode pedir de novo. Não use mais ferramentas." });
+      const { text, calls } = await streamChat({ model, messages, ...(noTools ? {} : { tools: TOOLS, tool_choice: "auto" }), max_completion_tokens: chat ? 2000 : 700, reasoning_effort: "low" }, (d) => { if (d.trim()) spoke = true; emit({ t: "texto", d }); });
       if (!calls.length) break;
       let said = text;
       if (!spoke) {

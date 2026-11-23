@@ -351,7 +351,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     const calm = () => { gotAny = true; if (slow) clearTimeout(slow); };
     try {
       let body: Record<string, unknown> = { messages: history.current };
-      for (let round = 0; round < 4; round++) {
+      for (let round = 0; round < 9; round++) {
+        if (round === 8) body = { ...body, finalizar: true }; // muitas idas e vindas com a ponte: pede para responder com o que já tem
         const res = await fetch("/api/voz", { method: "POST", headers: { "content-type": "application/json", ...(await authHeaders()) }, body: JSON.stringify(body), signal: ctrl.signal });
         if (!res.ok || !res.body) throw new Error(res.status === 429 ? "Calma, estou recebendo pedidos demais. Tente em instantes." : "Não consegui falar com o servidor.");
         const reader = res.body.getReader(), dec = new TextDecoder();

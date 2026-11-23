@@ -21,18 +21,24 @@ let token: string | null = null;
 type Out<T> = { ok: true; data: T } | { ok: false; erro: string; offline: boolean };
 export async function bridgeDirect<T = unknown>(path: string, method: "GET" | "POST" = "GET"): Promise<Out<T>> {
   if (!directEnabled()) return { ok: false, erro: "acesso direto desligado", offline: true };
-  try {
-    if (!token) {
-      const r = await fetch(`${base()}/parear`, { mode: "cors", signal: AbortSignal.timeout(3000) });
-      if (!r.ok) return { ok: false, erro: `a ponte recusou este site (${r.status})`, offline: true };
-      token = ((await r.json()) as { token?: string }).token ?? null;
-      if (!token) return { ok: false, erro: "a ponte não entregou a senha", offline: true };
-    }
-    const res = await fetch(`${base()}${path}`, { method, headers: { "x-presence-token": token }, mode: "cors", signal: AbortSignal.timeout(7000) });
-    if (res.status === 401) { token = null; return { ok: false, erro: "a ponte foi reiniciada, tente de novo", offline: true }; }
-    if (!res.ok) return { ok: false, erro: `a ponte respondeu ${res.status}`, offline: false };
-    return { ok: true, data: (await res.json()) as T };
-  } catch (e) { return { ok: false, erro: `não alcancei a ponte em ${base()} (${e instanceof Error ? e.message : "erro"})`, offline: true }; }
+  let last: Out<T> = { ok: false, erro: "sem resposta", offline: true };
+  // tenta até 3 vezes: a ponte pode estar ocupada (varredura) ou ter sido reiniciada (senha nova) — falha de um instante não vira "perdi a conexão"
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
+    try {
+      if (!token) {
+        const r = await fetch(`${base()}/parear`, { mode: "cors", signal: AbortSignal.timeout(4000) });
+        if (!r.ok) return { ok: false, erro: `a ponte recusou este site (${r.status})`, offline: true };
+        token = ((await r.json()) as { token?: string }).token ?? null;
+        if (!token) return { ok: false, erro: "a ponte não entregou a senha", offline: true };
+      }
+      const res = await fetch(`${base()}${path}`, { method, headers: { "x-presence-token": token }, mode: "cors", signal: AbortSignal.timeout(15000) });
+      if (res.status === 401) { token = null; last = { ok: false, erro: "a ponte foi reiniciada", offline: true }; continue; }
+      if (!res.ok) { last = { ok: false, erro: `a ponte respondeu ${res.status}`, offline: false }; if (res.status >= 500) continue; return last; }
+      return { ok: true, data: (await res.json()) as T };
+    } catch (e) { last = { ok: false, erro: `não alcancei a ponte em ${base()} (${e instanceof Error ? e.message : "erro"})`, offline: true }; }
+  }
+  return last;
 }
 
 /** Consulta a ponte: primeiro direto do navegador; se não der, pelo servidor do app (app local). */

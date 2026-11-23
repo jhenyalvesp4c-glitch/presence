@@ -48,3 +48,7 @@ Além de marcações e respostas, o Orion avisa (tela, notificação e voz) quan
 - a mensagem fala de CRM (P4C, disparo em massa, usuários, templates, conexão, QR code, API oficial…), **exceto** se também falar de campanha, anúncio, valor, preço, orçamento, verba, saldo ou R$.
 
 As regras ficam em `src/lib/whatsapp/relevance.ts` (só texto, sem IA, sem custo) e podem ser ajustadas em Configurações → WhatsApp → "Ajustar as palavras dos avisos". Exige a ponte atualizada (rota `GET /recentes`); com a ponte antiga só avisa marcações.
+
+## Voz no site publicado: robustez
+- O navegador tenta a ponte até 3 vezes (reparea sozinho se ela foi reiniciada; espera até 15 s) antes de dizer que ela não respondeu.
+- Até 8 idas e vindas navegador↔servidor por pedido; se ainda faltar resposta, o app pede uma rodada final (`finalizar`) em que o Orion responde com o que já tem, sem ferramentas — nunca fica mudo.
