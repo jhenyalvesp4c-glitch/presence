@@ -93,3 +93,8 @@ Configurações → "Velocidade da conversa" mostra, para as últimas 8 resposta
 - O orbe, o chat e o Perguntar/Documentar usam as mesmas tabelas e a mesma busca (`loadCorpus` em `orion.functions.ts`). O que se documenta em qualquer um aparece nos outros.
 - A busca (Perguntar e `buscar_no_orion`) enxerga anotações, demandas, tarefas, notas, conversas, treinamentos **e** memórias, hábitos, saúde (peso/medidas, dieta, treino), listas, plano do dia, financeiro (saldos, faturas, assinaturas) e acertos de contas (`orion-extra.ts`).
 - Para ações (lançar, editar, excluir) o orbe/chat usam as ferramentas específicas; o Perguntar só responde.
+
+## Conversa natural (nome e avisos)
+- Conversa comum ("tudo bem?", "como você está") é respondida direto, sem ferramenta e sem aviso.
+- O aviso antes de demorar ("Já estou buscando.", "Vou dar uma olhada para você.") só sai quando uma ferramenta de verdade vai rodar (`src/lib/voice/filler.ts`, regras no `PERSONA` de `agent.ts`). O aviso de resposta lenta (`SLOW_FILLER`) só dispara depois de 4,5 s e diz apenas "Só um instante."
+- O nome da pessoa é usado na saudação e raramente depois; nunca nos avisos.

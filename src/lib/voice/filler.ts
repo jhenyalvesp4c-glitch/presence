@@ -3,9 +3,9 @@ const LOOKUP = new Set(["buscar_no_orion", "consultar_registros", "resumo_do_dia
 const WHATS = new Set(["whatsapp_ler", "whatsapp_conversas", "whatsapp_marcar_lidas"]);
 const DOING = new Set(["registrar", "atualizar_demanda", "gerenciar_tarefa", "documentar", "lembrar", "esquecer", "lista", "roteiro"]);
 
-const VERIFY = ["Estou verificando para você.", "Já estou verificando, só um instante.", "Deixa eu verificar isso para você."];
-const OPENING = ["Estou abrindo o seu WhatsApp, só um instante.", "Já estou olhando o seu WhatsApp, um instante."];
-const WORKING = ["Pode deixar, já estou fazendo isso.", "Certo, já estou cuidando disso.", "Já estou fazendo, só um instante."];
+const VERIFY = ["Já estou buscando.", "Vou dar uma olhada para você.", "Deixa eu ver isso.", "Estou procurando aqui."];
+const OPENING = ["Já estou abrindo o WhatsApp.", "Vou olhar o WhatsApp agora."];
+const WORKING = ["Pode deixar, já estou fazendo.", "Certo, já estou cuidando disso.", "Estou fazendo agora."];
 
 const pick = <T,>(list: T[], seed: string): T => list[[...seed].reduce((n, c) => n + c.charCodeAt(0), 0) % list.length]!;
 
@@ -20,5 +20,5 @@ export function fillerFor(toolNames: string[], seed = ""): string {
 }
 
 /** Frase para quando a resposta está demorando e ainda não se sabe o que será feito. */
-export const SLOW_FILLER = "Um instante, estou verificando para você.";
-export const SLOW_AFTER_MS = 2200;
+export const SLOW_FILLER = "Só um instante.";
+export const SLOW_AFTER_MS = 4500;

@@ -38,7 +38,7 @@ describe("voz: financeiro", () => {
   });
   it("a ferramenta existe, é consulta (avisa que está verificando) e está descrita para a IA", () => {
     expect(TOOLS.some((t) => (t as { function: { name: string } }).function.name === "financeiro")).toBe(true);
-    expect(fillerFor(["financeiro"], "x")).toMatch(/verific/i);
+    expect(fillerFor(["financeiro"], "x")).toMatch(/busca|olhada|ver isso|procurando/i);
   });
 });
 
