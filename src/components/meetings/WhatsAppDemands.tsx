@@ -1,5 +1,5 @@
 /** Verificar demandas no WhatsApp: um clique lê todos os grupos e conversas privadas (com imagens e PDFs), a IA lista os pedidos e você decide o que é demanda; o que você marcar segue para a Central. */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { AlertTriangle, BellOff, Brain, Check, CheckCheck, FileText, Loader2, MessageCircle, Quote, Radar, RefreshCw, Search, Send, Users, X } from "lucide-react";
@@ -11,6 +11,9 @@ import { backdropProps } from "@/lib/backdrop";
 import { useDecide, useDecided, useRules, useSaveRules, useUndecide } from "@/lib/data/wa-requests";
 import { DEFAULT_RULES, buildBatches, groupChats, mergeRequests, requestsToInboxText, sinceSeconds, type ImageRef, type Req, type WaMessage } from "@/lib/wa-requests";
 import { findRequests } from "@/lib/wa-requests.functions";
+import { loadOrgContext, planFor, runOrganize } from "@/lib/data/wa-organize";
+import type { OrgAction, OrgCtx } from "@/lib/wa-requests";
+import { ListChecks } from "lucide-react";
 import { startBridge, waGet } from "@/lib/whatsapp/client";
 
 const ls = { get: (k: string, d = "") => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sem armazenamento */ } } };
@@ -41,6 +44,8 @@ export function WhatsAppDemands() {
   const [reqs, setReqs] = useState<Req[]>([]), [imgs, setImgs] = useState<Map<number, Img>>(new Map()), [sel, setSel] = useState<Set<string>>(new Set()), [q, setQ] = useState(""), [showResolved, setShowResolved] = useState(false);
   const [stats, setStats] = useState<{ conversas: number; mensagens: number; ocultos: number; falhas: number; truncado: boolean } | null>(null), [inbox, setInbox] = useState<{ id: number; text: string; files: LocalFile[] } | null>(null), [zoom, setZoom] = useState<Img | null>(null);
   const abort = useRef(false), inboxRef = useRef<HTMLDivElement>(null);
+  const [org, setOrg] = useState<{ actions: OrgAction[]; ctx: OrgCtx[]; reqs: Req[] } | null>(null), [orgBusy, setOrgBusy] = useState(false);
+  const openDemands = useRef<{ codigo: string; titulo: string; dossie: string; projeto: string }[]>([]);
   const decidedKeys = useMemo(() => new Map((decided.data ?? []).map((d) => [d.key, d.status])), [decided.data]);
 
   const scan = async () => {
@@ -48,6 +53,8 @@ export function WhatsAppDemands() {
     setProg({ txt: "Falando com o WhatsApp…", done: 0, total: 0 });
     const st = await waGet<{ phase: string }>("status");
     if (!st.ok) { setOffline(st.erro); setPhase("idle"); return; }
+    // as demandas já abertas: a IA liga o que chegou à demanda certa em vez de abrir outra
+    try { const c = await loadOrgContext(); openDemands.current = c.flatMap((x) => x.demands.filter((d) => d.status !== "done").map((d) => ({ codigo: d.id.replace(/^#/, ""), titulo: d.title, dossie: d.polo ?? "", projeto: x.name }))).slice(0, 60); } catch { openDemands.current = []; }
     const last = Number(ls.get("orion:wa:varredura", "0")) || null, since = sinceSeconds(period, last), startedAt = Math.floor(Date.now() / 1000);
     setProg({ txt: "Buscando as mensagens…", done: 0, total: 0 });
     const r = await waGet<{ ok?: boolean; messages: WaMessage[]; truncated: boolean }>("varredura", { since: String(since), limit: "3000" });
@@ -66,7 +73,7 @@ export function WhatsAppDemands() {
       }
       setProg({ txt: `A IA está procurando pedidos (${i + 1}/${batches.length})…`, done: i, total: batches.length });
       try {
-        const res = await findRequests({ data: { texto: b.text, hoje: iso(), diaSemana: new Date().toLocaleDateString("pt-BR", { weekday: "long" }), euSou, regras: rulesQ.data ?? "", aceitos: aceitos.slice(0, 12).map((d) => ({ titulo: d.title, chat: d.chat, trecho: d.quote })), descartados: descartados.slice(0, 12).map((d) => ({ titulo: d.title, chat: d.chat, trecho: d.quote })), files } });
+        const res = await findRequests({ data: { texto: b.text, hoje: iso(), diaSemana: new Date().toLocaleDateString("pt-BR", { weekday: "long" }), euSou, regras: rulesQ.data ?? "", aceitos: aceitos.slice(0, 12).map((d) => ({ titulo: d.title, chat: d.chat, trecho: d.quote })), descartados: descartados.slice(0, 12).map((d) => ({ titulo: d.title, chat: d.chat, trecho: d.quote })), demandas: openDemands.current, files } });
         if (res.ok) lists.push(res.pedidos); else { falhas++; toast.error(res.error); }
       } catch (e) { falhas++; toast.error(`Falhou um lote: ${(e as Error).message}`); }
     }
@@ -92,6 +99,31 @@ export function WhatsAppDemands() {
     setReqs((r) => r.filter((x) => !sel.has(x.key))); setSel(new Set());
     setTimeout(() => inboxRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   };
+  const organize = async () => {
+    const chosen = reqs.filter((x) => sel.has(x.key)); if (!chosen.length) { toast.error("Marque pelo menos um pedido."); return; }
+    setOrgBusy(true);
+    try { const ctx = await loadOrgContext(); setOrg({ actions: planFor(chosen, ctx), ctx, reqs: chosen }); }
+    catch (e) { toast.error(`Não consegui olhar as demandas: ${(e as Error).message}`); }
+    setOrgBusy(false);
+  };
+  const confirmOrganize = async () => {
+    if (!org) return; setOrgBusy(true);
+    try {
+      const r = await runOrganize(org.actions, org.ctx);
+      decide.mutate({ reqs: org.reqs, status: "enviada" }, { onError: (e) => toast.error(e.message) });
+      const ks = new Set(org.reqs.map((x) => x.key)); setReqs((l) => l.filter((x) => !ks.has(x.key))); setSel(new Set());
+      toast.success(`${r.updated ? `${r.updated} ${r.updated === 1 ? "demanda atualizada" : "demandas atualizadas"}` : ""}${r.updated && r.created ? " · " : ""}${r.created ? `${r.created} ${r.created === 1 ? "criada" : "criadas"}` : ""} — ${r.steps} ${r.steps === 1 ? "passo" : "passos"} no checklist`);
+      setOrg(null);
+    } catch (e) { toast.error(`Não consegui organizar: ${(e as Error).message}`); }
+    setOrgBusy(false);
+  };
+  // "Orion, verifica o WhatsApp": a voz abre esta tela com ?verificar=1 e a leitura começa sozinha
+  const auto = useRef(false);
+  useEffect(() => {
+    if (auto.current || typeof location === "undefined" || new URLSearchParams(location.search).get("verificar") !== "1") return;
+    auto.current = true; window.history.replaceState(null, "", location.pathname + "?aba=demandas"); void scan();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const turnOn = async () => { setStarting(true); const r = await startBridge(); if (!r.ok) toast.error(r.erro); else { toast.success("WhatsApp ligado em segundo plano"); setOffline(null); } setStarting(false); };
 
   return (
@@ -119,6 +151,7 @@ export function WhatsAppDemands() {
           <label className="relative min-w-0 flex-1"><Search size={12} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrar por grupo, pessoa ou assunto…" className="w-full rounded-full border border-white/10 bg-black/25 py-1.5 pl-8 pr-3 text-xs outline-none focus:border-emerald/60" /></label>
           <button type="button" onClick={() => setSel(new Set(visible.map((x) => x.key)))} className="text-xs text-emerald hover:underline" data-testid="marcar-todos"><CheckCheck size={12} className="mr-1 inline" />Marcar todos</button><button type="button" onClick={() => setSel(new Set())} className="text-xs text-muted-foreground hover:underline">Limpar</button>
           <button type="button" onClick={() => dismiss(visible.filter((x) => !sel.has(x.key)))} className="text-xs text-muted-foreground hover:text-destructive hover:underline" data-testid="descartar-restantes"><BellOff size={12} className="mr-1 inline" />Descartar os não marcados</button>
+          <button type="button" onClick={() => void organize()} disabled={!sel.size || orgBusy} className="inline-flex items-center gap-2 rounded-full border border-cyan/50 bg-cyan/15 px-5 py-2 text-sm font-medium text-cyan shadow-[0_0_28px_-10px_var(--cyan)] transition hover:bg-cyan/25 active:scale-95 disabled:opacity-40" data-testid="organizar-demandas">{orgBusy ? <Loader2 size={14} className="animate-spin" /> : <ListChecks size={14} />} Organizar nas demandas ({sel.size})</button>
           <button type="button" onClick={send} disabled={!sel.size} className="inline-flex items-center gap-2 rounded-full border border-emerald/50 bg-emerald/15 px-5 py-2 text-sm font-medium text-emerald shadow-[0_0_28px_-10px_var(--emerald)] transition hover:bg-emerald/25 active:scale-95 disabled:opacity-40" data-testid="criar-demandas"><Send size={14} /> Criar demandas ({sel.size})</button></div>
         {hiddenResolved > 0 && <button type="button" onClick={() => setShowResolved((o) => !o)} className="px-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{showResolved ? "Esconder" : "Mostrar"} {hiddenResolved} que parece(m) já resolvido(s)</button>}
         <ul className="space-y-3" data-testid="pedidos">{visible.map((x, i) => {
@@ -130,7 +163,7 @@ export function WhatsAppDemands() {
                 <div className="min-w-0 flex-1">
                   <h3 className="font-display text-base font-semibold leading-snug">{x.titulo}</h3>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[0.65rem] text-muted-foreground"><span className="inline-flex items-center gap-1">{x.grupo ? <Users size={10} className="text-emerald" /> : <MessageCircle size={10} className="text-cyan" />}{x.chat}</span><span>· {x.quem}</span><span>· {x.quando}</span>{x.prazo && <span className="text-amber">· prazo {dm(x.prazo)}</span>}<span className="inline-flex items-center gap-1" style={{ color: c }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: c, boxShadow: `0 0 6px ${c}` }} />{x.prioridade === "media" ? "normal" : x.prioridade}</span>
-                    {x.paraMim === "talvez" && <span className="rounded-full bg-white/10 px-1.5">pedido geral</span>}{x.resolvido && <span className="rounded-full bg-emerald/15 px-1.5 text-emerald">parece resolvido</span>}{x.confianca !== "alta" && <span className="rounded-full bg-amber/15 px-1.5 text-amber">confiança {x.confianca}</span>}</p>
+                    {x.tipo === "complemento" && <span className="rounded-full bg-cyan/15 px-1.5 text-cyan">complemento{x.demanda ? ` de #${x.demanda}` : ""}</span>}{x.paraMim === "talvez" && <span className="rounded-full bg-white/10 px-1.5">pedido geral</span>}{x.resolvido && <span className="rounded-full bg-emerald/15 px-1.5 text-emerald">parece resolvido</span>}{x.confianca !== "alta" && <span className="rounded-full bg-amber/15 px-1.5 text-amber">confiança {x.confianca}</span>}</p>
                   {x.detalhes && <p className="mt-2 text-sm text-muted-foreground">{x.detalhes}</p>}
                   {x.trecho && <blockquote className="mt-2 flex gap-2 border-l border-white/15 pl-3 text-xs italic text-muted-foreground"><Quote size={11} className="mt-0.5 shrink-0 opacity-60" />{x.trecho}</blockquote>}
                   {x.imagens.some((n) => imgs.has(n)) && <div className="mt-3 flex flex-wrap gap-2" data-testid="evidencias">{x.imagens.map((n) => imgs.get(n)).filter((v): v is Img => !!v).map((im) => <button key={im.n} type="button" onClick={() => setZoom(im)} className="group relative h-16 w-16 overflow-hidden rounded-xl border border-white/10 hover:border-emerald/60" aria-label={`Ver ${im.file.name}`}>{im.file.mime.startsWith("image/") && im.file.preview ? <img src={im.file.preview} alt="" className="h-full w-full object-cover" /> : <span className="grid h-full w-full place-items-center bg-black/30 text-muted-foreground"><FileText size={20} /></span>}</button>)}</div>}
@@ -141,6 +174,25 @@ export function WhatsAppDemands() {
         })}</ul>
       </>}
       {phase === "done" && reqs.length === 0 && !inbox && <p className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-muted-foreground" data-testid="sem-pedidos">Nenhum pedido novo encontrado neste período. 🎉</p>}
+
+      {org && createPortal(
+        <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-background/70 p-3 backdrop-blur-md" {...backdropProps(() => !orgBusy && setOrg(null))} data-testid="organizar-dialogo">
+          <div role="dialog" aria-label="Organizar nas demandas" onClick={(e) => e.stopPropagation()} className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[oklch(0.14_0.035_265/0.92)] shadow-[0_40px_120px_-30px_var(--cyan)] backdrop-blur-2xl" style={{ animation: "vp-in .45s cubic-bezier(.2,.8,.2,1) both" }}>
+            <header className="flex items-start gap-3 px-6 pb-3 pt-6"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan/15 text-cyan"><ListChecks size={20} /></span>
+              <div className="min-w-0 flex-1"><p className="mono-caps !text-[0.6rem]">Organizar</p><h2 className="font-serif text-2xl"><span className="text-gradient">Onde cada pedido vai entrar</span></h2>
+                <p className="mt-1 text-xs text-muted-foreground">O que já tem demanda aberta do mesmo dossiê só é atualizado (passos no checklist e tudo o que foi enviado nas observações). Só cria demanda quando não existe nenhuma.</p></div>
+              <button type="button" onClick={() => setOrg(null)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition hover:rotate-90 hover:text-foreground"><X size={16} /></button></header>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 pb-4">
+              {org.actions.map((a, i) => (
+                <div key={i} className={`rounded-2xl border p-3 ${a.kind === "update" ? "border-cyan/40 bg-cyan/[0.06]" : "border-emerald/40 bg-emerald/[0.06]"}`} data-testid="organizar-acao">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`tag ${a.kind === "update" ? "!text-cyan" : "!text-emerald"}`}>{a.kind === "update" ? "Atualiza" : "Cria nova"}</span>{a.kind === "update" ? <><span className="font-mono text-xs text-muted-foreground">{a.code}</span> {a.title}</> : a.title}{a.dossier && <span className="text-xs text-muted-foreground">· {a.dossier}</span>}</p>
+                  <ul className="mt-2 space-y-1 pl-1 text-xs text-muted-foreground">{a.add.map((t, k) => <li key={k} className="flex gap-2"><Check size={11} className="mt-0.5 shrink-0 text-emerald" /><span className="min-w-0 break-words">{t}</span></li>)}</ul>
+                </div>))}
+              {!org.actions.length && <p className="py-6 text-center text-sm text-muted-foreground">Nada para organizar.</p>}
+            </div>
+            <footer className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-3"><button type="button" onClick={() => setOrg(null)} disabled={orgBusy} className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs transition hover:border-cyan/40 active:scale-95">Cancelar</button>
+              <button type="button" onClick={() => void confirmOrganize()} disabled={orgBusy || !org.actions.length} data-testid="organizar-confirmar" className="inline-flex items-center gap-2 rounded-full border border-cyan/50 bg-cyan/15 px-5 py-1.5 text-xs font-medium text-cyan transition hover:-translate-y-0.5 hover:bg-cyan/25 active:scale-95 disabled:opacity-40">{orgBusy && <Loader2 size={12} className="animate-spin" />} Organizar</button></footer>
+          </div></div>, document.body)}
 
       <div ref={inboxRef}>{inbox && <InboxPanel incoming={inbox} onClose={() => setInbox(null)} onListen={() => undefined} listening={false} interim="" />}</div>
       {zoom && createPortal(<div className="fixed inset-0 z-[70] grid place-items-center bg-background/90 p-4 backdrop-blur-md" {...backdropProps(() => setZoom(null))} data-testid="zoom"><div className="relative max-h-full max-w-3xl" onClick={(e) => e.stopPropagation()}>{zoom.file.mime.startsWith("image/") && zoom.file.preview ? <img src={zoom.file.preview} alt={zoom.file.name} className="max-h-[85dvh] rounded-2xl border border-white/10" /> : <p className="glass rounded-2xl p-6 text-sm">{zoom.file.name} (PDF) vai junto como evidência.</p>}<p className="mt-2 text-center font-mono text-xs text-muted-foreground">{zoom.ref.chatName}</p><button type="button" onClick={() => setZoom(null)} aria-label="Fechar" className="absolute -right-3 -top-3 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-background"><X size={15} /></button></div></div>, document.body)}

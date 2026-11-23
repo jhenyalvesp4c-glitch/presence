@@ -17,7 +17,7 @@ export function useDecide() {
   return useMutation({
     mutationFn: async (v: { reqs: Req[]; status: "enviada" | "descartada" }) => {
       if (!v.reqs.length) return;
-      must(await supabase.from("whatsapp_requests").upsert(v.reqs.map((r) => ({ key: r.key, chat_name: r.chat, is_group: r.grupo, asker: r.quem, title: r.titulo, details: r.detalhes, quote: r.trecho, asked_label: r.quando, deadline: r.prazo, priority: r.prioridade, status: v.status })), { onConflict: "user_id,key" }).select("id"));
+      must(await supabase.from("whatsapp_requests").upsert(v.reqs.map((r) => ({ key: r.key, chat_name: r.chat, is_group: r.grupo, asker: r.quem, title: r.titulo, details: r.detalhes.slice(0, 2000), quote: r.trecho, asked_label: r.quando, deadline: r.prazo, priority: r.prioridade, status: v.status })), { onConflict: "user_id,key" }).select("id"));
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: KEY }),
   });

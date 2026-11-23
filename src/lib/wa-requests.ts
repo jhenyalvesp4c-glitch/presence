@@ -1,9 +1,11 @@
+import { nextCode, type CheckItem, type Demand } from "./demands";
+
 /** Verificar demandas no WhatsApp: monta lotes de mensagens (grupos e conversas privadas), limpa o que a IA devolve e transforma os pedidos escolhidos no texto que vai para a Central. Funções puras. */
 export type WaMessage = { id: string; chat: string; chat_name: string; is_group: boolean; sender_name: string; from_me: boolean; ts: number; text: string; kind: string; has_media?: boolean; media_mime?: string };
 export type ImageRef = { n: number; chat: string; id: string; mime: string; ts: number; chatName: string };
 export type Batch = { text: string; chats: string[]; count: number; images: ImageRef[] };
 export type Priority = "alta" | "media" | "baixa";
-export type Req = { key: string; chat: string; grupo: boolean; quem: string; titulo: string; detalhes: string; trecho: string; quando: string; prazo: string | null; prioridade: Priority; paraMim: "sim" | "talvez"; resolvido: boolean; imagens: number[]; confianca: "alta" | "media" | "baixa" };
+export type Req = { key: string; chat: string; grupo: boolean; quem: string; titulo: string; detalhes: string; trecho: string; quando: string; prazo: string | null; prioridade: Priority; paraMim: "sim" | "talvez"; resolvido: boolean; imagens: number[]; confianca: "alta" | "media" | "baixa" ; tipo: "pedido" | "complemento"; demanda: string | null };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 export const stamp = (ts: number) => { const d = new Date(ts * 1000); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -71,8 +73,8 @@ export function cleanRequests(raw: unknown, validImages: Set<number>): Req[] {
     const x = p as Record<string, unknown> | null, titulo = str(x?.["titulo"], 200);
     if (!x || !titulo) return [];
     const chat = str(x["chat"], 120) || "Conversa", quem = str(x["quem"], 80) || "Alguém", quando = str(x["quando"], 20), pr = x["prioridade"], conf = x["confianca"];
-    return [{ key: reqKey(chat, quem, titulo, quando), chat, grupo: x["grupo"] === true, quem, titulo, detalhes: str(x["detalhes"], 800), trecho: str(x["trecho"], 500), quando, prazo: date(x["prazo"]), prioridade: pr === "alta" || pr === "baixa" ? pr : "media", paraMim: x["paraMim"] === "talvez" ? "talvez" : "sim", resolvido: x["resolvido"] === true,
-      imagens: (Array.isArray(x["imagens"]) ? (x["imagens"] as unknown[]) : []).map(Number).filter((n) => validImages.has(n)).slice(0, 4), confianca: conf === "baixa" || conf === "media" ? conf : "alta" }];
+    return [{ key: reqKey(chat, quem, titulo, quando), chat, grupo: x["grupo"] === true, quem, titulo, detalhes: str(x["detalhes"], 3000), trecho: str(x["trecho"], 500), quando, prazo: date(x["prazo"]), prioridade: pr === "alta" || pr === "baixa" ? pr : "media", paraMim: x["paraMim"] === "talvez" ? "talvez" : "sim", resolvido: x["resolvido"] === true,
+      imagens: (Array.isArray(x["imagens"]) ? (x["imagens"] as unknown[]) : []).map(Number).filter((n) => validImages.has(n)).slice(0, 4), confianca: conf === "baixa" || conf === "media" ? conf : "alta", tipo: x["tipo"] === "complemento" ? "complemento" : "pedido", demanda: str(x["demanda"], 20).replace(/^#/, "").toUpperCase() || null }];
   }).slice(0, 60);
 }
 /** Junta os pedidos de vários lotes, sem repetir, e põe os que são para você e ainda abertos primeiro. */
@@ -116,4 +118,86 @@ export function rulesPrompt(rules: string, aceitos: Example[], descartados: Exam
   if (aceitos.length) parts.push(`Pedidos que ela JÁ ACEITOU como demanda (liste coisas parecidas):\n${ex(aceitos)}`);
   if (descartados.length) parts.push(`Pedidos que ela DESCARTOU, não eram demanda (não liste coisas parecidas):\n${ex(descartados)}`);
   return parts.join("\n\n");
+}
+
+
+/* ───────────── organizar nas demandas: atualizar a que já existe (checklist + detalhes) ou criar ───────────── */
+const kw = (t: string) => norm(t).split(" ").filter((w) => w.length >= 4);
+/** O dossiê (polo) que o nome do grupo/conversa cita: o nome mais longo contido no nome da conversa. */
+export function matchDossier(chat: string, dossiers: string[]): string | null {
+  const c = ` ${norm(chat)} `;
+  const hits = dossiers.filter((d) => { const n = norm(d); return n.length >= 3 && c.includes(` ${n} `); });
+  return hits.sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+export type OrgCtx = { pid: string; name: string; demands: Demand[]; dossiers: string[] };
+export type OrgAction =
+  | { kind: "update"; pid: string; project: string; code: string; title: string; dossier: string | null; add: string[]; notes: string[]; keys: string[]; deadline: string | null; priority: Priority }
+  | { kind: "create"; pid: string; project: string; dossier: string | null; title: string; add: string[]; notes: string[]; keys: string[]; deadline: string | null; priority: Priority };
+
+const RANKP: Record<Priority, number> = { alta: 3, media: 2, baixa: 1 };
+const bestP = (a: Priority, b: Priority): Priority => (RANKP[a] >= RANKP[b] ? a : b);
+const stepOf = (r: Req) => `${r.titulo}${r.detalhes ? ` — ${r.detalhes.split(/\n|(?<=[.!?])\s/)[0]!.slice(0, 220)}` : ""}`.slice(0, 480);
+/** Tudo o que a pessoa mandou, sem perder nada: vira uma observação completa dentro da demanda. */
+export const noteOf = (r: Req) => [`WhatsApp · ${r.quando} · ${r.quem} ${r.grupo ? `no grupo "${r.chat}"` : `(conversa com ${r.chat})`}`, r.titulo, r.detalhes, r.prazo ? `Prazo combinado: ${dm(r.prazo)}.` : "", r.trecho ? `Mensagem original: "${r.trecho}"` : ""].filter(Boolean).join("\n").slice(0, 1900);
+const deadlineOf = (iso: string | null) => (iso ? dm(iso).slice(0, 5) : null);
+
+/** Decide, para cada pedido escolhido, onde ele entra. Pedidos do mesmo dossiê entram na MESMA demanda (nunca uma demanda nova por pedido). */
+export function planOrganize(reqs: Req[], ctx: OrgCtx[]): OrgAction[] {
+  const actions = new Map<string, OrgAction>();
+  const allDossiers = ctx.flatMap((c) => c.dossiers.map((name) => ({ name, c })));
+  for (const r of reqs) {
+    const dn = matchDossier(r.chat, allDossiers.map((d) => d.name)) ?? matchDossier(`${r.titulo} ${r.detalhes}`, allDossiers.map((d) => d.name));
+    const home = (dn && allDossiers.find((d) => d.name === dn)?.c) || ctx[0];
+    if (!home) continue;
+    const open = home.demands.filter((d) => d.status !== "done");
+    // 1) a IA já ligou a uma demanda aberta (código)
+    let target = r.demanda ? open.find((d) => d.id.replace(/^#/, "").toUpperCase() === r.demanda) ?? ctx.flatMap((c) => c.demands).find((d) => d.status !== "done" && d.id.replace(/^#/, "").toUpperCase() === r.demanda) : undefined;
+    // 2) demanda aberta do mesmo dossiê: a que mais combina com o assunto; se nenhuma combina, a mais recente (não cria outra)
+    if (!target && dn) {
+      const mine = open.filter((d) => d.type === "polo" && d.polo && norm(d.polo) === norm(dn));
+      if (mine.length) {
+        const words = new Set(kw(`${r.titulo} ${r.detalhes}`));
+        const scored = mine.map((d) => ({ d, hit: kw(`${d.title} ${d.desc}`).filter((w) => words.has(w)).length })).sort((a, b) => b.hit - a.hit || b.d.id.localeCompare(a.d.id));
+        target = scored[0]!.d;
+      }
+    }
+    const targetCtx = target ? ctx.find((c) => c.demands.some((d) => d.id === target!.id)) ?? home : home;
+    const key = target ? `u:${targetCtx.pid}:${target.id}` : `c:${home.pid}:${dn ? norm(dn) : "geral"}`;
+    const cur = actions.get(key);
+    const step = stepOf(r), note = noteOf(r), dl = deadlineOf(r.prazo);
+    if (cur) {
+      if (!cur.add.some((x) => norm(x) === norm(step))) cur.add.push(step);
+      cur.notes.push(note); cur.keys.push(r.key); cur.priority = bestP(cur.priority, r.prioridade);
+      if (dl && (!cur.deadline || dl < cur.deadline)) cur.deadline = dl;
+    } else if (target) {
+      actions.set(key, { kind: "update", pid: targetCtx.pid, project: targetCtx.name, code: target.id, title: target.title, dossier: target.polo ?? dn, add: [step], notes: [note], keys: [r.key], deadline: dl, priority: r.prioridade });
+    } else {
+      actions.set(key, { kind: "create", pid: home.pid, project: home.name, dossier: dn, title: r.titulo, add: [step], notes: [note], keys: [r.key], deadline: dl, priority: r.prioridade });
+    }
+  }
+  return [...actions.values()].map((a) => (a.kind === "create" && a.add.length > 1 ? { ...a, title: `${a.dossier ?? "WhatsApp"}: ${a.add.length} pedidos` } : a));
+}
+
+/** Aplica o plano nas demandas de UM projeto (devolve a lista nova). Atualiza checklist, observações, histórico, prioridade e prazo. */
+export function applyOrganize(demands: Demand[], actions: OrgAction[], today: Date = new Date()): Demand[] {
+  let out = [...demands];
+  const label = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}`;
+  for (const a of actions) {
+    if (a.kind === "update") {
+      out = out.map((d) => {
+        if (d.id !== a.code) return d;
+        const have = new Set((d.checklist ?? []).map((c) => norm(c.text)));
+        const add: CheckItem[] = a.add.filter((t) => !have.has(norm(t))).map((text) => ({ text, done: false }));
+        const notes = a.notes.filter((n) => !d.notes.some((x) => norm(x) === norm(n)));
+        return { ...d, checklist: [...(d.checklist ?? []), ...add], notes: [...d.notes, ...notes], priority: bestP(d.priority, a.priority), deadline: d.deadline && d.deadline !== "—" ? d.deadline : (a.deadline ?? d.deadline),
+          history: [...d.history, { d: label, text: `Atualizada pelo WhatsApp: +${add.length} ${add.length === 1 ? "passo" : "passos"} no checklist`, s: d.status }] };
+      });
+    } else {
+      const type = a.dossier ? "polo" : "geral";
+      out = [{ id: nextCode(out, type), type, ...(a.dossier ? { polo: a.dossier } : {}), title: a.title.slice(0, 300), desc: `Criada a partir de pedidos no WhatsApp.\n${a.notes.join("\n\n")}`.slice(0, 5000), priority: a.priority, status: "todo", deadline: a.deadline ?? "",
+        history: [{ d: label, text: `Criada pelo WhatsApp com ${a.add.length} ${a.add.length === 1 ? "passo" : "passos"} no checklist`, s: "todo" }], notes: [...a.notes], checklist: a.add.map((text) => ({ text, done: false })) } as Demand, ...out];
+    }
+  }
+  return out;
 }

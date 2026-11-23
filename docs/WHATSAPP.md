@@ -52,3 +52,11 @@ As regras ficam em `src/lib/whatsapp/relevance.ts` (só texto, sem IA, sem custo
 ## Voz no site publicado: robustez
 - O navegador tenta a ponte até 3 vezes (reparea sozinho se ela foi reiniciada; espera até 15 s) antes de dizer que ela não respondeu.
 - Até 8 idas e vindas navegador↔servidor por pedido; se ainda faltar resposta, o app pede uma rodada final (`finalizar`) em que o Orion responde com o que já tem, sem ferramentas — nunca fica mudo.
+
+## Organizar pedidos nas demandas (checklist, sem duplicar)
+Em Reuniões → Demandas do WhatsApp, depois de marcar o que é demanda, **"Organizar nas demandas"** (`src/lib/wa-requests.ts`: `planOrganize`/`applyOrganize`; `src/lib/data/wa-organize.ts`):
+- A IA recebe as demandas **já abertas** e marca cada item como `pedido` ou `complemento` (informação nova sobre algo já pedido: base, template, data, arquivo) e, quando for continuação, o código da demanda. `detalhes` agora vai até 3000 caracteres e a IA detalha tudo (template, base, colunas, quantidade, datas, arquivos).
+- Para cada pedido: (1) demanda ligada pela IA; (2) senão, demanda aberta "por dossiê" do mesmo dossiê do nome do grupo (a que mais combina com o assunto; nunca abre outra); (3) senão, cria **uma** demanda por dossiê com um passo de checklist por pedido.
+- Em demanda existente entram: passos no checklist, uma **observação completa** por pedido (quem, quando, grupo, detalhes, prazo, mensagem original), prioridade mais alta e prazo, e um item no histórico. Passos e observações repetidos não duplicam.
+- Mostra antes o que vai atualizar/criar. Voz: `verificar_whatsapp_demandas` abre a tela e a leitura começa sozinha (`/reunioes?aba=demandas&verificar=1`).
+- "Criar demandas" (Central de entrada) continua disponível. Imagens e PDFs só entram pelo caminho da Central.

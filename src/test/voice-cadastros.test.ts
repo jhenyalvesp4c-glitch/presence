@@ -29,7 +29,7 @@ describe("sequência de hábito", () => {
 
 describe("autonomia da voz", () => {
   const names = TOOLS.map((t) => (t as { function: { name: string } }).function.name);
-  it("tem as ferramentas novas", () => { for (const n of ["cadastros", "habitos", "gravar_reuniao", "treino", "dieta", "documentacao", "ler_documento", "documentar", "buscar_no_orion", "juntar_demandas"]) expect(names, n).toContain(n); });
+  it("tem as ferramentas novas", () => { for (const n of ["cadastros", "habitos", "gravar_reuniao", "treino", "dieta", "documentacao", "ler_documento", "documentar", "buscar_no_orion", "juntar_demandas", "verificar_whatsapp_demandas"]) expect(names, n).toContain(n); });
   it("abre central do dia, clientes, reuniões e cursos", () => { for (const k of ["central", "clientes", "reunioes", "cursos", "mapa", "configuracoes", "documentacao"]) expect(PAGES[k], k).toBeTruthy(); });
   it("avisa ao mexer em cadastros e hábitos", () => { expect(fillerFor(["cadastros"], "a")).not.toBe(""); expect(fillerFor(["habitos"], "a")).not.toBe(""); });
 });

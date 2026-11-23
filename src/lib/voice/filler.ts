@@ -1,7 +1,7 @@
 /** Frase curta falada quando o Orion vai demorar (consultar, pesquisar, mexer em algo), para nunca ficar em silêncio. Pura, sem IA. */
 const LOOKUP = new Set(["buscar_no_orion", "ler_documento", "consultar_registros", "resumo_do_dia", "whatsapp_mencoes", "financeiro", "planejamento", "analise_corporal", "acerto", "ideias"]);
 const WHATS = new Set(["whatsapp_ler", "whatsapp_conversas", "whatsapp_marcar_lidas"]);
-const DOING = new Set(["registrar", "atualizar_demanda", "gerenciar_tarefa", "documentar", "lembrar", "esquecer", "lista", "roteiro", "cadastros", "habitos", "treino", "dieta", "documentacao", "juntar_demandas"]);
+const DOING = new Set(["registrar", "atualizar_demanda", "gerenciar_tarefa", "documentar", "lembrar", "esquecer", "lista", "roteiro", "cadastros", "habitos", "treino", "dieta", "documentacao", "juntar_demandas", "verificar_whatsapp_demandas"]);
 
 const VERIFY = ["Já estou buscando.", "Vou dar uma olhada para você.", "Deixa eu ver isso.", "Estou procurando aqui."];
 const OPENING = ["Já estou abrindo o WhatsApp.", "Vou olhar o WhatsApp agora."];
