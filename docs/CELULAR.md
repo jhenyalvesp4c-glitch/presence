@@ -36,3 +36,6 @@ Configurações → **Avisos no celular**: liga as notificações **deste aparel
 
 ## App instalado que abre "encolhido" (iPhone) — moldura
 Alguns iPhones abrem o app da tela inicial com a página 2x mais larga que a tela (ex.: 856 px numa tela de 428 px, zoom 0,5) e o layout de computador aparece. O aviso amarelo (`ZoomHint`) mostra os números. `src/components/ScaleFrame.tsx` resolve: só nesse caso (app instalado + zoom ≤ 0,7 + largura ≥ 1,4× a da tela) o Orion se abre dentro de um `<iframe>` com a largura real da tela, ampliado pelo mesmo fator, então a página enxerga uma tela de celular. `?moldura=1` força (teste) e `?moldura=0` desliga. Limites: o iframe usa o mesmo endereço (a navegação acontece dentro dele); permissão de notificações/microfone dentro de iframe pode pedir a confirmação de novo.
+
+## Tela de app (travada)
+No app instalado e dentro da moldura (`ScaleFrame.tsx` → `useAppLock`): `html[data-lock="1"]` com `touch-action: pan-y` (só rola na vertical, sem zoom de pinça nem duplo toque), `overscroll-behavior: none` (sem efeito elástico) e `overflow-x: hidden`; além disso `gesturestart/gesturechange/gestureend` e `touchmove` com 2+ dedos são cancelados (o Safari do iPhone ignora `user-scalable=no`). Faixas com rolagem lateral (`overflow-x: auto`) continuam funcionando. `?travar=1` liga a trava fora do app instalado (teste).

@@ -660,3 +660,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @media (max-width: 767px) {
   .fixed.inset-0[class*="place-items-center"] { overflow-y: auto; align-items: safe center; overscroll-behavior: contain; }
 }
+
+/* Tela de app (app instalado / moldura): sem zoom, sem balanço lateral, sem efeito elástico (ver ScaleFrame.tsx).
+   touch-action: pan-y no documento permite só rolar na vertical; faixas com rolagem lateral (overflow-x) continuam funcionando. */
+html[data-lock="1"], html[data-lock="1"] body { overscroll-behavior: none; touch-action: pan-y; -webkit-touch-callout: none; }
+html[data-lock="1"] { height: 100%; overflow-x: hidden; }
