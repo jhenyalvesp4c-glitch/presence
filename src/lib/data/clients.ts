@@ -54,7 +54,7 @@ export const useFreeMeetings = () => useQuery({ queryKey: [...KEY, "free-meeting
 
 export function useClientActions(projectId: string) {
   const qc = useQueryClient(), refresh = () => qc.invalidateQueries({ queryKey: KEY });
-  const m = <V,>(fn: (v: V) => Promise<unknown>) => useMutation({ mutationFn: fn, onSuccess: refresh });
+  const m = <V, R = unknown>(fn: (v: V) => Promise<R>) => useMutation({ mutationFn: fn, onSuccess: refresh });
   return {
     importDossiers: m(async (list: { id: string; name: string }[]) => importDossiersAsClients(projectId, list)),
     save: m(async (c: Omit<Client, "id" | "projectId"> & { id?: string | undefined }) => { const row = toRow({ ...c, projectId }); if (c.id) must(await supabase.from("clients").update(row).eq("id", c.id).select("id")); else { const id = (must(await supabase.from("clients").insert(row).select("id")) as { id: string }[])[0]?.id; if (id) { const { seedSetup } = await import("./client-setup"); await seedSetup(id, projectId).catch(() => 0); } return id; } return c.id; }),
@@ -63,7 +63,7 @@ export function useClientActions(projectId: string) {
     removeDoc: m(async (d: ClientDoc) => { must(await supabase.from("client_docs").delete().eq("id", d.id).select("id")); if (d.attachments.length) await supabase.storage.from("presence-app-brain-files").remove(d.attachments.map((a) => a.path)); }),
     addLog: m(async (v: { clientId: string; text: string; date?: string | undefined }) => { must(await supabase.from("client_log").insert({ client_id: v.clientId, text: v.text.trim().slice(0, 2000), ...(v.date ? { log_date: v.date } : {}) }).select("id")); }),
     removeLog: m(async (id: string) => { must(await supabase.from("client_log").delete().eq("id", id).select("id")); }),
-    addAccess: m(async (v: { clientId: string; label: string; username: string; note: string }) => { must(await supabase.from("client_access").insert({ client_id: v.clientId, label: v.label.trim().slice(0, 160), username: v.username.trim().slice(0, 160), note: v.note.trim().slice(0, 400) }).select("id")); }),
+    addAccess: m(async (v: { clientId: string; label: string; username: string; note: string }): Promise<string> => (must(await supabase.from("client_access").insert({ client_id: v.clientId, label: v.label.trim().slice(0, 160), username: v.username.trim().slice(0, 160), note: v.note.trim().slice(0, 400) }).select("id")) as { id: string }[])[0]!.id),
     removeAccess: m(async (id: string) => { must(await supabase.from("client_access").delete().eq("id", id).select("id")); }),
     linkMeeting: m(async (v: { meetingId: string; clientId: string | null }) => { must(await supabase.from("meetings").update({ client_id: v.clientId }).eq("id", v.meetingId).select("id")); }),
     setDemand: m(async (v: { code: string; status: "todo" | "done" }) => { must(await supabase.from("project_demands").update({ status: v.status, updated_at: new Date().toISOString() }).eq("project_id", projectId).eq("code", v.code).select("code")); }),

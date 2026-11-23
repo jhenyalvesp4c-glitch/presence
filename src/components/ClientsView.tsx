@@ -2,7 +2,7 @@
  * Documentação → Clientes: carteira real (banco), ligada aos dossiês, demandas e reuniões. Visual do Financeiro/Orion:
  * fundo animado, painel com moldura de luz, rosca de receita, radar de vencimentos, cartões 3D e anéis de progresso.
  */
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
 import { useMeeting } from "@/lib/data/meetings";
@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { ClipboardCopy, Gavel, ListChecks, MessagesSquare, Mic } from "lucide-react";
 import { copyText } from "@/lib/clipboard";
 import { analysisToMarkdown } from "@/lib/meetings";
-import { Building2, CalendarClock, Check, ClipboardList, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
+import { Building2, CalendarClock, Check, ClipboardList, Copy, Eye, EyeOff, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
@@ -18,6 +18,7 @@ import { PortfolioHealth } from "@/components/PortfolioHealth";
 import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { applyDefaultToAll, useSetupSummaries } from "@/lib/data/client-setup";
+import { loginsOfDossier, passwordOfAccess, removeAccessLogin, saveAccessLogin } from "@/lib/login-store";
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, SectionTitle, Tilt } from "@/components/finance/fx";
 import { ClientsPreview } from "@/components/ClientsPreview";
 import { SetupSummary } from "@/components/SetupGuide";
@@ -31,14 +32,6 @@ const COLORS = ["violet", "cyan", "emerald", "amber", "pink"] as const;
 const colorOf = (id: string) => COLORS[[...id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % COLORS.length]!;
 const ini = (n: string) => n.split(" ").filter((w) => w.length > 2).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || n.slice(0, 2).toUpperCase();
 const cssColor = (tone: string) => `var(--${tone})`;
-/** Logins cadastrados na Documentação para o dossiê (ficam só neste navegador). Nunca devolve a senha. */
-function readLoginsFor(dossier: string): { id: string; title: string; user: string; owner: string }[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem("presence.logins.v1") ?? "[]") as { id?: string; title?: string; login?: { user?: string; owner?: string; dossier?: string } }[];
-    const key = dossier.trim().toLowerCase();
-    return raw.filter((d) => d.login && (d.login.dossier?.trim() || d.title || "").toLowerCase() === key).map((d) => ({ id: String(d.id), title: d.title ?? "Login", user: d.login?.user ?? "", owner: d.login?.owner ?? "" }));
-  } catch { return []; }
-}
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 type Tab = "docs" | "reun" | "dem" | "ace" | "lin" | "imp";
@@ -255,7 +248,11 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
   const meets = [...ownMeets, ...(links?.meetings ?? []).filter((m) => !ownMeets.some((x) => x.id === m.id)).map((m) => ({ id: m.id, clientId: c.id, title: m.title, happenedOn: m.happenedOn, summary: m.summary || "do polo" }))];
   const ownDem = (extras?.demands ?? []).filter((d) => d.clientId === c.id);
   const dem = [...ownDem, ...(links?.demands ?? []).filter((d) => !ownDem.some((x) => x.code === d.code)).map((d) => ({ ...d, clientId: c.id }))];
-  const logins = useMemo(() => (dossierName ? readLoginsFor(dossierName) : []), [dossierName]);
+  const [loginTick, setLoginTick] = useState(0);
+  useEffect(() => { const h = () => setLoginTick((n) => n + 1); window.addEventListener("orion:logins", h); return () => window.removeEventListener("orion:logins", h); }, []);
+  // os acessos criados aqui (id "a-…") já aparecem na lista de acessos; aqui ficam só os cadastrados na Documentação
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const logins = useMemo(() => (dossierName ? loginsOfDossier(dossierName).filter((l) => !l.id.startsWith("a-")) : []), [dossierName, loginTick]);
   const [confirm, setConfirm] = useState(false), tone = colorOf(c.id);
   const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
   return (
@@ -276,7 +273,7 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
       {tab === "docs" && <><DocsTab client={c} docs={docs} acts={acts} err={err} />{(links?.libDocs.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-docs-dossie"><p className="mono-caps">Da pasta do dossiê (Biblioteca)</p>{links!.libDocs.map((d) => <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><FileText size={14} className="shrink-0 text-cyan" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{d.title}</p><p className="truncate text-xs text-muted-foreground">{d.kind}{d.folder && ` · ${d.folder}`}{d.updated && ` · ${d.updated}`}</p></div></div>)}</div>}</>}
       {tab === "reun" && <MeetingsTab client={c} meets={meets} acts={acts} err={err} />}
       {tab === "dem" && <div className="space-y-2">{!c.dossierId ? <p className="rounded-xl border border-dashed border-white/15 p-4 text-center text-xs text-muted-foreground">Vincule um dossiê a este cliente (botão de editar) e as demandas dele aparecem aqui.</p> : dem.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma demanda neste dossiê.</p> : dem.map((d) => <button key={d.code} onClick={() => acts.setDemand.mutate({ code: d.code, status: d.status === "done" ? "todo" : "done" }, { onError: err })} className="ex-card flex w-full items-center gap-3 p-3 text-left" style={{ "--rail": "var(--emerald)" } as CSSProperties}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${d.status === "done" ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{d.status === "done" && <Check size={12} />}</span><div className="min-w-0"><p className={`truncate text-sm font-medium ${d.status === "done" ? "text-muted-foreground line-through" : ""}`}>{d.title}</p><p className="text-xs text-muted-foreground">{d.code}{d.deadline && ` · prazo ${d.deadline}`}</p></div></button>)}<Link to="/demandas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as demandas</Link></div>}
-      {tab === "ace" && <><AccessTab client={c} access={access} acts={acts} err={err} />{logins.length > 0 && <div className="mt-4 space-y-2" data-testid="cliente-logins-dossie"><p className="mono-caps">Logins do dossiê (Documentação)</p>{logins.map((l) => <div key={l.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}><KeyRound size={14} className="shrink-0 text-amber" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{l.title}</p><p className="truncate font-mono text-xs text-muted-foreground">{l.user}{l.owner && ` · ${l.owner}`}</p></div></div>)}<p className="text-[0.65rem] text-muted-foreground">As senhas ficam só neste navegador e não aparecem aqui.</p></div>}</>}
+      {tab === "ace" && <><AccessTab client={c} access={access} acts={acts} err={err} dossierName={dossierName} />{logins.length > 0 && <div className="mt-4 space-y-2" data-testid="cliente-logins-dossie"><p className="mono-caps">Logins do dossiê (Documentação)</p>{logins.map((l) => <div key={l.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}><KeyRound size={14} className="shrink-0 text-amber" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{l.title}</p><p className="truncate font-mono text-xs text-muted-foreground">{l.user}{l.owner && ` · ${l.owner}`}</p><p className="truncate font-mono text-xs text-amber" data-testid="cliente-login-senha">Senha: {l.pass || "—"}</p></div><CopyPass value={l.pass} /></div>)}<p className="text-[0.65rem] text-muted-foreground">As senhas ficam só neste navegador (não vão para o banco nem para a IA).</p></div>}</>}
       {tab === "lin" && <><LogTab client={c} log={log} acts={acts} err={err} />{(links?.records.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-registros-dossie"><p className="mono-caps">Registros e notas do dossiê</p>{links!.records.slice(0, 12).map((r) => <div key={r.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"><p className="mono-caps">{r.kind === "nota" ? "Nota" : "Registro"} · {r.kind === "nota" ? r.date : dateBR(r.date)}</p><p className="line-clamp-2 whitespace-pre-wrap text-sm">{r.text}</p></div>)}</div>}</>}
       <div className="border-t border-white/10 pt-3">{confirm ? <div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-muted-foreground">Apagar o cliente, documentos e histórico? Não dá para desfazer.</span><button onClick={onDelete} data-testid="cliente-apagar-ok" className="rounded-full border border-destructive/60 px-3 py-1 text-destructive hover:bg-destructive/10">Apagar</button><button onClick={() => setConfirm(false)} className="rounded-full border border-white/15 px-3 py-1">Cancelar</button></div> : <button onClick={() => setConfirm(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"><Trash2 size={12} /> Apagar cliente</button>}</div>
           </aside>
@@ -376,16 +373,31 @@ function MeetingsTab({ client, meets, acts, err }: { client: Client; meets: { id
   );
 }
 
-function AccessTab({ client, access, acts, err }: { client: Client; access: import("@/lib/clients").ClientAccess[]; acts: Acts; err: (e: unknown) => void }) {
-  const [label, setLabel] = useState(""), [user, setUser] = useState(""), [note, setNote] = useState("");
+/** Copiar a senha. */
+function CopyPass({ value }: { value: string }) {
+  const [ok, setOk] = useState(false);
+  if (!value) return null;
+  return <button type="button" onClick={() => { void copyText(value).then(() => { setOk(true); setTimeout(() => setOk(false), 1200); }); }} aria-label="Copiar senha" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground transition hover:text-cyan active:scale-90">{ok ? <Check size={13} className="text-emerald" /> : <Copy size={13} />}</button>;
+}
+
+function AccessTab({ client, access, acts, err, dossierName }: { client: Client; access: import("@/lib/clients").ClientAccess[]; acts: Acts; err: (e: unknown) => void; dossierName: string | undefined }) {
+  const [label, setLabel] = useState(""), [user, setUser] = useState(""), [pass, setPass] = useState(""), [note, setNote] = useState(""), [shown, setShown] = useState<Record<string, boolean>>({});
+  const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60";
   return (
     <div className="space-y-2">
-      <p className="rounded-xl border border-amber/25 bg-amber/5 px-3 py-2 text-[0.7rem] text-muted-foreground">Guarde aqui <b className="text-foreground">onde</b> fica cada acesso e o usuário. Senhas não ficam no Orion: use seu gerenciador de senhas e anote o nome dele no campo de observação.</p>
-      {access.map((a) => <div key={a.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.label}</p><p className="truncate font-mono text-xs text-muted-foreground">{a.username || "—"}{a.note && ` · ${a.note}`}</p></div><button onClick={() => acts.removeAccess.mutate(a.id, { onError: err })} aria-label={`Apagar ${a.label}`} className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button></div>)}
-      <form onSubmit={(e) => { e.preventDefault(); if (!label.trim()) return; acts.addAccess.mutate({ clientId: client.id, label, username: user, note }, { onSuccess: () => { setLabel(""); setUser(""); setNote(""); }, onError: err }); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+      <p className="rounded-xl border border-amber/25 bg-amber/5 px-3 py-2 text-[0.7rem] text-muted-foreground">Guarde aqui <b className="text-foreground">onde</b> fica cada acesso, o usuário e a <b className="text-foreground">senha</b>. A senha fica <b className="text-foreground">só neste navegador</b> (não vai para o banco nem para a IA) e o acesso já aparece em <b className="text-foreground">Logins e senhas</b>, na Documentação.</p>
+      {access.map((a) => { const pw = passwordOfAccess(a.id); const on = shown[a.id] !== false; return (
+        <div key={a.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}>
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.label}</p><p className="truncate font-mono text-xs text-muted-foreground">{a.username || "—"}{a.note && ` · ${a.note}`}</p>
+            {pw !== null && <p className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-amber" data-testid="acesso-senha"><span className="text-muted-foreground">Senha:</span> {pw ? (on ? pw : "••••••••••") : "—"}{pw && <button type="button" onClick={() => setShown((m) => ({ ...m, [a.id]: !on }))} aria-label={on ? "Ocultar senha" : "Mostrar senha"} className="text-muted-foreground transition hover:text-cyan">{on ? <EyeOff size={12} /> : <Eye size={12} />}</button>}</p>}</div>
+          {pw && <CopyPass value={pw} />}
+          <button onClick={() => acts.removeAccess.mutate(a.id, { onSuccess: () => removeAccessLogin(a.id), onError: err })} aria-label={`Apagar ${a.label}`} className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
+        </div>); })}
+      <form onSubmit={(e) => { e.preventDefault(); if (!label.trim()) return; acts.addAccess.mutate({ clientId: client.id, label, username: user, note }, { onSuccess: (id) => { saveAccessLogin({ accessId: id, label, user, pass, owner: client.contactName, dossier: dossierName ?? client.name, note }); setLabel(""); setUser(""); setPass(""); setNote(""); }, onError: err }); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
         <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Onde (ex.: painel de anúncios)" aria-label="Onde" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
-        <div className="flex gap-2"><input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Usuário" aria-label="Usuário" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm" /><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observação" aria-label="Observação" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm" /></div>
-        <button type="submit" disabled={!label.trim()} className="w-full rounded-full border border-cyan/60 py-1.5 text-sm text-cyan disabled:opacity-40">Adicionar acesso</button>
+        <div className="flex gap-2"><input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Usuário" aria-label="Usuário" autoComplete="off" className={field} /><input value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Senha" aria-label="Senha" autoComplete="new-password" data-testid="acesso-nova-senha" className={`${field} font-mono`} /></div>
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observação (opcional)" aria-label="Observação" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
+        <button type="submit" disabled={!label.trim()} className="w-full rounded-full border border-cyan/60 py-1.5 text-sm text-cyan transition hover:bg-cyan/10 active:scale-[.99] disabled:opacity-40">Adicionar acesso</button>
       </form>
     </div>
   );

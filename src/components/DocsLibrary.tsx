@@ -198,6 +198,12 @@ function Library({ projectId }: { projectId: string }) {
     loadProjectState(projectId).then((st) => { setDossiers(st.ds.dossiers.map((d) => d.name)); setDossierList(st.ds.dossiers.map((d) => ({ id: d.id, name: d.name }))); }).catch(() => undefined);
   }, [projectId]);
   useEffect(() => { if (loaded) saveLogins(findFolder(folders, "log")?.docs ?? []); }, [folders, loaded]);
+  // acessos criados na ficha do cliente entram aqui na hora
+  useEffect(() => {
+    const h = () => { const saved = loadLogins(); if (saved) setFolders((fs) => mapFolders(fs, "log", (f) => ({ ...f, docs: saved }))); };
+    window.addEventListener("orion:logins", h);
+    return () => window.removeEventListener("orion:logins", h);
+  }, []);
   // Tudo da Documentação também vai para o segundo cérebro (Orion). Senhas NUNCA vão: ficam só neste navegador.
   useEffect(() => {
     if (!loaded) return;
@@ -541,7 +547,7 @@ function TreeNode({ f, depth, open, setOpen, cur, selId, onFolder, onDoc }: {
 }
 
 function LoginCard({ d, color, onOpen, onEdit, onDelete, heading = "dossie" }: { d: Doc; color: string; onOpen: () => void; onEdit?: () => void; onDelete?: () => void; heading?: "dossie" | "usuario" }) {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true); // a senha aparece (autorizado); o olho esconde
   const [copied, setCopied] = useState<string | null>(null);
   const copy = async (k: string, v: string, what: string) => {
     if (await copyText(v)) { setCopied(k); setTimeout(() => setCopied(null), 1400); toast.success(`${what} copiado`); }
@@ -854,7 +860,7 @@ function LoginEditor({ initial, preset = "", dossiers, onSave, onClose }: { init
   const [user, setUser] = useState(l?.user ?? "");
   const [pass, setPass] = useState(l?.pass ?? "");
   const [desc, setDesc] = useState(initial?.desc ?? "");
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true);
   const options = dossier && !dossiers.includes(dossier) ? [dossier, ...dossiers] : dossiers;
   const name = title.trim() || dossier;
   const ok = !!name && !!user.trim();

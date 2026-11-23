@@ -26,3 +26,8 @@ Tabelas: `clients`, `client_docs`, `client_log`, `client_access` (RLS só do don
 ## Painel do topo
 Por padrão mostra a **Saúde da carteira** (`PortfolioHealth`): implantação média dos clientes ativos (anel), lista "quem precisa de você" (menos andado primeiro, com travados e dias sem contato) e três cartões (sem implantação iniciada, demandas abertas, sem contato há 30 dias). O seletor alterna para **Receita e vencimentos**, que fica guardado até a pessoa cadastrar valores e datas. Regras em `src/lib/portfolio.ts` (testadas em `src/test/portfolio.test.ts`).
 
+
+## Logins e senhas: senha visível e acessos da ficha
+- **Logins e senhas** (Documentação → Logins dos Dossiês): a senha aparece por padrão (o olho esconde; botão para copiar). Autorizado pela usuária.
+- **Ficha do cliente → Acessos:** campo **Senha** além do usuário. O acesso (onde, usuário, observação) vai para o banco como antes (`client_access`); a **senha fica só neste navegador** (`src/lib/login-store.ts`, `presence.logins.v1`), nunca no banco, na IA, no MCP nem no segundo cérebro. O acesso também entra em **Logins e senhas** ligado ao dossiê do cliente (id `a-<acesso>`), e apagar o acesso apaga o login. Mostra a senha na ficha com olho e copiar.
+- Consequência: as senhas não aparecem em outro aparelho nem para outra pessoa; limpar os dados do navegador as apaga. (Guardar no banco, criptografado, é uma decisão à parte — peça antes.)
