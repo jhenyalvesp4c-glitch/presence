@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Eye, EyeOff, Loader2, LogOut, Lock, Mail, User } from "lucide-react";
+import { AtSign, Eye, EyeOff, Loader2, LogOut, Lock, User } from "lucide-react";
 
-import { useAuth } from "@/lib/auth";
+import { USERNAME_RE, useAuth } from "@/lib/auth";
 
 const FIELD = "w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/60 focus:border-cyan/60 focus:bg-white/[0.07]";
 
@@ -31,26 +31,20 @@ function Brand() {
 function Login() {
   const auth = useAuth();
   const [mode, setMode] = useState<"in" | "up">("in");
-  const [name, setName] = useState(""), [email, setEmail] = useState(""), [pw, setPw] = useState(""), [show, setShow] = useState(false);
+  const [name, setName] = useState(""), [login, setLogin] = useState(""), [pw, setPw] = useState(""), [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [info, setInfo] = useState("");
-
-  async function forgot() {
-    if (busy) return;
-    setError(""); setInfo(""); setBusy(true);
-    const r = await auth.resetPassword(email);
-    setBusy(false);
-    if (r.ok) setInfo(r.message ?? ""); else setError(r.error);
-  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     setError(""); setInfo("");
     if (mode === "up" && name.trim().length < 2) return void setError("Como podemos te chamar?");
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return void setError("Digite um e-mail válido.");
+    const l = login.trim().toLowerCase();
+    if (!l) return void setError("Digite o seu usuário.");
+    if (mode === "up" && !USERNAME_RE.test(l)) return void setError("Usuário: de 3 a 30 letras minúsculas, números, ponto, hífen ou _ (sem espaço).");
     if (pw.length < 6) return void setError("A senha precisa ter pelo menos 6 caracteres.");
     setBusy(true);
-    const r = mode === "in" ? await auth.signIn(email, pw) : await auth.signUp(name, email, pw);
+    const r = mode === "in" ? await auth.signIn(l, pw) : await auth.signUp(name, l, pw);
     setBusy(false);
     if (!r.ok) setError(r.error);
     else if (r.message) { setInfo(r.message); setMode("in"); setPw(""); }
@@ -74,8 +68,8 @@ function Login() {
           </label>
         )}
         <label className="relative block">
-          <Mail size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input className={FIELD} type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" data-testid="login-email" />
+          <AtSign size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input className={FIELD} type="text" placeholder={mode === "up" ? "Escolha um usuário (ex.: jheny)" : "Usuário"} value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={80} data-testid="login-usuario" />
         </label>
         <label className="relative block">
           <Lock size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -89,8 +83,7 @@ function Login() {
         <button type="submit" disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-brand py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-60" data-testid="login-enviar">
           {busy && <Loader2 size={15} className="animate-spin" />} {mode === "in" ? "Entrar" : "Criar minha conta"}
         </button>
-        {mode === "in" && <button type="button" onClick={() => void forgot()} disabled={busy} data-testid="login-esqueci" className="block w-full text-center text-xs text-cyan transition hover:underline disabled:opacity-60">Esqueci minha senha (digite o e-mail acima)</button>}
-        <p className="text-center text-[0.72rem] text-muted-foreground">{mode === "in" ? "Cada pessoa tem o seu espaço, com dados só dela." : "Seus dados ficam separados dos de qualquer outra conta."}</p>
+        <p className="text-center text-[0.72rem] text-muted-foreground">{mode === "in" ? "Contas antigas também entram com o e-mail no lugar do usuário." : "Sem e-mail e sem confirmação: a conta já fica pronta para usar."}</p>
       </form>
     </Shell>
   );

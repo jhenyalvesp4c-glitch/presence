@@ -8,9 +8,9 @@ type Status = "loading" | "out" | "ready" | "blocked";
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 type Auth = {
   status: Status; account: Account | null; blocked: string; recovering: boolean;
-  signIn: (email: string, password: string) => Promise<Result>;
-  signUp: (name: string, email: string, password: string) => Promise<Result>;
-  resetPassword: (email: string) => Promise<Result>;
+  /** `login` = nome de usuário (ou o e-mail das contas antigas). */
+  signIn: (login: string, password: string) => Promise<Result>;
+  signUp: (name: string, user: string, password: string) => Promise<Result>;
   setNewPassword: (password: string) => Promise<Result>;
   signOut: () => Promise<void>;
 };
@@ -21,13 +21,19 @@ export const useAuth = (): Auth => { const v = useContext(Ctx); if (!v) throw ne
 const DISABLED = (import.meta.env as Record<string, string | undefined>)["VITE_AUTH_DISABLED"] === "1";
 const NAME_KEY = "presence.signup.name";
 
+/** Contas novas são só usuário+senha: por baixo viram o e-mail interno "<usuario>@orion.local" (nada é enviado). */
+const LOCAL_DOMAIN = "@orion.local";
+export const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+export const loginToEmail = (login: string): string => { const t = login.trim().toLowerCase(); return t.includes("@") ? t : t + LOCAL_DOMAIN; };
+/** O que mostrar para a pessoa: o usuário (sem o domínio interno) ou o e-mail de contas antigas. */
+export const displayLogin = (email: string): string => email.endsWith(LOCAL_DOMAIN) ? email.slice(0, -LOCAL_DOMAIN.length) : email;
+
 const explain = (m: string): string => {
   const t = m.toLowerCase();
-  if (t.includes("invalid login")) return "E-mail ou senha incorretos.";
+  if (t.includes("invalid login")) return "Usuário ou senha incorretos.";
   if (t.includes("already registered") || t.includes("already been registered")) return "Já existe uma conta com esse e-mail. Use “Entrar”.";
-  if (t.includes("not confirmed")) return "Confirme seu e-mail pelo link que enviamos e depois entre.";
   if (t.includes("password") && (t.includes("6") || t.includes("short") || t.includes("weak"))) return "A senha precisa ter pelo menos 6 caracteres.";
-  if (t.includes("valid email") || t.includes("invalid email")) return "Esse e-mail não parece válido.";
+  if (t.includes("valid email") || t.includes("invalid email")) return "Esse usuário não parece válido.";
   if (t.includes("rate limit") || t.includes("too many")) return "Muitas tentativas. Aguarde um pouco e tente de novo.";
   if (t.includes("network") || t.includes("fetch")) return "Sem conexão com o servidor. Confira a internet.";
   return m;
@@ -52,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const d = data as { owner_id: string; nome: string | null; principal: boolean };
     try { localStorage.removeItem(NAME_KEY); } catch { /* sem armazenamento */ }
     setClientOwner(d.owner_id);
-    setAccount({ owner: d.owner_id, name: d.nome ?? "Você", principal: d.principal, email: session.user.email ?? "" });
+    setAccount({ owner: d.owner_id, name: d.nome ?? "Você", principal: d.principal, email: displayLogin(session.user.email ?? "") });
     setStatus("ready");
   }, []);
 
@@ -80,23 +86,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; clearTimeout(stuck); sub.subscription.unsubscribe(); };
   }, [claim]);
 
-  const signIn = useCallback<Auth["signIn"]>(async (email, password) => {
-    const { error } = await authClient.auth.signInWithPassword({ email: email.trim(), password });
+  const signIn = useCallback<Auth["signIn"]>(async (login, password) => {
+    const { error } = await authClient.auth.signInWithPassword({ email: loginToEmail(login), password });
     return error ? { ok: false, error: explain(error.message) } : { ok: true };
   }, []);
 
-  const signUp = useCallback<Auth["signUp"]>(async (name, email, password) => {
+  const signUp = useCallback<Auth["signUp"]>(async (name, user, password) => {
+    const u = user.trim().toLowerCase();
     try { localStorage.setItem(NAME_KEY, name.trim()); } catch { /* sem armazenamento */ }
-    const { data, error } = await authClient.auth.signUp({ email: email.trim(), password, options: { data: { name: name.trim() }, ...(typeof window !== "undefined" ? { emailRedirectTo: window.location.origin } : {}) } });
+    // cria o login direto no banco, já confirmado (sem e-mail); depois entra normalmente
+    const { error } = await authClient.rpc("create_login", { p_user: u, p_password: password, p_name: name.trim() });
     if (error) return { ok: false, error: explain(error.message) };
-    if (!data.session) return { ok: true, message: "Conta criada! Enviamos um e-mail de confirmação: abra o link e depois volte para entrar." };
-    return { ok: true };
-  }, []);
-
-  const resetPassword = useCallback<Auth["resetPassword"]>(async (email) => {
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return { ok: false, error: "Digite o e-mail da conta." };
-    const { error } = await authClient.auth.resetPasswordForEmail(email.trim(), typeof window !== "undefined" ? { redirectTo: window.location.origin } : {});
-    return error ? { ok: false, error: explain(error.message) } : { ok: true, message: "Se esse e-mail tem conta, enviamos um link para criar uma senha nova. Confira também o spam." };
+    const r = await authClient.auth.signInWithPassword({ email: loginToEmail(u), password });
+    return r.error ? { ok: false, error: explain(r.error.message) } : { ok: true };
   }, []);
 
   const setNewPassword = useCallback<Auth["setNewPassword"]>(async (password) => {
@@ -113,6 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") window.location.assign("/");
   }, []);
 
-  const value = useMemo<Auth>(() => ({ status, account, blocked, recovering, signIn, signUp, resetPassword, setNewPassword, signOut }), [status, account, blocked, recovering, signIn, signUp, resetPassword, setNewPassword, signOut]);
+  const value = useMemo<Auth>(() => ({ status, account, blocked, recovering, signIn, signUp, setNewPassword, signOut }), [status, account, blocked, recovering, signIn, signUp, setNewPassword, signOut]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
