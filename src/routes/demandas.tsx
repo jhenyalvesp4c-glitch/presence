@@ -139,6 +139,7 @@ function Demandas() {
   const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes">("overview");
   const [view, setView] = useState<"kanban" | "lista" | "matriz">("kanban");
   const [prioF, setPrioF] = useState<"todas" | Priority>("todas");
+  const [typeF, setTypeF] = useState<"todos" | DType>("todos");
   const [statusF, setStatusF] = useState<"todos" | "pend" | Status>("todos");
   const [poloF, setPoloF] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -194,13 +195,14 @@ function Demandas() {
 
   const filtered = useMemo(() => items.filter((i) => {
     if (prioF !== "todas" && i.priority !== prioF) return false;
+    if (typeF !== "todos" && i.type !== typeF) return false;
     // Com um dossiê escolhido, "pendente" vale para a execução daquele dossiê.
     const st = poloF ? (i.polo === poloF ? i.status : i.polos?.find((p) => p.name === poloF)?.status ?? i.status) : i.status;
     if (statusF === "pend" ? st === "done" : statusF !== "todos" && i.status !== statusF) return false;
     if (poloF && i.polo !== poloF && !i.polos?.some((p) => p.name === poloF)) return false;
     if (q && !`${i.id} ${i.title} ${i.polo ?? ""} ${i.polos?.map((p) => p.name).join(" ") ?? ""}`.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
-  }), [items, prioF, statusF, poloF, q]);
+  }), [items, prioF, typeF, statusF, poloF, q]);
 
   const update = (id: string, fn: (d: Demand) => Demand) =>
     setItems((xs) => xs.map((x) => {
@@ -255,7 +257,7 @@ function Demandas() {
       putMaterials(materialsKey(pid, d.id), f.materials).catch((e: Error) => toast.error(`Não consegui guardar os anexos: ${e.message}`));
     }
     setNewOpen(null);
-    setTab(f.type);
+    setTab("overview"); setTypeF((cur) => (cur === "todos" || cur === f.type ? cur : "todos"));
     setSelId(d.id);
   };
   const remove = (id: string) => { dropMaterials([id]); setItems((xs) => xs.filter((x) => x.id !== id)); setSelId((c) => (c === id ? null : c)); };
@@ -316,7 +318,6 @@ function Demandas() {
   const meetingsQ = useMeetings(), meetingCount = (meetingsQ.data ?? []).filter((m) => m.dossierProject === (pid ?? defaultProjectId())).length;
   const tabs = [
     { k: "overview" as const, label: "Visão geral", sub: "Todos os tipos", icon: LayoutGrid, color: "cyan", n: items.length },
-    ...(["geral", "polo", "multi"] as DType[]).map((t) => ({ k: t, label: tm[t].short, sub: tm[t].sub, icon: tm[t].icon, color: tm[t].color, n: count(t) })),
     { k: "agenda" as const, label: "Calendário", sub: "Compromissos", icon: Calendar, color: "emerald", n: appts.length },
     { k: "dossies" as const, label: L.plural, sub: "Cadastro", icon: Folder, color: "pink", n: ds.dossiers.length },
     { k: "docs" as const, label: "Documentação", sub: "Biblioteca", icon: FolderOpen, color: "violet", n: 19 },
@@ -399,6 +400,7 @@ function Demandas() {
               ))}
             </div>
             <div className="contents max-md:flex max-md:w-full max-md:gap-2 max-md:overflow-x-auto max-md:pb-1 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden">
+            {tab === "overview" && <Pick label="Tipo" value={typeF} onChange={(v) => setTypeF(v as typeof typeF)} options={[["todos", "Todos"], ["geral", tm.geral.short], ["polo", tm.polo.short], ["multi", tm.multi.short]]} />}
             <Pick label="Prioridade" value={prioF} onChange={(v) => setPrioF(v as typeof prioF)} options={[["todas", "Todas"], ["alta", "Alta"], ["media", "Média"], ["baixa", "Baixa"]]} />
             <Pick label="Status" value={statusF} onChange={(v) => setStatusF(v as typeof statusF)} options={[["todos", "Todos"], ["pend", "Só pendentes"], ["todo", "A fazer"], ["doing", "Em andamento"], ["done", "Concluídas"]]} />
             <Pick label={L.singular} value={poloF ?? ""} onChange={(v) => setPoloF(v || null)} options={[["", "Todos"], ...names.map((n): [string, string] => [n, n])]} />
@@ -451,11 +453,11 @@ function Demandas() {
                 <div className="relative mb-4 flex flex-wrap items-center gap-3">
                   <span className="relative grid h-9 w-9 place-items-center"><span aria-hidden className="absolute inset-0 rounded-full border border-cyan/50" style={{ animation: "pulse-ring 2.6s ease-out infinite" }} /><span className="icon-tile h-9 w-9 !rounded-full shadow-[0_0_22px_-6px_var(--cyan)]" style={tint("cyan")}><Layers size={16} /></span></span>
                   <h2 className="font-display text-lg font-semibold">Demandas por tipo</h2>
-                  <span className="tag" style={tint("violet")}>3 categorias · {filtered.length} demandas</span>
+                  <span className="tag" style={tint("violet")}>{typeF === "todos" ? "3 categorias" : tm[typeF].short} · {filtered.length} demandas</span>
                   {filtered.length > 0 && <span className="ml-auto flex items-center gap-2.5" data-testid="resumo-geral"><Ring pct={Math.round((filtered.filter((x) => x.status === "done").length / filtered.length) * 100)} color="var(--emerald)" size={44} thickness={5}><span className="text-[0.6rem] font-semibold tabular-nums">{Math.round((filtered.filter((x) => x.status === "done").length / filtered.length) * 100)}%</span></Ring><span className="hidden text-[0.68rem] leading-tight text-muted-foreground sm:block">concluído<br />no total</span></span>}
                 </div>
-                <div className={`grid items-start gap-4 max-md:-mx-4 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:gap-3 max-md:overflow-x-auto max-md:px-4 max-md:pb-2 max-md:pt-2 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden ${sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`} data-testid="carrossel-tipos">
-                  {(["geral", "polo", "multi"] as DType[]).map((t) => (
+                <div className={`grid items-start gap-4 max-md:-mx-4 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:gap-3 max-md:overflow-x-auto max-md:px-4 max-md:pb-2 max-md:pt-2 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden ${typeF !== "todos" ? "lg:grid-cols-1" : sel ? "lg:grid-cols-1 2xl:grid-cols-3" : "lg:grid-cols-3"}`} data-testid="carrossel-tipos">
+                  {(["geral", "polo", "multi"] as DType[]).filter((t) => typeF === "todos" || t === typeF).map((t) => (
                     <TypeBoard key={t} type={t} items={filtered.filter((i) => i.type === t)} selId={selId} onOpen={openCard} onCreate={() => setNewOpen({ type: t, status: "todo" })} />
                   ))}
                 </div>
@@ -479,7 +481,7 @@ function Demandas() {
         onDelete={() => sel && remove(sel.id)}
       />
       {ready && !sel && !newOpen && !noteEdit && (tab === "overview" || tab === "geral" || tab === "polo" || tab === "multi") && (
-        <button onClick={() => setNewOpen({ type: tab === "overview" ? "geral" : tab, status: "todo" })} data-testid="nova-demanda-fab" aria-label="Nova demanda"
+        <button onClick={() => setNewOpen({ type: tab === "overview" ? (typeF === "todos" ? "geral" : typeF) : tab, status: "todo" })} data-testid="nova-demanda-fab" aria-label="Nova demanda"
           className="fixed lift-c right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-brand text-primary-foreground shadow-[0_12px_32px_-6px_var(--cyan)] transition active:scale-95 md:hidden"><Plus size={24} /></button>
       )}
       {selecting && (
