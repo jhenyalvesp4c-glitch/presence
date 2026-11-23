@@ -1,5 +1,4 @@
 import { useShownPath } from "@/lib/shown-path";
-import { SpeechText } from "./SpeechText";
 import { useRouter } from "@tanstack/react-router";
 import { Mic } from "lucide-react";
 
@@ -51,9 +50,8 @@ export function VoiceDock() {
     <>
       {!onHome && (
         <div className="fixed bottom-4 left-4 z-40 flex max-w-[min(86vw,22rem)] flex-col items-start gap-2 lift-b sm:bottom-5 sm:left-5" data-testid="voz-dock">
-          {v.active && (v.botText || v.note) && (
+          {v.active && v.note && (
             <div className="space-y-1.5 animate-rise">
-              {v.botText && v.phase !== "listening" && <SpeechText text={v.botText} className="rounded-2xl border border-border bg-background/85 px-3.5 py-2 text-sm leading-snug shadow-[0_0_30px_-12px_var(--cyan)] backdrop-blur-xl" />}
               {v.note && <p className="rounded-xl border border-amber/40 bg-amber/10 px-3 py-1.5 text-[0.72rem] leading-snug text-amber" role="alert" data-testid="voz-aviso">{v.note}</p>}
             </div>
           )}

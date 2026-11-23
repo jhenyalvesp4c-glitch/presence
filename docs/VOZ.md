@@ -33,7 +33,7 @@ Ao tocar no orbe, enquanto aparece "Iniciando o Orion…", toca um toque de "sis
 ## Tempo para falar e texto acompanhando a fala
 
 - O Orion só entende que você terminou depois de **2,5 s de silêncio** (`SILENCE_MS` em `use-voice.tsx`), tanto no reconhecimento do navegador (que agora continua ouvindo nas pausas) quanto na gravação.
-- A caixa de fala tem tamanho fixo e o texto **aparece frase a frase, quando cada frase começa a ser falada**; a caixa rola sozinha para o fim (`SpeechText.tsx`), então toda a mensagem pode ser lida.
+- A legenda da fala foi removida (a esfera mostra só Ouvindo… / Pensando… / Falando…). `SpeechText.tsx` continua no código, sem uso, caso queira voltar.
 
 ## Roteiros de treinamento por voz
 
@@ -98,3 +98,6 @@ Configurações → "Velocidade da conversa" mostra, para as últimas 8 resposta
 - Conversa comum ("tudo bem?", "como você está") é respondida direto, sem ferramenta e sem aviso.
 - O aviso antes de demorar ("Já estou buscando.", "Vou dar uma olhada para você.") só sai quando uma ferramenta de verdade vai rodar (`src/lib/voice/filler.ts`, regras no `PERSONA` de `agent.ts`). O aviso de resposta lenta (`SLOW_FILLER`) só dispara depois de 4,5 s e diz apenas "Só um instante."
 - O nome da pessoa é usado na saudação e raramente depois; nunca nos avisos.
+
+## Papo rápido
+`src/lib/voice/smalltalk.ts` (`isSmallTalk`): cumprimentos, "tudo bem?", "como você está?", agradecimentos. Nesses casos o servidor responde direto (uma frase, sem ferramentas e sem raciocínio, `reasoning_effort: "none"`), por isso é imediato. É estrito: qualquer palavra fora da lista (ex.: "que dia é hoje", "como está meu financeiro") segue o fluxo normal com ferramentas.

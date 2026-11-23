@@ -5,6 +5,7 @@
  */
 import { buildUserContent, stripBinary, type Anexo } from "./attachments";
 import { fillerFor } from "./filler";
+import { isSmallTalk } from "./smalltalk";
 import { z } from "zod/v4";
 
 import { must, supabase, ownerId } from "../data/db";
@@ -551,6 +552,19 @@ export async function runAgent(history: Turn[], emit: Emit, resume?: Resume, opt
     { role: "system", content: `${PERSONA(st.briefing?.call_name || c.name)}${known ? `\n\n${known}` : ""}${directive ? `\n\nAGORA: ${directive}` : ""}${chat ? `\n\n${CHAT_MODE}` : ""}\n\n${contextText(c.ctx)}` },
     ...history.slice(-12).map((m, i, arr) => ({ role: m.role, content: m.content === GREET_MARK ? "(a conversa por voz acabou de começar)" : i === arr.length - 1 && m.role === "user" && chat && anexos.length ? buildUserContent(m.content.slice(0, 6000), anexos) : m.content.slice(0, chat ? 6000 : 2000) })),
   ];
+  const lastUser = history.at(-1);
+  const quick = !resume && !chat && !starting && !anexos.length && lastUser?.role === "user" && isSmallTalk(lastUser.content, [st.briefing?.call_name, c.name]);
+  if (quick) {
+    // papo rápido: resposta direta, sem ferramentas nem raciocínio, para ser imediata
+    const fast: Record<string, unknown>[] = [
+      { role: "system", content: `Você é o Orion, o assistente pessoal${(st.briefing?.call_name || c.name) ? ` de ${st.briefing?.call_name || c.name}` : ""}, por voz. Responda a conversa em UMA frase curta, natural e calorosa, em português do Brasil, como numa conversa de verdade (se perguntarem como você está, diga como está e devolva a pergunta). Não use o nome dela. Nunca diga que vai verificar, buscar ou olhar nada. Sem listas, emojis ou markdown.` },
+      ...history.slice(-6).map((m) => ({ role: m.role, content: m.content === GREET_MARK ? "(a conversa por voz acabou de começar)" : m.content })),
+    ];
+    try {
+      await streamChat({ model, messages: fast, max_completion_tokens: 120, reasoning_effort: "none" }, (d) => emit({ t: "texto", d }));
+      emit({ t: "fim" }); return;
+    } catch (e) { console.error("[voz rápida]", e); /* se falhar, segue o fluxo normal abaixo */ }
+  }
   try {
     let spoke = false; // já falou algo neste pedido? (aí não repete o aviso de "estou verificando")
     for (let round = 0; round < 5; round++) {

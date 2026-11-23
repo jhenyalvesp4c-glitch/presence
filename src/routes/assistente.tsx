@@ -1,4 +1,3 @@
-import { SpeechText } from "@/components/voice/SpeechText";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
@@ -181,7 +180,6 @@ function Assistente() {
                 <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em]" style={{ color: voice.phase === "listening" ? "var(--emerald)" : voice.phase === "thinking" ? "oklch(0.8 0.15 75)" : "var(--cyan)" }} data-testid="voz-fase">
                   {voice.phase === "listening" ? "Ouvindo…" : voice.phase === "thinking" ? (voice.status ?? "Pensando…") : "Falando…"}
                 </span>
-                {voice.botText && voice.phase !== "listening" && <SpeechText text={voice.botText} maxH="max-h-[4.6rem]" className="max-w-xl px-4 font-serif text-lg leading-snug text-foreground/90 sm:text-xl" />}
               </div>
             ) : (
               <span className="mono-caps mx-auto block w-fit rounded-full bg-[oklch(0.11_0.025_265/0.85)] px-5 shadow-[0_0_0_7px_oklch(0.11_0.025_265/0.85)] !text-[0.72rem] !tracking-[0.3em] !text-foreground">
