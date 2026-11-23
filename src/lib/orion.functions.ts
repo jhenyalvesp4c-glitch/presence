@@ -167,6 +167,36 @@ export async function loadCorpus() {
       workoutSplit: ok(workoutSplit as never), lists: ok(lists as never), listItems: ok(listItems as never), schedule: ok(schedule as never), settlements: ok(settlements as never), settleItems: ok(settleItems as never), ideas: ok(ideas as never),
     }, finance, new Date(`${todayIso}T12:00:00`)));
   } catch { /* o resto continua funcionando */ }
+  // Documentação (Biblioteca de documentos), plano de dieta, fichas de treino e programa: cada parte falha sozinha
+  try {
+    const [ld, lf, dp, wk, wex, tp] = await Promise.all([
+      supabase.from("library_docs").select("id, folder_id, title, description, kind, rules, steps, attachments, ai_summary, deleted, updated_label").limit(1500),
+      supabase.from("library_folders").select("id, name").limit(300),
+      supabase.from("diet_plans").select("id, name, data, updated_at").eq("active", true).limit(1),
+      supabase.from("workouts").select("id, name, duration_min, muscles").limit(100),
+      supabase.from("workout_exercises").select("workout_id, name, muscle, sets_reps, rest_seconds, position").order("position").limit(1500),
+      supabase.from("training_programs").select("id, name, data, updated_at").eq("active", true).limit(1),
+    ]);
+    const folderName = new Map<string, string>([["tut", "Tutoriais e Processos"], ["log", "Logins dos Dossiês"], ["reg", "Registros e Execuções"], ["tpl", "Templates"], ["tre", "Materiais de Treinamento"], ["ger", "Documentos Gerais"]]);
+    if (!lf.error) for (const f of (lf.data ?? []) as { id: string; name: string }[]) folderName.set(f.id, f.name);
+    if (!ld.error) for (const d of (ld.data ?? []) as { id: string; folder_id: string; title: string; description: string; kind: string; rules: string[] | null; steps: string[] | null; attachments: { name: string; path: string; mime: string; size: number }[] | null; ai_summary: string; deleted: boolean; updated_label: string }[]) {
+      if (d.deleted) continue;
+      docs.push({
+        id: `doc:${d.id}`, kind: "documentacao", title: d.title, where: `Documentação · ${folderName.get(d.folder_id) ?? "pasta"}`, link: "/demandas?aba=docs",
+        text: [`${d.kind}.`, d.description, ...(d.rules?.length ? [`Regras: ${d.rules.join(" | ")}`] : []), ...(d.steps?.length ? [`Passo a passo: ${d.steps.map((x, i) => `${i + 1}. ${x}`).join(" ")}`] : []), ...(d.ai_summary ? [`Conteúdo lido dos arquivos:\n${d.ai_summary}`] : []), ...(d.attachments?.length ? [`Arquivos: ${d.attachments.map((a) => a.name).join(", ")}.`] : [])].filter(Boolean).join("\n"),
+        files: (d.attachments ?? []).map((a) => ({ bucket: "presence-app-brain-files", path: a.path, name: a.name, mime: a.mime, size: a.size })),
+      });
+    }
+    const flat = (v: unknown, max = 4000): string => { try { return JSON.stringify(v).replace(/[{}\[\]"]/g, " ").replace(/\s+/g, " ").slice(0, max); } catch { return ""; } };
+    const plan = (dp.data ?? [])[0] as { id: string; name: string; data: unknown; updated_at: string } | undefined;
+    if (plan) docs.push({ id: `dieta:${plan.id}`, kind: "saude", title: `Plano alimentar: ${plan.name}`, text: flat(plan.data, 9000), date: day(plan.updated_at), link: "/saude/dieta" });
+    const prog = (tp.data ?? [])[0] as { id: string; name: string; data: unknown; updated_at: string } | undefined;
+    if (prog) docs.push({ id: `programa:${prog.id}`, kind: "saude", title: `Programa de treino: ${prog.name}`, text: flat(prog.data, 9000), date: day(prog.updated_at), link: "/programa" });
+    const exs = (wex.data ?? []) as { workout_id: string; name: string; muscle: string; sets_reps: string; rest_seconds: number }[];
+    for (const w of (wk.data ?? []) as { id: string; name: string; duration_min: number; muscles: string[] | null }[]) {
+      docs.push({ id: `ficha:${w.id}`, kind: "saude", title: `Ficha de treino: ${w.name}`, text: [`${w.duration_min} min. Músculos: ${(w.muscles ?? []).join(", ")}.`, ...exs.filter((e) => e.workout_id === w.id).map((e) => `${e.name} (${e.muscle}) ${e.sets_reps}, descanso ${e.rest_seconds}s`)].join("\n"), link: "/saude/treino" });
+    }
+  } catch { /* o resto continua funcionando */ }
   // reuniões: ata, decisões, quem faz o quê e pendências (também a conversa original, cortada)
   try {
     const { cleanAnalysis, analysisToMarkdown } = await import("./meetings");

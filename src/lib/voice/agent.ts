@@ -40,7 +40,7 @@ export type VoiceEvent =
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", cadastros: "Mexendo nos seus cadastros…", gravar_reuniao: "Abrindo as reuniões…", habitos: "Olhando seus hábitos…", treino: "Mexendo no seu treino…", dieta: "Olhando a sua dieta…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", ideias: "Mexendo na sua caixa de ideias…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", cadastros: "Mexendo nos seus cadastros…", documentacao: "Mexendo na Documentação…", ler_documento: "Lendo o documento…", gravar_reuniao: "Abrindo as reuniões…", habitos: "Olhando seus hábitos…", treino: "Mexendo no seu treino…", dieta: "Olhando a sua dieta…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", ideias: "Mexendo na sua caixa de ideias…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -96,6 +96,7 @@ Regras de fala:
 - HÁBITOS: "marca a água/o treino de hoje", "como estão meus hábitos", "cria o hábito X", "arquivar o hábito Y" → ferramenta habitos, na hora. Diga a sequência quando marcar.
 - TREINO: "cria uma ficha de treino de pernas", "tira o agachamento da ficha A", "muda a série do supino para 4 x 10", "segunda é treino de costas", "quero treinar 4 vezes por semana" → ferramenta treino, na hora. Ao criar ficha, monte você mesmo bons exercícios com séries/repetições.
 - DIETA: "o que eu como hoje", "marca o almoço", "tomei 500 de água", "uso a opção 2 hoje", "muda minha meta de proteína para 120" → ferramenta dieta, na hora. Criar um plano novo do zero é na tela de Dieta (abra com abrir_pagina).
+- DOCUMENTAR E BUSCAR: "documenta isso", "anota que…", "registra no segundo cérebro" → documentar, com TÍTULO e texto completo e organizado (não resuma demais: guarde todos os detalhes que ela falou). "cria um tutorial/processo/passo a passo de…" → documentacao (criar) numa pasta. Perguntas sobre algo que ela documentou, anotou, combinou ou que está em reunião, cliente, documento, demanda ou na Documentação → SEMPRE buscar_no_orion primeiro; se o trecho for curto ou ela pedir detalhes, ler_documento com o id. Responda com o que achou e diga de onde veio (documentação, reunião, cliente). Só diga que não achou depois de buscar, tentando também termos parecidos.
 - GRAVAR REUNIÃO: "grava a reunião", "vou entrar numa entrevista, grava", "começa a gravar o treinamento" → use gravar_reuniao com o tipo certo; a conversa por voz termina e a gravação começa sozinha.
 - CADASTROS (projetos, dossiês e clientes): "cria o dossiê X em Clientes", "cadastra o cliente X", "muda o status do cliente", "coloca o roteiro de implantação no cliente", "registra que falei com o cliente", "cria/edita/exclui projeto ou dossiê" → use a ferramenta cadastros e faça na hora. Cliente novo já ganha o dossiê ligado e o roteiro padrão. Excluir pede confirmação. Nunca use pedir_melhoria para isso.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
@@ -263,7 +264,8 @@ export const TOOLS = [
     detalhes: { type: "string", description: "Como entendeu que deve ficar: escopo, passos e o resultado esperado, claros o bastante para o Claude implementar sem perguntar de novo." },
     area: { type: "string", description: "Tela ou área do sistema envolvida (ex.: Treinamentos, Tarefas, WhatsApp)." },
   }, required: [] }),
-  fn("buscar_no_orion", "Pesquisa no segundo cérebro (anotações, demandas, tarefas, documentos, arquivos, roteiros, conversas) e devolve os trechos mais relevantes.", { type: "object", properties: { pergunta: { type: "string" } }, required: ["pergunta"] }),
+  fn("buscar_no_orion", "Pesquisa em TUDO que o Orion sabe: segundo cérebro (anotações e documentações), a Documentação (Biblioteca de documentos e pastas), clientes, reuniões, demandas, tarefas, roteiros, conversas, memórias, saúde, treino, dieta, finanças e ideias. Devolve os trechos mais relevantes, cada um com um `id`. Para ler um item inteiro (documento longo, ata completa) chame ler_documento com esse id. Use SEMPRE que ela perguntar sobre algo que ela documentou, anotou, combinou ou guardou, antes de dizer que não sabe.", { type: "object", properties: { pergunta: { type: "string", description: "A pergunta ou os assuntos, com os nomes importantes (cliente, projeto, pessoa)." } }, required: ["pergunta"] }),
+  fn("ler_documento", "Lê o texto COMPLETO de um item achado em buscar_no_orion (documento da Documentação, anotação, ata de reunião, ficha de cliente, demanda). Passe o id exato do resultado da busca.", { type: "object", properties: { id: { type: "string" } }, required: ["id"] }),
   fn("consultar_registros", "Lista e conta, com datas, o que a pessoa criou, concluiu ou documentou: demandas, tarefas/compromissos/lembretes e anotações do segundo cérebro. Use para 'o que fiz ontem', 'quais demandas concluí esta semana', 'quantas tarefas criei', 'o que documentei'. A tela mostra o painel completo.", { type: "object", properties: {
     assunto: { type: "string", enum: ["tudo", "demandas", "tarefas", "anotacoes"], description: "Padrão: tudo." },
     situacao: { type: "string", enum: ["concluidas", "criadas", "abertas", "todas"], description: "concluidas = finalizadas; criadas = registradas no período; abertas = ainda pendentes. Padrão: todas." },
@@ -271,7 +273,12 @@ export const TOOLS = [
     de: { type: "string", description: "AAAA-MM-DD (opcional, no lugar de periodo)." }, ate: { type: "string", description: "AAAA-MM-DD (opcional)." },
     texto: { type: "string", description: "Filtra por palavra no título/projeto/polo (opcional)." },
   } }),
-  fn("documentar", "Guarda uma anotação no segundo cérebro (Orion) com a data do acontecimento.", { type: "object", properties: { texto: { type: "string" }, data: { type: "string", description: "AAAA-MM-DD; padrão hoje." } }, required: ["texto"] }),
+  fn("documentar", "DOCUMENTA no segundo cérebro (Orion): guarda anotações, ocorrências, decisões, combinados, resumos, aprendizados, qualquer coisa que ela pedir para documentar, com a data do acontecimento. Escreva um texto COMPLETO e organizado (pode ser longo), sem perder detalhes que ela falou; dê um titulo curto. Se citar projeto ou dossiês/clientes, passe em projeto e dossies. Para documento estruturado (tutorial, processo, passo a passo) numa pasta da Documentação, use a ferramenta documentacao. Nunca guarde senhas.", { type: "object", properties: { texto: { type: "string" }, titulo: { type: "string", description: "Título curto (até 80 caracteres)." }, data: { type: "string", description: "AAAA-MM-DD; padrão hoje." }, projeto: { type: "string" }, dossies: { type: "array", items: { type: "string" }, description: "Nomes de dossiês/clientes citados." } }, required: ["texto"] }),
+  fn("documentacao", "A DOCUMENTAÇÃO (Biblioteca de documentos e pastas, tela Documentação): listar pastas e documentos, ler, CRIAR documento estruturado (tutorial, processo, guia, checklist, manual), editar, mover entre pastas, excluir, criar e excluir pasta. Para criar: titulo, descricao (texto completo), tipo (Tutorial/Processo/Guia/Checklist/Manual/Documento), regras [], passos [], pasta (nome; padrão Documentos Gerais). Para editar: alvo + novo_titulo/descricao/acrescentar/regras/passos/adicionar_passos/tipo. Excluir pede confirmação. NUNCA guarde senhas ou chaves.", { type: "object", properties: {
+    acao: { type: "string", enum: ["listar", "ler", "criar", "editar", "mover", "excluir", "criar_pasta", "excluir_pasta"] }, titulo: { type: "string" }, alvo: { type: "string" }, novo_titulo: { type: "string" }, descricao: { type: "string" }, acrescentar: { type: "string" },
+    tipo: { type: "string", enum: ["Tutorial", "Processo", "Guia", "Checklist", "Manual", "Documento"] }, pasta: { type: "string" }, nome: { type: "string" },
+    regras: { type: "array", items: { type: "string" } }, passos: { type: "array", items: { type: "string" } }, adicionar_passos: { type: "array", items: { type: "string" } }, confirmado: { type: "boolean" },
+  }, required: ["acao"] }),
   fn("lembrar", "Guarda na memória algo DURADOURO sobre a pessoa (preferência, rotina, regra, fato do trabalho, pessoa importante) para lembrar nas próximas conversas. Não use para pedidos do momento.", { type: "object", properties: {
     texto: { type: "string", description: "A informação, em uma frase clara, na 3ª pessoa. Ex.: Prefere resumos curtos pela manhã." },
     tipo: { type: "string", enum: MEMORY_KINDS, description: "aprendizado, preferencia, rotina, pessoa ou regra." },
@@ -502,7 +509,7 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       const q = String(args["pergunta"] ?? "");
       const { docs, kws } = rank(await loadCorpus(), q, ctx.today, 8);
       if (!docs.length) return { ok: true, encontrados: 0, dica: "Diga que não encontrou nada sobre isso." };
-      return { ok: true, encontrados: docs.length, trechos: docs.map((d) => ({ tipo: d.kind, data: d.date, onde: d.where, titulo: d.title, texto: snippet(d.text, kws, 360), arquivos: d.files?.map((f) => f.name) })) };
+      return { ok: true, encontrados: docs.length, trechos: docs.map((d) => ({ id: d.id, tipo: d.kind, data: d.date, onde: d.where, titulo: d.title, texto: snippet(d.text, kws, 360), arquivos: d.files?.map((f) => f.name) })) };
     }
 
     case "consultar_registros": {
@@ -591,13 +598,33 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
     }
 
     case "documentar": {
-      const texto = String(args["texto"] ?? "").trim().slice(0, 6000);
+      const texto = String(args["texto"] ?? "").trim().slice(0, 20000);
       if (!texto) return { ok: false, erro: "Sem texto para guardar." };
+      if (/\b(senha|password|token|api[ _-]?key)\b\s*[:=]/i.test(texto)) return { ok: false, erro: "Parece haver uma senha ou chave no texto. Senhas não são guardadas no Orion: diga sem a senha." };
       const names = (must(await supabase.from("dossiers").select("name")) as { name: string }[]).map((x) => x.name);
       const date = resolveDay(args["data"], ctx.today);
-      must(await supabase.from("brain_entries").insert({ user_id: ownerId(), text: texto, entry_date: date, dossier_names: mentionedDossiers(texto, names) }).select("id"));
-      emit({ t: "painel", p: { titulo: "Documentado no Orion", secoes: [{ titulo: date.split("-").reverse().join("/"), itens: [{ rotulo: texto.slice(0, 160), link: "/cerebro" }] }] } });
-      return { ok: true };
+      const extra = Array.isArray(args["dossies"]) ? (args["dossies"] as unknown[]).map((x) => String(x).trim()).filter(Boolean) : [];
+      let projectId: string | null = null;
+      if (String(args["projeto"] ?? "").trim()) { try { projectId = (await resolveProject(String(args["projeto"]))).id; } catch { /* sem projeto */ } }
+      const titulo = String(args["titulo"] ?? "").trim().slice(0, 80);
+      must(await supabase.from("brain_entries").insert({ user_id: ownerId(), ...(titulo ? { title: titulo } : {}), text: texto, entry_date: date, project_id: projectId, dossier_names: [...new Set([...mentionedDossiers(texto, names), ...extra])] }).select("id"));
+      emit({ t: "painel", p: { titulo: "Documentado no Orion", secoes: [{ titulo: date.split("-").reverse().join("/"), itens: [{ rotulo: titulo || texto.slice(0, 160), link: "/cerebro" }] }] } });
+      return { ok: true, acao: "documentado", titulo: titulo || undefined };
+    }
+
+    case "documentacao": {
+      const { runDocumentationTool } = await import("./documentation-tool");
+      const out = await runDocumentationTool(args).catch((e): { result: Record<string, unknown>; navegar?: undefined } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer na Documentação." } }));
+      if (out.navegar && out.result["ok"] === true && args["acao"] !== "ler") emit({ t: "acao", a: { tipo: "navegar", para: out.navegar } });
+      return out.result;
+    }
+
+    case "ler_documento": {
+      const { loadCorpus } = await import("../orion.functions");
+      const id = String(args["id"] ?? "");
+      const d = (await loadCorpus()).find((x) => x.id === id);
+      if (!d) return { ok: false, erro: "Não achei esse item. Use o id exato de buscar_no_orion." };
+      return { ok: true, tipo: d.kind, titulo: d.title, data: d.date, onde: d.where, texto: d.text.slice(0, 9000), arquivos: d.files?.map((f) => f.name) };
     }
   }
   return { ok: false, erro: `Ferramenta desconhecida: ${name}` };

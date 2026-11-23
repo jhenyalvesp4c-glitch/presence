@@ -111,3 +111,8 @@ Tudo que dá para fazer nas telas, a voz faz (e nunca usa `pedir_melhoria` para 
 - **Reuniões**: `gravar_reuniao` abre `/reunioes?gravar=1&tipo=…`; a gravação começa sozinha quando a conversa por voz termina (para não gravar a fala do Orion) e termina no botão Finalizar.
 - **Abrir páginas**: Central do dia, Clientes, Documentação, Playbooks, Treinamentos, Reuniões, Cursos, Mapa, Configurações, Assinaturas… (`PAGES` em `agent.ts`; `/demandas?aba=docs&secao=cli` abre direto a seção).
 - Já existiam: demandas, tarefas/lembretes/compromissos, listas, financeiro (incl. categorias, cartões, assinaturas), planejamento, ideias, roteiros de treinamento, WhatsApp (leitura), memória.
+
+## Documentar e buscar em tudo
+- `documentar` (segundo cérebro): título, texto completo (até 20 mil caracteres), data, projeto e dossiês/clientes citados. Recusa texto com senha/chave.
+- `documentacao` (`documentation-tool.ts`): a Biblioteca da tela Documentação — listar, ler, criar (tutorial, processo, guia, checklist, manual), editar, mover, excluir e criar/excluir pasta. Nunca grava na pasta de logins.
+- `buscar_no_orion` + `ler_documento`: a busca (`loadCorpus` em `orion.functions.ts`) cobre segundo cérebro, **Documentação (library_docs)**, clientes (ficha, documentos e histórico), reuniões, demandas, tarefas, roteiros, conversas, memórias, hábitos, saúde, **plano de dieta, fichas de treino e programa**, listas, plano do dia, financeiro e ideias. Cada trecho traz um `id`; `ler_documento` devolve o texto completo. O Perguntar/Documentar da tela usa a mesma busca.
