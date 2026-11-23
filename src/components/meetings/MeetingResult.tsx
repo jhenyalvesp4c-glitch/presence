@@ -1,5 +1,5 @@
 /** Resultado da análise: ata, decisões, quem faz o quê (por pessoa, com seleção para virar demanda/lembrete), pendências, resumo por grupo e próxima reunião. */
-import { AlertCircle, BellRing, CalendarClock, Check, CheckCircle2, ClipboardList, FileText, Flag, Gavel, ListChecks, MessagesSquare, Users } from "lucide-react";
+import { AlertCircle, BellRing, CalendarClock, Check, CheckCircle2, ClipboardList, FileText, Flag, Gavel, Hash, HelpCircle, Layers, ListChecks, MessagesSquare, Pin, Target, Users } from "lucide-react";
 
 import type { Analysis, MAction } from "@/lib/meetings";
 import { byPerson } from "@/lib/meetings";
@@ -30,6 +30,23 @@ export function MeetingResult({ a, selected, sent, onToggle, onSelectAll, readOn
         {a.topicos.length > 0 && <ol className="relative mt-4 space-y-3 border-l border-white/10 pl-4">{a.topicos.map((t, i) => <li key={t.assunto} className="relative" style={{ animation: "fin-rise .5s both", animationDelay: `${i * 60}ms` }}><span aria-hidden className="absolute -left-[21px] top-[0.4rem] h-2 w-2 rounded-full bg-cyan shadow-[0_0_8px_var(--cyan)]" /><b className="text-sm">{t.assunto}</b>{t.pontos.length > 0 && <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">{t.pontos.map((p) => <li key={p}>• {p}</li>)}</ul>}</li>)}</ol>}
       </Card>}
 
+      {a.fatos.length > 0 && <Card title="Fatos e números" Icon={Hash} color="var(--amber)" n={n++} testId="fatos">
+        <dl className="grid gap-2 sm:grid-cols-2">{a.fatos.map((f, i) => (
+          <div key={`${f.rotulo}-${i}`} className="group rounded-2xl border bg-white/[0.03] px-3.5 py-2.5 backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.07]" style={{ borderColor: f.confirmar ? "color-mix(in oklab, var(--amber) 55%, transparent)" : "rgba(255,255,255,.1)", animation: `fin-rise .45s ${Math.min(i, 12) * 0.04}s both` }} data-testid="fato">
+            <dt className="flex items-center gap-2 font-mono text-[0.6rem] uppercase tracking-[0.16em] text-muted-foreground">{f.rotulo}{f.confirmar && <span className="rounded-full border border-amber/50 bg-amber/10 px-1.5 py-px text-[0.55rem] tracking-normal text-amber">confirmar</span>}</dt>
+            <dd className="mt-1 text-sm font-medium leading-snug">{f.valor}</dd>
+          </div>))}</dl>
+      </Card>}
+
+      {a.secoes.map((sc, i) => (
+        <Card key={`${sc.titulo}-${i}`} title={sc.titulo} Icon={Layers} color={["var(--cyan)", "var(--violet)", "var(--emerald)", "var(--amber)", "var(--pink, var(--violet))"][i % 5]!} n={n++} testId="secao">
+          <ul className="space-y-1.5 text-sm">{sc.itens.map((it, k) => <li key={`${it}-${k}`} className="flex gap-2.5"><span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]" /><span className="[overflow-wrap:anywhere]">{it}</span></li>)}</ul>
+        </Card>))}
+
+      {a.expectativas.length > 0 && <Card title="O que esperam de você" Icon={Target} color="var(--emerald)" n={n++} testId="expectativas"><ul className="space-y-1.5 text-sm">{a.expectativas.map((d, i) => <li key={`${d}-${i}`} className="flex gap-2.5"><CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald" /><span>{d}</span></li>)}</ul></Card>}
+
+      {a.lembrar.length > 0 && <Card title="Para não esquecer" Icon={Pin} color="var(--violet)" n={n++} testId="lembrar"><ul className="space-y-1.5 text-sm">{a.lembrar.map((d, i) => <li key={`${d}-${i}`} className="flex gap-2.5"><Pin size={13} className="mt-0.5 shrink-0 text-violet" /><span>{d}</span></li>)}</ul></Card>}
+
       {a.grupos.length > 0 && <Card title="Resumo por grupo" Icon={MessagesSquare} color="var(--emerald)" n={n++} testId="grupos">
         <div className="grid gap-3 lg:grid-cols-2">{a.grupos.map((g, i) => <article key={g.nome} className="rounded-2xl border border-white/10 bg-black/20 p-4" style={{ animation: "fin-rise .5s both", animationDelay: `${i * 70}ms` }}>
           <h4 className="flex items-center gap-2 font-display text-base font-semibold"><Users size={14} className="text-emerald" />{g.nome}</h4><p className="mt-1.5 text-sm text-muted-foreground">{g.resumo}</p>
@@ -53,6 +70,7 @@ export function MeetingResult({ a, selected, sent, onToggle, onSelectAll, readOn
       </Card>}
 
       {a.pendencias.length > 0 && <Card title="Pendências em aberto" Icon={AlertCircle} color="var(--amber)" n={n++} testId="pendencias"><ul className="space-y-1.5 text-sm">{a.pendencias.map((d) => <li key={d} className="flex gap-2"><span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber shadow-[0_0_8px_var(--amber)]" />{d}</li>)}</ul></Card>}
+      {a.perguntas.length > 0 && <Card title="Perguntas sem resposta" Icon={HelpCircle} color="var(--cyan)" n={n++} testId="perguntas"><ul className="space-y-1.5 text-sm">{a.perguntas.map((d, i) => <li key={`${d}-${i}`} className="flex gap-2.5"><HelpCircle size={13} className="mt-0.5 shrink-0 text-cyan" /><span>{d}</span></li>)}</ul></Card>}
 
       {a.proxima && <Card title="Próxima reunião" Icon={CalendarClock} color="var(--cyan)" n={n++} testId="proxima"><p className="text-sm"><b className="font-display text-lg text-cyan">{a.proxima.data ? dm(a.proxima.data) : "A definir"}{a.proxima.hora ? ` · ${a.proxima.hora}` : ""}</b>{a.proxima.assunto ? <span className="text-muted-foreground"> — {a.proxima.assunto}</span> : null}</p></Card>}
     </div>

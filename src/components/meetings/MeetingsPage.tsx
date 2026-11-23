@@ -2,17 +2,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { copyText } from "@/lib/clipboard";
-import { ClipboardCopy, Clock, FileText, Loader2, Mic, MessageCircle, Radar, Send, Sparkles, Square, Trash2, X } from "lucide-react";
+import { Briefcase, ClipboardCopy, Clock, GraduationCap, Users, FileText, Loader2, Mic, MessageCircle, Radar, Send, Sparkles, Square, Trash2, X } from "lucide-react";
 
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt } from "@/components/finance/fx";
 import { InboxPanel } from "@/components/inbox/InboxPanel";
 import { Burst, Thinking, VoiceWave } from "@/components/ideas/fx";
-import { demoAnalysis } from "@/lib/meetings-demo";
+import { demoAnalysis, demoByKind } from "@/lib/meetings-demo";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
 import { WhatsAppDemands } from "@/components/meetings/WhatsAppDemands";
 import { WhatsAppPicker } from "@/components/meetings/WhatsAppPicker";
 import { useLinkTargets, useMeetingActions, useMeetings, type Meeting } from "@/lib/data/meetings";
-import { actionsToInboxText, analysisToMarkdown, type Analysis, type Mode, type Source } from "@/lib/meetings";
+import { KIND_LABEL, actionsToInboxText, analysisToMarkdown, type Analysis, type MeetingKind, type Mode, type Source } from "@/lib/meetings";
 import { analyzeMeeting } from "@/lib/meetings.functions";
 import { Link2 } from "lucide-react";
 import { useLiveRecorder } from "@/lib/use-live-recorder";
@@ -28,7 +28,7 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
   const targets = useLinkTargets().data;
   const polos = (targets?.dossiers ?? []).filter((d) => !embedded || !projectId || d.project === projectId), clientes = (targets?.clients ?? []).filter((c) => !embedded || !projectId || c.project === projectId);
   const homeProject = embedded ? (projectId ?? null) : null;
-  const [onlyProject, setOnlyProject] = useState(true);
+  const [onlyProject, setOnlyProject] = useState(true), [tipo, setTipo] = useState<MeetingKind>("reuniao");
   const [link, setLink] = useState<{ dossierId: string | null; dossierProject: string | null; clientId: string | null }>({ dossierId: null, dossierProject: embedded ? (projectId ?? null) : null, clientId: null });
   const poloName = polos.find((d) => d.id === link.dossierId && d.project === link.dossierProject)?.name;
   const dupNames = new Set(polos.map((d) => d.name).filter((n, i, l) => l.indexOf(n) !== i));
@@ -66,7 +66,7 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
     setBusy(true); setA(null); setCur(null); setInbox(null);
     const today = isoOf(), weekday = new Date().toLocaleDateString("pt-BR", { weekday: "long" });
     try {
-      const r = await analyzeMeeting({ data: { texto: body, modo: mode, hoje: today, diaSemana: weekday, euSou: me.trim(), titulo: title.trim() } });
+      const r = await analyzeMeeting({ data: { texto: body, modo: mode, hoje: today, diaSemana: weekday, euSou: me.trim(), titulo: title.trim(), tipo } });
       if (!r.ok) { toast.error(r.error); setBusy(false); return; }
       const analysis = r.analise, source: Source = origem ?? src;
       setA(analysis); setSelected(new Set(analysis.acoes.map((_, i) => i))); setSent(new Set()); setBurst((n) => n + 1);
@@ -78,6 +78,7 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
     setBusy(false);
   };
   const open = (m: Meeting) => { setLink({ dossierId: m.dossierId, dossierProject: m.dossierProject, clientId: m.clientId }); setA(m.analysis); setCur({ id: m.id, title: m.title, date: m.happenedOn, raw: m.raw, source: m.source, mode: m.mode }); setSelected(new Set(m.analysis.acoes.map((_, i) => i).filter((i) => !m.sent.includes(i)))); setSent(new Set(m.sent)); setInbox(null); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100); };
+  const showKindDemo = (k: MeetingKind) => { const an = demoByKind(k); setMode("reuniao"); setTipo(k); setA(an); setCur({ id: null, title: an.titulo, date: isoOf(), raw: "", source: "texto", mode: "reuniao", demo: true }); setSelected(new Set(an.acoes.map((_, i) => i))); setSent(new Set()); setInbox(null); setBurst((n) => n + 1); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
   const showDemo = (m: Mode) => { const an = demoAnalysis(m); setMode(m); setA(an); setCur({ id: null, title: an.titulo, date: isoOf(), raw: "", source: "texto", mode: m, demo: true }); setSelected(new Set(an.acoes.map((_, i) => i))); setSent(new Set()); setInbox(null); setBurst((n) => n + 1); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); };
   const sendToCentral = () => {
     if (!a || !cur) return;
@@ -123,6 +124,16 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
           <div className="flex gap-1 rounded-2xl border border-white/10 p-1" role="tablist" aria-label="Origem">{([["texto", "Colar texto", FileText], ["voz", "Gravar", Mic], ["whatsapp", "Do WhatsApp", MessageCircle]] as const).map(([k, l, I]) => <button key={k} role="tab" aria-selected={src === k} onClick={() => setSrc(k)} data-testid={`origem-${k}`} className={tab(src === k)}><I size={15} />{l}</button>)}</div>
         </div>
 
+        {mode === "reuniao" && (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Tipo de gravação" data-testid="reuniao-tipos">
+            {([["reuniao", "Reunião", "Pauta, decisões e quem faz o quê", Users], ["entrevista", "Entrevista", "Vaga, salário, benefícios e etapas", Briefcase], ["treinamento", "Treinamento", "Passo a passo e o que enviar depois", GraduationCap], ["livre", "Livre", "Primeiro dia, aula, call longa", Sparkles]] as const).map(([k, l, d, I]) => (
+              <button key={k} type="button" role="radio" aria-checked={tipo === k} onClick={() => setTipo(k)} data-testid={`tipo-${k}`}
+                className={`group flex items-start gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition duration-300 hover:-translate-y-0.5 active:scale-[0.98] ${tipo === k ? "border-violet/60 bg-violet/10 shadow-[0_0_24px_-10px_var(--violet)]" : "border-white/10 bg-white/[0.03] hover:border-white/25"}`}>
+                <I size={16} className={`mt-0.5 shrink-0 transition duration-300 group-hover:scale-110 ${tipo === k ? "text-violet" : "text-muted-foreground"}`} />
+                <span className="min-w-0"><span className="block text-sm font-medium">{l}</span><span className="block text-[0.65rem] leading-snug text-muted-foreground">{d}</span></span>
+              </button>))}
+          </div>)}
+
         {src === "voz" && <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4" data-testid="gravador">
           {!rec.recording && !rec.finishing && <div className="flex flex-wrap items-center gap-4">
             <button type="button" onClick={() => void startRec()} disabled={!rec.supported} className="grid h-16 w-16 place-items-center rounded-full border border-violet/60 bg-violet/15 text-violet shadow-[0_0_34px_-8px_var(--violet)] transition hover:bg-violet/25 active:scale-90 disabled:opacity-40" aria-label="Gravar reunião" data-testid="gravar"><Mic size={24} /></button>
@@ -147,16 +158,16 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
         {!(a && cur && !cur.demo) && <div className="mt-4">{LinkBar}</div>}
         <div className="mt-3 grid gap-3 sm:grid-cols-2"><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} placeholder="Título (opcional): Alinhamento P4C" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-violet/60" data-testid="reuniao-titulo" />
           <input value={me} onChange={(e) => setMe(e.target.value)} maxLength={60} placeholder="Seu nome na conversa (para marcar o que é seu)" className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-violet/60" data-testid="reuniao-eu" /></div>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} maxLength={60000} disabled={busy} placeholder={mode === "grupo" ? "Traga os grupos pelo WhatsApp (acima) ou cole aqui as conversas. Para vários grupos, comece cada um com: === Grupo: nome ===" : "Cole aqui a conversa do WhatsApp, a transcrição ou as suas anotações da reunião…"} className="mt-3 w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-relaxed outline-none transition focus:border-violet/60 disabled:opacity-60" data-testid="reuniao-texto" />
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} maxLength={60000} disabled={busy} placeholder={mode === "grupo" ? "Traga os grupos pelo WhatsApp (acima) ou cole aqui as conversas. Para vários grupos, comece cada um com: === Grupo: nome ===" : ({ reuniao: "Cole aqui a conversa do WhatsApp, a transcrição ou as suas anotações da reunião…", entrevista: "Cole ou grave a entrevista: empresa, vaga, salário, benefícios, o que vão esperar de você, etapas do processo…", treinamento: "Cole ou grave o treinamento: o que foi ensinado, o que ficou de enviar, o que ficou de marcar…", livre: "Cole ou grave qualquer conversa: primeiro dia de trabalho, aula, call longa… o Orion organiza tudo em seções." } as const)[tipo]} className="mt-3 w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm leading-relaxed outline-none transition focus:border-violet/60 disabled:opacity-60" data-testid="reuniao-texto" />
         <div className="mt-1 flex items-center justify-between text-[0.68rem] text-muted-foreground"><span>{text.length.toLocaleString("pt-BR")} / 60.000 caracteres</span>{text && !busy && <button type="button" onClick={() => setText("")} className="hover:text-foreground">limpar</button>}</div>
         {busy ? <Thinking lines={mode === "grupo" ? THINK_GROUP : THINK_MEETING} />
           : <button type="button" onClick={() => void analyze()} disabled={!text.trim() || rec.recording} className="mt-3 inline-flex items-center gap-2 rounded-full border border-violet/50 bg-violet/15 px-6 py-3 text-sm font-medium text-violet shadow-[0_0_30px_-10px_var(--violet)] transition hover:bg-violet/25 active:scale-95 disabled:opacity-40" data-testid="analisar"><Sparkles size={16} /> {mode === "grupo" ? "Resumir com o Orion" : "Gerar ata com o Orion"}</button>}
-        <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 pt-3 text-xs text-muted-foreground">Quer só ver como fica?<button type="button" onClick={() => showDemo("reuniao")} className="text-violet underline-offset-2 hover:underline" data-testid="exemplo-reuniao">Exemplo de reunião</button><button type="button" onClick={() => showDemo("grupo")} className="text-emerald underline-offset-2 hover:underline" data-testid="exemplo-grupo">Exemplo de resumo de grupos</button><span className="opacity-70">(dados inventados, não usa IA e não salva)</span></p>
+        <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 pt-3 text-xs text-muted-foreground">Quer só ver como fica?<button type="button" onClick={() => showDemo("reuniao")} className="text-violet underline-offset-2 hover:underline" data-testid="exemplo-reuniao">Exemplo de reunião</button><button type="button" onClick={() => showKindDemo("entrevista")} className="text-cyan underline-offset-2 hover:underline" data-testid="exemplo-entrevista">Exemplo de entrevista</button><button type="button" onClick={() => showKindDemo("treinamento")} className="text-amber underline-offset-2 hover:underline" data-testid="exemplo-treinamento">Exemplo de treinamento</button><button type="button" onClick={() => showDemo("grupo")} className="text-emerald underline-offset-2 hover:underline" data-testid="exemplo-grupo">Exemplo de resumo de grupos</button><span className="opacity-70">(dados inventados, não usa IA e não salva)</span></p>
       </section>
 
       <div ref={resultRef} className="mt-6 scroll-mt-6">
         {a && cur && <>
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="mono-caps !text-[0.62rem]">{dm(cur.date)} · {cur.mode === "grupo" ? "resumo de grupos" : "reunião"}{cur.demo && <span className="ml-2 rounded-full bg-amber/20 px-2 py-0.5 text-amber" data-testid="badge-exemplo">exemplo com dados inventados</span>}</p><h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="reuniao-titulo-final">{cur.title}</h2></div>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><p className="mono-caps !text-[0.62rem]">{dm(cur.date)} · {cur.mode === "grupo" ? "resumo de grupos" : KIND_LABEL[a.tipo].toLowerCase()}{cur.demo && <span className="ml-2 rounded-full bg-amber/20 px-2 py-0.5 text-amber" data-testid="badge-exemplo">exemplo com dados inventados</span>}</p><h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl" data-testid="reuniao-titulo-final">{cur.title}</h2></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void copy()} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm hover:bg-white/10" data-testid="copiar-ata"><ClipboardCopy size={14} /> Copiar ata</button>
               <button type="button" onClick={sendToCentral} disabled={nSel === 0 && !(a.proxima?.data && !sent.has(-1))} className="inline-flex items-center gap-2 rounded-full border border-emerald/50 bg-emerald/15 px-5 py-2 text-sm font-medium text-emerald shadow-[0_0_28px_-10px_var(--emerald)] transition hover:bg-emerald/25 active:scale-95 disabled:opacity-40" data-testid="enviar-central"><Send size={14} /> Criar demandas e lembretes ({nSel}{a.proxima?.data && !sent.has(-1) ? " + compromisso" : ""})</button></div></div>
           {!cur.demo && <div className="mb-3">{LinkBar}</div>}
@@ -171,7 +182,7 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
         {history.isSuccess && shownHistory.length === 0 && <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-muted-foreground">Nenhuma reunião ainda. A primeira análise fica guardada aqui.</p>}
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{shownHistory.map((m, i) => (
           <li key={m.id} className="ex-card group px-4 py-3" style={{ "--rail": m.mode === "grupo" ? "var(--emerald)" : "var(--violet)", animation: "fin-rise .5s both", animationDelay: `${Math.min(i, 8) * 50}ms` } as React.CSSProperties} data-testid="reuniao-item">
-            <button type="button" onClick={() => open(m)} className="block w-full text-left"><span className="font-mono text-[0.62rem] uppercase tracking-wider text-muted-foreground">{dm(m.happenedOn)} · {m.mode === "grupo" ? "grupos" : m.source === "voz" ? "gravada" : m.source === "whatsapp" ? "whatsapp" : "texto"}</span>
+            <button type="button" onClick={() => open(m)} className="block w-full text-left"><span className="font-mono text-[0.62rem] uppercase tracking-wider text-muted-foreground">{dm(m.happenedOn)} · {m.analysis.tipo !== "reuniao" && m.mode !== "grupo" ? `${KIND_LABEL[m.analysis.tipo].toLowerCase()} · ` : ""}{m.mode === "grupo" ? "grupos" : m.source === "voz" ? "gravada" : m.source === "whatsapp" ? "whatsapp" : "texto"}</span>
               <b className="mt-0.5 block truncate font-display text-base">{m.title}</b><span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{m.analysis.resumo || m.analysis.grupos[0]?.resumo}</span>
               <span className="mt-2 flex gap-3 font-mono text-[0.62rem] text-muted-foreground"><span>{m.analysis.acoes.length} ações</span><span>{m.analysis.decisoes.length} decisões</span>{m.sent.length > 0 && <span className="text-emerald">{m.sent.filter((n) => n >= 0).length} enviadas</span>}</span></button>
             <button type="button" onClick={() => remove(m)} aria-label={`Apagar ${m.title}`} className="absolute right-3 top-3 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={13} /></button></li>))}</ul></section>

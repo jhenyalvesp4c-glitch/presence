@@ -23,3 +23,33 @@ describe("meetings", () => {
   });
   it("period start", () => { const now = new Date(2026, 10, 21, 15, 0); expect(sinceFor("hoje", now)).toBe(Math.floor(new Date(2026, 10, 21, 0, 0).getTime() / 1000)); expect(sinceFor("24h", now)).toBe(Math.floor(now.getTime() / 1000) - 86400); });
 });
+
+import { analysisToMarkdown as toMd, cleanAnalysis as clean } from "./meetings";
+import { demoByKind } from "./meetings-demo";
+
+describe("tipos de gravação e resumo detalhado", () => {
+  it("guarda tipo, fatos exatos (com 'confirmar'), seções, expectativas, lembretes e perguntas", () => {
+    const a = clean({ titulo: "Entrevista — X", resumo: "Longa ata.", tipo: "entrevista", fatos: [{ rotulo: "Salário", valor: "R$ 4.500", confirmar: false }, { rotulo: "Bônus", valor: "até 1 salário (confirmar)", confirmar: true }, { rotulo: "", valor: "vazio" }], secoes: [{ titulo: "A vaga", itens: ["Híbrido"] }, { titulo: "Vazia", itens: [] }], expectativas: ["Entregar relatório"], lembrar: ["Enviar portfólio"], perguntas: ["Como é o bônus?"] })!;
+    expect(a.tipo).toBe("entrevista");
+    expect(a.fatos).toEqual([{ rotulo: "Salário", valor: "R$ 4.500", confirmar: false }, { rotulo: "Bônus", valor: "até 1 salário (confirmar)", confirmar: true }]);
+    expect(a.secoes).toEqual([{ titulo: "A vaga", itens: ["Híbrido"] }]);
+    expect(a.expectativas).toEqual(["Entregar relatório"]); expect(a.lembrar).toHaveLength(1); expect(a.perguntas).toHaveLength(1);
+  });
+  it("análises antigas (sem os campos novos) continuam abrindo como reunião", () => {
+    const a = clean({ titulo: "Velha", resumo: "ok" })!;
+    expect(a.tipo).toBe("reuniao"); expect(a.fatos).toEqual([]); expect(a.secoes).toEqual([]);
+  });
+  it("só fatos ou só seções já contam como análise válida; tipo inválido vira reunião", () => {
+    expect(clean({ fatos: [{ rotulo: "Salário", valor: "R$ 1" }], tipo: "xyz" })!.tipo).toBe("reuniao");
+    expect(clean({})).toBeNull();
+  });
+  it("ata em Markdown inclui fatos, seções, expectativas, lembretes e perguntas", () => {
+    const md = toMd(demoByKind("entrevista"), "2026-11-22");
+    for (const t of ["## Fatos e números", "**Salário:** R$ 4.500 por mês", "_(confirmar)_", "## A empresa", "## Remuneração e benefícios", "## O que esperam de você", "## Para não esquecer", "## Perguntas sem resposta"]) expect(md).toContain(t);
+  });
+  it("exemplo de treinamento separa o que eu fiquei de enviar", () => {
+    const a = demoByKind("treinamento");
+    expect(a.acoes.filter((x) => x.minha)).toHaveLength(2);
+    expect(a.secoes.map((s) => s.titulo)).toContain("Materiais e acessos prometidos");
+  });
+});
