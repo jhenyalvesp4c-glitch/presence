@@ -149,8 +149,9 @@ const findFolder = (fs: FolderT[], id: string): FolderT | undefined => {
 const mapFolders = (fs: FolderT[], id: string, fn: (f: FolderT) => FolderT): FolderT[] =>
   fs.map((f) => (f.id === id ? fn(f) : { ...f, subs: f.subs && mapFolders(f.subs, id, fn) }));
 
-export function DocsLibrary({ projectId }: { projectId: string }) {
-  const [section, setSection] = useState<"lib" | "tre" | "cli" | "pla">("lib");
+export function DocsLibrary({ projectId, initialSection }: { projectId: string; initialSection?: "lib" | "tre" | "cli" | "pla" | undefined }) {
+  const [section, setSection] = useState<"lib" | "tre" | "cli" | "pla">(initialSection ?? "lib");
+  useEffect(() => { if (initialSection) setSection(initialSection); }, [initialSection]);
   return (
     <div className="space-y-4">
       <div className="glass inline-flex rounded-2xl p-1 animate-rise">

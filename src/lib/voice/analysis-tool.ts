@@ -30,6 +30,23 @@ export async function runAnalysisTool(args: Record<string, unknown>): Promise<{ 
     return { result: { ok: true, acao: "meta_definida", tipo: quando, valor: v, unidade: quando === "peso" ? "kg" : "cm" }, panel: { titulo: "Meta definida", secoes: [{ titulo: "Meta", itens: [{ rotulo: quando === "peso" ? `Peso: ${kg(v)} kg` : `Cintura: ${kg(v)} cm` }] }], abrir: { rotulo: "Abrir a análise", para: "/analise" } }, ...nav };
   }
 
+  if (acao === "medida") {
+    // registra peso e/ou medidas de hoje (uma linha por data, como a tela Saúde → Medidas)
+    const dia = /^\d{4}-\d{2}-\d{2}$/.test(String(args["data"] ?? "")) ? String(args["data"]) : today();
+    const num = (v: unknown) => { const n = Number(String(v ?? "").replace(",", ".")); return Number.isFinite(n) && String(v ?? "").trim() !== "" ? n : null; };
+    const peso = num(args["peso"]);
+    const KEYS: Record<string, string> = { cintura: "cintura", abdomen: "abdomen", quadril: "quadril", peito: "peito", braco: "braco", gluteo: "gluteo", coxa: "coxa" };
+    const vals: Record<string, string> = {};
+    for (const [arg, key] of Object.entries(KEYS)) { const n = num(args[arg]); if (n !== null) { if (n < 5 || n > 250) return { result: { ok: false, erro: `Valor de ${arg} estranho (${n}). Em centímetros, por favor.` } }; vals[key] = String(n).replace(".", ","); } }
+    if (peso === null && !Object.keys(vals).length) return { result: { ok: false, erro: "Qual peso ou medida devo registrar?" } };
+    if (peso !== null && (peso < 20 || peso > 400)) return { result: { ok: false, erro: "Esse peso não parece válido (em kg)." } };
+    const same = rows.find((r) => r.measured_on === dia), base = same ?? rows.at(-1);
+    const row = { name: base?.name ?? "", measured_on: dia, height_m: base?.height_m ?? null, weight_kg: peso ?? same?.weight_kg ?? null, values: { ...(same?.values ?? {}), ...vals }, notes: same?.notes ?? "" };
+    const { error } = await supabase.from("body_measurements").upsert(row, { onConflict: "user_id,measured_on" });
+    if (error) return { result: { ok: false, erro: "Não consegui salvar a medição." } };
+    return { result: { ok: true, acao: "medida_registrada", dia, peso_kg: peso, medidas: vals } };
+  }
+
   if (acao === "gordura") {
     const v = Number(String(args["valor"] ?? "").replace(",", "."));
     if (!Number.isFinite(v) || v < 3 || v > 70) return { result: { ok: false, erro: "Qual é o percentual de gordura medido? (entre 3 e 70)" } };

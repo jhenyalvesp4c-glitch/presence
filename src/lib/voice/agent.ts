@@ -40,7 +40,7 @@ export type VoiceEvent =
 /** O que a esfera mostra enquanto executa cada ferramenta (em vez de só "Pensando…"). */
 export const TOOL_STATUS: Record<string, string> = {
   whatsapp_ler: "Abrindo o seu WhatsApp…", whatsapp_conversas: "Abrindo o seu WhatsApp…", whatsapp_mencoes: "Procurando suas marcações no WhatsApp…", whatsapp_marcar_lidas: "Marcando as conversas como lidas…",
-  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", ideias: "Mexendo na sua caixa de ideias…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
+  registrar: "Registrando para você…", atualizar_demanda: "Atualizando a demanda…", gerenciar_tarefa: "Atualizando o item…", lista: "Mexendo na sua lista…", cadastros: "Mexendo nos seus cadastros…", gravar_reuniao: "Abrindo as reuniões…", habitos: "Olhando seus hábitos…", treino: "Mexendo no seu treino…", dieta: "Olhando a sua dieta…", financeiro: "Olhando o seu financeiro…", planejamento: "Mexendo no seu plano do dia…", analise_corporal: "Olhando a sua evolução…", ideias: "Mexendo na sua caixa de ideias…", acerto: "Mexendo no acerto de contas…", pedir_melhoria: "Montando o pedido para o Claude…", roteiro: "Editando o roteiro…", resumo_do_dia: "Olhando o seu dia…",
   consultar_registros: "Consultando o que você fez…", buscar_no_orion: "Procurando no Orion…", documentar: "Anotando no Orion…", lembrar: "Guardando na memória…", abrir_pagina: "Abrindo a tela…",
 };
 export type Turn = { role: "user" | "assistant"; content: string };
@@ -51,6 +51,7 @@ export const PAGES: Record<string, string> = {
   inicio: "/assistente", demandas: "/demandas", projetos: "/projetos", tarefas: "/tarefas", calendario: "/calendario", planejamento: "/planejamento",
   saude: "/saude", treino: "/saude/treino", dieta: "/saude/dieta", habitos: "/habitos", progresso: "/analise", cerebro: "/cerebro",
   organizar: "/organizar", financeiro: "/financeiro", listas: "/tarefas?aba=listas", analise: "/analise", resumo: "/resumo", ideias: "/ideias",
+  central: "/central", cursos: "/cursos", reunioes: "/reunioes", mapa: "/mapa", configuracoes: "/configuracoes", clientes: "/demandas?aba=docs&secao=cli", documentacao: "/demandas?aba=docs", playbooks: "/demandas?aba=docs&secao=pla", treinamentos: "/demandas?aba=docs&secao=tre", assinaturas: "/financeiro?aba=assinaturas",
 };
 
 /* ───────────── contexto (com cache curto, para responder rápido) ───────────── */
@@ -92,6 +93,11 @@ Regras de fala:
 - FINANCEIRO: para dinheiro ("quanto gastei", "quanto tenho", "como está minha fatura", "o que falta pagar", "minhas assinaturas", "gastei 50 no mercado") use a ferramenta financeiro. Ela traz os números reais; nunca invente valores. Responda em uma ou duas frases, com poucos números (valor falado como "mil duzentos e cinquenta reais"). Para registrar um gasto ou ganho, use acao lancar com a frase dela exatamente como foi dita; se faltar conta ou cartão, pergunte só isso. Compra parcelada não se lança por voz.
 - FINANCEIRO, SIMULAR E PROJETAR: "e se eu comprar X no crédito em janeiro?", "quanto fica minha fatura de fevereiro se eu parcelar em 3x?", "quanto sobra pra mim" → use financeiro com acao simular (valor, cartao, mes = mês em que a fatura FECHA, parcelas_total). NÃO grava nada, é só conta. A conta sempre considera quando ela RECEBE (entradas fixas) e quando ela realmente PAGA a fatura: se o cartão está marcado para pagar no fechamento, o dinheiro sai logo depois de fechar (dia 28/29), nunca na virada do mês nem no vencimento. Diga a fatura daquele mês antes e depois, quanto sobra do dinheiro do mês e o saldo no fim, e avise se ficar negativo. Se ela disser que paga a fatura quando fecha, grave com financeiro acao editar, tipo_alvo cartao, alvo o cartão, pagamento=fechamento (dias_apos_fechamento 1 por padrão). Compra só se grava se ela mandar lançar.
 - FINANCEIRO, ALTERAR: você também mexe no financeiro pela ferramenta financeiro: pausar/reativar assinaturas, informar o total de uma fatura (fatura_total), detalhar uma compra, parcela ou assinatura dentro de uma fatura (detalhar: o total do banco NÃO muda), cadastrar_parcelada, cadastrar_fixa, editar e excluir. Faça na hora o que foi pedido com clareza e confirme em UMA frase com o antes e o depois ("Mudei a Netflix de 55,90 para 59,90"). EXCLUIR sempre pede confirmação: chame excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim. Faltou um dado (qual cartão, que valor, que dia)? Pergunte só isso. Fatura "de novembro" é a que FECHA em novembro. Para "me leva/abre os próximos meses" use acao abrir com aba.
+- HÁBITOS: "marca a água/o treino de hoje", "como estão meus hábitos", "cria o hábito X", "arquivar o hábito Y" → ferramenta habitos, na hora. Diga a sequência quando marcar.
+- TREINO: "cria uma ficha de treino de pernas", "tira o agachamento da ficha A", "muda a série do supino para 4 x 10", "segunda é treino de costas", "quero treinar 4 vezes por semana" → ferramenta treino, na hora. Ao criar ficha, monte você mesmo bons exercícios com séries/repetições.
+- DIETA: "o que eu como hoje", "marca o almoço", "tomei 500 de água", "uso a opção 2 hoje", "muda minha meta de proteína para 120" → ferramenta dieta, na hora. Criar um plano novo do zero é na tela de Dieta (abra com abrir_pagina).
+- GRAVAR REUNIÃO: "grava a reunião", "vou entrar numa entrevista, grava", "começa a gravar o treinamento" → use gravar_reuniao com o tipo certo; a conversa por voz termina e a gravação começa sozinha.
+- CADASTROS (projetos, dossiês e clientes): "cria o dossiê X em Clientes", "cadastra o cliente X", "muda o status do cliente", "coloca o roteiro de implantação no cliente", "registra que falei com o cliente", "cria/edita/exclui projeto ou dossiê" → use a ferramenta cadastros e faça na hora. Cliente novo já ganha o dossiê ligado e o roteiro padrão. Excluir pede confirmação. Nunca use pedir_melhoria para isso.
 - LISTAS: para "preciso levar/organizar/montar uma lista de…", "checklist…" use a ferramenta lista (ela fica salva na página Listas). Se ela só deu o tema ("vou à praia"), monte você mesmo uma lista completa, agrupada por tema, sem perguntar antes. Se ela citou itens, crie com eles. Sempre passe sugestoes (4 a 6 ideias que ainda não estão) e diga em UMA frase curta duas ou três delas, perguntando se quer incluir. Depois ela vai ajustando ("tira o biquíni", "coloca protetor", "marca a toalha como pronto"): use adicionar, remover, marcar. Sem dizer o nome, a lista é a mais recente. Se ela aceitar sugestões ("coloca todas"), adicione-as.
 - EXCLUIR sempre pede confirmação: chame a ferramenta com excluir/acao=excluir, ela devolve precisa_confirmar; pergunte "Quer mesmo excluir …?" e só repita com confirmado=true se ela disser sim.
 - Nunca diga que não consegue concluir, editar ou excluir algo: use as ferramentas. Se falhar, diga o motivo real.
@@ -146,8 +152,9 @@ export const TOOLS = [
     item: { type: "string", description: "editar/excluir: descrição (aproximada) do lançamento." }, no_cartao_de: { type: "string", enum: ["eu", "outro"] }, parte_da_outra: { type: "number" }, parcela: { type: "string" }, divisao_padrao: { type: "number", description: "criar: divisão padrão das contas da casa (% da outra pessoa)." },
     confirmado: { type: "boolean", description: "true SÓ depois que ela confirmar uma exclusão." },
   }, required: ["acao"] }),
-  fn("analise_corporal", "Evolução do CORPO da pessoa (Saúde → Análise): peso, cintura, gordura, massa magra, pontuação, indicadores, ritmo e metas. Ações: resumo (padrão; `periodo` opcional: 'mês', '3 meses', '6 meses', 'ano', 'tudo'), meta (define a meta de peso ou de cintura; sem `valor` só mostra as metas), gordura (registra o % de gordura medido, na última medição).", { type: "object", properties: {
-    acao: { type: "string", enum: ["resumo", "meta", "gordura"] },
+  fn("analise_corporal", "Evolução do CORPO da pessoa (Saúde → Análise): peso, cintura, gordura, massa magra, pontuação, indicadores, ritmo e metas. Ações: resumo (padrão; `periodo` opcional: 'mês', '3 meses', '6 meses', 'ano', 'tudo'), meta (define a meta de peso ou de cintura; sem `valor` só mostra as metas), gordura (registra o % de gordura medido, na última medição), medida (registra o peso e/ou medidas de hoje: peso em kg; cintura, abdomen, quadril, peito, braco, gluteo, coxa em cm; data opcional AAAA-MM-DD). 'Pesei 68,5' ou 'minha cintura está 82' → medida.", { type: "object", properties: {
+    acao: { type: "string", enum: ["resumo", "meta", "gordura", "medida"] },
+    peso: { type: "number" }, cintura: { type: "number" }, abdomen: { type: "number" }, quadril: { type: "number" }, peito: { type: "number" }, braco: { type: "number" }, gluteo: { type: "number" }, coxa: { type: "number" }, data: { type: "string" },
     periodo: { type: "string", description: "Período do resumo, em palavras." },
     tipo: { type: "string", enum: ["peso", "cintura"], description: "Qual meta (acao meta)." },
     valor: { type: "number", description: "Meta em kg/cm (acao meta) ou % de gordura medido (acao gordura)." },
@@ -186,6 +193,37 @@ export const TOOLS = [
     dividir_com: { type: "string", description: "Nome da pessoa com quem a compra/parcelada/fixa é DIVIDIDA (lancar, cadastrar_parcelada, cadastrar_fixa, detalhar). O total do banco não muda; a parte da pessoa entra como receita a receber." },
     percentual_dela: { type: "number", description: "Quantos % do valor ficam com a outra pessoa (padrão 50)." }, pessoa: { type: "string", description: "acao dividir: nome da pessoa; vazio ou 'remover' tira a divisão." },
     frase: { type: "string", description: "A frase dela, como falou (acao lancar). Ex.: 'gastei 50 no mercado no débito pelo Nubank'." },
+  }, required: ["acao"] }),
+  fn("cadastros", "Cria, edita, exclui e lista PROJETOS, DOSSIÊS (polos) e CLIENTES, igual às telas Projetos, Demandas e Clientes. Para 'cria o dossiê X em Clientes' use entidade cliente (o dossiê é criado junto e ligado). Entidade projeto: criar (nome, descricao, prazo), editar (alvo, novo_nome, descricao, prazo, status Ativo/Planejando/Pausado), excluir, listar. Entidade dossie: criar/editar/excluir/listar dentro de um projeto (sem projeto = Demandas gerais). Entidade cliente: criar (nome + segmento, contato, email, telefone, plano, valor_mensal, status), editar (alvo + campos), registrar_contato (alvo + texto), aplicar_roteiro (alvo: coloca o roteiro padrão de implantação), excluir, listar. EXCLUIR sempre pede confirmação (precisa_confirmar).", { type: "object", properties: {
+    entidade: { type: "string", enum: ["projeto", "dossie", "cliente"] },
+    acao: { type: "string", enum: ["criar", "editar", "excluir", "listar", "registrar_contato", "aplicar_roteiro"] },
+    nome: { type: "string" }, alvo: { type: "string", description: "Nome aproximado do item existente (editar/excluir/registrar_contato/aplicar_roteiro)." }, novo_nome: { type: "string" },
+    projeto: { type: "string", description: "Projeto onde está o dossiê ou cliente; vazio = Demandas gerais." },
+    descricao: { type: "string" }, prazo: { type: "string", description: "AAAA-MM-DD" }, status: { type: "string" },
+    segmento: { type: "string" }, contato: { type: "string" }, email: { type: "string" }, telefone: { type: "string" }, plano: { type: "string" }, valor_mensal: { type: "number" }, observacoes: { type: "string" },
+    texto: { type: "string", description: "registrar_contato: o que aconteceu." }, data: { type: "string", description: "AAAA-MM-DD, opcional." },
+    com_roteiro: { type: "boolean", description: "cliente criar: false para não aplicar o roteiro padrão (padrão: aplica)." },
+    confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
+  }, required: ["entidade", "acao"] }),
+  fn("gravar_reuniao", "COMEÇA a gravar uma reunião, entrevista, treinamento ou conversa livre: abre a página de Reuniões e a gravação começa sozinha assim que esta conversa por voz termina (para não gravar a sua fala). Diga em uma frase: 'Abrindo as reuniões, a gravação começa já. Quando acabar, toque em finalizar que eu organizo tudo.' Não dá para parar a gravação por voz: ela termina no botão Finalizar.", { type: "object", properties: {
+    tipo: { type: "string", enum: ["reuniao", "entrevista", "treinamento", "livre"], description: "Padrão: reuniao." },
+  } }),
+  fn("habitos", "HÁBITOS da pessoa (tela Hábitos): listar com a sequência de dias, criar, marcar como feito (hoje ou outro dia), desmarcar, renomear e arquivar. Ações: listar, criar (nome), marcar/desmarcar (alvo, data opcional AAAA-MM-DD), renomear (alvo, novo_nome), arquivar (alvo; pede confirmação).", { type: "object", properties: {
+    acao: { type: "string", enum: ["listar", "criar", "marcar", "desmarcar", "renomear", "arquivar"] }, nome: { type: "string" }, alvo: { type: "string" }, novo_nome: { type: "string" },
+    data: { type: "string" }, confirmado: { type: "boolean" },
+  }, required: ["acao"] }),
+  fn("treino", "FICHAS DE TREINO (Saúde → Treino): listar, ver, criar, editar, excluir, divisão da semana e meta semanal. Ações: listar; ver (alvo); criar (nome, duracao_min, musculos, exercicios [{nome, musculo, series_reps '3 x 12', descanso_s}]) — monte você mesmo exercícios bons quando ela só disser o foco; editar (alvo + novo_nome, duracao_min, musculos, adicionar [exercícios], remover [nomes], alterar [{alvo, series_reps, descanso_s, musculo}]); excluir (alvo; pede confirmação); semana (mostra a divisão); definir_dia (dia 'segunda'…, alvo = ficha ou 'livre'); meta_semanal (valor 1 a 14).", { type: "object", properties: {
+    acao: { type: "string", enum: ["listar", "ver", "criar", "editar", "excluir", "semana", "definir_dia", "meta_semanal"] }, nome: { type: "string" }, alvo: { type: "string" }, novo_nome: { type: "string" },
+    duracao_min: { type: "number" }, musculos: { type: "array", items: { type: "string" } }, dia: { type: "string" }, valor: { type: "number" }, titulo: { type: "string" },
+    exercicios: { type: "array", items: { type: "object", properties: { nome: { type: "string" }, musculo: { type: "string" }, series_reps: { type: "string" }, descanso_s: { type: "number" } }, required: ["nome"] } },
+    adicionar: { type: "array", items: { type: "object", properties: { nome: { type: "string" }, musculo: { type: "string" }, series_reps: { type: "string" }, descanso_s: { type: "number" } }, required: ["nome"] } },
+    remover: { type: "array", items: { type: "string" } },
+    alterar: { type: "array", items: { type: "object", properties: { alvo: { type: "string" }, series_reps: { type: "string" }, descanso_s: { type: "number" }, musculo: { type: "string" } }, required: ["alvo"] } },
+    confirmado: { type: "boolean" },
+  }, required: ["acao"] }),
+  fn("dieta", "DIETA do dia (Saúde → Dieta): ver o plano de hoje, marcar/desmarcar refeições feitas, registrar água, escolher a opção do dia e mudar as metas. Ações: hoje; marcar_refeicao / desmarcar_refeicao (alvo = nome da refeição ou 'todas'); agua (ml, pode ser negativo para corrigir); escolher_opcao (alvo = nome da opção); metas (kcal, proteina_g, carbo_g, gordura_g; sem valores só mostra).", { type: "object", properties: {
+    acao: { type: "string", enum: ["hoje", "marcar_refeicao", "desmarcar_refeicao", "agua", "escolher_opcao", "metas"] }, alvo: { type: "string" }, ml: { type: "number" },
+    kcal: { type: "number" }, proteina_g: { type: "number" }, carbo_g: { type: "number" }, gordura_g: { type: "number" },
   }, required: ["acao"] }),
   fn("lista", "Cria e ajusta LISTAS/CHECKLISTS salvas (o que levar para a praia, compras, preparar uma viagem, passos de algo). Ações: criar (com titulo e itens agrupados), adicionar, remover, marcar (feito), desmarcar, mostrar, listar, renomear, excluir. Em criar/adicionar/mostrar passe sempre `sugestoes` com 4 a 6 ideias úteis que ainda NÃO estão na lista. Quando ela pedir uma lista sem dizer os itens, monte você mesmo uma lista completa e bem pensada, agrupada por tema.", { type: "object", properties: {
     acao: { type: "string", enum: ["criar", "adicionar", "remover", "marcar", "desmarcar", "mostrar", "listar", "renomear", "excluir"] },
@@ -398,6 +436,37 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
       if (out.panel) emit({ t: "painel", p: out.panel });
       if (out.navegar) emit({ t: "acao", a: { tipo: "navegar", para: out.navegar } });
       if (out.mudou) emit({ t: "acao", a: { tipo: "atualizar", o: "financeiro" } });
+      return out.result;
+    }
+
+    case "gravar_reuniao": {
+      const t = ["reuniao", "entrevista", "treinamento", "livre"].includes(String(args["tipo"])) ? String(args["tipo"]) : "reuniao";
+      emit({ t: "acao", a: { tipo: "navegar", para: `/reunioes?gravar=1&tipo=${t}` } });
+      emit({ t: "acao", a: { tipo: "encerrar" } });
+      return { ok: true, acao: "gravação vai começar ao fim desta conversa", tipo: t };
+    }
+
+    case "habitos": {
+      const { runHabitTool } = await import("./habits-tool");
+      const out = await runHabitTool(args, ctx.today).catch((e): { result: Record<string, unknown> } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer nos hábitos." } }));
+      return out.result;
+    }
+
+    case "treino": {
+      const { runWorkoutTool } = await import("./workout-tool");
+      const out = await runWorkoutTool(args).catch((e): { result: Record<string, unknown> } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer no treino." } }));
+      return out.result;
+    }
+
+    case "dieta": {
+      const { runDietTool } = await import("./diet-tool");
+      const out = await runDietTool(args, ctx.today).catch((e): { result: Record<string, unknown> } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer na dieta." } }));
+      return out.result;
+    }
+
+    case "cadastros": {
+      const { runRegistryTool } = await import("./registry-tool");
+      const out = await runRegistryTool(args).catch((e): { result: Record<string, unknown> } => ({ result: { ok: false, erro: e instanceof Error ? e.message : "Não consegui mexer nisso." } }));
       return out.result;
     }
 

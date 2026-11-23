@@ -16,6 +16,7 @@ import { KIND_LABEL, actionsToInboxText, analysisToMarkdown, type Analysis, type
 import { analyzeMeeting } from "@/lib/meetings.functions";
 import { Link2 } from "lucide-react";
 import { useLiveRecorder } from "@/lib/use-live-recorder";
+import { useVoice } from "@/lib/voice/use-voice";
 
 const ls = { get: (k: string, d = "") => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sem armazenamento */ } } };
 const isoOf = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -48,6 +49,21 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
   const rec = useLiveRecorder(chunkMs), resultRef = useRef<HTMLDivElement>(null), inboxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { ls.set("orion:reunioes:eu", me); }, [me]);
+  // "Orion, grava a reunião": a voz abre a página com ?gravar=1 e a gravação começa assim que a conversa por voz acaba (para não gravar a fala do Orion)
+  const voice = useVoice();
+  const autoRec = useRef<"espera" | "feito">("espera");
+  useEffect(() => {
+    if (autoRec.current === "feito" || typeof location === "undefined") return;
+    const q = new URLSearchParams(location.search);
+    if (q.get("gravar") !== "1") return;
+    const t = q.get("tipo");
+    if (t === "entrevista" || t === "treinamento" || t === "livre" || t === "reuniao") setTipo(t);
+    if (voice.active) return; // espera a conversa por voz terminar
+    autoRec.current = "feito";
+    const timer = setTimeout(() => { void startRec(); window.history.replaceState(null, "", location.pathname); }, 800);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice.active]);
   const append = (t: string) => setText((x) => (x.trim() ? `${x.trim()}\n\n${t}` : t));
   // gravação contínua: transcreve enquanto grava; ao finalizar, junta tudo ao texto e já organiza
   const startRec = async () => { try { await rec.start(); setSrc("voz"); } catch (e) { toast.error((e as Error).message); } };

@@ -35,7 +35,11 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/demandas")({
-  validateSearch: (s: Record<string, unknown>): { projeto?: string | undefined } => ({ projeto: typeof s["projeto"] === "string" ? (s["projeto"] as string) : undefined }),
+  validateSearch: (s: Record<string, unknown>): { projeto?: string | undefined; aba?: string | undefined; secao?: string | undefined } => ({
+    projeto: typeof s["projeto"] === "string" ? (s["projeto"] as string) : undefined,
+    aba: ["notas", "docs", "dossies", "agenda", "reunioes"].includes(String(s["aba"])) ? String(s["aba"]) : undefined,
+    secao: ["lib", "tre", "cli", "pla"].includes(String(s["secao"])) ? String(s["secao"]) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Demandas · P4C" },
@@ -109,7 +113,7 @@ const today = () => new Date().toLocaleDateString("pt-BR", { day: "2-digit", mon
 
 /* ---------------- página ---------------- */
 function Demandas() {
-  const { projeto } = Route.useSearch();
+  const { projeto, aba: abaUrl, secao: secaoUrl } = Route.useSearch();
   // Projeto atual: o do `?projeto=` se existir no banco; senão o padrão (P4C).
   const [known, setKnown] = useState<Project[] | null>(null);
   useEffect(() => {
@@ -136,7 +140,8 @@ function Demandas() {
   const tm = typeMetaFor(L);
   const [items, setItems, itemsReady] = useDbState<Demand[]>(pid, [], () => loadDemands(pid!), (p, n) => saveDemands(pid!, p, n));
   const ready = pid !== null && stReady && itemsReady;
-  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes">("overview");
+  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes">((abaUrl as "docs" | undefined) ?? "overview");
+  useEffect(() => { if (abaUrl) setTab(abaUrl as "docs"); }, [abaUrl, secaoUrl]);
   const [view, setView] = useState<"kanban" | "lista" | "matriz">("kanban");
   const [prioF, setPrioF] = useState<"todas" | Priority>("todas");
   const [typeF, setTypeF] = useState<"todos" | DType>("todos");
@@ -434,7 +439,7 @@ function Demandas() {
           ) : tab === "reunioes" ? (
             <MeetingsPage embedded projectId={pid ?? defaultProjectId()} />
           ) : tab === "docs" ? (
-            <DocsLibrary projectId={pid ?? defaultProjectId()} />
+            <DocsLibrary projectId={pid ?? defaultProjectId()} initialSection={secaoUrl as "lib" | "tre" | "cli" | "pla" | undefined} />
           ) : tab === "agenda" ? (
             <DemandCalendar items={appts} dossiers={ds.dossiers} label={L} onSave={saveAppt} onDelete={removeAppt} onToggle={toggleAppt} saving={saveApptM.isPending} />
           ) : tab === "notas" ? (

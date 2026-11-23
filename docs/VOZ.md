@@ -101,3 +101,13 @@ Configurações → "Velocidade da conversa" mostra, para as últimas 8 resposta
 
 ## Papo rápido
 `src/lib/voice/smalltalk.ts` (`isSmallTalk`): cumprimentos, "tudo bem?", "como você está?", agradecimentos. Nesses casos o servidor responde direto (uma frase, sem ferramentas e sem raciocínio, `reasoning_effort: "none"`), por isso é imediato. É estrito: qualquer palavra fora da lista (ex.: "que dia é hoje", "como está meu financeiro") segue o fluxo normal com ferramentas.
+
+## Autonomia total (o que a voz faz por você)
+Tudo que dá para fazer nas telas, a voz faz (e nunca usa `pedir_melhoria` para isso):
+- **Cadastros** (`registry-tool.ts`, ferramenta `cadastros`): criar/editar/excluir/listar projetos, dossiês e clientes; cliente novo já cria o dossiê ligado e aplica o roteiro padrão; registrar contato; aplicar roteiro. Excluir sempre pede confirmação.
+- **Hábitos** (`habits-tool.ts`): listar com sequência, criar, marcar/desmarcar, renomear, arquivar.
+- **Treino** (`workout-tool.ts`): fichas e exercícios, divisão da semana, meta semanal.
+- **Dieta** (`diet-tool.ts`): plano de hoje, refeições, água, opção do dia, metas. **Medidas**: `analise_corporal` ação `medida` (peso e circunferências).
+- **Reuniões**: `gravar_reuniao` abre `/reunioes?gravar=1&tipo=…`; a gravação começa sozinha quando a conversa por voz termina (para não gravar a fala do Orion) e termina no botão Finalizar.
+- **Abrir páginas**: Central do dia, Clientes, Documentação, Playbooks, Treinamentos, Reuniões, Cursos, Mapa, Configurações, Assinaturas… (`PAGES` em `agent.ts`; `/demandas?aba=docs&secao=cli` abre direto a seção).
+- Já existiam: demandas, tarefas/lembretes/compromissos, listas, financeiro (incl. categorias, cartões, assinaturas), planejamento, ideias, roteiros de treinamento, WhatsApp (leitura), memória.
