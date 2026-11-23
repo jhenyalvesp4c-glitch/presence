@@ -127,7 +127,7 @@ export function Modal({ open, onClose, title, subtitle, children, width = "max-w
           <div><h2 id={id} className="font-serif text-2xl leading-tight"><span className="text-gradient">{title}</span></h2>{subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}</div>
           <button onClick={onClose} aria-label="Fechar" className={btn.icon}><X size={16} /></button>
         </header>
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-6 pb-5">{children}</div>
+        <div className="fin-modal-body relative min-h-0 flex-1 overflow-y-auto px-6 pb-5">{children}</div>
         {footer && <footer className="relative flex flex-wrap items-center justify-end gap-2 border-t border-white/10 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">{footer}</footer>}
       </div>
     </div>, document.body);

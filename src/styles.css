@@ -648,3 +648,10 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, 1em); }
   button, a, [role="button"], [role="tab"] { touch-action: manipulation; }
 }
+
+/* Janela aberta no celular: a barra de baixo e os botões flutuantes saem de cena (ver ModalGuard.tsx). */
+@media (max-width: 767px) {
+  html[data-modal="1"] [data-testid="barra-inferior"], html[data-modal="1"] .lift-a, html[data-modal="1"] .lift-b, html[data-modal="1"] .lift-c { opacity: 0; pointer-events: none; transform: translateY(12px); transition: opacity .2s, transform .2s; }
+  /* Botões Salvar/Cancelar das janelas do Financeiro ficam presos no pé: alcançáveis mesmo com o teclado aberto */
+  .fin-modal-body .fin-actions { position: sticky; bottom: 0; z-index: 10; margin-left: -1.5rem; margin-right: -1.5rem; padding: .75rem 1.5rem calc(.75rem + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.1); background: oklch(0.15 0.03 265 / .96); backdrop-filter: blur(12px); }
+}

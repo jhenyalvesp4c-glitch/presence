@@ -21,3 +21,8 @@ O Orion abre em tela cheia, com o ícone da esfera, e tem atalhos (Central do di
 
 ## Próximo degrau: avisos com o app fechado (push)
 Exige VAPID (chaves), tabela de aparelhos e uma rotina de envio (cron). No iPhone só funciona com o app instalado (iOS 16.4+). Não implementado ainda.
+
+## Janelas (modais) no celular
+- `src/components/ModalGuard.tsx`: quando há uma janela aberta (qualquer `[role=dialog]` ou camada fixa de tela cheia com z-index ≥ 50), marca `html[data-modal="1"]` e o CSS esconde a barra de baixo e os botões flutuantes. Assim nenhuma janela fica com o botão de salvar coberto, mesmo as presas dentro de blocos com animação.
+- Janelas do Financeiro (`Modal` em `finance/ui.tsx`): os botões `Actions` (`.fin-actions`) ficam presos no pé da janela no celular; o corpo rola e o campo em foco continua visível com o teclado aberto (testado com a tela reduzida para ~508 px).
+- Novas janelas: prefira `createPortal(document.body)` e `max-h-[..dvh]`; mantenha o botão principal no pé, fora da área que rola.

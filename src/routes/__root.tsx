@@ -19,6 +19,7 @@ import { WhatsAppWatcher } from "@/components/whatsapp/WhatsAppWatcher";
 import { GlobalRail, useRailPad } from "@/components/GlobalRail";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { TouchTargets } from "@/components/TouchTargets";
+import { ModalGuard } from "@/components/ModalGuard";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { ZoomHint } from "@/components/ZoomHint";
 import { VoiceProvider } from "@/lib/voice/use-voice";
@@ -170,6 +171,7 @@ function RootComponent() {
         {/* espaço no fim da página: o conteúdo rola até acima dos botões flutuantes */}
         <div aria-hidden className="h-16 md:hidden" />
         <TouchTargets />
+        <ModalGuard />
         <OrionDock />
         <VoiceDock />
         <ReminderWatcher />

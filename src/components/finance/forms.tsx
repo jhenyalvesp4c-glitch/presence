@@ -11,7 +11,7 @@ import { CatIcon, Field, MoneyInput, Pill, Segmented, Select, TextInput, TONE_KE
 
 const Grid = ({ children }: { children: ReactNode }) => <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
 export function Actions({ onCancel, onSave, saveLabel = "Salvar", disabled, extra }: { onCancel?: (() => void) | undefined; onSave: () => void; saveLabel?: string | undefined; disabled?: boolean | undefined; extra?: ReactNode }) {
-  return <div className="mt-5 flex flex-wrap items-center justify-end gap-2">{extra}{onCancel && <button type="button" className={btn.ghost} onClick={onCancel}>Cancelar</button>}<button type="button" className={btn.primary} onClick={onSave} disabled={disabled} data-testid="fin-salvar">{saveLabel}</button></div>;
+  return <div className="fin-actions mt-5 flex flex-wrap items-center justify-end gap-2">{extra}{onCancel && <button type="button" className={btn.ghost} onClick={onCancel}>Cancelar</button>}<button type="button" className={btn.primary} onClick={onSave} disabled={disabled} data-testid="fin-salvar">{saveLabel}</button></div>;
 }
 
 /** Seletor de cor (as paletas de cartão/conta). */

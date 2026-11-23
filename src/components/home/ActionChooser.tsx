@@ -50,7 +50,7 @@ export function ActionChooser({ onPick, onClose }: { onPick: (a: HomeAction) => 
               const I = o.icon;
               return (
                 <button key={o.key} onClick={() => onPick(o.key)} data-testid={`acao-${o.key}`} style={{ ...tint(o.color), animationDelay: `${i * 90}ms` }}
-                  className="group relative flex min-h-[15rem] flex-col overflow-hidden rounded-3xl border border-[color-mix(in_oklab,var(--glow)_40%,transparent)] bg-[linear-gradient(160deg,color-mix(in_oklab,var(--glow)_12%,transparent),transparent_70%)] p-6 text-left backdrop-blur-xl animate-rise transition duration-300 hover:-translate-y-2 hover:border-[var(--glow)] hover:shadow-[0_24px_60px_-20px_var(--glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--glow)]">
+                  className="group relative flex min-h-[15rem] max-sm:min-h-0 flex-col overflow-hidden rounded-3xl border border-[color-mix(in_oklab,var(--glow)_40%,transparent)] bg-[linear-gradient(160deg,color-mix(in_oklab,var(--glow)_12%,transparent),transparent_70%)] p-6 max-sm:p-4 text-left backdrop-blur-xl animate-rise transition duration-300 hover:-translate-y-2 hover:border-[var(--glow)] hover:shadow-[0_24px_60px_-20px_var(--glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--glow)]">
                   <span aria-hidden className="scanline pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-50" />
                   <span aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[var(--glow)] opacity-20 blur-3xl transition duration-500 group-hover:opacity-40" />
                   <span className="relative flex items-start">
