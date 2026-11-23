@@ -14,6 +14,7 @@ import { transcribeAudio } from "@/lib/audio.functions";
 import type { Panel, Turn, VoiceEvent } from "./agent";
 import { takeSentences } from "./sentences";
 import { SLOW_AFTER_MS, SLOW_FILLER } from "./filler";
+import { isDismiss } from "./dismiss";
 import { markStt, recordPerf, takeStt } from "./perf";
 
 /** Marcas de tempo do pedido em andamento (para o medidor de velocidade). */
@@ -339,6 +340,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     stopListening();
     const sp = spk(); sp.reset();
     const greeting = text === GREET_MARK;
+    if (!greeting && isDismiss(text)) setPanel(null); // "obrigada", "pode fechar"…: some o que está na tela, sem precisar clicar
     setUserText(greeting ? "" : text); setBotText(""); setP("thinking");
     history.current = [...history.current, { role: "user" as const, content: text }].slice(-16);
     const ctrl = new AbortController(); abort.current = ctrl;

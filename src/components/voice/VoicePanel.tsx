@@ -11,7 +11,7 @@ type Tone = { c: string; Icon: typeof Bell };
 const ROSE = "oklch(0.72 0.18 10)", AMBER = "oklch(0.82 0.15 75)";
 
 /** Cor e ícone de cada seção, pelo nome. */
-function toneOf(title: string): Tone {
+export function toneOf(title: string): Tone {
   const n = normalize(title);
   if (n.includes("compromiss")) return { c: "var(--violet)", Icon: CalendarDays };
   if (n.includes("lembret")) return { c: AMBER, Icon: Bell };
@@ -24,10 +24,10 @@ function toneOf(title: string): Tone {
   return { c: "var(--cyan)", Icon: Sparkles };
 }
 
-const countOf = (title: string) => /\((\d+)\)\s*$/.exec(title)?.[1];
-const bare = (title: string) => title.replace(/\s*\(\d+\)\s*$/, "");
+export const countOf = (title: string) => /\((\d+)\)\s*$/.exec(title)?.[1];
+export const bare = (title: string) => title.replace(/\s*\(\d+\)\s*$/, "");
 /** "09:00–10:00 · local" → hora separada do resto. */
-const splitTime = (d?: string) => { const m = d ? /^(\d{2}:\d{2}(?:–\d{2}:\d{2})?)(?:\s*·\s*)?(.*)$/.exec(d) : null; return m ? { time: m[1]!, rest: m[2] || undefined } : { time: undefined, rest: d }; };
+export const splitTime = (d?: string) => { const m = d ? /^(\d{2}:\d{2}(?:–\d{2}:\d{2})?)(?:\s*·\s*)?(.*)$/.exec(d) : null; return m ? { time: m[1]!, rest: m[2] || undefined } : { time: undefined, rest: d }; };
 
 /** Modal do que o Orion mostra por voz (o dia, registros, o que foi criado): bonito, organizado e clicável. */
 export function VoicePanel({ panel, onClose, onOpen }: { panel: Panel; onClose: () => void; onOpen: (href: string) => void }) {

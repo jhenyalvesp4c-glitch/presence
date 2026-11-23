@@ -1,7 +1,10 @@
 import { useShownPath } from "@/lib/shown-path";
 import { useRouter } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Mic } from "lucide-react";
+import type { Panel } from "@/lib/voice/agent";
 
+import { HudPanel } from "@/components/voice/HudPanel";
 import { VoicePanel } from "@/components/voice/VoicePanel";
 import { WhatsChat } from "@/components/voice/WhatsChat";
 import { useVoice, type Phase } from "@/lib/voice/use-voice";
@@ -45,6 +48,16 @@ export function VoiceDock() {
   const path = useShownPath();
   const go = (href: string) => router.history.push(href);
   const onHome = path === "/assistente";
+  // o painel de cartões sai com animação quando a voz o fecha (ex.: "obrigada")
+  const [shown, setShown] = useState<Panel | null>(null), [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (v.panel) { setShown(v.panel); setLeaving(false); return; }
+    if (!shown) return;
+    setLeaving(true);
+    const t = setTimeout(() => { setShown(null); setLeaving(false); }, 480);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v.panel]);
 
   return (
     <>
@@ -65,7 +78,7 @@ export function VoiceDock() {
         <p className="fixed bottom-4 left-1/2 z-40 w-[min(92vw,34rem)] -translate-x-1/2 rounded-xl border border-amber/40 bg-background/90 px-3 py-2 text-center text-[0.75rem] leading-snug text-amber backdrop-blur" role="alert" data-testid="voz-aviso">{v.note}</p>
       )}
 
-      {v.panel && (v.panel.chat ? <WhatsChat panel={v.panel} onClose={v.closePanel} /> : <VoicePanel panel={v.panel} onClose={v.closePanel} onOpen={go} />)}
+      {shown && (shown.chat ? <WhatsChat panel={shown} onClose={v.closePanel} /> : shown.confirmar ? <VoicePanel panel={shown} onClose={v.closePanel} onOpen={go} /> : <HudPanel panel={shown} leaving={leaving} onClose={v.closePanel} onOpen={go} />)}
     </>
   );
 }

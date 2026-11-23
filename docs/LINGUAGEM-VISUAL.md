@@ -32,3 +32,6 @@
 - Descreva no resumo final **quais efeitos** foram usados e reaproveitados.
 - Se criar um efeito novo e ele servir para outras telas, vire utilitário em `styles.css` e acrescente aqui.
 - Ao receber captura de tela da usuária, compare com as telas de referência acima (Clientes é o padrão de "vidro transparente").
+
+## HUD do Orion (o que a voz mostra na tela)
+Painéis da voz usam `HudPanel` (`src/components/voice/HudPanel.tsx`): cartões de vidro **flutuantes** (não bloqueiam a tela) com cantos de mira, varredura de luz, entrada de lados diferentes com desfoque, flutuação lenta, troca automática de página a cada 8 s (pausa com o mouse), pontos de navegação e saída animada. Fecham sozinhos quando a pessoa agradece ou dispensa ("obrigada", "pode fechar", "não preciso mais" — `src/lib/voice/dismiss.ts`). Painéis de confirmação e conversa do WhatsApp continuam em janela (`VoicePanel`, `WhatsChat`). Animações `hud-*` em `styles.css`.

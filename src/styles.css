@@ -668,3 +668,14 @@ html[data-lock="1"] { height: 100%; overflow-x: hidden; }
 
 /* Área do indicador do iPhone (embaixo). Dentro da moldura (ScaleFrame) ela é calculada pelo documento de fora e passada pra cá. */
 :root { --sab: env(safe-area-inset-bottom, 0px); }
+
+/* ───────── HUD do Orion (painéis de voz flutuantes) ───────── */
+@keyframes hud-from-left { from { opacity: 0; transform: translate3d(-70px, 18px, 0) scale(.92) rotate(-2deg); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes hud-from-right { from { opacity: 0; transform: translate3d(70px, 18px, 0) scale(.92) rotate(2deg); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes hud-from-up { from { opacity: 0; transform: translate3d(0, -40px, 0) scale(.94); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes hud-from-bottom { from { opacity: 0; transform: translate3d(0, 40px, 0) scale(.94); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes hud-out { from { opacity: 1; transform: none; filter: none; } to { opacity: 0; transform: translate3d(0, -26px, 0) scale(.9); filter: blur(10px); } }
+@keyframes hud-float { 0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); } 50% { transform: translate3d(0, -7px, 0) rotate(.35deg); } }
+@keyframes hud-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hud-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .hud-card { animation: none !important; } }
