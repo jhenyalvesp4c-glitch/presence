@@ -187,6 +187,7 @@ export function WhatsAppDemands() {
                 <div key={i} className={`rounded-2xl border p-3 ${a.kind === "update" ? "border-cyan/40 bg-cyan/[0.06]" : "border-emerald/40 bg-emerald/[0.06]"}`} data-testid="organizar-acao">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`tag ${a.kind === "update" ? "!text-cyan" : "!text-emerald"}`}>{a.kind === "update" ? "Atualiza" : "Cria nova"}</span>{a.kind === "update" ? <><span className="font-mono text-xs text-muted-foreground">{a.code}</span> {a.title}</> : a.title}{a.dossier && <span className="text-xs text-muted-foreground">· {a.dossier}</span>}</p>
                   <ul className="mt-2 space-y-1 pl-1 text-xs text-muted-foreground">{a.add.map((t, k) => <li key={k} className="flex gap-2"><Check size={11} className="mt-0.5 shrink-0 text-emerald" /><span className="min-w-0 break-words">{t}</span></li>)}</ul>
+                  <p className="mt-2 flex items-center gap-1.5 text-[0.68rem] text-muted-foreground"><FileText size={11} className="shrink-0" /> Mensagens, templates e dados recebidos entram organizados no <b className="text-foreground">Material</b> da demanda.</p>
                 </div>))}
               {!org.actions.length && <p className="py-6 text-center text-sm text-muted-foreground">Nada para organizar.</p>}
             </div>

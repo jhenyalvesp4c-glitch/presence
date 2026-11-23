@@ -171,3 +171,15 @@ export async function moveMaterials(projectId: string, toCode: string, fromCodes
   }
   notify(materialsKey(projectId, toCode));
 }
+
+/** Acrescenta seções ao texto do Material de uma demanda (sem repetir uma seção que já está lá, pela primeira linha dela). */
+export async function appendMaterialBody(projectId: string, code: string, sections: string[]): Promise<number> {
+  if (!sections.length) return 0;
+  const cur = (must(await supabase.from("demand_materials").select("body").eq("project_id", projectId).eq("code", code).limit(1)) as { body: string }[])[0]?.body ?? "";
+  const fresh = sections.filter((x) => { const sig = x.split("\n").slice(0, 3).join("\n"); return !cur.includes(sig); });
+  if (!fresh.length) return 0;
+  const body = `${cur}${cur.trim() ? "\n\n" : ""}${fresh.join("\n\n")}`.slice(0, 50000);
+  must(await supabase.from("demand_materials").upsert({ project_id: projectId, code, body }, { onConflict: "project_id,code" }).select("code"));
+  notify(materialsKey(projectId, code));
+  return fresh.length;
+}

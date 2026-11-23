@@ -5,7 +5,9 @@ export type WaMessage = { id: string; chat: string; chat_name: string; is_group:
 export type ImageRef = { n: number; chat: string; id: string; mime: string; ts: number; chatName: string };
 export type Batch = { text: string; chats: string[]; count: number; images: ImageRef[] };
 export type Priority = "alta" | "media" | "baixa";
-export type Req = { key: string; chat: string; grupo: boolean; quem: string; titulo: string; detalhes: string; trecho: string; quando: string; prazo: string | null; prioridade: Priority; paraMim: "sim" | "talvez"; resolvido: boolean; imagens: number[]; confianca: "alta" | "media" | "baixa" ; tipo: "pedido" | "complemento"; demanda: string | null };
+/** Texto que alguém mandou (template, mensagem, lista, link, dados): vai inteiro, separado, para o Material da demanda. */
+export type Conteudo = { titulo: string; texto: string };
+export type Req = { key: string; chat: string; grupo: boolean; quem: string; titulo: string; detalhes: string; trecho: string; quando: string; prazo: string | null; prioridade: Priority; paraMim: "sim" | "talvez"; resolvido: boolean; imagens: number[]; confianca: "alta" | "media" | "baixa" ; tipo: "pedido" | "complemento"; demanda: string | null; passos: string[]; conteudos: Conteudo[] };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 export const stamp = (ts: number) => { const d = new Date(ts * 1000); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -74,7 +76,9 @@ export function cleanRequests(raw: unknown, validImages: Set<number>): Req[] {
     if (!x || !titulo) return [];
     const chat = str(x["chat"], 120) || "Conversa", quem = str(x["quem"], 80) || "Alguém", quando = str(x["quando"], 20), pr = x["prioridade"], conf = x["confianca"];
     return [{ key: reqKey(chat, quem, titulo, quando), chat, grupo: x["grupo"] === true, quem, titulo, detalhes: str(x["detalhes"], 3000), trecho: str(x["trecho"], 500), quando, prazo: date(x["prazo"]), prioridade: pr === "alta" || pr === "baixa" ? pr : "media", paraMim: x["paraMim"] === "talvez" ? "talvez" : "sim", resolvido: x["resolvido"] === true,
-      imagens: (Array.isArray(x["imagens"]) ? (x["imagens"] as unknown[]) : []).map(Number).filter((n) => validImages.has(n)).slice(0, 4), confianca: conf === "baixa" || conf === "media" ? conf : "alta", tipo: x["tipo"] === "complemento" ? "complemento" : "pedido", demanda: str(x["demanda"], 20).replace(/^#/, "").toUpperCase() || null }];
+      imagens: (Array.isArray(x["imagens"]) ? (x["imagens"] as unknown[]) : []).map(Number).filter((n) => validImages.has(n)).slice(0, 4), confianca: conf === "baixa" || conf === "media" ? conf : "alta", tipo: x["tipo"] === "complemento" ? "complemento" : "pedido", demanda: str(x["demanda"], 20).replace(/^#/, "").toUpperCase() || null,
+      passos: (Array.isArray(x["passos"]) ? (x["passos"] as unknown[]) : []).map((t) => str(t, 400)).filter(Boolean).slice(0, 12),
+      conteudos: (Array.isArray(x["conteudos"]) ? (x["conteudos"] as unknown[]) : []).flatMap((c): Conteudo[] => { const o = c as Record<string, unknown> | null, texto = str(o?.["texto"], 4000); return texto ? [{ titulo: str(o?.["titulo"], 120) || "Conteúdo recebido", texto }] : []; }).slice(0, 8) }];
   }).slice(0, 60);
 }
 /** Junta os pedidos de vários lotes, sem repetir, e põe os que são para você e ainda abertos primeiro. */
@@ -132,14 +136,27 @@ export function matchDossier(chat: string, dossiers: string[]): string | null {
 
 export type OrgCtx = { pid: string; name: string; demands: Demand[]; dossiers: string[] };
 export type OrgAction =
-  | { kind: "update"; pid: string; project: string; code: string; title: string; dossier: string | null; add: string[]; notes: string[]; keys: string[]; deadline: string | null; priority: Priority }
-  | { kind: "create"; pid: string; project: string; dossier: string | null; title: string; add: string[]; notes: string[]; keys: string[]; deadline: string | null; priority: Priority };
+  | { kind: "update"; pid: string; project: string; code: string; title: string; dossier: string | null; add: string[]; notes: string[]; material: string[]; keys: string[]; deadline: string | null; priority: Priority }
+  | { kind: "create"; pid: string; project: string; code?: string; dossier: string | null; title: string; add: string[]; notes: string[]; material: string[]; keys: string[]; deadline: string | null; priority: Priority };
 
 const RANKP: Record<Priority, number> = { alta: 3, media: 2, baixa: 1 };
 const bestP = (a: Priority, b: Priority): Priority => (RANKP[a] >= RANKP[b] ? a : b);
-const stepOf = (r: Req) => `${r.titulo}${r.detalhes ? ` — ${r.detalhes.split(/\n|(?<=[.!?])\s/)[0]!.slice(0, 220)}` : ""}`.slice(0, 480);
-/** Tudo o que a pessoa mandou, sem perder nada: vira uma observação completa dentro da demanda. */
-export const noteOf = (r: Req) => [`WhatsApp · ${r.quando} · ${r.quem} ${r.grupo ? `no grupo "${r.chat}"` : `(conversa com ${r.chat})`}`, r.titulo, r.detalhes, r.prazo ? `Prazo combinado: ${dm(r.prazo)}.` : "", r.trecho ? `Mensagem original: "${r.trecho}"` : ""].filter(Boolean).join("\n").slice(0, 1900);
+/** Passos do checklist: as ações concretas que a IA detalhou (uma por linha); sem elas, o título do pedido com a primeira frase. */
+const stepsOf = (r: Req): string[] => (r.passos.length ? r.passos : [`${r.titulo}${r.detalhes ? ` — ${r.detalhes.split(/\n|(?<=[.!?])\s/)[0]!.slice(0, 220)}` : ""}`]).map((t) => t.slice(0, 480));
+/** Observação CURTA (só o registro de que veio do WhatsApp): o conteúdo completo vai para o Material, organizado. */
+export const noteOf = (r: Req) => `WhatsApp · ${r.quando} · ${r.quem} ${r.grupo ? `(grupo ${r.chat})` : `(conversa)`} — ${r.titulo}`.slice(0, 400);
+const sectionHead = (r: Req) => `WhatsApp · ${r.quando} · ${r.quem}${r.grupo ? ` (grupo ${r.chat})` : ` (conversa com ${r.chat})`}`;
+/** Texto organizado para o Material da demanda: o que fazer, contexto e cada conteúdo recebido, separado e inteiro (para copiar). */
+export function materialOf(r: Req): string {
+  const L = ["━━━━━━━━━━━━━━━━━━━━", sectionHead(r), `Pedido: ${r.titulo}`];
+  if (r.prazo) L.push(`Prazo: ${dm(r.prazo)}`);
+  const passos = stepsOf(r);
+  if (r.passos.length) L.push("", "O QUE FAZER", ...passos.map((p, i) => `${i + 1}. ${p}`));
+  if (r.detalhes.trim()) L.push("", "CONTEXTO", r.detalhes.trim());
+  if (r.conteudos.length) { L.push("", "CONTEÚDOS RECEBIDOS"); for (const c of r.conteudos) L.push("", `▸ ${c.titulo}`, c.texto.trim()); }
+  else if (r.trecho) L.push("", `Mensagem original: "${r.trecho}"`);
+  return L.join("\n").slice(0, 12000);
+}
 const deadlineOf = (iso: string | null) => (iso ? dm(iso).slice(0, 5) : null);
 
 /** Decide, para cada pedido escolhido, onde ele entra. Pedidos do mesmo dossiê entram na MESMA demanda (nunca uma demanda nova por pedido). */
@@ -165,15 +182,15 @@ export function planOrganize(reqs: Req[], ctx: OrgCtx[]): OrgAction[] {
     const targetCtx = target ? ctx.find((c) => c.demands.some((d) => d.id === target!.id)) ?? home : home;
     const key = target ? `u:${targetCtx.pid}:${target.id}` : `c:${home.pid}:${dn ? norm(dn) : "geral"}`;
     const cur = actions.get(key);
-    const step = stepOf(r), note = noteOf(r), dl = deadlineOf(r.prazo);
+    const steps = stepsOf(r), note = noteOf(r), mat = materialOf(r), dl = deadlineOf(r.prazo);
     if (cur) {
-      if (!cur.add.some((x) => norm(x) === norm(step))) cur.add.push(step);
-      cur.notes.push(note); cur.keys.push(r.key); cur.priority = bestP(cur.priority, r.prioridade);
+      for (const st of steps) if (!cur.add.some((x) => norm(x) === norm(st))) cur.add.push(st);
+      cur.notes.push(note); cur.material.push(mat); cur.keys.push(r.key); cur.priority = bestP(cur.priority, r.prioridade);
       if (dl && (!cur.deadline || dl < cur.deadline)) cur.deadline = dl;
     } else if (target) {
-      actions.set(key, { kind: "update", pid: targetCtx.pid, project: targetCtx.name, code: target.id, title: target.title, dossier: target.polo ?? dn, add: [step], notes: [note], keys: [r.key], deadline: dl, priority: r.prioridade });
+      actions.set(key, { kind: "update", pid: targetCtx.pid, project: targetCtx.name, code: target.id, title: target.title, dossier: target.polo ?? dn, add: [...steps], notes: [note], material: [mat], keys: [r.key], deadline: dl, priority: r.prioridade });
     } else {
-      actions.set(key, { kind: "create", pid: home.pid, project: home.name, dossier: dn, title: r.titulo, add: [step], notes: [note], keys: [r.key], deadline: dl, priority: r.prioridade });
+      actions.set(key, { kind: "create", pid: home.pid, project: home.name, dossier: dn, title: r.titulo, add: [...steps], notes: [note], material: [mat], keys: [r.key], deadline: dl, priority: r.prioridade });
     }
   }
   return [...actions.values()].map((a) => (a.kind === "create" && a.add.length > 1 ? { ...a, title: `${a.dossier ?? "WhatsApp"}: ${a.add.length} pedidos` } : a));
@@ -195,9 +212,21 @@ export function applyOrganize(demands: Demand[], actions: OrgAction[], today: Da
       });
     } else {
       const type = a.dossier ? "polo" : "geral";
-      out = [{ id: nextCode(out, type), type, ...(a.dossier ? { polo: a.dossier } : {}), title: a.title.slice(0, 300), desc: `Criada a partir de pedidos no WhatsApp.\n${a.notes.join("\n\n")}`.slice(0, 5000), priority: a.priority, status: "todo", deadline: a.deadline ?? "",
+      const desc = `Criada a partir de pedidos no WhatsApp. O que fazer está no checklist; as mensagens, templates e dados recebidos estão organizados no Material.\n${a.notes.map((n) => `• ${n}`).join("\n")}`.slice(0, 5000);
+      out = [{ id: a.code ?? nextCode(out, type), type, ...(a.dossier ? { polo: a.dossier } : {}), title: a.title.slice(0, 300), desc, priority: a.priority, status: "todo", deadline: a.deadline ?? "",
         history: [{ d: label, text: `Criada pelo WhatsApp com ${a.add.length} ${a.add.length === 1 ? "passo" : "passos"} no checklist`, s: "todo" }], notes: [...a.notes], checklist: a.add.map((text) => ({ text, done: false })) } as Demand, ...out];
     }
   }
   return out;
+}
+
+/** Dá o código às demandas que vão ser criadas (antes de gravar), para o Material poder ser ligado a elas. */
+export function assignCodes(demands: Demand[], actions: OrgAction[]): OrgAction[] {
+  let list = [...demands];
+  return actions.map((a) => {
+    if (a.kind !== "create") return a;
+    const type = a.dossier ? "polo" : "geral", code = nextCode(list, type);
+    list = [{ id: code, type } as Demand, ...list];
+    return { ...a, code };
+  });
 }
