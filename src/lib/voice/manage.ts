@@ -5,6 +5,7 @@ import { must, supabase } from "../data/db";
 import type { Demand, Priority, Status } from "../demands";
 import { keywords, normalize } from "../orion";
 import { listProjects } from "../mcp/lookup";
+import { addDemandAsTask } from "../data/tasks";
 
 export const STATUS_LABEL: Record<Status, string> = { todo: "A fazer", doing: "Em andamento", done: "Concluída" };
 const today = () => new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -68,6 +69,7 @@ async function loadAllDemands(): Promise<Loaded[]> {
 export type DemandChange = {
   demanda: string; status?: Status | undefined; titulo?: string | undefined; descricao?: string | undefined; prioridade?: Priority | undefined;
   prazo?: string | undefined; nota?: string | undefined; dossie?: string | undefined; excluir?: boolean | undefined; confirmado?: boolean | undefined;
+  adicionarTarefa?: boolean | undefined;
   checklistAdicionar?: string[] | undefined; checklistMarcar?: string[] | undefined; checklistDesmarcar?: string[] | undefined; checklistRemover?: string[] | undefined;
 };
 
@@ -111,6 +113,11 @@ export async function changeDemand(c: DemandChange): Promise<Record<string, unkn
     n = { ...n, checklist: list };
     feito.push(`checklist (${list.filter((x) => x.done).length}/${list.length})`);
     if (faltou.length) return { ok: false, erro: `Não achei no checklist: ${faltou.join("; ")}.`, opcoes: (d.checklist ?? []).map((x) => x.text).slice(0, 8) };
+  }
+  if (c.adicionarTarefa) {
+    await saveDemands(pid, all, all.map((x) => (x.id === d.id ? n : x)));
+    const r = await addDemandAsTask(pid, n);
+    return { ok: true, acao: "atualizada", demanda: `${n.id} ${n.title}`, projeto: project, status_agora: STATUS_LABEL[n.status], mudou: [...feito, r.created ? "adicionada às Tarefas (categoria Demandas)" : "já estava nas Tarefas"] };
   }
   if (!feito.length) return { ok: false, erro: "Nada para mudar. Diga o que alterar (status, título, prazo, prioridade, descrição ou observação)." };
   await saveDemands(pid, all, all.map((x) => (x.id === d.id ? n : x)));

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { deadlineIso, type Demand } from "../demands";
 import type { Category, Color, Priority, Task } from "../types";
 import { must, supabase } from "./db";
 
@@ -136,4 +137,42 @@ export function useUpdateTask() {
     },
     onSuccess: invalidate,
   });
+}
+
+
+/** Tarefas que já nasceram de demandas deste projeto (código da demanda → id da tarefa). */
+export function useDemandTasks(projectId: string | null) {
+  return useQuery({
+    queryKey: ["demand-tasks", projectId],
+    enabled: !!projectId,
+    queryFn: async () => new Map((must(await supabase.from("tasks").select("id, demand_code").eq("project_id", projectId!).not("demand_code", "is", null)) as { id: string; demand_code: string }[]).map((r) => [r.demand_code, r.id])),
+  });
+}
+
+/** Texto e dados da tarefa que representa uma demanda. */
+export function taskFromDemand(d: Demand, now: Date = new Date()): NewTask {
+  const check = d.checklist?.length ? `\n\nChecklist da demanda:\n${d.checklist.map((c) => `${c.done ? "[x]" : "[ ]"} ${c.text}`).join("\n")}` : "";
+  return {
+    title: `${d.id.replace(/^#/, "")} · ${d.title}`.slice(0, 200),
+    description: `${d.polo ? `Dossiê: ${d.polo}\n` : ""}${d.desc.trim()}${check}`.trim().slice(0, 2000) || null,
+    priority: d.priority, due_date: deadlineIso(d.deadline, now),
+  };
+}
+
+/** A categoria "Demandas" das Tarefas (cria na primeira vez; se já existir uma com esse nome, usa ela). */
+export async function ensureDemandCategory(): Promise<string> {
+  const all = must(await supabase.from("task_categories").select("id, slug, name, position")) as { id: string; slug: string; name: string; position: number }[];
+  const hit = all.find((c) => c.slug === "demandas" || c.name.trim().toLowerCase() === "demandas");
+  if (hit) return hit.id;
+  const last = all.reduce((m, c) => Math.max(m, c.position), 0);
+  return (must(await supabase.from("task_categories").insert({ name: "Demandas", color: "violet", icon: "layers", slug: "demandas", position: last + 1 }).select("id").single()) as { id: string }).id;
+}
+
+/** Coloca a demanda na lista de Tarefas (uma vez só: se já existe, devolve a existente). */
+export async function addDemandAsTask(projectId: string, d: Demand): Promise<{ id: string; created: boolean }> {
+  const have = must(await supabase.from("tasks").select("id").eq("project_id", projectId).eq("demand_code", d.id).limit(1)) as { id: string }[];
+  if (have[0]) return { id: have[0].id, created: false };
+  const category_id = await ensureDemandCategory();
+  const t = await createTaskRow({ ...taskFromDemand(d), category_id }, { project_id: projectId, demand_code: d.id, source: "manual" });
+  return { id: t.id, created: true };
 }

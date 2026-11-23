@@ -124,3 +124,6 @@ Tudo que dá para fazer nas telas, a voz faz (e nunca usa `pedir_melhoria` para 
 
 ## Ditado (Ditar / Registrar demanda)
 `useSpeech` (`src/lib/use-speech.ts`) avisa `orion:ditado` ao começar e ao terminar; o Orion (`use-voice.tsx`) solta o microfone da escuta de "Orion" e da conversa enquanto dura o ditado e depois volta (dois reconhecimentos de voz ao mesmo tempo se cancelavam: "Ouvindo…" aparecia e sumia). O ditado começa 0,45 s depois para o outro soltar o microfone, e os erros agora aparecem num aviso (microfone bloqueado, sem internet, nada ouvido).
+
+## Demanda como tarefa
+Demandas → janela da demanda: botão **"Adicionar às Tarefas"** (vira "Já está nas Tarefas" e leva para a lista); ao criar a demanda: caixa "Adicionar também às Tarefas". A tarefa vai para a categoria **Demandas** (criada na primeira vez, `ensureDemandCategory`), com título `P059 · …`, dossiê e checklist na descrição, prioridade e prazo da demanda (`deadlineIso`), ligada por `tasks.demand_code` + `project_id`; uma vez só por demanda (`addDemandAsTask`). Voz: `atualizar_demanda` com `adicionar_as_tarefas`.

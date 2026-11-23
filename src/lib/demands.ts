@@ -90,3 +90,14 @@ export function diffDemands(prev: Demand[], next: Demand[]): { upserts: Demand[]
     deletes: prev.filter((d) => !ids.has(d.id)).map((d) => d.id),
   };
 }
+
+/** Prazo da demanda ("20/11" ou "20/11/2026") → data AAAA-MM-DD para a tarefa; "—"/vazio → null. Sem ano, usa o ano atual (ou o próximo se a data já passou há mais de 60 dias). */
+export function deadlineIso(deadline: string, now: Date = new Date()): string | null {
+  const m = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(deadline.trim());
+  if (!m) return null;
+  const day = Number(m[1]), mon = Number(m[2]);
+  if (mon < 1 || mon > 12 || day < 1 || day > 31) return null;
+  let year = m[3] ? (m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3])) : now.getFullYear();
+  if (!m[3] && now.getTime() - new Date(year, mon - 1, day).getTime() > 60 * 86_400_000) year += 1;
+  return `${year}-${String(mon).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}

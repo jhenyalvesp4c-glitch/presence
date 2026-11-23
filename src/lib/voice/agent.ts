@@ -98,6 +98,7 @@ Regras de fala:
 - TREINO: "cria uma ficha de treino de pernas", "tira o agachamento da ficha A", "muda a série do supino para 4 x 10", "segunda é treino de costas", "quero treinar 4 vezes por semana" → ferramenta treino, na hora. Ao criar ficha, monte você mesmo bons exercícios com séries/repetições.
 - DIETA: "o que eu como hoje", "marca o almoço", "tomei 500 de água", "uso a opção 2 hoje", "muda minha meta de proteína para 120" → ferramenta dieta, na hora. Criar um plano novo do zero é na tela de Dieta (abra com abrir_pagina).
 - DOCUMENTAR E BUSCAR: "documenta isso", "anota que…", "registra no segundo cérebro" → documentar, com TÍTULO e texto completo e organizado (não resuma demais: guarde todos os detalhes que ela falou). "cria um tutorial/processo/passo a passo de…" → documentacao (criar) numa pasta. Perguntas sobre algo que ela documentou, anotou, combinou ou que está em reunião, cliente, documento, demanda ou na Documentação → SEMPRE buscar_no_orion primeiro; se o trecho for curto ou ela pedir detalhes, ler_documento com o id. Responda com o que achou e diga de onde veio (documentação, reunião, cliente). Só diga que não achou depois de buscar, tentando também termos parecidos.
+- DEMANDA COMO TAREFA: "coloca essa demanda nas tarefas", "adiciona a P049 em tarefas" → atualizar_demanda com adicionar_as_tarefas=true (vai para a categoria Demandas das Tarefas, uma vez só).
 - JUNTAR DEMANDAS: "junta as demandas do mesmo dossiê/polo", "tem demanda repetida de Lauro, junta" → juntar_demandas (com dossie se ela citou; sem citar, mostre a previa e peça o ok). Cada grupo vira UMA demanda com checklist. Checklist de uma demanda: atualizar_demanda com checklist_adicionar/marcar/desmarcar/remover (ex.: "marca o passo da fila como feito").
 - DEMANDAS DO WHATSAPP: "vê se mandaram mais informação das demandas", "puxa as demandas do grupo", "chegou a base?" → verificar_whatsapp_demandas. Ela marca na tela o que é demanda e o Orion organiza: atualiza a demanda já aberta do mesmo dossiê (checklist + detalhes) ou cria uma, nunca duplica por dossiê.
 - GRAVAR REUNIÃO: "grava a reunião", "vou entrar numa entrevista, grava", "começa a gravar o treinamento" → use gravar_reuniao com o tipo certo; a conversa por voz termina e a gravação começa sozinha.
@@ -137,6 +138,7 @@ export const TOOLS = [
     prazo: { type: "string", description: "AAAA-MM-DD ou dd/mm." }, nota: { type: "string", description: "Observação a acrescentar." },
     excluir: { type: "boolean", description: "true para excluir a demanda (pede confirmação)." },
     confirmado: { type: "boolean", description: "true só depois de ela confirmar a exclusão." },
+    adicionar_as_tarefas: { type: "boolean", description: "true para colocar a demanda também na lista de Tarefas (categoria Demandas)." },
     checklist_adicionar: { type: "array", items: { type: "string" }, description: "Passos novos para o checklist da demanda." },
     checklist_marcar: { type: "array", items: { type: "string" }, description: "Passos do checklist para marcar como feitos (nomes aproximados; 'todos' marca tudo)." },
     checklist_desmarcar: { type: "array", items: { type: "string" } }, checklist_remover: { type: "array", items: { type: "string" } },
@@ -399,6 +401,7 @@ export async function runTool(name: string, args: Record<string, unknown>, emit:
         titulo: args["titulo"] as string | undefined, descricao: args["descricao"] as string | undefined, prioridade: args["prioridade"] as "alta" | "media" | "baixa" | undefined,
         prazo: args["prazo"] as string | undefined, nota: args["nota"] as string | undefined, dossie: args["dossie"] as string | undefined,
         excluir: args["excluir"] === true, confirmado: args["confirmado"] === true,
+        adicionarTarefa: args["adicionar_as_tarefas"] === true,
         checklistAdicionar: strList(args["checklist_adicionar"]), checklistMarcar: strList(args["checklist_marcar"]), checklistDesmarcar: strList(args["checklist_desmarcar"]), checklistRemover: strList(args["checklist_remover"]),
       }).catch((e): Record<string, unknown> => ({ ok: false, erro: e instanceof Error ? e.message : "Não consegui alterar a demanda." }));
       if (r["ok"]) emit({ t: "painel", p: { titulo: r["acao"] === "excluida" ? "Demanda excluída" : "Demanda atualizada", secoes: [{ titulo: String(r["acao"] === "excluida" ? "Excluída" : (r["status_agora"] ?? "Atualizada")), itens: [{ rotulo: String(r["demanda"]), detalhe: Array.isArray(r["mudou"]) ? (r["mudou"] as string[]).join(" · ") : undefined, link: r["acao"] === "excluida" ? undefined : "/demandas" }] }] } });

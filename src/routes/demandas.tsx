@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { backdropProps } from "@/lib/backdrop";
 import { MeetingsPage } from "@/components/meetings/MeetingsPage";
 import { useMeetings } from "@/lib/data/meetings";
@@ -19,7 +19,7 @@ import {
   calendarItems, clearLegacyAppointments, takeLegacyAppointments, type AppointmentDraft, type CalItem,
 } from "@/lib/appointments";
 import { importAppointments, unlinkDossierAppointments, useDeleteCalendarItem, useSaveAppointment } from "@/lib/data/appointments";
-import { useCategories, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { addDemandAsTask, useCategories, useDemandTasks, useTasks, useToggleTask } from "@/lib/data/tasks";
 import { useQueryClient } from "@tanstack/react-query";
 import { FinBackdrop, Tilt } from "@/components/finance/fx";
 import { applyMerges, findMergeGroups, mergeGroup, type MergeGroup } from "@/lib/demand-merge";
@@ -32,7 +32,7 @@ import { createPortal } from "react-dom";
 import { DictateButton, appendSpoken } from "@/components/DictateButton";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  ArrowLeft, Atom, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
+  ArrowLeft, ArrowRight, Atom, ListChecks, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
   Filter, Folder, FolderOpen, Globe, Hexagon, History, LayoutGrid, Layers, List, Loader, MapPin,
   Mic, MessageSquare, MoreHorizontal, Network, Pencil, Plus, Search, Send, SquareCheck, StickyNote, Table2, Trash2, X,
 } from "lucide-react";
@@ -169,8 +169,9 @@ function Demandas() {
   };
   // Calendário: compromissos salvos por projeto; cada um pode estar ligado a um dossiê ou ser geral.
   // Ficam no banco como tarefas da categoria Compromissos, por isso entram no "Organize/Planeje meu dia".
-  const qc = useQueryClient();
+  const qc = useQueryClient(), navigate = useNavigate();
   const tasksQ = useTasks();
+  const demandTasks = useDemandTasks(pid);
   const catsQ = useCategories();
   const compId = (catsQ.data ?? []).find((c) => c.slug === "comp")?.id;
   const appts = useMemo(() => calendarItems(tasksQ.data ?? [], compId), [tasksQ.data, compId]);
@@ -252,7 +253,16 @@ function Demandas() {
   });
   const setPoloNote = (id: string, name: string, note: string) => update(id, (d) => ({ ...d, polos: d.polos?.map((p) => (p.name === name ? { ...p, note } : p)) }));
   const dropMaterials = (codes: Iterable<string>) => { if (pid) for (const c of codes) deleteMaterials(materialsKey(pid, c)).catch(() => undefined); };
-  const createDemand = (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials; checklist?: string[] }) => {
+  /** Põe a demanda também na lista de Tarefas (categoria "Demandas"); só uma vez por demanda. */
+  const addToTasks = async (d: Demand) => {
+    if (!pid) return;
+    try {
+      const r = await addDemandAsTask(pid, d);
+      void qc.invalidateQueries({ queryKey: ["tasks"] }); void qc.invalidateQueries({ queryKey: ["categories"] }); void qc.invalidateQueries({ queryKey: ["demand-tasks"] });
+      toast.success(r.created ? "Adicionada às Tarefas, na categoria Demandas" : "Essa demanda já está nas Tarefas", { action: { label: "Ver tarefas", onClick: () => void navigate({ to: "/tarefas" }) } });
+    } catch (e) { toast.error(`Não consegui adicionar às Tarefas: ${(e as Error).message}`); }
+  };
+  const createDemand = (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials; checklist?: string[]; addTask?: boolean }) => {
     const multi = f.type === "multi";
     const d: Demand = {
       id: nextCode(items, f.type), type: f.type, title: f.title, desc: f.desc || "Sem descrição.", priority: f.priority, status: f.status,
@@ -265,6 +275,7 @@ function Demandas() {
     if (pid && (f.materials.body.trim() || f.materials.files.length)) {
       putMaterials(materialsKey(pid, d.id), f.materials).catch((e: Error) => toast.error(`Não consegui guardar os anexos: ${e.message}`));
     }
+    if (pid && f.addTask) void addToTasks(d);
     setNewOpen(null);
     setTab("overview"); setTypeF((cur) => (cur === "todos" || cur === f.type ? cur : "todos"));
     setSelId(d.id);
@@ -502,6 +513,7 @@ function Demandas() {
         onEdit={(patch) => sel && update(sel.id, (d) => ({ ...d, ...patch }))}
         onNote={(t) => sel && update(sel.id, (d) => ({ ...d, notes: [...d.notes, t], history: [...d.history, { d: today(), text: "Observação adicionada", s: d.status }] }))}
         onDelete={() => sel && remove(sel.id)}
+        inTasks={!!sel && !!demandTasks.data?.has(sel.id)} onAddTask={() => { if (!sel) return; if (demandTasks.data?.has(sel.id)) void navigate({ to: "/tarefas" }); else void addToTasks(sel); }}
       />
       {ready && !sel && !newOpen && !noteEdit && (tab === "overview" || tab === "geral" || tab === "polo" || tab === "multi") && (
         <button onClick={() => setNewOpen({ type: tab === "overview" ? (typeF === "todos" ? "geral" : typeF) : tab, status: "todo" })} data-testid="nova-demanda-fab" aria-label="Nova demanda"
@@ -569,13 +581,13 @@ function TargetPicker({ names, value, onChange, single }: { names: string[]; val
 
 function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   start: { type: DType; status: Status }; dossiers: string[]; onClose: () => void;
-  onCreate: (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials; checklist?: string[] }) => void;
+  onCreate: (f: { type: DType; title: string; desc: string; priority: Priority; deadline: string; targets: string[]; status: Status; materials: Materials; checklist?: string[]; addTask?: boolean }) => void;
 }) {
   const [materials, setMaterials] = useState<Materials>(EMPTY_MATERIALS);
   const tm = useTM();
   const [type, setType] = useState<DType>(start.type);
   const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState(""), [steps, setSteps] = useState("");
+  const [desc, setDesc] = useState(""), [steps, setSteps] = useState(""), [asTask, setAsTask] = useState(false);
   const [priority, setPriority] = useState<Priority>("media");
   const [date, setDate] = useState("");
   const [targets, setTargets] = useState<string[]>([]);
@@ -585,7 +597,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   const pick = (t: DType) => { setType(t); setTargets((x) => (t === "polo" ? x.slice(0, 1) : t === "geral" ? [] : x)); };
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in max-sm:place-items-end max-sm:p-0 sm:p-4" {...backdropProps(onClose)}>
-      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials, checklist: steps.split("\n").map((x) => x.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim()).filter(Boolean) }); }}
+      <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials, checklist: steps.split("\n").map((x) => x.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim()).filter(Boolean), addTask: asTask }); }}
         className="glass relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:pb-[var(--sab)]" role="dialog" aria-label="Nova demanda">
         <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" />
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
@@ -610,6 +622,10 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
                 className="mt-1 w-full resize-y rounded-xl border border-border bg-secondary/40 px-3 py-2 pr-12 text-sm outline-none focus:border-cyan/60" />
               <DictateButton onText={(t) => setSteps((x) => appendSpoken(x, t, "\n"))} label="Checklist" className="right-2 top-8" />
             </div>
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-secondary/30 px-3 py-2 text-xs transition hover:border-violet/50" data-testid="nova-como-tarefa">
+              <input type="checkbox" checked={asTask} onChange={(e) => setAsTask(e.target.checked)} className="h-4 w-4 accent-[var(--violet)]" />
+              <ListChecks size={14} className="text-violet" /><span className="min-w-0 flex-1"><b className="font-medium text-foreground">Adicionar também às Tarefas</b><span className="block text-[0.65rem] text-muted-foreground">Cria uma tarefa na categoria “Demandas”, com o prazo e a prioridade desta demanda.</span></span>
+            </label>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -1366,7 +1382,8 @@ function ChecklistBlock({ items, onChange }: { items: { text: string; done: bool
   );
 }
 
-function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onStatus, onPolo, onAddPolos, onPoloNote, onEdit, onNote, onDelete }: {
+function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onStatus, onPolo, onAddPolos, onPoloNote, onEdit, onNote, onDelete, inTasks, onAddTask }: {
+  inTasks?: boolean; onAddTask?: () => void;
   demand: Demand | null; autoEdit: boolean; storageKey: string | null; dossiers: string[]; onClose: () => void; onStatus: (s: Status) => void; onPolo: (p: string) => void;
   onAddPolos: (names: string[]) => void; onPoloNote: (p: string, t: string) => void;
   onEdit: (p: Partial<Demand>) => void; onNote: (t: string) => void; onDelete: () => void;
@@ -1504,6 +1521,15 @@ function DetailPanel({ demand: d, autoEdit, storageKey, dossiers, onClose, onSta
               </div>
               <p className="mt-2 text-[0.6rem] text-muted-foreground">Toque em um item para avançar o status dele; o ícone ao lado guarda uma observação só dele.</p>
             </Block>
+          )}
+
+          {/* tarefas */}
+          {onAddTask && (
+            <button type="button" onClick={onAddTask} data-testid="adicionar-tarefa" className={`group flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm transition hover:-translate-y-0.5 active:scale-[.99] ${inTasks ? "border-emerald/40 bg-emerald/[0.07]" : "border-violet/40 bg-violet/[0.07] hover:bg-violet/[0.12]"}`}>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${inTasks ? "bg-emerald/15 text-emerald" : "bg-violet/15 text-violet"}`}>{inTasks ? <CheckCircle2 size={18} /> : <ListChecks size={18} />}</span>
+              <span className="min-w-0 flex-1"><b className="block font-medium">{inTasks ? "Já está nas Tarefas" : "Adicionar às Tarefas"}</b><span className="text-xs text-muted-foreground">{inTasks ? "Categoria “Demandas”. Toque para ver na lista de Tarefas." : "Cria uma tarefa na categoria “Demandas”, com o prazo e a prioridade desta demanda."}</span></span>
+              <ArrowRight size={15} className="shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+            </button>
           )}
 
           {/* checklist */}
