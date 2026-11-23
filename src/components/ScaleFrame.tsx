@@ -6,6 +6,21 @@
  */
 import { useEffect, useState, type ReactNode } from "react";
 
+/** Cor de fundo do app (a mesma da moldura, para não aparecer emenda). */
+const APP_BG_FALLBACK = "#07080f";
+const appBg = (): string => { try { const c = getComputedStyle(document.body).backgroundColor; return c && c !== "rgba(0, 0, 0, 0)" ? c : APP_BG_FALLBACK; } catch { return APP_BG_FALLBACK; } };
+
+/** Endereço dentro da moldura; leva a área do indicador do iPhone (já dividida pelo fator) em `_sab`. */
+function frameSrc(k: number): string {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:0;bottom:0;width:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden";
+  document.body.appendChild(probe);
+  const px = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+  probe.remove();
+  const q = new URLSearchParams(location.search); q.delete("moldura"); q.set("_sab", String(Math.round((px / k) * 10) / 10));
+  return `${location.pathname}?${q.toString()}${location.hash}`;
+}
+
 /** Fator de ampliação (ex.: 2) se estamos no caso acima; senão null. */
 function frameFactor(): number | null {
   try {
@@ -27,6 +42,20 @@ function frameFactor(): number | null {
  * "Tela de app": no app instalado (e dentro da moldura) bloqueia o zoom com dois dedos e o duplo toque, impede a página de
  * balançar para os lados e o efeito elástico nas pontas. A rolagem vertical do conteúdo continua normal.
  */
+/** Dentro da moldura: aplica a área do indicador que o documento de fora mediu e limpa o endereço. */
+function useFrameSafeArea() {
+  useEffect(() => {
+    try {
+      if (window.self === window.top) return;
+      const q = new URLSearchParams(location.search), sab = q.get("_sab");
+      if (sab === null) return;
+      document.documentElement.style.setProperty("--sab", `${Number(sab) || 0}px`);
+      q.delete("_sab"); const rest = q.toString();
+      history.replaceState(history.state, "", `${location.pathname}${rest ? `?${rest}` : ""}${location.hash}`);
+    } catch { /* sem acesso */ }
+  }, []);
+}
+
 function useAppLock(force: boolean) {
   useEffect(() => {
     let off = () => undefined as void;
@@ -51,14 +80,15 @@ function useAppLock(force: boolean) {
 export function ScaleFrame({ children }: { children: ReactNode }) {
   const [k, setK] = useState<number | null>(null);
   useAppLock(!!k);
+  useFrameSafeArea();
   useEffect(() => { setK(frameFactor()); }, []);
   if (!k) return <>{children}</>;
-  const inv = 100 / k;
+  const inv = 100 / k, APP_BG = appBg();
   return (
-    <div data-testid="moldura-celular" style={{ position: "fixed", inset: 0, background: "#070a1d", paddingBottom: "env(safe-area-inset-bottom)", touchAction: "none", overscrollBehavior: "none" }}>
-      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-        <iframe title="Orion" src={`${location.pathname}${location.search.replace(/[?&]moldura=1/, "")}${location.hash}`} allow="microphone; camera; clipboard-write; clipboard-read; fullscreen; notifications"
-          style={{ position: "absolute", left: 0, top: 0, border: 0, width: `${inv}%`, height: `${inv}%`, transform: `scale(${k})`, transformOrigin: "0 0", background: "#070a1d" }} />
+    <div data-testid="moldura-celular" style={{ position: "fixed", inset: 0, background: APP_BG, touchAction: "none", overscrollBehavior: "none" }}>
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", background: APP_BG }}>
+        <iframe title="Orion" src={frameSrc(k)} allow="microphone; camera; clipboard-write; clipboard-read; fullscreen; notifications"
+          style={{ position: "absolute", left: 0, top: 0, border: 0, width: `${inv}%`, height: `${inv}%`, transform: `scale(${k})`, transformOrigin: "0 0", background: APP_BG }} />
       </div>
     </div>
   );

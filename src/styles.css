@@ -445,7 +445,7 @@
 
 /* Altura da barra de navegação de baixo (só no celular): usada para erguer os botões flutuantes. */
 :root { --tabbar: 0px; }
-@media (max-width: 767px) { :root { --tabbar: calc(4.4rem + env(safe-area-inset-bottom)); } }
+@media (max-width: 767px) { :root { --tabbar: calc(4.4rem + var(--sab)); } }
 @media (max-width: 767px) {
   .lift-a { bottom: calc(var(--tabbar) + 1rem) !important; }
   .lift-b { bottom: calc(var(--tabbar) + 0.75rem) !important; }
@@ -653,7 +653,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @media (max-width: 767px) {
   html[data-modal="1"] [data-testid="barra-inferior"], html[data-modal="1"] .lift-a, html[data-modal="1"] .lift-b, html[data-modal="1"] .lift-c { opacity: 0; pointer-events: none; transform: translateY(12px); transition: opacity .2s, transform .2s; }
   /* Botões Salvar/Cancelar das janelas do Financeiro ficam presos no pé: alcançáveis mesmo com o teclado aberto */
-  .fin-modal-body .fin-actions { position: sticky; bottom: 0; z-index: 10; margin-left: -1.5rem; margin-right: -1.5rem; padding: .75rem 1.5rem calc(.75rem + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.1); background: oklch(0.15 0.03 265 / .96); backdrop-filter: blur(12px); }
+  .fin-modal-body .fin-actions { position: sticky; bottom: 0; z-index: 10; margin-left: -1.5rem; margin-right: -1.5rem; padding: .75rem 1.5rem calc(.75rem + var(--sab)); border-top: 1px solid rgba(255,255,255,.1); background: oklch(0.15 0.03 265 / .96); backdrop-filter: blur(12px); }
 }
 
 /* Janelas centralizadas (grid + place-items-center): se forem mais altas que a tela (teclado aberto), rolam em vez de cortar o fim. */
@@ -665,3 +665,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
    touch-action: pan-y no documento permite só rolar na vertical; faixas com rolagem lateral (overflow-x) continuam funcionando. */
 html[data-lock="1"], html[data-lock="1"] body { overscroll-behavior: none; touch-action: pan-y; -webkit-touch-callout: none; }
 html[data-lock="1"] { height: 100%; overflow-x: hidden; }
+
+/* Área do indicador do iPhone (embaixo). Dentro da moldura (ScaleFrame) ela é calculada pelo documento de fora e passada pra cá. */
+:root { --sab: env(safe-area-inset-bottom, 0px); }

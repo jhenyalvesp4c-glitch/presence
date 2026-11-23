@@ -120,7 +120,7 @@ function Flow() {
       <div aria-hidden className="pointer-events-none fixed -left-24 -top-28 h-96 w-96 rounded-full bg-[var(--violet)] opacity-30 blur-3xl" style={{ animation: "vp-aurora 14s ease-in-out infinite" }} />
       <div aria-hidden className="pointer-events-none fixed -bottom-32 -right-24 h-96 w-96 rounded-full bg-[var(--cyan)] opacity-20 blur-3xl" style={{ animation: "vp-aurora 17s ease-in-out infinite reverse" }} />
 
-      <div className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))]">
+      <div className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-5 pb-[calc(1.5rem+var(--sab))] pt-[calc(1rem+env(safe-area-inset-top))]">
         {/* topo */}
         <header className="flex items-center gap-3">
           <div className="flex rounded-full border border-white/10 bg-white/[0.04] p-1 text-xs">

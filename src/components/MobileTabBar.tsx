@@ -19,7 +19,7 @@ export function MobileTabBar() {
   const path = useShownPath(), badges = useNavBadges() as Record<string, Badge | undefined>;
   return (
     <nav aria-label="Navegação principal" data-testid="barra-inferior"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[oklch(0.13_0.03_265/0.92)] pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden">
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[oklch(0.13_0.03_265/0.92)] pb-[var(--sab)] backdrop-blur-2xl md:hidden">
       <ul className="mx-auto grid max-w-md grid-cols-6">
         {items.map((it) => {
           const { Icon, label, to, match, c } = it, badge = badges[("badgeOf" in it ? it.badgeOf : to) as string];

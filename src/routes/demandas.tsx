@@ -563,7 +563,7 @@ function NewDemandDialog({ start, dossiers, onClose, onCreate }: {
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in max-sm:place-items-end max-sm:p-0 sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onCreate({ type, title: title.trim(), desc: desc.trim(), priority, deadline, targets: needs ? targets : [], status: start.status, materials }); }}
-        className="glass relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]" role="dialog" aria-label="Nova demanda">
+        className="glass relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:max-h-[94dvh] max-sm:rounded-b-none max-sm:pb-[var(--sab)]" role="dialog" aria-label="Nova demanda">
         <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" />
         <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10" style={tint("cyan")}><Plus size={18} /></span>
@@ -1221,7 +1221,7 @@ function NoteDialog({ note, dossiers, onClose, onSave }: {
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-3 backdrop-blur-sm animate-in fade-in max-sm:place-items-end max-sm:p-0 sm:p-4" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (ok) onSave({ text, color, dossierId: dossierId || undefined }); }}
-        className="glass relative flex w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]" role="dialog" aria-label={note ? "Editar nota" : "Nova nota"}>
+        className="glass relative flex w-full max-w-lg flex-col overflow-hidden rounded-3xl animate-in zoom-in-95 max-sm:rounded-b-none max-sm:pb-[var(--sab)]" role="dialog" aria-label={note ? "Editar nota" : "Nova nota"}>
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
           <span className="icon-tile h-10 w-10" style={tint(color)}><StickyNote size={18} /></span>
           <h2 className="flex-1 font-display text-xl font-bold">{note ? "Editar nota" : "Nova nota"}</h2>
