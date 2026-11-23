@@ -11,7 +11,7 @@
 ## Como funciona
 - Tela de entrada do Orion (`AuthGate`): "Entrar" e "Criar conta" (Supabase Auth por baixo). Ao entrar, a função `presence_app.claim_account` vincula o login a um espaço de dados próprio (`account_owner`).
 - A conta principal (a primeira) usa o dono legado `00000000-0000-0000-0000-000000000001`; as demais usam o próprio id. Cada pessoa só enxerga o que é dela (RLS por `owner_id()`).
-- **Limite de contas:** `presence_app.app_settings` (`max_accounts`, hoje 10). Existe para proteger o custo da IA enquanto o cadastro está aberto. Para mudar: `update presence_app.app_settings set value = 20 where key = 'max_accounts';`.
+- **Limite de contas:** `presence_app.app_settings` (`max_accounts`, hoje 1.000.000 = sem limite na prática). Existe para proteger o custo da IA enquanto o cadastro está aberto. Para mudar: `update presence_app.app_settings set value = 20 where key = 'max_accounts';`.
 
 ## Vercel
 - A proteção "Vercel Authentication" (SSO) fica **só nas prévias** (`ssoProtection.deploymentType = "preview"`). A produção é pública, para qualquer pessoa abrir o site e criar a conta. Se ela voltar para "all", só quem tem login na Vercel entra.
