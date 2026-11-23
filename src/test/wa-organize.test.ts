@@ -61,4 +61,13 @@ describe("organizar pedidos do WhatsApp nas demandas", () => {
     const code = (acts[0] as { code?: string }).code!;
     expect(code).toMatch(/^#P0/); expect(applyOrganize(c[0]!.demands, acts).some((x) => x.id === code)).toBe(true);
   });
+  it("observação antiga com o texto inteiro vira linha curta e o conteúdo vai para o Material (nada se perde)", () => {
+    const velha = `WhatsApp · 23/11 16:31 · Daniel (grupo UniFECAF)\nCriar e enviar as mensagens\n${"Versão 1: Olá {{nome}}. ".repeat(30)}`;
+    const c = ctx([dem("#P060", "Maceió", "Acompanhar fila", { notes: [velha, "anotação minha"] })]);
+    const plan = planOrganize([req({ titulo: "Criar e enviar as mensagens" })], c);
+    const a = plan[0]!;
+    expect(a.material[0]).toContain("REGISTRO ANTERIOR"); expect(a.material[0]).toContain("Versão 1: Olá {{nome}}.");
+    const d = applyOrganize(c[0]!.demands, plan)[0]!;
+    expect(d.notes[0]!.length).toBeLessThan(260); expect(d.notes[0]).toContain("conteúdo no Material"); expect(d.notes).toContain("anotação minha");
+  });
 });

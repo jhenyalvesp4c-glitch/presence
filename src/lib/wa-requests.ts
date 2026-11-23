@@ -159,6 +159,11 @@ export function materialOf(r: Req): string {
 }
 const deadlineOf = (iso: string | null) => (iso ? dm(iso).slice(0, 5) : null);
 
+/** Observação antiga do WhatsApp com o texto inteiro (formato anterior): vira uma linha curta e o conteúdo vai para o Material. */
+export const isOldWaNote = (n: string) => n.startsWith("WhatsApp ·") && n.length > 300;
+const shortOldNote = (n: string) => `${n.split("\n").slice(0, 2).join(" — ").slice(0, 200)} (conteúdo no Material)`;
+const movedSection = (n: string) => `━━━━━━━━━━━━━━━━━━━━\nREGISTRO ANTERIOR (movido das observações)\n${n}`.slice(0, 6000);
+
 /** Decide, para cada pedido escolhido, onde ele entra. Pedidos do mesmo dossiê entram na MESMA demanda (nunca uma demanda nova por pedido). */
 export function planOrganize(reqs: Req[], ctx: OrgCtx[]): OrgAction[] {
   const actions = new Map<string, OrgAction>();
@@ -188,7 +193,7 @@ export function planOrganize(reqs: Req[], ctx: OrgCtx[]): OrgAction[] {
       cur.notes.push(note); cur.material.push(mat); cur.keys.push(r.key); cur.priority = bestP(cur.priority, r.prioridade);
       if (dl && (!cur.deadline || dl < cur.deadline)) cur.deadline = dl;
     } else if (target) {
-      actions.set(key, { kind: "update", pid: targetCtx.pid, project: targetCtx.name, code: target.id, title: target.title, dossier: target.polo ?? dn, add: [...steps], notes: [note], material: [mat], keys: [r.key], deadline: dl, priority: r.prioridade });
+      actions.set(key, { kind: "update", pid: targetCtx.pid, project: targetCtx.name, code: target.id, title: target.title, dossier: target.polo ?? dn, add: [...steps], notes: [note], material: [...target.notes.filter(isOldWaNote).map(movedSection), mat], keys: [r.key], deadline: dl, priority: r.prioridade });
     } else {
       actions.set(key, { kind: "create", pid: home.pid, project: home.name, dossier: dn, title: r.titulo, add: [...steps], notes: [note], material: [mat], keys: [r.key], deadline: dl, priority: r.prioridade });
     }
@@ -207,7 +212,7 @@ export function applyOrganize(demands: Demand[], actions: OrgAction[], today: Da
         const have = new Set((d.checklist ?? []).map((c) => norm(c.text)));
         const add: CheckItem[] = a.add.filter((t) => !have.has(norm(t))).map((text) => ({ text, done: false }));
         const notes = a.notes.filter((n) => !d.notes.some((x) => norm(x) === norm(n)));
-        return { ...d, checklist: [...(d.checklist ?? []), ...add], notes: [...d.notes, ...notes], priority: bestP(d.priority, a.priority), deadline: d.deadline && d.deadline !== "—" ? d.deadline : (a.deadline ?? d.deadline),
+        return { ...d, checklist: [...(d.checklist ?? []), ...add], notes: [...d.notes.map((n) => (isOldWaNote(n) ? shortOldNote(n) : n)), ...notes], priority: bestP(d.priority, a.priority), deadline: d.deadline && d.deadline !== "—" ? d.deadline : (a.deadline ?? d.deadline),
           history: [...d.history, { d: label, text: `Atualizada pelo WhatsApp: +${add.length} ${add.length === 1 ? "passo" : "passos"} no checklist`, s: d.status }] };
       });
     } else {

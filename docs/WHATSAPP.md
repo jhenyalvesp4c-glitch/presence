@@ -60,3 +60,6 @@ Em Reuniões → Demandas do WhatsApp, depois de marcar o que é demanda, **"Org
 - Em demanda existente entram: **passos detalhados no checklist** (a IA devolve `passos`: ações concretas), uma **observação curta** por pedido (só o registro de que veio do WhatsApp), o **Material** da demanda com seção organizada (`materialOf`: O QUE FAZER, CONTEXTO e CONTEÚDOS RECEBIDOS — cada mensagem/template/versão inteira e separada, em `conteudos`), prioridade mais alta e prazo, e um item no histórico. Passos e observações repetidos não duplicam.
 - Mostra antes o que vai atualizar/criar. Voz: `verificar_whatsapp_demandas` abre a tela e a leitura começa sozinha (`/reunioes?aba=demandas&verificar=1`).
 - "Criar demandas" (Central de entrada) continua disponível. Imagens e PDFs só entram pelo caminho da Central.
+
+### Reorganizar o que já foi organizado
+Chip **"Reorganizar o que já organizei"** na verificação: mostra de novo os pedidos já enviados (marcados "já organizado antes"). Ao organizar, a demanda existente ganha só o que falta (passos e seções do Material sem duplicar) e as observações antigas do WhatsApp com o texto inteiro viram uma linha curta, com o conteúdo movido para o Material ("REGISTRO ANTERIOR"): nada se perde. Use o período "Hoje" ou "7 dias" para voltar no tempo.
