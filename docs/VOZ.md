@@ -139,3 +139,6 @@ Em Tarefas, ao concluir, a linha risca, desliza e some (só ficam as pendentes);
 
 ## Mover demanda sem abrir (arrastar e botões)
 No quadro de Demandas (cartões pequenos e grandes): **arraste o cartão** para outra coluna (A fazer / Em andamento / Concluídas; a coluna acende ao passar por cima) ou use os botões no cartão (**▶ Iniciar**, **✓ Concluir**, **↺ Reabrir**), sem abrir a janela lateral. Aparece um aviso com **Desfazer**. Os botões ficam sempre visíveis no celular e aparecem ao passar o mouse no computador; arrastar só funciona com mouse (no toque, use os botões). Mesma regra de status da janela da demanda (`setStatus`: concluir marca todos os dossiês).
+
+### Ditado quando o reconhecimento do navegador não funciona (app Presence/Electron)
+`useSpeech` tenta o reconhecimento do navegador; se der erro de rede/serviço (acontece no app instalado, que não tem o serviço de voz do Google), troca sozinho para **gravar o microfone e transcrever no servidor** (`transcribeAudio`, OpenAI), o mesmo caminho da conversa com o Orion, e lembra a escolha (`presence.stt = gravado`). A gravação termina quando você para de falar (1,8 s de silêncio) ou toca de novo; mostra "Ouvindo… / Transcrevendo…".
