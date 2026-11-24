@@ -1360,6 +1360,8 @@ function ChecklistBlock({ items, onChange }: { items: CheckItem[]; onChange: (ne
   const [text, setText] = useState(""), [waitFor, setWaitFor] = useState<number | null>(null), [from, setFrom] = useState(""), [note, setNote] = useState("");
   const done = items.filter((c) => c.done).length, pct = items.length ? Math.round((done / items.length) * 100) : 0, waiting = items.filter((c) => c.wait && !c.done).length;
   const todayIso = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  /** Tira o "aguardando" repetido que a pessoa digitou no campo "de quem" e encurta. */
+  const waitWho = (v: string) => v.replace(/^\s*aguardando(\s+retorno)?(\s+d[eao]s?)?\s*/i, "").trim().slice(0, 40);
   const startWait = (i: number) => { const w = items[i]?.wait; setWaitFor(i); setFrom(w?.from ?? ""); setNote(w?.note ?? ""); };
   const saveWait = () => { if (waitFor === null) return; onChange(items.map((c, k) => (k === waitFor ? { ...c, wait: { from: from.trim().slice(0, 120), note: note.trim().slice(0, 1000), since: c.wait?.since || todayIso() } } : c))); setWaitFor(null); };
   const since = (iso: string) => { if (!iso) return ""; const d = Math.round((new Date(`${todayIso()}T12:00:00`).getTime() - new Date(`${iso}T12:00:00`).getTime()) / 864e5); return d <= 0 ? "desde hoje" : d === 1 ? "desde ontem" : `há ${d} dias`; };
@@ -1377,21 +1379,23 @@ function ChecklistBlock({ items, onChange }: { items: CheckItem[]; onChange: (ne
               <button onClick={() => onChange(items.map((x, k) => (k === i ? { ...x, done: !x.done, wait: !x.done ? undefined : x.wait } : x)))} aria-label={c.done ? "Desmarcar" : "Marcar como feito"} aria-pressed={c.done} className="mt-0.5 shrink-0 transition active:scale-90">
                 {c.done ? <CheckCircle2 size={18} className="text-emerald drop-shadow-[0_0_6px_var(--emerald)]" /> : <Circle size={18} className="text-muted-foreground transition group-hover:text-cyan" />}
               </button>
-              <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words text-xs leading-snug transition ${c.done ? "text-muted-foreground line-through decoration-emerald/60" : "text-foreground"}`}>{c.text}</span>
-              {c.wait && !c.done && (
-                <span className="group/w relative shrink-0" data-testid="passo-aguardando">
-                  <button type="button" onClick={() => startWait(i)} className="inline-flex items-center gap-1 rounded-full border border-amber/50 bg-amber/15 px-2 py-0.5 text-[0.65rem] font-medium text-amber transition hover:bg-amber/25"><Hourglass size={10} className="animate-pulse" /> Aguardando{c.wait.from ? ` ${c.wait.from}` : ""}</button>
-                  <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 w-64 translate-y-1 rounded-xl border border-amber/40 bg-[oklch(0.15_0.04_265/0.96)] p-3 text-left text-xs opacity-0 shadow-[0_18px_50px_-20px_var(--amber)] backdrop-blur-xl transition duration-200 group-hover/w:translate-y-0 group-hover/w:opacity-100">
-                    <b className="flex items-center gap-1.5 text-amber"><Hourglass size={11} /> Aguardando retorno{c.wait.from ? ` de ${c.wait.from}` : ""}</b>
+              <span className={`min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere] text-xs leading-snug transition ${c.done ? "text-muted-foreground line-through decoration-emerald/60" : "text-foreground"}`}>{c.text}</span>
+              {!c.done && !c.wait && <button onClick={() => startWait(i)} aria-label="Marcar como aguardando retorno" title="Aguardando retorno" data-testid="aguardar" className="shrink-0 text-muted-foreground/70 transition hover:scale-110 hover:text-amber"><Hourglass size={14} /></button>}
+              <button onClick={() => onChange(items.filter((_, k) => k !== i))} aria-label="Tirar do checklist" className="shrink-0 text-muted-foreground opacity-0 transition hover:text-pink group-hover:opacity-100 max-md:opacity-100"><X size={13} /></button>
+            </div>
+            {c.wait && !c.done && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-[1.65rem]" data-testid="passo-aguardando">
+                <span className="group/w relative min-w-0 max-w-full">
+                  <button type="button" onClick={() => startWait(i)} className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber/50 bg-amber/15 px-2.5 py-0.5 text-[0.68rem] font-medium text-amber transition hover:bg-amber/25"><Hourglass size={10} className="shrink-0 animate-pulse" /><span className="truncate">Aguardando{waitWho(c.wait.from) ? ` ${waitWho(c.wait.from)}` : ""}</span></button>
+                  <span role="tooltip" className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 w-64 max-w-[80vw] translate-y-1 rounded-xl border border-amber/40 bg-[oklch(0.15_0.04_265/0.96)] p-3 text-left text-xs opacity-0 shadow-[0_18px_50px_-20px_var(--amber)] backdrop-blur-xl transition duration-200 group-hover/w:translate-y-0 group-hover/w:opacity-100">
+                    <b className="flex items-center gap-1.5 text-amber"><Hourglass size={11} /> Aguardando retorno{waitWho(c.wait.from) ? ` de ${waitWho(c.wait.from)}` : ""}</b>
                     <span className="mt-1 block whitespace-pre-wrap break-words text-foreground/90">{c.wait.note || "Sem observação."}</span>
                     {c.wait.since && <span className="mt-1.5 block font-mono text-[0.65rem] text-muted-foreground">{since(c.wait.since)}</span>}
                   </span>
                 </span>
-              )}
-              {!c.done && !c.wait && <button onClick={() => startWait(i)} aria-label="Marcar como aguardando retorno" title="Aguardando retorno" data-testid="aguardar" className="shrink-0 text-muted-foreground opacity-0 transition hover:text-amber group-hover:opacity-100 max-md:opacity-100"><Hourglass size={13} /></button>}
-              {c.wait && !c.done && <button onClick={() => onChange(items.map((x, k) => (k === i ? { ...x, wait: undefined } : x)))} aria-label="Recebi o retorno" title="Recebi o retorno" data-testid="recebi" className="shrink-0 rounded-full border border-emerald/40 px-1.5 text-[0.62rem] text-emerald transition hover:bg-emerald/15">Recebi</button>}
-              <button onClick={() => onChange(items.filter((_, k) => k !== i))} aria-label="Tirar do checklist" className="shrink-0 text-muted-foreground opacity-0 transition hover:text-pink group-hover:opacity-100 max-md:opacity-100"><X size={13} /></button>
-            </div>
+                <button onClick={() => onChange(items.map((x, k) => (k === i ? { ...x, wait: undefined } : x)))} aria-label="Recebi o retorno" title="Recebi o retorno" data-testid="recebi" className="shrink-0 rounded-full border border-emerald/40 px-2 py-0.5 text-[0.65rem] text-emerald transition hover:bg-emerald/15 active:scale-95">Recebi</button>
+              </div>
+            )}
             {waitFor === i && (
               <form onSubmit={(e) => { e.preventDefault(); saveWait(); }} className="mt-2 space-y-1.5 rounded-lg border border-amber/30 bg-black/25 p-2" style={{ animation: "fin-rise .25s both" }}>
                 <input autoFocus value={from} onChange={(e) => setFrom(e.target.value)} placeholder="Aguardando retorno de quem? (ex.: Daniel)" className="w-full rounded-lg border border-white/10 bg-black/25 px-2.5 py-1.5 text-xs outline-none focus:border-amber/60" data-testid="aguardando-de" />
