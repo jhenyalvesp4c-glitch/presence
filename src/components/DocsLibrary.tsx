@@ -149,20 +149,21 @@ const findFolder = (fs: FolderT[], id: string): FolderT | undefined => {
 const mapFolders = (fs: FolderT[], id: string, fn: (f: FolderT) => FolderT): FolderT[] =>
   fs.map((f) => (f.id === id ? fn(f) : { ...f, subs: f.subs && mapFolders(f.subs, id, fn) }));
 
-export function DocsLibrary({ projectId, initialSection }: { projectId: string; initialSection?: "lib" | "tre" | "cli" | "pla" | undefined }) {
-  const [section, setSection] = useState<"lib" | "tre" | "cli" | "pla">(initialSection ?? "lib");
-  useEffect(() => { if (initialSection) setSection(initialSection); }, [initialSection]);
+export function DocsLibrary({ projectId, initialSection, onOpenClients }: { projectId: string; initialSection?: "lib" | "tre" | "cli" | "pla" | undefined; onOpenClients?: (() => void) | undefined }) {
+  const [section, setSection] = useState<"lib" | "tre" | "pla">(initialSection === "tre" || initialSection === "pla" ? initialSection : "lib");
+  useEffect(() => { if (initialSection === "cli") onOpenClients?.(); else if (initialSection) setSection(initialSection); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSection]);
   return (
     <div className="space-y-4">
       <div className="glass inline-flex rounded-2xl p-1 animate-rise">
-        {([["lib", "Biblioteca", BookOpen, "cyan"], ["tre", "Treinamentos", GraduationCap, "pink"], ["cli", "Clientes", Users, "violet"], ["pla", "Playbooks", Rocket, "emerald"]] as const).map(([k, l, I, c]) => (
+        {([["lib", "Biblioteca", BookOpen, "cyan"], ["tre", "Treinamentos", GraduationCap, "pink"], ["pla", "Playbooks", Rocket, "emerald"]] as const).map(([k, l, I, c]) => (
           <button key={k} onClick={() => setSection(k)} style={tint(c)}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition ${section === k ? "bg-[color-mix(in_oklab,var(--glow)_15%,transparent)] text-[var(--glow)] shadow-[0_0_20px_-8px_var(--glow)]" : "text-muted-foreground hover:text-foreground"}`}>
             <I size={15} /> {l}
           </button>
         ))}
       </div>
-      {section === "lib" ? <Library projectId={projectId} /> : section === "tre" ? <TrainingScripts projectId={projectId} /> : section === "cli" ? <ClientsView projectId={projectId} /> : <PlaybooksView projectId={projectId} onOpenClients={() => setSection("cli")} onOpenLibrary={() => setSection("lib")} />}
+      {section === "lib" ? <Library projectId={projectId} /> : section === "tre" ? <TrainingScripts projectId={projectId} /> : <PlaybooksView projectId={projectId} onOpenClients={() => onOpenClients?.()} onOpenLibrary={() => setSection("lib")} />}
     </div>
   );
 }

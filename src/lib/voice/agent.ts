@@ -52,7 +52,7 @@ export const PAGES: Record<string, string> = {
   inicio: "/assistente", demandas: "/demandas", projetos: "/projetos", tarefas: "/tarefas", calendario: "/calendario", planejamento: "/planejamento",
   saude: "/saude", treino: "/saude/treino", dieta: "/saude/dieta", habitos: "/habitos", progresso: "/analise", cerebro: "/cerebro",
   organizar: "/organizar", financeiro: "/financeiro", listas: "/tarefas?aba=listas", analise: "/analise", resumo: "/resumo", ideias: "/ideias",
-  central: "/central", cursos: "/cursos", reunioes: "/reunioes", mapa: "/mapa", configuracoes: "/configuracoes", clientes: "/demandas?aba=docs&secao=cli", documentacao: "/demandas?aba=docs", playbooks: "/demandas?aba=docs&secao=pla", treinamentos: "/demandas?aba=docs&secao=tre", assinaturas: "/financeiro?aba=assinaturas",
+  central: "/central", cursos: "/cursos", reunioes: "/reunioes", mapa: "/mapa", configuracoes: "/configuracoes", clientes: "/demandas?aba=clientes", documentacao: "/demandas?aba=docs", playbooks: "/demandas?aba=docs&secao=pla", treinamentos: "/demandas?aba=docs&secao=tre", assinaturas: "/financeiro?aba=assinaturas",
 };
 
 /* ───────────── contexto (com cache curto, para responder rápido) ───────────── */

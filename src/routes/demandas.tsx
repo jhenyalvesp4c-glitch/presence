@@ -3,6 +3,8 @@ import { backdropProps } from "@/lib/backdrop";
 import { MeetingsPage } from "@/components/meetings/MeetingsPage";
 import { useMeetings } from "@/lib/data/meetings";
 import { DocsLibrary } from "@/components/DocsLibrary";
+import { ClientsView } from "@/components/ClientsView";
+import { useClients } from "@/lib/data/clients";
 import type { Project } from "@/lib/projects";
 import { nextCode, type DType, type Demand, type Hist, type Priority, type PoloExec, type Status } from "@/lib/demands";
 import { loadDemands, loadProjectState, loadProjects, saveDemands, saveDossiers, saveNotesDb, type ProjectState } from "@/lib/data/project-data";
@@ -33,7 +35,7 @@ import { createPortal } from "react-dom";
 import { DictateButton, appendSpoken } from "@/components/DictateButton";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  ArrowLeft, ArrowRight, Atom, Hourglass, ListChecks, Play, RotateCcw, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
+  ArrowLeft, ArrowRight, Atom, Hourglass, ListChecks, Play, RotateCcw, Users, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
   Filter, Folder, FolderOpen, Globe, Hexagon, History, LayoutGrid, Layers, List, Loader, MapPin,
   Mic, MessageSquare, MoreHorizontal, Network, Pencil, Plus, Search, Send, SquareCheck, StickyNote, Table2, Trash2, X,
 } from "lucide-react";
@@ -41,7 +43,7 @@ import {
 export const Route = createFileRoute("/demandas")({
   validateSearch: (s: Record<string, unknown>): { projeto?: string | undefined; aba?: string | undefined; secao?: string | undefined } => ({
     projeto: typeof s["projeto"] === "string" ? (s["projeto"] as string) : undefined,
-    aba: ["notas", "docs", "dossies", "agenda", "reunioes"].includes(String(s["aba"])) ? String(s["aba"]) : undefined,
+    aba: ["notas", "docs", "dossies", "agenda", "reunioes", "clientes"].includes(String(s["aba"])) ? String(s["aba"]) : undefined,
     secao: ["lib", "tre", "cli", "pla"].includes(String(s["secao"])) ? String(s["secao"]) : undefined,
   }),
   head: () => ({
@@ -148,7 +150,7 @@ function Demandas() {
   const tm = typeMetaFor(L);
   const [items, setItems, itemsReady] = useDbState<Demand[]>(pid, [], () => loadDemands(pid!), (p, n) => saveDemands(pid!, p, n));
   const ready = pid !== null && stReady && itemsReady;
-  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes">((abaUrl as "docs" | undefined) ?? "overview");
+  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes" | "clientes">((abaUrl as "docs" | undefined) ?? (secaoUrl === "cli" ? "clientes" : "overview"));
   useEffect(() => { if (abaUrl) setTab(abaUrl as "docs"); }, [abaUrl, secaoUrl]);
   const [view, setView] = useState<"kanban" | "lista" | "matriz">("kanban");
   const [prioF, setPrioF] = useState<"todas" | Priority>("todas");
@@ -358,6 +360,7 @@ function Demandas() {
   const pend = items.filter((i) => i.status !== "done").length;
   const done = items.length - pend;
 
+  const clientsQ = useClients(pid ?? defaultProjectId());
   const meetingsQ = useMeetings(), meetingCount = (meetingsQ.data ?? []).filter((m) => m.dossierProject === (pid ?? defaultProjectId())).length;
   const tabs = [
     { k: "overview" as const, label: "Visão geral", sub: "Todos os tipos", icon: LayoutGrid, color: "cyan", n: items.length },
@@ -365,9 +368,9 @@ function Demandas() {
     { k: "dossies" as const, label: L.plural, sub: "Cadastro", icon: Folder, color: "pink", n: ds.dossiers.length },
     { k: "docs" as const, label: "Documentação", sub: "Biblioteca", icon: FolderOpen, color: "violet", n: 19 },
     { k: "reunioes" as const, label: "Reuniões", sub: "Atas e decisões", icon: Mic, color: "violet", n: meetingCount },
-    { k: "notas" as const, label: "Notas", sub: "Lembretes", icon: StickyNote, color: "amber", n: notes.length },
+    { k: "clientes" as const, label: "Clientes", sub: "Carteira e fichas", icon: Users, color: "amber", n: clientsQ.data?.length ?? 0 },
   ];
-  const filterBar = tab !== "notas" && tab !== "docs" && tab !== "dossies" && tab !== "agenda" && tab !== "reunioes";
+  const filterBar = tab !== "notas" && tab !== "clientes" && tab !== "docs" && tab !== "dossies" && tab !== "agenda" && tab !== "reunioes";
   const boardItems = (t: typeof tab) => filtered.filter((i) => t === "overview" || i.type === t);
 
   return (
@@ -476,8 +479,10 @@ function Demandas() {
             </div>
           ) : tab === "reunioes" ? (
             <MeetingsPage embedded projectId={pid ?? defaultProjectId()} />
+          ) : tab === "clientes" ? (
+            <ClientsView projectId={pid ?? defaultProjectId()} />
           ) : tab === "docs" ? (
-            <DocsLibrary projectId={pid ?? defaultProjectId()} initialSection={secaoUrl as "lib" | "tre" | "cli" | "pla" | undefined} />
+            <DocsLibrary projectId={pid ?? defaultProjectId()} initialSection={secaoUrl as "lib" | "tre" | "cli" | "pla" | undefined} onOpenClients={() => setTab("clientes")} />
           ) : tab === "agenda" ? (
             <DemandCalendar items={appts} dossiers={ds.dossiers} label={L} onSave={saveAppt} onDelete={removeAppt} onToggle={toggleAppt} saving={saveApptM.isPending} />
           ) : tab === "notas" ? (
