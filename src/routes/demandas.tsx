@@ -33,7 +33,7 @@ import { createPortal } from "react-dom";
 import { DictateButton, appendSpoken } from "@/components/DictateButton";
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  ArrowLeft, ArrowRight, Atom, Hourglass, ListChecks, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
+  ArrowLeft, ArrowRight, Atom, Hourglass, ListChecks, Play, RotateCcw, Calendar, Check, CheckCircle2, CheckSquare, ChevronDown, ChevronRight, Circle, Clock, FileText,
   Filter, Folder, FolderOpen, Globe, Hexagon, History, LayoutGrid, Layers, List, Loader, MapPin,
   Mic, MessageSquare, MoreHorizontal, Network, Pencil, Plus, Search, Send, SquareCheck, StickyNote, Table2, Trash2, X,
 } from "lucide-react";
@@ -77,9 +77,10 @@ const typeBase: Record<DType, { color: string; icon: typeof Globe; prefix: strin
 const LabelCtx = createContext<DossierLabel>(DEFAULT_LABEL);
 const useLabel = () => useContext(LabelCtx);
 /** Lápis e lixeira dos cartões: abrir para editar e excluir (com confirmação). */
-type Actions = { edit: (id: string) => void; del: (id: string) => void; selecting: boolean; picked: Set<string>; toggle: (id: string) => void };
-const ActionsCtx = createContext<Actions>({ edit: () => {}, del: () => {}, selecting: false, picked: new Set(), toggle: () => {} });
-function CardActions({ id, pos = "right-1.5 top-1.5" }: { id: string; pos?: string }) {
+type Actions = { edit: (id: string) => void; del: (id: string) => void; selecting: boolean; picked: Set<string>; toggle: (id: string) => void; move: (id: string, s: Status) => void };
+const ActionsCtx = createContext<Actions>({ edit: () => {}, del: () => {}, selecting: false, picked: new Set(), toggle: () => {}, move: () => {} });
+const DRAG = "text/orion-demanda";
+function CardActions({ id, status, pos = "right-1.5 top-1.5" }: { id: string; status?: Status; pos?: string }) {
   const a = useContext(ActionsCtx);
   if (a.selecting) {
     const on = a.picked.has(id);
@@ -94,6 +95,9 @@ function CardActions({ id, pos = "right-1.5 top-1.5" }: { id: string; pos?: stri
   }
   return (
     <span className={`absolute ${pos} z-10 flex gap-0.5 opacity-100 transition md:opacity-0 md:group-hover/card:opacity-100 md:focus-within:opacity-100`}>
+      {status === "todo" && <button onClick={(e) => { e.stopPropagation(); a.move(id, "doing"); }} aria-label={`Iniciar ${id}`} title="Iniciar (em andamento)" data-testid="card-iniciar" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-amber"><Play size={11} /></button>}
+      {status && status !== "done" && <button onClick={(e) => { e.stopPropagation(); a.move(id, "done"); }} aria-label={`Concluir ${id}`} title="Concluir" data-testid="card-concluir" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-emerald"><CheckCircle2 size={11} /></button>}
+      {status === "done" && <button onClick={(e) => { e.stopPropagation(); a.move(id, "todo"); }} aria-label={`Reabrir ${id}`} title="Reabrir (a fazer)" data-testid="card-reabrir" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-cyan"><RotateCcw size={11} /></button>}
       <button onClick={(e) => { e.stopPropagation(); a.edit(id); }} aria-label={`Editar ${id}`} title="Editar" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-cyan"><Pencil size={11} /></button>
       <button onClick={(e) => { e.stopPropagation(); a.del(id); }} aria-label={`Excluir ${id}`} title="Excluir" className="rounded-md bg-background/70 p-1 text-muted-foreground backdrop-blur transition hover:text-destructive"><Trash2 size={11} /></button>
     </span>
@@ -227,6 +231,13 @@ function Demandas() {
     polos: d.polos?.map((p) => (s === "done" ? { ...p, status: "done", date: p.date ?? today() } : s === "todo" ? { ...p, status: "todo", date: undefined } : p)),
     history: [...d.history, { d: today(), text: `Status alterado para ${statusMeta[s].label.replace(/s$/, "")}`, s }],
   }));
+  /** Arrastar o cartão para outra coluna (ou tocar em Iniciar/Concluir no cartão): muda o status sem abrir a demanda. */
+  const moveCard = (id: string, s: Status) => {
+    const cur = items.find((x) => x.id === id);
+    if (!cur || cur.status === s) return;
+    setStatus(id, s);
+    toast.success(`${id} · ${statusMeta[s].label}`, { duration: 3000, action: { label: "Desfazer", onClick: () => setStatus(id, cur.status) } });
+  };
   const cyclePolo = (id: string, name: string) => update(id, (d) => {
     const cur = d.polos!.find((p) => p.name === name)!;
     const nx: Status = cur.status === "todo" ? "doing" : cur.status === "doing" ? "done" : "todo";
@@ -361,7 +372,7 @@ function Demandas() {
 
   return (
     <LabelCtx.Provider value={L}>
-    <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard, selecting, picked, toggle }}>
+    <ActionsCtx.Provider value={{ edit: editCard, del: deleteCard, selecting, picked, toggle, move: moveCard }}>
     <div className="rail-bleed relative min-h-screen overflow-x-clip">
       <FinBackdrop />
       <BgFx />
@@ -913,7 +924,7 @@ const firstStatus = (items: Demand[]): Status => STATUSES.find((s) => items.some
 
 function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; items: Demand[]; selId: string | null; onOpen: (id: string) => void; onCreate: () => void }) {
   const m = useTM()[type];
-  const [st, setSt] = useState<Status>(() => firstStatus(items));
+  const [st, setSt] = useState<Status>(() => firstStatus(items)), [over, setOver] = useState<Status | null>(null), act = useContext(ActionsCtx);
   return (
     <div className="ex-card ex-glass flex flex-col p-3 transition duration-300 hover:-translate-y-0.5 max-md:w-[88%] max-md:shrink-0 max-md:snap-center" style={{ ...tint(m.color), "--rail": "var(--glow)" } as CSSProperties}>
       <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent shadow-[0_0_14px_var(--glow)]" />
@@ -931,7 +942,9 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
         {STATUSES.map((s) => {
           const col = items.filter((i) => i.status === s);
           return (
-            <div key={s} className={`min-w-0 ${s === st ? "" : "max-md:hidden"}`} style={tint(statusMeta[s].color)}>
+            <div key={s} className={`min-w-0 rounded-xl transition ${over === s ? "bg-[color-mix(in_oklab,var(--glow)_14%,transparent)] ring-2 ring-[var(--glow)]" : ""} ${s === st ? "" : "max-md:hidden"}`} style={tint(statusMeta[s].color)}
+              onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (over !== s) setOver(s); } }} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver((o) => (o === s ? null : o)); }}
+              onDrop={(e) => { const id = e.dataTransfer.getData(DRAG); setOver(null); if (id) { e.preventDefault(); act.move(id, s); } }}>
               <div className="mb-2 flex items-center justify-between rounded-full max-md:hidden border border-[color-mix(in_oklab,var(--glow)_40%,transparent)] bg-[color-mix(in_oklab,var(--glow)_12%,transparent)] px-2.5 py-1 text-[0.62rem] text-[var(--glow)] shadow-[inset_0_1px_0_rgba(255,255,255,.1)] backdrop-blur">
                 <span className="truncate">{statusMeta[s].label}</span><span className="font-mono">{col.length}</span>
               </div>
@@ -953,7 +966,7 @@ function TypeBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
 function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; onClick: () => void; delay: number }) {
   const L = useLabel();
   return (
-    <div className="group/card relative">
+    <div className="group/card relative cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => { e.dataTransfer.setData(DRAG, d.id); e.dataTransfer.effectAllowed = "move"; e.currentTarget.style.opacity = ".5"; }} onDragEnd={(e) => { e.currentTarget.style.opacity = ""; }}>
     <button onClick={onClick} style={{ ...tint(typeBase[d.type].color), animationDelay: `${delay * 0.05}s` }}
       className={`group card-sheen relative w-full overflow-hidden rounded-xl border border-white/12 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--glow)_11%,transparent),rgba(255,255,255,.02)_60%)] p-2 pl-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-md transition duration-300 animate-rise active:scale-[0.98] max-md:rounded-2xl max-md:p-3.5 hover:-translate-y-1 hover:border-[color-mix(in_oklab,var(--glow)_50%,transparent)] hover:shadow-[0_8px_24px_-12px_var(--glow)] ${active ? "border-[var(--glow)] shadow-[0_0_24px_-6px_var(--glow)]" : "border-border"}`}>
       <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" />
@@ -975,7 +988,7 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
           <Hourglass size={9} className="shrink-0 animate-pulse" /> {w.length} aguardando retorno
         </span>) : null; })()}
     </button>
-    <CardActions id={d.id} />
+    <CardActions id={d.id} status={d.status} />
     </div>
   );
 }
@@ -983,7 +996,7 @@ function MiniCard({ d, active, onClick, delay }: { d: Demand; active: boolean; o
 function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; items: Demand[]; selId: string | null; onOpen: (id: string) => void; onCreate: (s: Status) => void }) {
   const m = useTM()[type];
   const L = useLabel();
-  const [st, setSt] = useState<Status>(() => firstStatus(items));
+  const [st, setSt] = useState<Status>(() => firstStatus(items)), [over, setOver] = useState<Status | null>(null), act = useContext(ActionsCtx);
   return (
     <section className="fin-frame glass glass-clear relative overflow-hidden rounded-3xl p-5 animate-rise max-md:rounded-2xl max-md:p-3" style={tint(m.color)}>
       <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full opacity-20 blur-3xl" style={{ background: "var(--glow)" }} />
@@ -1010,7 +1023,9 @@ function FullBoard({ type, items, selId, onOpen, onCreate }: { type: DType; item
         {STATUSES.map((s) => {
           const col = items.filter((i) => i.status === s);
           return (
-            <div key={s} className={`ex-card ex-glass flex min-h-[200px] flex-col p-3 ${s === st ? "" : "max-md:hidden"}`} style={{ ...tint(statusMeta[s].color), "--rail": "var(--glow)" } as React.CSSProperties}>
+            <div key={s} className={`ex-card ex-glass flex min-h-[200px] flex-col p-3 transition ${over === s ? "ring-2 ring-[var(--glow)] brightness-125" : ""} ${s === st ? "" : "max-md:hidden"}`} style={{ ...tint(statusMeta[s].color), "--rail": "var(--glow)" } as React.CSSProperties}
+              onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (over !== s) setOver(s); } }} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver((o) => (o === s ? null : o)); }}
+              onDrop={(e) => { const id = e.dataTransfer.getData(DRAG); setOver(null); if (id) { e.preventDefault(); act.move(id, s); } }}>
               <span aria-hidden className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glow)] to-transparent shadow-[0_0_14px_var(--glow)]" />
               <div className="flex items-center gap-2 px-1 pb-3 max-md:hidden">
                 <span className="h-2.5 w-2.5 animate-pulse-ring rounded-full bg-[var(--glow)] shadow-[0_0_10px_var(--glow)]" />
@@ -1040,7 +1055,7 @@ function BigCard({ d, active, onClick, delay }: { d: Demand; active: boolean; on
   const pct = progress(d);
   const dn = d.polos?.filter((p) => p.status === "done").length ?? 0;
   return (
-    <div className="group/card relative">
+    <div className="group/card relative cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => { e.dataTransfer.setData(DRAG, d.id); e.dataTransfer.effectAllowed = "move"; e.currentTarget.style.opacity = ".5"; }} onDragEnd={(e) => { e.currentTarget.style.opacity = ""; }}>
     <button onClick={onClick} style={{ ...tint(prio[d.priority].color), animationDelay: `${delay * 0.06}s` }}
       className={`group card-sheen relative w-full overflow-hidden rounded-2xl border bg-[linear-gradient(135deg,color-mix(in_oklab,var(--glow)_11%,transparent),rgba(255,255,255,.02)_60%)] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-md transition duration-300 animate-rise hover:-translate-y-1 hover:shadow-[0_16px_36px_-14px_var(--glow)] active:scale-[0.99] ${active ? "border-cyan shadow-[0_0_30px_-6px_var(--cyan)]" : "border-white/12 hover:border-[color-mix(in_oklab,var(--glow)_55%,transparent)]"}`}>
       <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-[var(--glow)] shadow-[0_0_8px_var(--glow)]" />
@@ -1062,7 +1077,7 @@ function BigCard({ d, active, onClick, delay }: { d: Demand; active: boolean; on
         <span className="font-mono">{pct}%</span>
       </div>
     </button>
-    <CardActions id={d.id} pos="right-9 top-3" />
+    <CardActions id={d.id} status={d.status} pos="right-9 top-3" />
     </div>
   );
 }
@@ -1086,7 +1101,7 @@ function ListView({ items, selId, onOpen }: { items: Demand[]; selId: string | n
           <span className="font-mono text-xs">{progress(d)}%</span>
           <span className="max-md:hidden" />
         </button>
-        <CardActions id={d.id} pos="right-4 top-1/2 -translate-y-1/2" />
+        <CardActions id={d.id} status={d.status} pos="right-4 top-1/2 -translate-y-1/2" />
         </div>
       ))}
       {!items.length && <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma demanda encontrada.</p>}
