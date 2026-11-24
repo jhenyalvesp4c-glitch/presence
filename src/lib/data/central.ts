@@ -38,3 +38,19 @@ export const useCentralContracts = (today: string) => useQuery({
   queryKey: ["central", "contracts", today],
   queryFn: async (): Promise<ExpiringClient[]> => (must(await supabase.from("clients").select("id, name, contract_end, status, monthly_value").in("status", ["ativo", "neg"]).not("contract_end", "is", null).lte("contract_end", addDays(today, 30)).order("contract_end")) as { id: string; name: string; contract_end: string; status: string; monthly_value: number | string }[]).map((c) => ({ id: c.id, name: c.name, contractEnd: c.contract_end, status: c.status, monthlyValue: Number(c.monthly_value) })),
 });
+
+
+export type CentralWaiting = { projectId: string; code: string; demandTitle: string; dossier: string; step: string; from: string; note: string; since: string | null; days: number };
+/** Passos de demandas abertas marcados como "Aguardando retorno" (de quem, observação, há quantos dias). */
+export const useCentralWaiting = (today: string) => useQuery({
+  queryKey: ["central", "waiting", today],
+  queryFn: async (): Promise<CentralWaiting[]> => {
+    const steps = must(await supabase.from("demand_checklist").select("project_id, code, text, waiting_from, waiting_note, waiting_since").eq("waiting", true).eq("done", false).limit(200)) as { project_id: string; code: string; text: string; waiting_from: string; waiting_note: string; waiting_since: string | null }[];
+    if (!steps.length) return [];
+    const dem = must(await supabase.from("project_demands").select("project_id, code, title, status, dossier_name").in("code", [...new Set(steps.map((x) => x.code))]).neq("status", "done")) as { project_id: string; code: string; title: string; dossier_name: string | null }[];
+    const by = new Map(dem.map((d) => [`${d.project_id}|${d.code}`, d]));
+    const days = (iso: string | null) => (iso ? Math.max(0, Math.round((new Date(`${today}T12:00:00`).getTime() - new Date(`${iso}T12:00:00`).getTime()) / 864e5)) : 0);
+    return steps.flatMap((x): CentralWaiting[] => { const d = by.get(`${x.project_id}|${x.code}`); return d ? [{ projectId: x.project_id, code: x.code, demandTitle: d.title, dossier: d.dossier_name ?? "", step: x.text, from: x.waiting_from, note: x.waiting_note, since: x.waiting_since, days: days(x.waiting_since) }] : []; })
+      .sort((a, b) => b.days - a.days);
+  },
+});

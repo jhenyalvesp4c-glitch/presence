@@ -4,13 +4,13 @@
  */
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowUpRight, Building2, Rocket, CalendarClock, Check, ClipboardList, Droplets, Dumbbell, HeartPulse, Mic, Repeat, Sparkles, Sprout, Utensils, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Building2, Hourglass, Rocket, CalendarClock, Check, ClipboardList, Droplets, Dumbbell, HeartPulse, Mic, Repeat, Sparkles, Sprout, Utensils, Wallet } from "lucide-react";
 
 import { Meter, Ring, useCountUp } from "@/components/finance/charts";
 import { BrandTile, brandOf } from "@/components/finance/brands";
 import { FinBackdrop, HeroPanel, LiveDot } from "@/components/finance/fx";
 import { dayProgress, daysBetween, greeting } from "@/lib/central";
-import { useCentralContracts, useCentralDemands, useCentralDiet, useCentralMeetings, useCentralMoney } from "@/lib/data/central";
+import { useCentralContracts, useCentralDemands, useCentralDiet, useCentralMeetings, useCentralMoney, useCentralWaiting } from "@/lib/data/central";
 import { useSetupSummaries } from "@/lib/data/client-setup";
 import { useFixedActions, useFixedDone, useFixedTasks } from "@/lib/data/fixed-tasks";
 import { useHabitCompletions, useHabits, useToggleHabit } from "@/lib/data/habits";
@@ -49,7 +49,7 @@ export function CentralDoDia() {
   const tasksQ = useTasks(), toggleTask = useToggleTask();
   const fixedQ = useFixedTasks(), doneQ = useFixedDone(today, today), fixedActs = useFixedActions();
   const habitsQ = useHabits(), compQ = useHabitCompletions(), toggleHabit = useToggleHabit();
-  const setupQ = useSetupSummaries(), splitQ = useSplit(), demandsQ = useCentralDemands(today), meetQ = useCentralMeetings(today), dietQ = useCentralDiet(today), moneyQ = useCentralMoney(today), contractsQ = useCentralContracts(today);
+  const waitQ = useCentralWaiting(today), setupQ = useSetupSummaries(), splitQ = useSplit(), demandsQ = useCentralDemands(today), meetQ = useCentralMeetings(today), dietQ = useCentralDiet(today), moneyQ = useCentralMoney(today), contractsQ = useCentralContracts(today);
 
   const tasks = tasksQ.data ?? [], overdue = tasks.filter((t) => !t.done && t.due_date && t.due_date < today), todays = tasks.filter((t) => t.due_date === today);
   const agenda = todays.filter((t) => t.due_time).sort((a, b) => (a.due_time ?? "").localeCompare(b.due_time ?? ""));
@@ -117,6 +117,24 @@ export function CentralDoDia() {
 
         <Section title="Demandas" tone="violet" icon={ClipboardList} to="/projetos" count={openDemands}>
           {demandsQ.isError ? <Failed /> : demands.length === 0 ? <Empty>{openDemands ? `${openDemands} em aberto, nenhuma com prazo para os próximos dias.` : "Nenhuma demanda em aberto."}</Empty> : <ul className="space-y-1.5">{demands.slice(0, 6).map((d) => <li key={`${d.projectId}${d.code}`} className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm"><span className={`h-2 w-2 shrink-0 rounded-full ${d.bucket === "late" ? "bg-destructive" : d.bucket === "today" ? "bg-amber" : "bg-cyan"}`} /><span className="min-w-0 flex-1 truncate">{d.title}{d.dossier && <span className="text-muted-foreground"> · {d.dossier}</span>}</span><span className={`shrink-0 text-xs tabular-nums ${d.bucket === "late" ? "text-destructive" : "text-muted-foreground"}`}>{d.bucket === "today" ? "hoje" : dateBR(d.deadline)}</span></li>)}</ul>}
+        </Section>
+
+        <Section title="Aguardando retorno" tone="amber" icon={Hourglass} to="/projetos" count={(waitQ.data ?? []).length}>
+          {waitQ.isError ? <Failed /> : (waitQ.data ?? []).length === 0 ? <Empty>Nenhuma pendência esperando retorno. 🎉</Empty> : (
+            <ul className="space-y-1.5" data-testid="central-aguardando">{(waitQ.data ?? []).slice(0, 8).map((w, i) => (
+              <li key={`${w.projectId}${w.code}${i}`} className="group/w relative">
+                <Link to="/demandas" search={{ projeto: w.projectId }} className="flex items-start gap-2.5 rounded-xl px-2.5 py-1.5 text-sm transition hover:bg-white/[0.06]">
+                  <Hourglass size={13} className="mt-1 shrink-0 animate-pulse text-amber" />
+                  <span className="min-w-0 flex-1"><span className="block truncate">{w.step}</span><span className="block truncate text-[0.7rem] text-muted-foreground">{w.code} · {w.dossier || w.demandTitle}{w.from ? ` · aguardando ${w.from}` : ""}</span></span>
+                  <span className={`shrink-0 font-mono text-[0.68rem] ${w.days >= 3 ? "text-destructive" : "text-amber"}`}>{w.days === 0 ? "hoje" : `${w.days}d`}</span>
+                </Link>
+                <span role="tooltip" className="pointer-events-none absolute left-2 right-2 top-full z-30 mt-1 rounded-xl border border-amber/40 bg-[oklch(0.15_0.04_265/0.96)] p-3 text-xs opacity-0 shadow-[0_18px_50px_-20px_var(--amber)] backdrop-blur-xl transition duration-200 group-hover/w:opacity-100">
+                  <b className="text-amber">{w.demandTitle}</b>
+                  <span className="mt-1 block whitespace-pre-wrap break-words text-foreground/90">{w.note || "Sem observação."}</span>
+                  {w.since && <span className="mt-1 block font-mono text-[0.65rem] text-muted-foreground">desde {dateBR(w.since)}</span>}
+                </span>
+              </li>))}
+            </ul>)}
         </Section>
 
         <Section title="Dinheiro" tone="emerald" icon={Wallet} to="/financeiro">

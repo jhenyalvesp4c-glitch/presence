@@ -144,7 +144,7 @@ export async function loadDemands(pid: string): Promise<Demand[]> {
     supabase.from("demand_executions").select("project_id, code, dossier_name, status, done_on, note, position").eq("project_id", pid),
     supabase.from("demand_history").select("project_id, code, label, text, status, position").eq("project_id", pid),
     supabase.from("demand_notes").select("project_id, code, text, position").eq("project_id", pid),
-    supabase.from("demand_checklist").select("project_id, code, text, done, position").eq("project_id", pid),
+    supabase.from("demand_checklist").select("project_id, code, text, done, position, waiting, waiting_from, waiting_note, waiting_since").eq("project_id", pid),
   ]);
   return rowsToDemands(
     must(d) as DemandRows["demand"][], must(e) as DemandRows["executions"], must(h) as DemandRows["history"], must(n) as DemandRows["notes"], must(k) as DemandRows["checklist"],
@@ -157,6 +157,14 @@ export async function saveDemands(pid: string, prev: Demand[], next: Demand[]) {
   if (!upserts.length && !deletes.length) return;
   const { error } = await supabase.rpc("save_demands", { p_project: pid, p_items: upserts.map((d) => demandToRows(pid, d)), p_delete: deletes });
   if (error) throw new Error(error.message);
+  // "aguardando retorno": a função de gravação guarda o texto e o feito; os dados da espera vão logo em seguida (mesma posição do passo)
+  for (const d of upserts) {
+    const rows = demandToRows(pid, d).checklist.filter((c) => c.waiting);
+    for (const c of rows) {
+      const r = await supabase.from("demand_checklist").update({ waiting: true, waiting_from: c.waiting_from ?? "", waiting_note: c.waiting_note ?? "", waiting_since: c.waiting_since ?? null }).eq("project_id", pid).eq("code", c.code).eq("position", c.position);
+      if (r.error) throw new Error(r.error.message);
+    }
+  }
 }
 
 export { seedProjects };

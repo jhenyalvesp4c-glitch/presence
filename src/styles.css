@@ -704,3 +704,7 @@ html[data-lock="1"] { height: 100%; overflow-x: hidden; }
 [data-sonner-toast][data-type="warning"] { --orion-tone: oklch(0.82 0.15 75); }
 [data-sonner-toast].orion-toast-wa { --orion-tone: oklch(0.78 0.19 150); }
 @media (prefers-reduced-motion: reduce) { [data-sonner-toast]::before { animation: none; } }
+
+/* tarefa concluída sai da lista: risca, desliza e fecha o espaço */
+@keyframes task-out { 0% { opacity: 1; transform: none; max-height: 6rem; } 35% { opacity: .55; transform: translateX(14px); } 100% { opacity: 0; transform: translateX(48px); max-height: 0; padding-block: 0; border-width: 0; } }
+@media (prefers-reduced-motion: reduce) { @keyframes task-out { from { opacity: 1; } to { opacity: 0; max-height: 0; padding-block: 0; } } }

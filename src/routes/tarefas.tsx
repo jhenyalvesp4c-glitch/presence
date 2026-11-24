@@ -110,10 +110,21 @@ function TarefasPage() {
     const c = o.fixed.category_id ? catById.get(o.fixed.category_id) : undefined;
     return { id: o.key, t: o.fixed.title, d: c?.name ?? "Tarefa fixa", tag: "Fixa", c: (c?.color ?? "emerald") as C, Icon: getIcon(c?.icon ?? "check"), time: o.fixed.due_time ? hhmm(o.fixed.due_time) : "—", done: o.done, cat: o.fixed.category_id ?? "", date: o.date, priority: o.fixed.priority, fixed: true };
   }), [fixedQ.data, fixedDoneQ.data, weekStartIso, weekEndIso, catById]);
-  const toggleRow = (tk: Row) => {
+  // Ao concluir, a tarefa sai da lista com uma animação e ficam só as pendentes ("Mostrar concluídas" traz de volta).
+  const [leaving, setLeaving] = useState<Set<string>>(new Set()), [showDone, setShowDone] = useState(false);
+  const setDone = (tk: Row, done: boolean) => {
     const fx = tk.fixed ? parseFixedKey(tk.id) : null;
-    if (fx) fixedAct.toggle.mutate({ id: fx.id, date: fx.date, done: !tk.done }, { onError: (e) => toast.error(e.message) });
-    else toggle.mutate({ id: tk.id, done: !tk.done }, { onError: (e) => toast.error(e.message) });
+    if (fx) fixedAct.toggle.mutate({ id: fx.id, date: fx.date, done: !done }, { onError: (e) => toast.error(e.message) });
+    else toggle.mutate({ id: tk.id, done: !done }, { onError: (e) => toast.error(e.message) });
+  };
+  const toggleRow = (tk: Row) => {
+    const completing = !tk.done;
+    setDone(tk, tk.done);
+    if (completing && !showDone) {
+      setLeaving((l) => new Set(l).add(tk.id));
+      setTimeout(() => setLeaving((l) => { const n = new Set(l); n.delete(tk.id); return n; }), 900);
+      toast.success("Tarefa concluída", { duration: 4000, action: { label: "Desfazer", onClick: () => { setLeaving((l) => { const n = new Set(l); n.delete(tk.id); return n; }); setDone({ ...tk, done: true }, true); } } });
+    }
   };
 
   // Tarefas sem data aparecem em "Hoje" (quando o dia é hoje) e em "Todas".
@@ -133,6 +144,8 @@ function TarefasPage() {
   const done = tasks.filter((t) => t.done).length;
   const pct = dayTasks.length ? Math.round((dayTasks.filter((t) => t.done).length / dayTasks.length) * 100) : 0;
   const shown = useMemo(() => [...tasks, ...(tab < 2 ? fixedRows : [])].filter((t) => inRange(t) && (!cat || t.cat === cat) && t.t.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), [tasks, fixedRows, cat, q, tab, day]);
+  const nDone = shown.filter((t) => t.done).length;
+  const visible = showDone ? shown : shown.filter((t) => !t.done || leaving.has(t.id));
   const lastTime = shown.length ? shown.map((t) => t.time).filter((t) => t !== "—").sort().at(-1) : null;
 
   const weekStart = startOfWeek(day, { weekStartsOn: 1 });
@@ -266,9 +279,9 @@ function TarefasPage() {
               </div>
             </div>
             <ul className="mt-4 divide-y divide-border">
-              {shown.map((tk, i) => (
-                <li key={tk.id} style={{ "--glow": colorVar(tk.c), animationDelay: `${i * 0.05}s` } as React.CSSProperties}
-                  className="group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 py-3 animate-rise sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]">
+              {visible.map((tk, i) => (
+                <li key={tk.id} style={{ "--glow": colorVar(tk.c), animationDelay: `${i * 0.05}s`, ...(leaving.has(tk.id) && tk.done ? { animation: "task-out .6s .25s ease-in forwards" } : {}) } as React.CSSProperties}
+                  className={`${leaving.has(tk.id) ? "overflow-hidden " : ""}group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 py-3 animate-rise sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]`}>
                   <button aria-label="Concluir" onClick={() => toggleRow(tk)}
                     className={`grid h-5 w-5 place-items-center rounded-md border transition ${tk.done ? "border-cyan bg-cyan text-background shadow-[0_0_12px_var(--cyan)]" : "border-muted-foreground/50 hover:border-cyan"}`}>
                     {tk.done && <Check size={13} strokeWidth={3} />}
@@ -292,7 +305,9 @@ function TarefasPage() {
               {tasksQ.isPending && <li className="flex justify-center py-10"><Loader2 className="animate-spin text-cyan" /></li>}
               {tasksQ.isError && <li className="py-10 text-center text-sm text-destructive">Não consegui carregar as tarefas: {tasksQ.error.message}</li>}
               {tasksQ.isSuccess && shown.length === 0 && <li className="py-10 text-center text-sm text-muted-foreground">{tasks.length === 0 ? "Você ainda não tem tarefas. Crie a primeira ao lado." : "Nenhuma tarefa encontrada."}</li>}
+              {tasksQ.isSuccess && shown.length > 0 && visible.length === 0 && <li className="py-8 text-center text-sm text-muted-foreground" data-testid="tudo-concluido" style={{ animation: "fin-rise .5s both" }}>Tudo concluído por aqui. 🎉</li>}
             </ul>
+            {nDone > 0 && <button type="button" onClick={() => setShowDone((v) => !v)} data-testid="mostrar-concluidas" className="mx-auto mt-2 text-xs text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline">{showDone ? "Esconder concluídas" : `Mostrar ${nDone} ${nDone === 1 ? "concluída" : "concluídas"}`}</button>}
             <div className="relative flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
               <div className="absolute inset-x-10 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan/25 to-transparent" />
               <div className="relative grid h-16 w-16 place-items-center">

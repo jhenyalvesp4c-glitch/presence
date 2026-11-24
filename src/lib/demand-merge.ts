@@ -35,7 +35,7 @@ export function mergeGroup(g: MergeGroup, opts: { title?: string | undefined; to
   const checklist: CheckItem[] = [];
   for (const d of g.items) {
     checklist.push({ text: `${d.id.replace(/^#/, "")} · ${stepText(d)}`.slice(0, 500), done: false });
-    for (const c of d.checklist ?? []) checklist.push({ text: `   ${c.text}`.slice(0, 500), done: c.done });
+    for (const c of d.checklist ?? []) checklist.push({ text: `   ${c.text}`.slice(0, 500), done: c.done, ...(c.wait ? { wait: c.wait } : {}) });
   }
   const desc = [`Juntada de ${g.items.length} demandas de ${g.dossier}:`, ...g.items.map((d) => `• ${d.id} ${d.title}${d.desc.trim() ? `\n  ${d.desc.trim().replace(/\n+/g, "\n  ")}` : ""}`)].join("\n").slice(0, 5000);
   const priority = g.items.reduce<Priority>((best, d) => (RANK[d.priority] > RANK[best] ? d.priority : best), "baixa");

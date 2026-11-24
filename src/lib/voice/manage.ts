@@ -70,6 +70,7 @@ export type DemandChange = {
   demanda: string; status?: Status | undefined; titulo?: string | undefined; descricao?: string | undefined; prioridade?: Priority | undefined;
   prazo?: string | undefined; nota?: string | undefined; dossie?: string | undefined; excluir?: boolean | undefined; confirmado?: boolean | undefined;
   adicionarTarefa?: boolean | undefined;
+  checklistAguardar?: { passo: string; de?: string | undefined; nota?: string | undefined }[] | undefined; checklistRecebido?: string[] | undefined;
   checklistAdicionar?: string[] | undefined; checklistMarcar?: string[] | undefined; checklistDesmarcar?: string[] | undefined; checklistRemover?: string[] | undefined;
 };
 
@@ -102,7 +103,7 @@ export async function changeDemand(c: DemandChange): Promise<Record<string, unkn
   if (c.prazo !== undefined) { n = { ...n, deadline: deadlineText(c.prazo) }; feito.push("prazo"); }
   if (c.nota?.trim()) { n = { ...n, notes: [...n.notes, c.nota.trim()], history: [...n.history, { d: today(), text: "Observação adicionada", s: n.status }] }; feito.push("observação"); }
   // checklist da demanda (passos para riscar)
-  if (c.checklistAdicionar?.length || c.checklistMarcar?.length || c.checklistDesmarcar?.length || c.checklistRemover?.length) {
+  if (c.checklistAdicionar?.length || c.checklistMarcar?.length || c.checklistDesmarcar?.length || c.checklistRemover?.length || c.checklistAguardar?.length || c.checklistRecebido?.length) {
     let list = [...(n.checklist ?? [])];
     const acharPor = (q: string) => list.map((x, i) => ({ x, i })).filter(({ x }) => /^(todos?|tudo)$/i.test(q) || normalize(x.text).includes(normalize(q)));
     const faltou: string[] = [];
@@ -110,6 +111,9 @@ export async function changeDemand(c: DemandChange): Promise<Record<string, unkn
     for (const q of c.checklistMarcar ?? []) { const h = acharPor(q); if (!h.length) faltou.push(q); list = list.map((x, i) => (h.some((y) => y.i === i) ? { ...x, done: true } : x)); }
     for (const q of c.checklistDesmarcar ?? []) { const h = acharPor(q); if (!h.length) faltou.push(q); list = list.map((x, i) => (h.some((y) => y.i === i) ? { ...x, done: false } : x)); }
     for (const q of c.checklistRemover ?? []) { const h = acharPor(q); if (!h.length) faltou.push(q); list = list.filter((_, i) => !h.some((y) => y.i === i)); }
+    const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+    for (const a of c.checklistAguardar ?? []) { const h = acharPor(a.passo); if (!h.length) { faltou.push(a.passo); continue; } list = list.map((x, i) => (h.some((y) => y.i === i) && !x.done ? { ...x, wait: { from: (a.de ?? "").slice(0, 120), note: (a.nota ?? "").slice(0, 1000), since: x.wait?.since || hoje } } : x)); }
+    for (const q of c.checklistRecebido ?? []) { const h = acharPor(q); if (!h.length) faltou.push(q); list = list.map((x, i) => (h.some((y) => y.i === i) ? { ...x, wait: undefined } : x)); }
     n = { ...n, checklist: list };
     feito.push(`checklist (${list.filter((x) => x.done).length}/${list.length})`);
     if (faltou.length) return { ok: false, erro: `Não achei no checklist: ${faltou.join("; ")}.`, opcoes: (d.checklist ?? []).map((x) => x.text).slice(0, 8) };

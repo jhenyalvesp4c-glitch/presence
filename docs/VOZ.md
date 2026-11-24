@@ -127,3 +127,12 @@ Tudo que dá para fazer nas telas, a voz faz (e nunca usa `pedir_melhoria` para 
 
 ## Demanda como tarefa
 Demandas → janela da demanda: botão **"Adicionar às Tarefas"** (vira "Já está nas Tarefas" e leva para a lista); ao criar a demanda: caixa "Adicionar também às Tarefas". A tarefa vai para a categoria **Demandas** (criada na primeira vez, `ensureDemandCategory`), com título `P059 · …`, dossiê e checklist na descrição, prioridade e prazo da demanda (`deadlineIso`), ligada por `tasks.demand_code` + `project_id`; uma vez só por demanda (`addDemandAsTask`). Voz: `atualizar_demanda` com `adicionar_as_tarefas`.
+
+## Aguardando retorno (pendências dentro da demanda)
+- Cada passo do checklist pode ficar **Aguardando retorno** (ampulheta): de quem + observação + desde quando (`CheckItem.wait`). Selo âmbar no passo; **passando o mouse** aparece a observação e há quantos dias; **Recebi** tira o selo; concluir o passo também. O cartão da demanda mostra "N aguardando retorno" (tooltip com a lista).
+- **Central do dia**: seção "Aguardando retorno" com todos os passos esperando (há quantos dias, vermelho a partir de 3), tooltip com a observação e link para a demanda (`useCentralWaiting`).
+- Banco: colunas `waiting`, `waiting_from`, `waiting_note`, `waiting_since` em `demand_checklist` (migração só aditiva). Os dados da espera são gravados logo depois do `save_demands` (`saveDemands` em `project-data.ts`), então a função do banco não precisa mudar.
+- Voz: `atualizar_demanda` com `checklist_aguardar` [{passo, de, nota}] e `checklist_recebido`.
+
+## Tarefas: concluída some da lista
+Em Tarefas, ao concluir, a linha risca, desliza e some (só ficam as pendentes); o aviso tem **Desfazer** e o link "Mostrar N concluídas" traz de volta.

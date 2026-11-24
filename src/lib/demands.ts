@@ -9,7 +9,9 @@ export type DType = "geral" | "polo" | "multi";
 export type PoloExec = { name: string; status: Status; date?: string | undefined; note?: string | undefined };
 export type Hist = { d: string; text: string; s: Status };
 /** Passo do checklist de uma demanda (para ir riscando). */
-export type CheckItem = { text: string; done: boolean };
+/** `wait`: o passo está AGUARDANDO RETORNO de alguém (de quem, observação e desde quando, AAAA-MM-DD). */
+export type Waiting = { from: string; note: string; since: string };
+export type CheckItem = { text: string; done: boolean; wait?: Waiting | undefined };
 export type Demand = {
   id: string; type: DType; title: string; desc: string; priority: Priority; status: Status;
   deadline: string; polo?: string | undefined; polos?: PoloExec[] | undefined; history: Hist[]; notes: string[];
@@ -35,7 +37,7 @@ export type DemandRows = {
   executions: { project_id: string; code: string; dossier_name: string; status: Status; done_on: string | null; note: string; position: number }[];
   history: { project_id: string; code: string; label: string; text: string; status: Status; position: number }[];
   notes: { project_id: string; code: string; text: string; position: number }[];
-  checklist: { project_id: string; code: string; text: string; done: boolean; position: number }[];
+  checklist: { project_id: string; code: string; text: string; done: boolean; position: number; waiting?: boolean; waiting_from?: string; waiting_note?: string; waiting_since?: string | null }[];
 };
 
 /** Uma demanda da tela -> linhas das 4 tabelas. */
@@ -51,7 +53,7 @@ export function demandToRows(projectId: string, d: Demand): DemandRows {
     })),
     history: d.history.map((h, i) => ({ ...key, label: h.d.slice(0, 20), text: h.text.slice(0, 500), status: h.s, position: i })),
     notes: d.notes.map((text, i) => ({ ...key, text: text.slice(0, 2000), position: i })),
-    checklist: (d.checklist ?? []).filter((c) => c.text.trim()).map((c, i) => ({ ...key, text: c.text.trim().slice(0, 500), done: !!c.done, position: i })),
+    checklist: (d.checklist ?? []).filter((c) => c.text.trim()).map((c, i) => ({ ...key, text: c.text.trim().slice(0, 500), done: !!c.done, position: i, waiting: !!c.wait && !c.done, waiting_from: c.wait?.from.slice(0, 120) ?? "", waiting_note: c.wait?.note.slice(0, 1000) ?? "", waiting_since: c.wait?.since || null })),
   };
 }
 
@@ -76,7 +78,7 @@ export function rowsToDemands(
       polos: r.type === "multi" ? e.map((x) => ({ name: x.dossier_name, status: x.status, date: x.done_on ?? undefined, note: x.note || undefined })) : undefined,
       history: sorted(hi.get(r.code)).map((h) => ({ d: h.label, text: h.text, s: h.status })),
       notes: sorted(no.get(r.code)).map((n) => n.text),
-      ...(ck.get(r.code)?.length ? { checklist: sorted(ck.get(r.code)).map((c) => ({ text: c.text, done: c.done })) } : {}),
+      ...(ck.get(r.code)?.length ? { checklist: sorted(ck.get(r.code)).map((c): CheckItem => ({ text: c.text, done: c.done, ...(c.waiting && !c.done ? { wait: { from: c.waiting_from ?? "", note: c.waiting_note ?? "", since: c.waiting_since ?? "" } } : {}) })) } : {}),
     };
   });
 }
