@@ -45,3 +45,6 @@ Variáveis novas só valem depois de **republicar** (Redeploy). A chamada usa `r
 ## Demanda com checklist de verdade e microfone nos campos
 - A IA da Central (e a voz, `registrar`) devolve em `checklist` **todas as ações** da demanda (um item por ação, detalhado) e em `descricao` só o resumo. Ao confirmar, `execute.ts` grava o checklist **real** da demanda (riscável na janela da demanda), em vez de colar texto na descrição.
 - Criar demanda em Demandas: campo **Checklist** (um passo por linha) e microfone (`DictateButton`) em Detalhes, Checklist e "Conteúdo e anexos"; o mesmo microfone existe na descrição e no Material da demanda aberta.
+
+## Planilhas (Excel / Google Sheets)
+A Central e todos os campos de anexo que usam `readFiles` aceitam **.xlsx** (Excel, ou Google Sheets baixado em Arquivo → Baixar → Excel) e **CSV/TSV**. Em vez de mandar milhares de linhas, o app lê a planilha no navegador (`read-excel-file`) e entrega à IA um **resumo** (`src/lib/spreadsheet.ts`): abas, colunas, quantidade de linhas, valores que se repetem (status, cidade, template), quantos telefones/e-mails válidos e as primeiras linhas. CSV grande também vira resumo. O formato antigo `.xls`, Word e PowerPoint ainda não são lidos (salvar como .xlsx / PDF).

@@ -1,4 +1,5 @@
 import { MAX_FILES, MAX_TEXT_FILE_CHARS, MAX_TOTAL_CHARS, type InboxFile } from "@/lib/inbox";
+import { parseCsv, summarizeSheets } from "@/lib/spreadsheet";
 
 export type LocalFile = InboxFile & { preview?: string | undefined };
 
@@ -42,13 +43,25 @@ export async function readFiles(list: File[], current: LocalFile[]): Promise<{ a
       else if (f.type === "application/pdf" || /\.pdf$/i.test(name)) {
         if (f.size > MAX_PDF_BYTES) { rejected.push(`${name}: PDF maior que 3 MB`); continue; }
         out = { name, mime: "application/pdf", size: f.size, data: toBase64(await f.arrayBuffer()) };
-      } else if (f.type.startsWith("text/") || /\.(txt|md|csv|json)$/i.test(name)) {
-        const t = (await f.text()).slice(0, MAX_TEXT_FILE_CHARS);
+      } else if (/\.xlsx$/i.test(name) || f.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+        // Excel / Google Sheets baixado como .xlsx: vira um resumo (abas, colunas, linhas, valores comuns e amostra), sem mandar milhares de linhas
+        if (f.size > 25 * 1024 * 1024) { rejected.push(`${name}: planilha maior que 25 MB`); continue; }
+        const { default: readXlsxFile } = await import("read-excel-file/browser");
+        const sheets = await readXlsxFile(f);
+        const t = summarizeSheets(name, sheets.map((x) => ({ sheet: x.sheet, data: x.data as unknown[][] })));
+        out = { name, mime: "text/plain", size: t.length, data: utf8ToBase64(t) };
+      } else if (f.type.startsWith("text/") || /\.(txt|md|csv|tsv|json)$/i.test(name)) {
+        let t = await f.text();
+        // CSV grande (base de contatos): em vez de cortar no meio, manda um resumo da base
+        if (/\.(csv|tsv)$/i.test(name) && t.length > 6000) t = summarizeSheets(name, [{ sheet: "CSV", data: parseCsv(t) }]);
+        t = t.slice(0, MAX_TEXT_FILE_CHARS);
         out = { name, mime: "text/plain", size: t.length, data: utf8ToBase64(t) };
       } else if (f.type.startsWith("audio/") || /\.(mp3|m4a|wav|ogg|opus|aac)$/i.test(name)) {
         rejected.push(`${name}: áudio ainda não é transcrito aqui. Use o microfone (ditado) ou cole a transcrição`); continue;
-      } else if (/\.(docx?|xlsx?|pptx?)$/i.test(name)) {
-        rejected.push(`${name}: documentos do Office ainda não são lidos. Salve como PDF e envie de novo`); continue;
+      } else if (/\.xls$/i.test(name)) {
+        rejected.push(`${name}: o formato antigo .xls não é lido. Abra no Excel e salve como .xlsx (ou baixe do Google Sheets como Excel .xlsx)`); continue;
+      } else if (/\.(docx?|pptx?)$/i.test(name)) {
+        rejected.push(`${name}: Word e PowerPoint ainda não são lidos. Salve como PDF e envie de novo`); continue;
       } else { rejected.push(`${name}: tipo de arquivo não suportado`); continue; }
       if (total + out.data.length > MAX_TOTAL_CHARS) { rejected.push(`${name}: passou do limite total de ~3 MB por envio`); continue; }
       total += out.data.length;
