@@ -110,3 +110,42 @@ describe("Gasto fixo no acerto de contas", () => {
     expect(statementText({ me: "Eu", person: "Felipe", items: [net], generatedOn: "2026-11-25" })).toContain("Internet (fixa)");
   });
 });
+
+import { acertoByMonth } from "@/lib/finance/settle";
+import { monthClose, monthPlan, cashBreakdown } from "@/lib/finance/calc";
+import { EMPTY_STATE, type FinanceState } from "@/lib/finance/types";
+
+describe("Acerto de contas na sobra de caixa, mês a mês", () => {
+  const mk = (id: string, o: Partial<SettleItem>): SettleItem => ({ id, kind: "compra", date: "2026-11-25", description: id, amount: 100, payer: "outro", otherShare: 0, installment: "", ...o });
+  const watch = mk("Apple Watch", { amount: 66.11, installment: "9/18" });
+  const net = mk("Internet", { amount: 120, otherShare: 50, installment: "fixa", date: "2026-11-10" });
+  const groups = [{ person: "Felipe", items: [watch, net, mk("do financeiro", { linked: true, amount: 999 })] }];
+
+  it("soma o que você paga em cada mês (parcela + fixo) e deixa de fora o que vem do financeiro", () => {
+    const m = acertoByMonth(groups, "2026-11", "2027-02");
+    expect(m["2026-11"]!.pagar).toBe(66.11 + 60);      // watch 9/18 inteiro + metade da internet
+    expect(m["2026-12"]!.pagar).toBe(66.11 + 60);      // 10/18 + internet
+    expect(m["2027-02"]!.pagar).toBe(66.11 + 60);
+    expect(m["2026-11"]!.receber).toBe(0);
+    expect(acertoByMonth(groups, "2026-12", "2027-02")["2026-11"]).toBeUndefined(); // mês passado fica de fora
+  });
+  it("compra no seu cartão que é do outro vira a receber; pix já feito abate o mês; pix aguardando não conta", () => {
+    const g = [{ person: "Felipe", items: [mk("no meu cartão", { payer: "eu", otherShare: 100, amount: 80 }), mk("eu devo", { amount: 200 }), mk("pix", { kind: "pagamento", payer: "eu", amount: 150 }), mk("pix futuro", { kind: "pagamento", payer: "eu", amount: 999, pending: true })] }];
+    const m = acertoByMonth(g, "2026-11", "2026-11")["2026-11"]!;
+    expect(m.pagar).toBe(0);                    // 80 − 200 + 150 = +30 → ele ainda te deve 30
+    expect(m.receber).toBe(30);
+  });
+  const st: FinanceState = { ...EMPTY_STATE, onboarded: true, accounts: [{ id: "a", name: "Conta", kind: "banco", tone: "roxo", balanceBase: 1000, baseDate: "2026-11-25" }] };
+  const today = new Date("2026-11-25T12:00:00");
+  it("a sobra de caixa e os próximos meses descontam o acerto", () => {
+    const ac = acertoByMonth(groups, "2026-11", "2027-11");
+    const sem = monthClose(st, today, "bolso", false), com = monthClose(st, today, "bolso", false, ac);
+    expect(com.acertoPagar).toBe(126.11); expect(sem.sobra - com.sobra).toBeCloseTo(126.11, 2);
+    const p = monthPlan(st, today, 3, "bolso", false, ac);
+    expect(p.map((x) => x.acerto)).toEqual([126.11, 126.11, 126.11]);
+    expect(p[1]!.items.find((i) => i.group === "acerto")).toMatchObject({ label: "Acerto de contas", amount: 126.11 });
+    expect(monthPlan(st, today, 3, "bolso", false)[0]!.acerto).toBe(0);
+    expect(cashBreakdown(st, today, "bolso", false, ac).groups.find((g) => g.id === "acerto")?.total).toBe(126.11);
+    expect(monthClose(st, today, "cofrinho", false, ac).acertoPagar).toBe(0); // visão só cofrinho não mistura
+  });
+});
