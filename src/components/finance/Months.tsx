@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useCofView } from "@/lib/finance/cof-view";
+import { CofFilter } from "./CofFilter";
 import { CalendarRange, ChevronDown, CreditCard, Layers, PiggyBank, Repeat, TrendingDown, TrendingUp } from "lucide-react";
 import { brl, closingYmOf, dateBR, invoiceLabel, monthName, monthPlan, type MonthPlan, type PlanItem } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
@@ -62,7 +64,7 @@ function MonthCard({ m, open, onToggle, first }: { m: MonthPlan; open: boolean; 
 /** Próximos meses: quanto entra, quanto sai (fixas, assinaturas, faturas, parcelas) e quanto sobra, mês a mês. */
 export function MonthsView() {
   const { state, today } = useFinance(), [openYm, setOpenYm] = useState<string | null>(null), [n, setN] = useState(12);
-  const plan = useMemo(() => monthPlan(state, today, n), [state, today, n]);
+  const [view] = useCofView(), plan = useMemo(() => monthPlan(state, today, n, view), [state, today, n, view]);
   const empty = state.accounts.length + state.cards.length + state.recurring.length + state.plans.length === 0;
   if (empty) return <Empty icon={CalendarRange} title="Ainda não há o que projetar" hint="Cadastre contas, cartões, salário e despesas fixas para ver os próximos meses." />;
   const worst = plan.reduce((a, b) => (b.saldoFinal < a.saldoFinal ? b : a), plan[0]!), firstNeg = plan.find((m) => m.saldoFinal < 0);
@@ -75,6 +77,7 @@ export function MonthsView() {
         </div>
       </div>
 
+      <CofFilter />
       {firstNeg ? <p className="rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: `color-mix(in oklab, ${ROSE} 40%, transparent)`, background: `color-mix(in oklab, ${ROSE} 8%, transparent)` }} data-testid="fin-meses-alerta">O saldo projetado fica <b>negativo em {monthName(firstNeg.ym)}</b> ({brl(firstNeg.saldoFinal)}). O pior ponto é em {monthName(worst.ym)}: {brl(worst.saldoFinal)}.</p>
         : <p className="rounded-2xl border border-emerald/30 bg-emerald/[0.06] px-4 py-3 text-sm text-muted-foreground" data-testid="fin-meses-alerta">O saldo projetado se mantém positivo nos próximos {n} meses. O ponto mais baixo é em <b className="text-foreground">{monthName(worst.ym)}</b>: {brl(worst.saldoFinal)}.</p>}
 

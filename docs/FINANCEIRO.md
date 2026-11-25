@@ -87,3 +87,13 @@ A pessoa renomeia, troca cor/ícone/palavras-chave, oculta e cria categorias (bo
 - **Saldo disponível** (`totalBalance`) é só o dinheiro livre das contas e carteiras. O que está nos cofrinhos aparece à parte ("Guardado nos cofrinhos", `reservedBalance`).
 - Nas contas de caixa (sobra de caixa, próximos meses, fluxo de caixa, simulação de compra), cada fatura entra só pela parte que **sai do saldo**: valor do banco menos o que o cofrinho paga (`cashOut`). As parcelas do cofrinho saem do cofrinho, nunca do saldo.
 - Em **Próximos meses**, cada mês mostra "Cofrinhos pagam" e marca as parcelas do cofrinho dentro da fatura. Na aba **Próximas** do cartão, cada fatura mostra "Cofrinho paga X · Do seu saldo Y".
+
+### Filtro de cofrinho (vale em todas as telas)
+
+O filtro **Ver: Tudo · Sem cofrinho · Só cofrinho** (`CofFilter`, `useCofView`, fica guardado no navegador, padrão **Sem cofrinho**) aparece na Visão geral, em Contas e cartões, dentro de cada cartão, em Compras parceladas e em Próximos meses. Só aparece se existir um cofrinho.
+
+- **Tudo:** saldo livre + cofrinhos e o valor inteiro das faturas.
+- **Sem cofrinho:** só o que sai do seu saldo. A parcela de outra pessoa numa compra paga por cofrinho conta aqui até ela pagar.
+- **Só cofrinho:** o dinheiro guardado e o que os cofrinhos pagam.
+
+As contas ficam em `calc.ts`: `invAmount`, `linesIn`, `viewBalance` e o parâmetro `view` de `monthClose`, `cashBreakdown`, `monthPlan` e `cashflow`.

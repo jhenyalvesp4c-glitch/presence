@@ -410,6 +410,27 @@ export const cashOut = (inv: Pick<Invoice, "total" | "funded">): number => round
 /** Faturas abertas que saem do dinheiro livre (sem a parte dos cofrinhos). */
 export const totalOpenCash = (s: FinanceState, today: Date) => sum(s.cards.map((c) => cashOut(openInvoice(s, c, today))));
 
+/** Como ver o dinheiro: tudo junto, só o que sai do saldo (sem cofrinho) ou só o que os cofrinhos pagam. */
+export type CofView = "tudo" | "bolso" | "cofrinho";
+/** Valor de uma fatura na visão escolhida. `mine` = só a minha parte (sem a de outras pessoas). */
+export function invAmount(inv: Pick<Invoice, "total" | "funded" | "mine" | "own">, view: CofView, mine = false): number {
+  if (view === "cofrinho") return inv.funded;
+  if (view === "bolso") return mine ? inv.own : cashOut(inv);
+  return mine ? inv.mine : inv.total;
+}
+/** Quanto de uma linha da fatura cai na visão. Numa parcela paga por cofrinho, a parte de outra pessoa não é do cofrinho: continua do bolso até ela pagar. */
+export function lineAmountIn(l: Pick<InvoiceLine, "amount" | "funded" | "shared">, view: CofView): number {
+  if (view === "tudo") return l.amount;
+  const others = l.shared?.part ?? 0;
+  if (l.funded) return view === "cofrinho" ? round2(l.amount - others) : others;
+  return view === "cofrinho" ? 0 : l.amount;
+}
+/** Linhas da fatura que aparecem na visão, já com o valor da visão. */
+export const linesIn = (lines: InvoiceLine[], view: CofView): InvoiceLine[] => (view === "tudo" ? lines : lines.map((l) => ({ ...l, amount: lineAmountIn(l, view) })).filter((l) => l.amount > 0));
+/** Dinheiro da visão: tudo (livre + cofrinhos), só livre ou só cofrinhos. */
+export const viewBalance = (s: FinanceState, today: Date, view: CofView): number => (view === "tudo" ? round2(totalBalance(s, today) + reservedBalance(s, today)) : view === "cofrinho" ? reservedBalance(s, today) : totalBalance(s, today));
+export const totalOpenView = (s: FinanceState, today: Date, view: CofView) => sum(s.cards.map((c) => invAmount(openInvoice(s, c, today), view)));
+
 /* ───────────── fluxo de caixa previsto ───────────── */
 /**
  * Sobra (ou falta) de caixa depois de pagar tudo que já está comprometido:
@@ -417,10 +438,10 @@ export const totalOpenCash = (s: FinanceState, today: Date) => sum(s.cards.map((
  * Compras no crédito não entram à parte (já estão dentro das faturas), para não contar duas vezes.
  */
 export type MonthClose = { saldo: number; aReceber: number; aPagarConta: number; faturas: number; sobra: number; /** Das faturas abertas, quanto os cofrinhos pagam (já separado; fora da conta acima). */ cofrinhosPagam: number };
-export function monthClose(s: FinanceState, today: Date): MonthClose {
-  const todayIso = isoOf(today), later = monthEntries(s, ymOf(today)).filter((e) => e.date > todayIso);
-  const saldo = totalBalance(s, today), aReceber = total(incomeOf(later));
-  const aPagarConta = total(expensesOf(later).filter((e) => !e.cardId && e.method !== "credito")), faturas = totalOpenCash(s, today);
+export function monthClose(s: FinanceState, today: Date, view: CofView = "bolso"): MonthClose {
+  const todayIso = isoOf(today), later = view === "cofrinho" ? [] : monthEntries(s, ymOf(today)).filter((e) => e.date > todayIso);
+  const saldo = viewBalance(s, today, view), aReceber = total(incomeOf(later));
+  const aPagarConta = total(expensesOf(later).filter((e) => !e.cardId && e.method !== "credito")), faturas = totalOpenView(s, today, view);
   return { saldo, aReceber, aPagarConta, faturas, sobra: round2(saldo + aReceber - aPagarConta - faturas), cofrinhosPagam: sum(s.cards.map((c) => openInvoice(s, c, today).funded)) };
 }
 
@@ -428,9 +449,9 @@ export function monthClose(s: FinanceState, today: Date): MonthClose {
  * Detalhamento da SOBRA DE CAIXA (a mesma conta de `monthClose`): o que já está nas contas + o que ainda entra no mês,
  * menos o que ainda sai das contas e as faturas dos cartões. Compras e parcelas no crédito aparecem dentro das faturas.
  */
-export function cashBreakdown(s: FinanceState, today: Date): MonthBreakdown {
-  const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today);
-  const later = monthEntries(s, ym).filter((e) => e.date > todayIso).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bolso"): MonthBreakdown {
+  const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today, view);
+  const later = (view === "cofrinho" ? [] : monthEntries(s, ym)).filter((e) => e.date > todayIso).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
   const incLater = incomeOf(later), outAcct = expensesOf(later).filter((e) => !e.cardId && e.method !== "credito");
   const mk = (id: string, desc: string, amount: number, kind: "receita" | "despesa", over: Partial<Entry> = {}): Entry => ({ id, kind, desc, amount, date: todayIso, category: "outros", method: "debito", source: "tx", ...over });
   const items: Entry[] = [...(c.saldo > 0 ? [mk("saldo", "Saldo nas contas hoje", c.saldo, "receita")] : []), ...incLater];
@@ -438,8 +459,8 @@ export function cashBreakdown(s: FinanceState, today: Date): MonthBreakdown {
   for (const card of s.cards) {
     const inv = openInvoice(s, card, today);
     if (inv.total <= 0) continue;
-    if (cashOut(inv) > 0) faturas.push(mk(`fat:${card.id}`, `Fatura ${card.name} · ${invoiceLabel(card, inv.ym)}${inv.funded > 0 ? ` (o cofrinho paga ${brl(inv.funded)})` : ""}`, cashOut(inv), "despesa", { date: inv.due, method: "credito", cardId: card.id }));
-    for (const l of inv.lines) catItems.push(mk(l.id, l.desc, l.amount, "despesa", { date: l.date, category: l.category, method: "credito", cardId: card.id, source: l.source === "parcela" ? "parcela" : "tx", parcel: l.parcel }));
+    if (invAmount(inv, view) > 0) faturas.push(mk(`fat:${card.id}`, `Fatura ${card.name} · ${invoiceLabel(card, inv.ym)}${view !== "tudo" && inv.funded > 0 ? (view === "bolso" ? ` (o cofrinho paga ${brl(inv.funded)})` : " (só a parte do cofrinho)") : ""}`, invAmount(inv, view), "despesa", { date: inv.due, method: "credito", cardId: card.id }));
+    for (const l of linesIn(inv.lines, view)) catItems.push(mk(l.id, l.desc, l.amount, "despesa", { date: l.date, category: l.category, method: "credito", cardId: card.id, source: l.source === "parcela" ? "parcela" : "tx", parcel: l.parcel }));
   }
   const buckets: Record<string, Entry[]> = { fixas: [], assinaturas: [], avulsas: [], faturas };
   for (const e of outAcct) buckets[groupOf(s, e)]!.push(e);
@@ -474,28 +495,28 @@ export type MonthPlan = {
  * contas fixas e assinaturas pagas em conta, avulsos futuros e as faturas dos cartões que vencem no mês (compras, parcelas,
  * assinaturas e fixas no cartão já estão dentro delas). No mês atual só entra o que ainda não aconteceu.
  */
-export function monthPlan(s: FinanceState, today: Date, months = 12): MonthPlan[] {
+export function monthPlan(s: FinanceState, today: Date, months = 12, view: CofView = "bolso"): MonthPlan[] {
   const todayIso = isoOf(today), cur = ymOf(today), out: MonthPlan[] = [];
-  let bal = totalBalance(s, today);
+  let bal = viewBalance(s, today, view);
   for (let i = 0; i < months; i++) {
     const ym = addMonths(cur, i), items: PlanItem[] = [], future = (d: string) => d > todayIso;
     for (const r of s.recurring) {
-      if (r.cardId || r.method === "credito" || !recurringActiveIn(r, ym)) continue;
+      if (view === "cofrinho" || r.cardId || r.method === "credito" || !recurringActiveIn(r, ym)) continue;
       const date = dayIn(ym, r.day);
       if (!future(date)) continue;
       items.push({ id: `${r.id}:${ym}`, group: r.kind === "receita" ? "entradas" : isSubscription(r) ? "assinaturas" : "fixas", label: r.desc, amount: r.amount, date });
     }
     for (const t of s.transactions) {
-      if (ymOf(t.date) !== ym || !future(t.date) || t.method === "credito" || t.cardId) continue;
+      if (view === "cofrinho" || ymOf(t.date) !== ym || !future(t.date) || t.method === "credito" || t.cardId) continue;
       items.push({ id: t.id, group: t.kind === "receita" ? "entradas" : "avulsas", label: t.desc, amount: t.amount, date: t.date });
     }
     let parcelas = 0, assinCartao = 0, cofre = 0;
     for (const c of s.cards) {
       const dueYm = dueYmPaidIn(c, ym), inv = invoiceFor(s, c, dueYm), pay = payDateOf(c, dueYm);
-      if (inv.total <= 0 || !future(pay)) continue;
-      parcelas += sum(inv.lines.filter((l) => l.source === "parcela").map((l) => l.amount)); cofre += inv.funded;
-      for (const l of inv.lines) if (l.source === "recorrente") { const r = s.recurring.find((x) => x.id === l.id.slice(0, l.id.lastIndexOf(":"))); if (r && isSubscription(r)) assinCartao += l.amount; }
-      items.push({ id: `fat:${c.id}:${dueYm}`, group: "faturas", label: `Fatura ${c.name}`, amount: cashOut(inv), date: pay, cardId: c.id, detail: `${invoiceLabelPay(c, dueYm)}${inv.funded > 0 ? ` · o cofrinho paga ${brl(inv.funded)}` : ""}`, lines: inv.lines, funded: inv.funded });
+      if (inv.total <= 0 || !future(pay) || invAmount(inv, view) <= 0) continue;
+      parcelas += sum(linesIn(inv.lines, view).filter((l) => l.source === "parcela").map((l) => l.amount)); cofre += inv.funded;
+      for (const l of linesIn(inv.lines, view)) if (l.source === "recorrente") { const r = s.recurring.find((x) => x.id === l.id.slice(0, l.id.lastIndexOf(":"))); if (r && isSubscription(r)) assinCartao += l.amount; }
+      items.push({ id: `fat:${c.id}:${dueYm}`, group: "faturas", label: `Fatura ${c.name}`, amount: invAmount(inv, view), date: pay, cardId: c.id, detail: `${invoiceLabelPay(c, dueYm)}${inv.funded > 0 && view === "bolso" ? ` · o cofrinho paga ${brl(inv.funded)}` : ""}`, lines: linesIn(inv.lines, view), funded: view === "tudo" ? inv.funded : view === "bolso" ? inv.funded : undefined });
     }
     items.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
     const g = (id: PlanItem["group"]) => sum(items.filter((x) => x.group === id).map((x) => x.amount));
@@ -514,19 +535,19 @@ export type Cashflow = { start: number; events: FlowEvent[]; end: number; min: n
  * Entram: salário e fixas pagas em conta (ainda por vir) e as faturas dos cartões que vencem na janela.
  * Compras no crédito, parcelas e fixas no cartão NÃO entram à parte: já estão dentro da fatura.
  */
-export function cashflow(s: FinanceState, today: Date, days = 60): Cashflow {
+export function cashflow(s: FinanceState, today: Date, days = 60, view: CofView = "bolso"): Cashflow {
   const todayIso = isoOf(today), end = isoOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() + days));
   const raw: Omit<FlowEvent, "balance">[] = [];
   for (let ym = ymOf(todayIso); ym <= ymOf(end); ym = addMonths(ym, 1)) {
     for (const r of s.recurring) {
-      if (r.cardId || r.method === "credito" || !recurringActiveIn(r, ym)) continue;
+      if (view === "cofrinho" || r.cardId || r.method === "credito" || !recurringActiveIn(r, ym)) continue;
       const d = dayIn(ym, r.day);
       if (d > todayIso && d <= end) raw.push({ id: `${r.id}:${ym}`, date: d, label: r.desc, amount: r.kind === "receita" ? r.amount : -r.amount, kind: r.kind });
     }
   }
-  for (const c of s.cards) for (const inv of upcomingInvoices(s, c, today, 4)) { const pay = payDateOf(c, inv.ym); if (cashOut(inv) > 0 && pay > todayIso && pay <= end) raw.push({ id: `fat:${c.id}:${inv.ym}`, date: pay, label: `Fatura ${c.name}`, amount: -cashOut(inv), kind: "fatura", cardId: c.id }); }
+  for (const c of s.cards) for (const inv of upcomingInvoices(s, c, today, 4)) { const pay = payDateOf(c, inv.ym); if (invAmount(inv, view) > 0 && pay > todayIso && pay <= end) raw.push({ id: `fat:${c.id}:${inv.ym}`, date: pay, label: `Fatura ${c.name}`, amount: -invAmount(inv, view), kind: "fatura", cardId: c.id }); }
   raw.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount); // no mesmo dia, o que entra vem antes do que sai
-  const start = totalBalance(s, today);
+  const start = viewBalance(s, today, view);
   let bal = start, min = start;
   const events = raw.map((e) => { bal = round2(bal + e.amount); min = Math.min(min, bal); return { ...e, balance: bal }; });
   return { start, events, end: bal, min, firstNegative: events.find((e) => e.balance < 0) ?? null, until: end };

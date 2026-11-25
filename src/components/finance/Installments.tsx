@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { CalendarCheck, ChevronDown, CreditCard, Layers, Pencil, Plus, Trash2, Wallet } from "lucide-react";
-import { addMonths, brl, commitments, dateBR, monthLabel, planInfo, planShare, sum, totalFutureParcels, ymOf } from "@/lib/finance/calc";
+import { addMonths, brl, commitments, dateBR, monthLabel, planInfo, planShare, sharedPart, sum, totalFutureParcels, ymOf } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
+import { useCofView } from "@/lib/finance/cof-view";
+import { CofFilter } from "./CofFilter";
 import type { Plan } from "@/lib/finance/types";
 import { AreaChart, Money, Ring, StackedBars } from "./charts";
 import { HeroPanel, SectionTitle } from "./fx";
@@ -56,16 +58,19 @@ export function PlanCard({ plan, onEdit, onDelete, index = 0 }: { plan: Plan; on
 
 export function InstallmentsView({ defaultCardId }: { defaultCardId?: string }) {
   const f = useFinance(), { state, today } = f, ym = ymOf(today);
-  const [filter, setFilter] = useState<"ativas" | "quitadas">("ativas"), [editing, setEditing] = useState<Plan | "new" | null>(null), [del, setDel] = useState<Plan | null>(null), [pay, setPay] = useState<"todas" | "cofrinho" | "bolso">("todas");
+  const [filter, setFilter] = useState<"ativas" | "quitadas">("ativas"), [editing, setEditing] = useState<Plan | "new" | null>(null), [del, setDel] = useState<Plan | null>(null), [view] = useCofView();
   const infos = useMemo(() => state.plans.map((p) => ({ p, i: planInfo(p, state.cards.find((c) => c.id === p.cardId), today) })), [state.plans, state.cards, today]);
-  const anyFunded = state.plans.some((p) => p.fundedBy);
-  const list = infos.filter((x) => (filter === "ativas" ? !x.i.done : x.i.done) && (!anyFunded || pay === "todas" || (pay === "cofrinho" ? !!x.p.fundedBy : !x.p.fundedBy))).sort((a, b) => a.i.lastYm.localeCompare(b.i.lastYm));
-  const future = useMemo(() => commitments(state, ym, 12), [state, ym]);
-  const restante = totalFutureParcels(state, today), esteMes = future[0]?.parcelas ?? 0, ativas = infos.filter((x) => !x.i.done);
+  // visão: "sem cofrinho" mostra as compras que ainda têm parcela do seu saldo; "só cofrinho", as que têm parcela paga por cofrinho
+  const hasOwn = (p: Plan) => !p.fundedBy || (p.fundedFrom ?? 1) > 1, hasFund = (p: Plan) => !!p.fundedBy;
+  const inView = (p: Plan) => view === "tudo" || (view === "cofrinho" ? hasFund(p) : hasOwn(p));
+  const list = infos.filter((x) => (filter === "ativas" ? !x.i.done : x.i.done) && inView(x.p)).sort((a, b) => a.i.lastYm.localeCompare(b.i.lastYm));
+  const stV = useMemo(() => ({ ...state, plans: state.plans.filter(inView) }), [state, view]); // eslint-disable-line react-hooks/exhaustive-deps
+  const future = useMemo(() => commitments(stV, ym, 12), [stV, ym]);
+  const restante = totalFutureParcels(stV, today), esteMes = future[0]?.parcelas ?? 0, vInfos = infos.filter((x) => inView(x.p)), ativas = vInfos.filter((x) => !x.i.done);
   const last = ativas.map((x) => x.i.lastYm).sort().at(-1);
   const peak = future.reduce((m, x) => (x.parcelas > m.parcelas ? x : m), future[0]!);
-  const paidAll = sum(infos.map((x) => x.i.paidAmount)), owedAll = sum(infos.map((x) => x.i.remainingAmount)), paidPct = paidAll + owedAll > 0 ? (paidAll / (paidAll + owedAll)) * 100 : 0;
-  const unpaid = infos.flatMap((x) => x.i.schedule.filter((p) => !p.paid));
+  const paidAll = sum(vInfos.map((x) => x.i.paidAmount)), owedAll = sum(vInfos.map((x) => x.i.remainingAmount)), paidPct = paidAll + owedAll > 0 ? (paidAll / (paidAll + owedAll)) * 100 : 0;
+  const unpaid = vInfos.flatMap((x) => x.i.schedule.filter((p) => !p.paid));
   const debtCurve = [{ label: "hoje", value: sum(unpaid.map((p) => p.amount)) }, ...Array.from({ length: 12 }, (_, k) => { const m = addMonths(ym, k); return { label: monthLabel(m).slice(0, 3), value: sum(unpaid.filter((p) => p.ym > m).map((p) => p.amount)) }; })];
   return (
     <div className="space-y-5" data-testid="fin-parcelas">
@@ -97,12 +102,16 @@ export function InstallmentsView({ defaultCardId }: { defaultCardId?: string }) 
         <StackedBars highlight={0} points={future.map((m) => ({ label: m.label, segs: state.cards.filter((c) => m.porCartao[c.id]).map((c) => ({ name: c.name, color: TONES[c.tone].glow, value: m.porCartao[c.id]! })) }))} />
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[0.72rem] text-muted-foreground">{state.cards.map((c) => <span key={c.id} className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full" style={{ background: TONES[c.tone].glow }} />{c.name}</span>)}<span className="ml-auto">Soma dos próximos 12 meses: <b className="text-foreground tabular-nums">{brl(sum(future.map((m) => m.parcelas)))}</b></span></div>
       </Panel>
-      {anyFunded && (() => { const act = infos.filter((x) => !x.i.done), fundedAmt = sum(act.filter((x) => x.p.fundedBy).map((x) => x.i.remainingAmount)), pocketAmt = sum(act.filter((x) => !x.p.fundedBy).map((x) => x.i.remainingAmount)); return (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan/25 bg-cyan/[0.05] px-4 py-3" data-testid="fin-parcelas-cofrinho">
-          <p className="text-sm">Falta pagar <b className="tabular-nums text-cyan">{brl(fundedAmt)}</b> com dinheiro do cofrinho e <b className="tabular-nums text-amber">{brl(pocketAmt)}</b> do seu bolso.</p>
-          <Segmented className="max-w-sm" value={pay} onChange={setPay} options={[{ value: "todas", label: "Todas" }, { value: "cofrinho", label: "Do cofrinho" }, { value: "bolso", label: "Do meu bolso" }]} />
-        </div>); })()}
-      <div className="flex items-center justify-between gap-3"><Segmented className="max-w-xs" value={filter} onChange={setFilter} options={[{ value: "ativas", label: `Ativas (${ativas.length})` }, { value: "quitadas", label: `Quitadas (${infos.length - ativas.length})` }]} /></div>
+      {state.accounts.some((a) => a.kind === "cofrinho") && (() => {
+        const act = infos.filter((x) => !x.i.done), left = act.flatMap((x) => x.i.schedule.filter((q) => !q.paid).map((q) => ({ amount: q.amount, covered: !!x.p.fundedBy && q.n >= (x.p.fundedFrom ?? 1), mine: x.p.shared ? q.amount - sharedPart(q.amount, planShare(x.p, q.n)) : q.amount })));
+        const fundedAmt = sum(left.filter((q) => q.covered).map((q) => q.mine)), pocketAmt = sum(left.filter((q) => !q.covered).map((q) => q.amount));
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan/25 bg-cyan/[0.05] px-4 py-3" data-testid="fin-parcelas-cofrinho">
+            <p className="text-sm">Falta pagar <b className="tabular-nums text-cyan">{brl(fundedAmt)}</b> com dinheiro do cofrinho e <b className="tabular-nums text-amber">{brl(pocketAmt)}</b> do seu saldo{pocketAmt > 0 ? " (inclui a parte de outras pessoas até elas pagarem)" : ""}.</p>
+            <CofFilter />
+          </div>);
+      })()}
+      <div className="flex items-center justify-between gap-3"><Segmented className="max-w-xs" value={filter} onChange={setFilter} options={[{ value: "ativas", label: `Ativas (${ativas.length})` }, { value: "quitadas", label: `Quitadas (${vInfos.length - ativas.length})` }]} /></div>
       {list.length === 0
         ? <Empty icon={Layers} title={filter === "ativas" ? "Nenhuma compra parcelada ativa" : "Nenhuma quitada ainda"} hint={filter === "ativas" ? "Cadastre compras antigas que ainda têm parcelas pendentes. Ex.: comprei em março em 12x e estou na 3ª." : undefined} action={filter === "ativas" ? <button className={btn.primary} onClick={() => setEditing("new")}><Plus size={16} /> Cadastrar compra parcelada</button> : undefined} />
         : <div className="grid gap-4 xl:grid-cols-2">{list.map(({ p }, i) => <PlanCard key={p.id} plan={p} index={i} onEdit={setEditing} onDelete={setDel} />)}</div>}

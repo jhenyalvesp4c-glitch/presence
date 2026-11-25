@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, ChevronLeft, ChevronRight, CreditCard, Landmark, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
-import { sum, accountBalance, addMonths, brl, cardAvailable, closingDateOf, closingYmOf, dateBR, invoiceFor, type Invoice, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
+import { sum, accountBalance, addMonths, brl, cardAvailable, closingDateOf, closingYmOf, dateBR, cashOut, invoiceFor, invAmount, linesIn, type CofView, type Invoice, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
@@ -9,6 +9,8 @@ import { Donut, Meter, Money, RadialRings } from "./charts";
 import { HeroPanel, SectionTitle, Tilt } from "./fx";
 import { AccountForm, CardForm, InvoiceItemForm, TxForm } from "./forms";
 import { CofrinhoPanel } from "./Cofrinho";
+import { CofFilter } from "./CofFilter";
+import { useCofView } from "@/lib/finance/cof-view";
 import { PlanCard } from "./Installments";
 import { EntryRow } from "./rows";
 import { CatBadge, ConfirmDelete, Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TONES, btn } from "./ui";
@@ -24,14 +26,15 @@ export type Sel = { type: "card" | "acc"; id: string } | null;
 
 /** Visão geral de contas e cartões, com acesso à área individual de cada um. */
 export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void }) {
-  const f = useFinance(), { state, today } = f;
+  const f = useFinance(), { state, today } = f, [view] = useCofView();
   const [edit, setEdit] = useState<{ type: "card" | "acc"; item?: Card | Account } | null>(null);
   const [onlyMine, setOnlyMineState] = useState(() => { try { return localStorage.getItem("fin.fatura.minha") === "1"; } catch { return false; } });
   const setOnlyMine = (v: boolean) => { setOnlyMineState(v); try { localStorage.setItem("fin.fatura.minha", v ? "1" : "0"); } catch { /* sem armazenamento */ } };
-  const invs = state.cards.map((c) => openInvoice(state, c, today)), allTotal = sum(invs.map((i) => i.total)), allMine = sum(invs.map((i) => i.mine));
+  const invs = state.cards.map((c) => openInvoice(state, c, today)), allTotal = sum(invs.map((i) => invAmount(i, view))), allMine = sum(invs.map((i) => invAmount(i, view, true)));
   if (sel) return <Detail sel={sel} onBack={() => onSel(null)} />;
   return (
     <div className="space-y-8" data-testid="fin-contas">
+      <CofFilter />
       <WealthHero onlyMine={onlyMine} />
       <section className="space-y-4">
         <SectionTitle kicker="Crédito" title="Seus" accent="cartões" sub="Toque num cartão para ver fatura, limite e compras." />
@@ -52,7 +55,7 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
             return (
               <div key={c.id} style={{ animation: `fin-pop .55s ${i * 0.08}s both` }}>
                 <Tilt max={12}><CardVisual card={c} usedPct={used} onClick={() => onSel({ type: "card", id: c.id })} /></Tilt>
-                <div className="mt-3 flex items-center justify-between px-1 text-xs"><span className="text-muted-foreground">Fatura atual · vence {dateBR(inv.due).slice(0, 5)}</span><b className="text-sm tabular-nums" title={`Valor do banco ${brl(inv.total)}`}>{brl(onlyMine ? inv.mine : inv.total)}</b></div>
+                <div className="mt-3 flex items-center justify-between px-1 text-xs"><span className="text-muted-foreground">Fatura atual · vence {dateBR(inv.due).slice(0, 5)}</span><b className="text-sm tabular-nums" title={`Valor do banco ${brl(inv.total)}`}>{brl(invAmount(inv, view, onlyMine))}</b></div>
                 <div className="mt-1.5 px-1"><Meter pct={used} color={TONES[c.tone].glow} height={6} /><div className="mt-1 flex justify-between text-[0.7rem] text-muted-foreground"><span>Disponível {brl(cardAvailable(state, c))}</span><span>Limite {brl(c.limit)}</span></div></div>
               </div>
             );
@@ -63,7 +66,7 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
       <section className="space-y-4">
         <SectionTitle kicker="Dinheiro em conta" title="Contas e" accent="carteiras" sub="Bancos, carteiras digitais e dinheiro." />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {state.accounts.map((a, i) => <div key={a.id} style={{ animation: `fin-pop .55s ${i * 0.07}s both` }}><AccountTile account={a} balance={accountBalance(state, a, today)} onClick={() => onSel({ type: "acc", id: a.id })} /></div>)}
+          {state.accounts.filter((a) => view === "tudo" || (view === "cofrinho" ? a.kind === "cofrinho" : a.kind !== "cofrinho")).map((a, i) => <div key={a.id} style={{ animation: `fin-pop .55s ${i * 0.07}s both` }}><AccountTile account={a} balance={accountBalance(state, a, today)} onClick={() => onSel({ type: "acc", id: a.id })} /></div>)}
           <AddTile label="Adicionar conta" onClick={() => setEdit({ type: "acc" })} testId="fin-add-conta" />
         </div>
       </section>
@@ -77,20 +80,20 @@ export function AccountsView({ sel, onSel }: { sel: Sel; onSel: (s: Sel) => void
 
 /** Topo da aba: quanto há nas contas, distribuição por conta e limite livre nos cartões. */
 function WealthHero({ onlyMine }: { onlyMine: boolean }) {
-  const { state, today } = useFinance(), [active, setActive] = useState<string | null>(null);
-  const balances = state.accounts.map((a) => ({ id: a.id, name: a.name, color: TONES[a.tone].glow, value: accountBalance(state, a, today) }));
+  const { state, today } = useFinance(), [active, setActive] = useState<string | null>(null), [view] = useCofView();
+  const balances = state.accounts.filter((a) => view === "tudo" || (view === "cofrinho" ? a.kind === "cofrinho" : a.kind !== "cofrinho")).map((a) => ({ id: a.id, name: a.name, color: TONES[a.tone].glow, value: accountBalance(state, a, today) }));
   const totalBal = balances.reduce((a, b) => a + b.value, 0), pos = balances.filter((b) => b.value > 0);
-  const limit = state.cards.reduce((a, c) => a + c.limit, 0), free = state.cards.reduce((a, c) => a + Math.max(0, cardAvailable(state, c)), 0), inv = state.cards.reduce((a, c) => { const i = openInvoice(state, c, today); return a + (onlyMine ? i.mine : i.total); }, 0);
+  const limit = state.cards.reduce((a, c) => a + c.limit, 0), free = state.cards.reduce((a, c) => a + Math.max(0, cardAvailable(state, c)), 0), inv = state.cards.reduce((a, c) => { const i = openInvoice(state, c, today); return a + invAmount(i, view, onlyMine); }, 0);
   const on = balances.find((b) => b.id === active);
   return (
     <HeroPanel glow="var(--violet)" data-testid="fin-patrimonio">
       <div className="grid items-center gap-6 md:grid-cols-[1.3fr_auto_auto]">
         <div className="min-w-0">
-          <p className="mono-caps">Patrimônio em contas</p>
+          <p className="mono-caps">{view === "cofrinho" ? "Guardado nos cofrinhos" : view === "tudo" ? "Patrimônio com os cofrinhos" : "Patrimônio em contas (sem cofrinho)"}</p>
           <p className="mt-2 whitespace-nowrap font-display text-5xl font-semibold leading-none tracking-tight md:text-6xl"><span className="text-gradient"><Money value={totalBal} /></span></p>
           <p className="mt-2 text-sm text-muted-foreground">{state.accounts.length} contas e carteiras · {state.cards.length} cartões</p>
           <div className="mt-5 grid grid-cols-3 gap-2.5">
-            {[{ l: "Limite total", v: limit, c: "var(--cyan)" }, { l: "Livre nos cartões", v: free, c: "var(--emerald)" }, { l: onlyMine ? "Faturas · minha parte" : "Faturas abertas", v: inv, c: "var(--violet)" }].map((k, i) => (
+            {[{ l: "Limite total", v: limit, c: "var(--cyan)" }, { l: "Livre nos cartões", v: free, c: "var(--emerald)" }, { l: view === "cofrinho" ? "Cofrinho paga nas faturas" : view === "bolso" ? (onlyMine ? "Faturas · do meu saldo, minha parte" : "Faturas · do meu saldo") : onlyMine ? "Faturas · minha parte" : "Faturas abertas", v: inv, c: "var(--violet)" }].map((k, i) => (
               <div key={k.l} className="rounded-2xl border bg-white/[0.03] px-3 py-2.5" style={{ borderColor: `color-mix(in oklab, ${k.c} 28%, transparent)`, animation: `fin-rise .6s ${0.15 + i * 0.07}s both` }}>
                 <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: k.c }}>{k.l}</p>
                 <p className="mt-0.5 font-display text-base font-semibold tabular-nums sm:text-lg"><Money value={k.v} cents={false} /></p>
@@ -118,7 +121,7 @@ function Stat({ label, children, color }: { label: string; children: React.React
 }
 
 function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) {
-  const f = useFinance(), { state, today } = f, ym = ymOf(today);
+  const f = useFinance(), { state, today } = f, ym = ymOf(today), [view] = useCofView();
   const card = sel.type === "card" ? state.cards.find((c) => c.id === sel.id) : undefined, acc = sel.type === "acc" ? state.accounts.find((a) => a.id === sel.id) : undefined;
   const [tab, setTab] = useState(sel.type === "card" ? "fatura" : "historico"), [edit, setEdit] = useState(false), [del, setDel] = useState(false), [editTx, setEditTx] = useState<Transaction | null>(null), [delTx, setDelTx] = useState<Entry | null>(null);
   const item = card ?? acc;
@@ -153,13 +156,14 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
       </div>
       <Segmented value={tab} onChange={setTab} className="max-w-2xl"
         options={card ? [{ value: "fatura", label: "Faturas" }, { value: "proximas", label: "Próximas" }, { value: "parceladas", label: "Parceladas" }, { value: "historico", label: "Histórico" }] : [{ value: "historico", label: "Histórico" }, { value: "debito", label: "Compras no débito" }, { value: "mes", label: "Despesas do mês" }]} />
+      <CofFilter />
       {card && tab === "fatura" && <InvoiceView card={card} />}
       {card && tab === "proximas" && (
         <div className="grid gap-4 sm:grid-cols-2" data-testid="fin-proximas">{upcomingInvoices(state, card, today, 6).slice(1).map((inv, i) => (
           <Panel key={inv.ym} glow={tone.glow} className="!p-4" style={{ animation: `fin-pop .5s ${i * 0.06}s both` }}>
-            <div className="flex items-center justify-between"><div><p className="font-display text-lg font-semibold">Fatura de {monthName(closingYmOf(card, inv.ym)).replace(/ de \d{4}$/, "")}</p><p className="text-xs text-muted-foreground">{invoiceLabel(card, inv.ym)}</p></div><b className="font-display text-xl tabular-nums">{brl(inv.total)}</b></div>
+            <div className="flex items-center justify-between"><div><p className="font-display text-lg font-semibold">Fatura de {monthName(closingYmOf(card, inv.ym)).replace(/ de \d{4}$/, "")}</p><p className="text-xs text-muted-foreground">{invoiceLabel(card, inv.ym)}</p></div><b className="font-display text-xl tabular-nums">{brl(invAmount(inv, view))}</b></div>
             {inv.funded > 0 && <p className="mt-2 flex flex-wrap gap-x-3 text-xs" data-testid="fin-proxima-divisao"><span className="text-cyan">Cofrinho paga {brl(inv.funded)}</span><span className="text-amber">Do seu saldo {brl(inv.own)}{inv.othersOwe > 0 ? ` (+ ${brl(inv.othersOwe)} de outros)` : ""}</span></p>}
-            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">{[...inv.lines].sort((a, b) => Number(!!b.funded) - Number(!!a.funded) || b.amount - a.amount).slice(0, 6).map((l) => <li key={l.id} className="flex justify-between gap-2"><span className="truncate">{l.desc}{l.parcel ? ` (${l.parcel})` : ""}{l.funded ? " · cofrinho" : ""}</span><span className="tabular-nums" style={l.funded ? { color: "var(--cyan)" } : undefined}>{brl(l.amount)}</span></li>)}{inv.lines.length === 0 && <li>Nada lançado ainda.</li>}{inv.lines.length > 6 && <li>+ {inv.lines.length - 6} itens</li>}</ul>
+            <ul className="mt-3 space-y-1 text-xs text-muted-foreground">{[...linesIn(inv.lines, view)].sort((a, b) => Number(!!b.funded) - Number(!!a.funded) || b.amount - a.amount).slice(0, 6).map((l) => <li key={l.id} className="flex justify-between gap-2"><span className="truncate">{l.desc}{l.parcel ? ` (${l.parcel})` : ""}{l.funded ? " · cofrinho" : ""}</span><span className="tabular-nums" style={l.funded ? { color: "var(--cyan)" } : undefined}>{brl(l.amount)}</span></li>)}{linesIn(inv.lines, view).length === 0 && <li>{inv.lines.length === 0 ? "Nada lançado ainda." : "Nada nesta visão."}</li>}{linesIn(inv.lines, view).length > 6 && <li>+ {linesIn(inv.lines, view).length - 6} itens</li>}</ul>
           </Panel>))}</div>
       )}
       {card && tab === "parceladas" && (
@@ -180,12 +184,12 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
 }
 
 function CardStats({ card }: { card: Card }) {
-  const { state, today } = useFinance(), inv = openInvoice(state, card, today), avail = cardAvailable(state, card), used = card.limit - avail, usedPct = card.limit ? (used / card.limit) * 100 : 0;
+  const { state, today } = useFinance(), [view] = useCofView(), inv = openInvoice(state, card, today), avail = cardAvailable(state, card), used = card.limit - avail, usedPct = card.limit ? (used / card.limit) * 100 : 0;
   const days = Math.ceil((parseIso(inv.due).getTime() - parseIso(isoOf(today)).getTime()) / 86400000), monthSpend = total(monthEntries(state, ymOf(today)).filter((e) => e.cardId === card.id && e.kind === "despesa"));
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Stat label="Fatura atual" color="var(--violet)"><Money value={inv.total} /></Stat>
+        <Stat label={view === "tudo" ? "Fatura atual" : view === "bolso" ? "Fatura atual · do meu saldo" : "Fatura atual · do cofrinho"} color="var(--violet)"><Money value={invAmount(inv, view)} /></Stat>
         <Stat label="Vencimento"><span className="text-lg">{dateBR(inv.due).slice(0, 5)}</span> <span className="font-sans text-xs font-normal text-muted-foreground">{days < 0 ? "vencida" : days === 0 ? "hoje" : `em ${days}d`}</span></Stat>
         <Stat label="Gasto no mês"><Money value={monthSpend} /></Stat>
         <Stat label="Limite total"><Money value={card.limit} /></Stat>
@@ -202,26 +206,26 @@ function CardStats({ card }: { card: Card }) {
 function InvoiceView({ card }: { card: Card }) {
   const f = useFinance(), { state, today } = f, open = invoiceMonthOf(card, isoOf(today)), [ym, setYm] = useState(open), [detail, setDetail] = useState(false), [onlyMine, setOnlyMine] = useState(() => { try { return localStorage.getItem("fin.fatura.minha") === "1"; } catch { return false; } });
   const pickView = (v: boolean) => { setOnlyMine(v); try { localStorage.setItem("fin.fatura.minha", v ? "1" : "0"); } catch { /* sem armazenamento */ } };
-  const inv = invoiceFor(state, card, ym), months = Array.from({ length: 9 }, (_, i) => addMonths(open, i - 2));
+  const [view] = useCofView(), inv = invoiceFor(state, card, ym), months = Array.from({ length: 9 }, (_, i) => addMonths(open, i - 2));
   const typed = card.declared?.[ym], isOpen = ym === open;
   const itemized = inv.lines.filter((l) => l.source !== "ajuste");
-  const [fund, setFund] = useState<"todas" | "cofrinho" | "bolso">("todas");
-  const hasFund = inv.funded > 0 || inv.lines.some((l) => l.funded), fundView = hasFund ? fund : "todas";
-  const showLine = (l: Invoice["lines"][number]) => (fundView === "cofrinho" ? !!l.funded : fundView === "bolso" ? !l.funded && l.source !== "ajuste" && !(l.shared && l.shared.part >= l.amount) : !(onlyMine && l.shared && l.shared.part >= l.amount));
-  const mineView = onlyMine || fundView !== "todas";
+  const hasFund = inv.funded > 0 || inv.lines.some((l) => l.funded);
+  // valor de cada linha na visão: "tudo" respeita só "minha parte"; "sem cofrinho" e "só cofrinho" já vêm separados (a parte de outra pessoa numa parcela do cofrinho fica do lado do saldo)
+  const shown = (l: Invoice["lines"][number]): number => (view === "tudo" ? (onlyMine && l.shared ? l.amount - l.shared.part : l.amount) : view === "cofrinho" ? l.amount : l.funded ? (onlyMine ? 0 : l.amount) : onlyMine && l.shared ? l.amount - l.shared.part : l.amount);
+  const viewLines = linesIn(inv.lines, view).filter((l) => shown(l) > 0.004);
   return (
     <div className="space-y-4" data-testid="fin-fatura">
       <div className="flex gap-2 overflow-x-auto pb-1 scroll-neon" data-testid="fin-fatura-meses">
-        {months.map((m) => { const i = invoiceFor(state, card, m), on = m === ym; return (
+        {months.map((m) => { const i = invoiceFor(state, card, m), on = m === ym, tileV = invAmount(i, view, onlyMine); return (
           <button key={m} onClick={() => setYm(m)} aria-pressed={on} data-testid={`fin-fatura-mes-${m}`}
             className={`shrink-0 rounded-2xl border px-3.5 py-2 text-left transition ${on ? "border-cyan/50 bg-cyan/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}>
             <p className="text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">fatura {monthLabel(closingYmOf(card, m))}{m === open ? " · atual" : ""}</p>
-            <p className="font-display text-base font-semibold tabular-nums">{i.total > 0 ? brl(i.total) : "—"}</p>
+            <p className="font-display text-base font-semibold tabular-nums">{tileV > 0 ? brl(tileV) : "—"}</p>
           </button>); })}
       </div>
       <Panel glow={TONES[card.tone].glow}>
         <Head icon={Receipt} title={`Fatura de ${monthName(closingYmOf(card, inv.ym))}`} sub={`Fecha em ${dateBR(closingDateOf(card, inv.ym))} · vence em ${dateBR(inv.due)}${isOpen ? " · fatura aberta" : ""}`}
-          right={<div className="flex items-center gap-1"><button className={btn.icon} aria-label="Mês anterior" onClick={() => setYm(addMonths(ym, -1))}><ChevronLeft size={16} /></button><b className="min-w-[7.5rem] text-center font-display text-2xl tabular-nums" data-testid="fin-fatura-total">{brl(inv.total)}</b><button className={btn.icon} aria-label="Próximo mês" onClick={() => setYm(addMonths(ym, 1))}><ChevronRight size={16} /></button></div>} />
+          right={<div className="flex items-center gap-1"><button className={btn.icon} aria-label="Mês anterior" onClick={() => setYm(addMonths(ym, -1))}><ChevronLeft size={16} /></button><b className="min-w-[7.5rem] text-center font-display text-2xl tabular-nums" data-testid="fin-fatura-total" title={`Valor do banco ${brl(inv.total)}`}>{brl(invAmount(inv, view, onlyMine))}</b><button className={btn.icon} aria-label="Próximo mês" onClick={() => setYm(addMonths(ym, 1))}><ChevronRight size={16} /></button></div>} />
         <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <Field label="Total desta fatura (como aparece no app do banco)" hint={typed !== undefined ? (inv.over > 0 ? `Atenção: os itens cadastrados passam ${brl(inv.over)} do total informado. Confira o total ou os itens.` : inv.adjustment > 0 ? `Já detalhado: ${brl(inv.total - inv.adjustment)}. Faltam ${brl(inv.adjustment)} para detalhar; conforme você cadastra as compras e parcelas, esse valor diminui e o total não muda.` : "Tudo detalhado: os itens fecham com o total.") : "Opcional. Informe o total do banco e vá cadastrando as compras e parcelas: elas abatem desse valor, sem duplicar."}>
             <MoneyInput value={typed} onChange={(v) => f.upsertCard(withDeclaredTotal(card, ym, v))} data-testid="fin-fatura-total-informado" />
@@ -242,21 +246,18 @@ function InvoiceView({ card }: { card: Card }) {
         {hasFund && (
           <div className="mb-3 rounded-2xl border border-cyan/25 bg-cyan/[0.05] p-3" data-testid="fin-fatura-cofrinho">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm">Fatura <b className="tabular-nums">{brl(inv.total)}</b>{inv.othersOwe > 0 ? <> · de outros <b className="tabular-nums">{brl(inv.othersOwe)}</b></> : null} · o cofrinho paga <b className="tabular-nums text-cyan">{brl(inv.funded)}</b> · sai do seu bolso <b className="tabular-nums text-amber" data-testid="fin-fatura-bolso">{brl(inv.own)}</b></p>
-              <div role="radiogroup" className="flex gap-1 rounded-full border border-white/10 bg-black/25 p-1 text-xs">
-                {([["todas", "Tudo"], ["cofrinho", "Do cofrinho"], ["bolso", "Do meu bolso"]] as const).map(([v, t]) => <button key={v} type="button" role="radio" aria-checked={fundView === v} onClick={() => setFund(v)} data-testid={`fin-fatura-filtro-${v}`} className={`rounded-full px-3 py-1 transition ${fundView === v ? "bg-cyan/20 text-cyan" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>)}
-              </div>
+              <p className="text-sm">Fatura do banco <b className="tabular-nums">{brl(inv.total)}</b>{inv.othersOwe > 0 ? <> · de outros <b className="tabular-nums">{brl(inv.othersOwe)}</b></> : null} · o cofrinho paga <b className="tabular-nums text-cyan">{brl(inv.funded)}</b> · sai do seu saldo <b className="tabular-nums text-amber" data-testid="fin-fatura-bolso">{brl(cashOut(inv))}</b>{inv.othersOwe > 0 ? <span className="text-muted-foreground"> (sua parte {brl(inv.own)})</span> : null}</p>
             </div>
-            <p className="mt-1.5 text-[0.7rem] text-muted-foreground">As parcelas “do cofrinho” já têm o dinheiro separado. “Do meu bolso” é o que você ainda precisa tirar do saldo (a parte de outras pessoas fica de fora).</p>
+            <p className="mt-1.5 text-[0.7rem] text-muted-foreground">Use o filtro “Ver” lá em cima: <b>Sem cofrinho</b> mostra só o que sai do seu saldo (a parte de outras pessoas conta aqui até elas pagarem) e <b>Só cofrinho</b> mostra o que o cofrinho paga.</p>
           </div>
         )}
         {inv.lines.length === 0 ? <Empty icon={Receipt} title="Fatura vazia" hint="As compras no crédito deste cartão aparecem aqui." /> : (
-          <ul className="space-y-0.5">{inv.lines.filter(showLine).map((l, i) => (
+          <ul className="space-y-0.5">{viewLines.map((l, i) => (
             <li key={l.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/[0.04]" style={{ animation: `fin-pop .4s ${Math.min(i, 12) * 0.03}s both` }}>
               <CatBadge id={l.category} size={34} />
               <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}{l.funded && <Pill color="var(--cyan)">cofrinho</Pill>}{l.shared && <Pill color="var(--emerald)">com {l.shared.person} · {l.shared.percent}%</Pill>}{l.source === "ajuste" && <Pill color="var(--cyan)">a detalhar</Pill>}</p><p className="text-xs text-muted-foreground">{l.source === "ajuste" ? "total do banco menos o que já foi cadastrado" : dateBR(l.date)}</p></div>
               {l.source === "ajuste" && <button className={`${btn.ghost} !px-3 !py-1.5 text-xs`} onClick={() => setDetail(true)} data-testid="fin-detalhar-linha">Detalhar</button>}
-              <b className="text-sm tabular-nums" title={l.shared ? `Valor do banco ${brl(l.amount)}` : undefined}>{brl(mineView && l.shared ? l.amount - l.shared.part : l.amount)}</b>
+              <b className="text-sm tabular-nums" title={l.shared ? `Valor do banco ${brl(l.amount)}` : undefined}>{brl(shown(l))}</b>
             </li>))}</ul>
         )}
       </Panel>

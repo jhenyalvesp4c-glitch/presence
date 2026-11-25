@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useCofView } from "@/lib/finance/cof-view";
 import { ArrowDownRight, ArrowUpRight, ChevronDown, CircleCheck, Clock3, CreditCard, Equal, Flame, Home, Layers, Lightbulb, Minus, Repeat, ShoppingBag, Sparkles, Wallet } from "lucide-react";
 import { brl, cashBreakdown, dateBR, monthName, type BreakdownGroupId, type MonthBreakdown } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
@@ -180,7 +181,7 @@ function Section({ title, hint, icon: I, color, totalValue, sign, pct, done, lat
 export function MonthBreakdownModal({ open, onClose, onTab }: { open: boolean; onClose: () => void; onTab: (t: string) => void }) {
   const { state, today } = useFinance();
   const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`, ym = todayIso.slice(0, 7);
-  const b = useMemo(() => cashBreakdown(state, today), [state, today]);
+  const [view] = useCofView(), b = useMemo(() => cashBreakdown(state, today, view), [state, today, view]);
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
   const firstId = b.groups[0]?.id;
   const isOpen = (id: string) => (openIds.has(id) ? !(id === firstId) : id === firstId); // o grupo que mais pesa já vem aberto

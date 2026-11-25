@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountBalance, cashOut, cofrinhoInfo, invoiceFor, monthClose, monthPlan, reservedBalance, totalBalance } from "@/lib/finance/calc";
+import { accountBalance, cashflow, cashOut, cofrinhoInfo, invAmount, invoiceFor, linesIn, monthClose, monthPlan, reservedBalance, sum, totalBalance } from "@/lib/finance/calc";
 import { fromRows, toRows } from "@/lib/finance/db-map";
 import { EMPTY_STATE, type FinanceState, type Plan } from "@/lib/finance/types";
 
@@ -82,5 +82,27 @@ describe("Saldo livre e sobra de caixa sem o dinheiro dos cofrinhos", () => {
     expect(dez.items.find((i) => i.group === "faturas")).toMatchObject({ amount: 275, funded: 175 });
     const jan = monthPlan(s, today, 3).find((m) => m.ym === "2027-01")!;
     expect(jan.faturas).toBe(275); expect(jan.cofrinhos).toBe(175);
+  });
+});
+
+describe("Filtro: tudo, sem cofrinho, só cofrinho", () => {
+  it("as três visões da fatura somam certo e as linhas batem com o total", () => {
+    const inv = invoiceFor(state(), card, "2026-12"); // 450 no banco: A 100 (cofrinho), B 200 (bolso), L 150 (cofrinho, metade de outra pessoa)
+    expect([invAmount(inv, "tudo"), invAmount(inv, "bolso"), invAmount(inv, "cofrinho")]).toEqual([450, 275, 175]);
+    expect(sum(linesIn(inv.lines, "bolso").map((l) => l.amount))).toBe(275);       // B 200 + a metade do L que é de outra pessoa
+    expect(sum(linesIn(inv.lines, "cofrinho").map((l) => l.amount))).toBe(175);    // A 100 + minha metade do L
+    expect(sum(linesIn(inv.lines, "tudo").map((l) => l.amount))).toBe(450);
+    expect(invAmount(inv, "bolso", true)).toBe(200); expect(invAmount(inv, "tudo", true)).toBe(375);
+  });
+  it("sobra de caixa e próximos meses mudam com a visão", () => {
+    const s = state();
+    expect(monthClose(s, today, "bolso")).toMatchObject({ saldo: 500, faturas: 275, sobra: 225 });
+    expect(monthClose(s, today, "tudo")).toMatchObject({ saldo: 1500, faturas: 450, sobra: 1050 });
+    expect(monthClose(s, today, "cofrinho")).toMatchObject({ saldo: 1000, faturas: 175, sobra: 825 });
+    const dez = (v: "tudo" | "bolso" | "cofrinho") => monthPlan(s, today, 2, v).find((m) => m.ym === "2026-12")!;
+    expect(dez("tudo").faturas).toBe(450); expect(dez("bolso").faturas).toBe(275); expect(dez("cofrinho").faturas).toBe(175);
+    expect(dez("cofrinho").entradas).toBe(0);
+    expect(cashflow(s, today, 40, "cofrinho").start).toBe(1000);
+    expect(cashflow(s, today, 40, "tudo").start).toBe(1500);
   });
 });
