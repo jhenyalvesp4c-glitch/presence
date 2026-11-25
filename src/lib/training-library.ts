@@ -11,11 +11,17 @@ export type Faq = { q: string; a: string };
 /** Arquivo anexado a um passo (imagem, PDF, planilha…), guardado no Storage. */
 export type MediaFile = { path: string; name: string; mime: string; size: number };
 export type Scenario = { situation: string; before: string; after: string; beforeLabel?: string | undefined; afterLabel?: string | undefined };
+export type Table = { title?: string | undefined; head: string[]; rows: string[][] };
+export type Panel = { title: string; lines: string[]; kind?: "config" | "result" | "variation" | "attention" | undefined };
 export type Block = {
   id: string; title: string; minutes: number; show: string[]; examples: string[]; tip?: string | undefined; faq?: Faq[] | undefined;
   visuals?: Visual[] | undefined; why?: string[] | undefined; scenario?: Scenario | undefined;
   /** Texto para falar na aula ou no vídeo (só o apresentador vê, nas notas). */
   say?: string | undefined;
+  /** Tabelas do bloco (ex.: categorias de filtros). */
+  tables?: Table[] | undefined;
+  /** Quadros de apoio: configuração do exemplo, resultado, variação, atenção. */
+  panels?: Panel[] | undefined;
   /** Arquivos de cada passo de "O que mostrar", pela posição do passo ("0", "1"…): viram botão na apresentação. */
   media?: Record<string, MediaFile[]> | undefined;
 };

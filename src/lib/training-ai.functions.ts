@@ -8,6 +8,7 @@ const file = z.object({ name: z.string().min(1).max(200), mime: z.string().min(1
 const input = z.object({
   brief: z.string().trim().min(10, "Conte um pouco mais sobre o que o treinamento precisa ensinar.").max(80000, "O texto passou de 80 mil caracteres. Divida em dois roteiros."),
   title: z.string().max(120).optional(), audience: z.string().max(120).optional(),
+  parte: z.object({ n: z.number().int().min(1).max(20), total: z.number().int().min(1).max(20) }).optional(),
   files: z.array(file).max(8).refine((l) => l.reduce((n, f) => n + f.data.length, 0) <= 4_200_000, "Arquivos grandes demais (máx. ~3 MB no total)."),
 });
 
@@ -23,14 +24,14 @@ export const generateTrainingScript = createServerFn({ method: "POST" })
       const { makeCreate, OpenAIError, explain } = await import("./mcp/openai");
       const model = process.env["OPENAI_MODEL"]?.trim() || DEFAULT_MODEL;
       const create = makeCreate();
-      const first = { role: "user", content: briefContent(data.brief, data.files, { ...(data.title ? { title: data.title } : {}), ...(data.audience ? { audience: data.audience } : {}) }) };
+      const first = { role: "user", content: briefContent(data.brief, data.files, { ...(data.title ? { title: data.title } : {}), ...(data.audience ? { audience: data.audience } : {}), ...(data.parte ? { parte: data.parte } : {}) }) };
       const retries: { role: "user"; content: { type: string; text: string }[] }[] = [];
       try {
         for (let round = 0; round < 3; round++) {
           const res = await create({
             model, instructions: SYSTEM, input: [first, ...retries],
             tools: [{ type: "function", name: TOOL_NAME, description: "Devolve o roteiro de treinamento organizado em blocos.", parameters: toolSchema(), strict: false }],
-            tool_choice: { type: "function", name: TOOL_NAME }, max_output_tokens: 14000, reasoning: { effort: "low" }, store: false,
+            tool_choice: { type: "function", name: TOOL_NAME }, max_output_tokens: 24000, reasoning: { effort: "low" }, store: false,
           });
           if (res.status === "incomplete") return { ok: false, error: "O conteúdo é grande demais para montar de uma vez. Envie menos arquivos ou divida em dois roteiros." };
           const call = res.output.find((o) => o.type === "function_call" && o["name"] === TOOL_NAME);

@@ -424,6 +424,14 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
                           </div>
                         ) : null}
 
+                        {(b.panels ?? []).map((p, pi) => <div key={`p${pi}`} className="rounded-xl border border-border p-3"><p className="mono-caps !text-[0.58rem]">{p.title}</p><ul className="mt-1 space-y-1">{p.lines.map((l, li) => <li key={li} className="whitespace-pre-wrap text-[0.75rem] leading-snug">{l}</li>)}</ul></div>)}
+                        {(b.tables ?? []).map((t, ti) => (
+                          <div key={`t${ti}`} className="overflow-x-auto rounded-xl border border-border p-2">
+                            {t.title && <p className="mono-caps !text-[0.58rem]">{t.title}</p>}
+                            <table className="mt-1 w-full text-left text-[0.72rem]"><thead><tr>{t.head.map((h, hi) => <th key={hi} className="px-2 py-1 font-semibold">{h}</th>)}</tr></thead><tbody>{t.rows.map((r, ri) => <tr key={ri} className="border-t border-border/50">{r.map((c, ci) => <td key={ci} className="px-2 py-1 align-top">{c}</td>)}</tr>)}</tbody></table>
+                          </div>
+                        ))}
+
                         {b.visuals?.length ? <VisualGuide visuals={b.visuals} onZoom={setZoom} /> : null}
 
                         {b.why?.length ? (

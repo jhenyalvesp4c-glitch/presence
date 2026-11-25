@@ -249,7 +249,7 @@ export function BlockEditor({ initial, color, examples, onClose, onSave, onDelet
       </div>
 
       <Section title="O que falar (para a aula ou o vídeo)">
-        <textarea value={b.say ?? ""} onChange={(e) => set("say", e.target.value)} rows={4} maxLength={1500} placeholder="Escreva como você falaria este bloco. Só você vê, nas notas do apresentador (tecla N)." className={`${field} resize-y`} />
+        <textarea value={b.say ?? ""} onChange={(e) => set("say", e.target.value)} rows={8} maxLength={12000} placeholder="Escreva como você falaria este bloco. Aparece na tela do bloco, ao lado do que mostrar." className={`${field} resize-y`} />
       </Section>
 
       <Section title="O que mostrar">

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy, Eye, GraduationCap, Grid3x3, Lightbulb, Maximize, MessageCircleQuestion,
-  Minimize, MousePointerClick, Sparkles, StickyNote, Target, ThumbsUp, Users, X, Image as ImageIcon,
+  Minimize, MousePointerClick, Mic, Sparkles, StickyNote, Target, ThumbsUp, Users, X, Image as ImageIcon,
 } from "lucide-react";
 
-import { mediaOf, type Block, type Example, type Faq, type MediaFile, type Script, type Visual } from "@/lib/training-library";
+import { mediaOf, type Block, type Example, type Faq, type MediaFile, type Panel, type Script, type Table, type Visual } from "@/lib/training-library";
 import { MediaViewer } from "./media-viewer";
 import { mediaUrl, primePaths, visualSrc } from "./training-images";
 
@@ -100,6 +100,31 @@ function ExamplePanel({ e, i }: { e: Example; i: number }) {
 }
 
 /** Um bloco inteiro numa página só: o que mostrar, por que ajuda, imagens, situação, exemplos e perguntas. */
+const PANEL_STYLE: Record<NonNullable<Panel["kind"]>, string> = {
+  config: "border-cyan/40 bg-cyan/5", result: "border-emerald/50 bg-emerald/10", variation: "border-violet/40 bg-violet/5", attention: "border-amber/60 bg-amber/10",
+};
+/** Quadro de apoio (configuração, resultado, variação, atenção) dentro do bloco. */
+export function PanelBox({ p }: { p: Panel }) {
+  return (
+    <div className={`rounded-2xl border p-4 ${PANEL_STYLE[p.kind ?? "config"]}`} data-testid="quadro-bloco">
+      <p className="mono-caps mb-2 !text-[clamp(.65rem,.9vw,.85rem)]">{p.title}</p>
+      <ul className="space-y-1.5">{p.lines.map((l, i) => <li key={i} className={`whitespace-pre-wrap ${big}`}>{l}</li>)}</ul>
+    </div>
+  );
+}
+/** Tabela do bloco, em largura total. */
+export function TableBox({ t }: { t: Table }) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-border bg-secondary/20 p-3 lg:col-span-2" data-testid="tabela-bloco">
+      {t.title && <p className="mono-caps mb-2 !text-[clamp(.65rem,.9vw,.85rem)]">{t.title}</p>}
+      <table className="w-full border-collapse text-left text-[clamp(.85rem,1.3vw,1.15rem)]">
+        <thead><tr>{t.head.map((h, i) => <th key={i} className="border-b border-border px-3 py-2 font-semibold text-[var(--glow)]">{h}</th>)}</tr></thead>
+        <tbody>{t.rows.map((r, ri) => <tr key={ri} className="border-b border-border/50 last:border-0">{r.map((c, ci) => <td key={ci} className="px-3 py-2 align-top">{c}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
 function BlockPage({ s, script, examples, shown, onToggle }: { s: Extract<Slide, { k: "block" }>; script: Script; examples: Example[]; shown: Record<string, boolean>; onToggle: (k: string) => void }) {
   const b = s.block;
   const [viewer, setViewer] = useState<{ title: string; files: MediaFile[] } | null>(null);
@@ -124,7 +149,7 @@ function BlockPage({ s, script, examples, shown, onToggle }: { s: Extract<Slide,
 
       <div className="grid gap-5 lg:grid-cols-2">
         {b.show.length > 0 && (
-          <Section icon={Eye} title="O que vamos mostrar" color="cyan" i={next()} className={b.why?.length ? "" : "lg:col-span-2"}>
+          <Section icon={Eye} title="O que vamos mostrar" color="cyan" i={next()} className={b.say ? "" : b.why?.length ? "" : "lg:col-span-2"}>
             <ul className="space-y-2">
               {b.show.map((t, i) => {
                 const k = `${b.id}:${i}`, ok = !!shown[k], files = mediaOf(b, i), has = files.length > 0;
@@ -147,6 +172,17 @@ function BlockPage({ s, script, examples, shown, onToggle }: { s: Extract<Slide,
             <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><MousePointerClick size={12} /> Clique num item para marcar como já mostrado. Os com botão azul abrem a imagem ou o arquivo.</p>
           </Section>
         )}
+
+        {b.say ? (
+          <Section icon={Mic} title="O que falar" color="violet" i={next()} className={b.show.length ? "" : "lg:col-span-2"}>
+            <div className="space-y-3" data-testid="falar-bloco">
+              {b.say.split(/\n{2,}/).map((p, i) => <p key={i} className={`whitespace-pre-wrap rounded-2xl border border-violet/30 bg-violet/5 p-3 ${big}`}>{p}</p>)}
+            </div>
+          </Section>
+        ) : null}
+
+        {(b.panels ?? []).map((p, pi) => <PanelBox key={`p${pi}`} p={p} />)}
+        {(b.tables ?? []).map((t, ti) => <TableBox key={`t${ti}`} t={t} />)}
 
         {b.why?.length ? (
           <Section icon={ThumbsUp} title="Por que isso ajuda no dia a dia" color="emerald" i={next()} className={b.show.length ? "" : "lg:col-span-2"}>

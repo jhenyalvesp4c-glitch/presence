@@ -98,3 +98,32 @@ describe("Arquivos dos passos acompanham as mudanças", () => {
     expect(shiftMedia(undefined, 0)).toBeUndefined();
   });
 });
+
+import { mergeDrafts, splitBrief } from "@/lib/training-ai";
+
+describe("Roteiro longo e completo", () => {
+  it("divide texto grande antes dos títulos de parte e não corta no meio", () => {
+    const part = (n: number) => `PARTE ${n} — Título\n` + Array.from({ length: 40 }, (_, i) => `Linha ${i} do que falar na parte ${n}.`).join("\n");
+    const text = [1, 2, 3, 4, 5, 6].map(part).join("\n\n\n");
+    const chunks = splitBrief(text, 2500);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((c) => /^PARTE \d/.test(c))).toBe(true);
+    expect(chunks.join("\n").replace(/\s+/g, "")).toBe(text.replace(/\s+/g, ""));
+    expect(splitBrief("curto", 2500)).toEqual(["curto"]);
+  });
+
+  it("junta os trechos na ordem e guarda fala, tabela e quadros inteiros", () => {
+    const fala = "Olá, pessoal!\n\nSegundo parágrafo da fala, completo.";
+    const a: Draft = { titulo: "T", publico: "P", objetivo: "O", duvidas: ["a"], blocos: [{ titulo: "Parte 1", minutos: 5, falar: fala, mostrar: ["Abrir Marketing"],
+      tabelas: [{ titulo: "Filtros", colunas: ["Categoria", "O que permite"], linhas: [["Tags", "Leads com tag"], ["Funil", "Leads do funil"]] }],
+      quadros: [{ titulo: "Resultado", tipo: "result", linhas: ["5.272 leads"] }] }] };
+    const b: Draft = { titulo: "", publico: "", objetivo: "", duvidas: ["a", "b"], blocos: [{ titulo: "Parte 2", minutos: 5, falar: "x", mostrar: ["Salvar"] }] };
+    const m = mergeDrafts([a, b]);
+    expect(m.blocos.map((x) => x.titulo)).toEqual(["Parte 1", "Parte 2"]);
+    expect(m.duvidas).toEqual(["a", "b"]);
+    const { script } = buildScript(m, { images: [] });
+    expect(script.blocks[0]!.say).toBe(fala);
+    expect(script.blocks[0]!.tables![0]!.rows).toHaveLength(2);
+    expect(script.blocks[0]!.panels![0]).toMatchObject({ kind: "result", lines: ["5.272 leads"] });
+  });
+});

@@ -7,7 +7,7 @@ import { transcribeAudio } from "@/lib/audio.functions";
 import { MAX_PENDING, filesFromClipboard, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { uploadFiles } from "@/lib/data/brain";
 import { MAX_SECONDS, useRecorder } from "@/lib/use-recorder";
-import { buildScript, usedImages, type Draft } from "@/lib/training-ai";
+import { buildScript, mergeDrafts, splitBrief, usedImages, type Draft } from "@/lib/training-ai";
 import { generateTrainingScript } from "@/lib/training-ai.functions";
 import type { Example, MediaFile, Script } from "@/lib/training-library";
 
@@ -80,9 +80,12 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
     if (files.reduce((n, f) => n + f.data.length, 0) > MAX_AI_CHARS) return void setError("Os arquivos passam de ~3 MB juntos. Remova alguns ou envie imagens menores.");
     setError(""); setStage(0);
     try {
-      const r = await generateTrainingScript({ data: { brief, ...(title.trim() ? { title: title.trim() } : {}), ...(audience.trim() ? { audience: audience.trim() } : {}), files: files.map((f) => ({ name: f.name, mime: f.mime, data: f.data })) } });
-      if (!r.ok) { setError(r.error); setStage(-1); return; }
-      const draft: Draft = r.draft;
+      // Texto longo é montado em trechos (em paralelo) para não resumir nem estourar o tempo; depois juntamos na ordem.
+      const chunks = splitBrief(brief);
+      const results = await Promise.all(chunks.map((c, i) => generateTrainingScript({ data: { brief: c, ...(title.trim() ? { title: title.trim() } : {}), ...(audience.trim() ? { audience: audience.trim() } : {}), ...(chunks.length > 1 ? { parte: { n: i + 1, total: chunks.length } } : {}), files: files.map((f) => ({ name: f.name, mime: f.mime, data: f.data })) } })));
+      const failed = results.find((r) => !r.ok);
+      if (failed && !failed.ok) { setError(failed.error); setStage(-1); return; }
+      const draft: Draft = mergeDrafts(results.flatMap((r) => (r.ok ? [r.draft] : [])));
       // Guarda só as imagens que a IA usou; "Imagem n" = n-ésima imagem enviada.
       const images = pending.filter((p) => p.ai!.mime.startsWith("image/"));
       const used = usedImages(draft).filter((n) => n >= 1 && n <= images.length);
@@ -133,7 +136,7 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-[0.8rem] leading-snug text-muted-foreground">{done.duvidas.map((d, i) => <li key={i}>{d}</li>)}</ul>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">Você pode editar qualquer bloco, trocar a ordem ou pedir outro roteiro. O que falar fica nas notas do apresentador (tecla N).</p>
+            <p className="text-xs text-muted-foreground">Você pode editar qualquer bloco, trocar a ordem ou pedir outro roteiro. O que falar aparece na tela de cada bloco, junto do que mostrar.</p>
             <div className="flex flex-wrap justify-end gap-2">
               <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">Fechar</button>
               <button onClick={() => { onOpen(done.script.id); onClose(); }} className="flex items-center gap-1.5 rounded-xl border border-[var(--glow)] px-4 py-2 text-sm text-[var(--glow)] transition hover:bg-[color-mix(in_oklab,var(--glow)_10%,transparent)]">Abrir roteiro <ArrowRight size={14} /></button>

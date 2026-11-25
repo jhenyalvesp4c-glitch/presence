@@ -16,7 +16,7 @@ const list = (v: unknown, n = 300) => (Array.isArray(v) ? v.map((x) => clean(x, 
 export function blockFrom(b: BlocoIn): Block {
   const out: Block = { id: newId("b"), title: clean(b.titulo, 120) || "Novo bloco", minutes: Math.min(240, Math.max(1, Math.round(Number(b.minutos) || 10))), show: list(b.mostrar), examples: [] };
   if (clean(b.dica)) out.tip = clean(b.dica, 600);
-  if (clean(b.falar, 2000)) out.say = clean(b.falar, 2000);
+  if (clean(b.falar, 12000)) out.say = clean(b.falar, 12000);
   const why = list(b.porque); if (why.length) out.why = why;
   const faq: Faq[] = (b.perguntas ?? []).map((p) => ({ q: clean(p.pergunta), a: clean(p.resposta, 800) })).filter((p) => p.q && p.a);
   if (faq.length) out.faq = faq;
@@ -98,7 +98,7 @@ export function editScript(lib: Library, a: ScriptArgs): Edit {
     if (clean(a.novo_titulo, 120)) { b = { ...b, title: clean(a.novo_titulo, 120) }; mudou.push("título"); }
     if (a.minutos !== undefined && Number(a.minutos) > 0) { b = { ...b, minutes: Math.min(240, Math.round(Number(a.minutos))) }; mudou.push("duração"); }
     if (a.dica !== undefined) { const t = clean(a.dica, 600); if (t) b = { ...b, tip: t }; else { const { tip: _t, ...r } = b; b = r; } mudou.push("dica"); }
-    if (a.falar !== undefined) { const t = clean(a.falar, 2000); if (t) b = { ...b, say: t }; else { const { say: _s, ...r } = b; b = r; } mudou.push("o que falar"); }
+    if (a.falar !== undefined) { const t = clean(a.falar, 12000); if (t) b = { ...b, say: t }; else { const { say: _s, ...r } = b; b = r; } mudou.push("o que falar"); }
     const inc = list(a.mostrar_incluir).filter((x) => !b.show.some((y) => score(y, x) >= 100));
     if (inc.length) { b = { ...b, show: [...b.show, ...inc] }; mudou.push(`${inc.length} passo(s) em "o que mostrar"`); }
     for (const q of list(a.mostrar_tirar)) {
