@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountBalance, cashBreakdown, cashflow, cashOut, reservesFor, round2, totalReserves, cofrinhoInfo, invAmount, invoiceFor, linesIn, monthClose, monthPlan, reservedBalance, sum, totalBalance } from "@/lib/finance/calc";
+import { categorySpent, spendGoals, spendMonthOf, accountBalance, cashBreakdown, cashflow, cashOut, reservesFor, round2, totalReserves, cofrinhoInfo, invAmount, invoiceFor, linesIn, monthClose, monthPlan, reservedBalance, sum, totalBalance } from "@/lib/finance/calc";
 import { fromRows, toRows } from "@/lib/finance/db-map";
 import { EMPTY_STATE, type FinanceState, type Plan } from "@/lib/finance/types";
 
@@ -141,5 +141,34 @@ describe("Metas que descontam da sobra de caixa (liga e desliga)", () => {
   it("a meta guarda o liga/desliga no banco", () => {
     const back = fromRows(toRows(withGoals()));
     expect(back.goals.map((g) => !!g.reserve)).toEqual([true, true, false]);
+  });
+});
+
+describe("Meta de gasto por categoria", () => {
+  // cartão fecha dia 5: compra até o dia 5 entra na fatura do mês; depois do dia 5 vai para o mês seguinte
+  const tx = (id: string, amount: number, date: string, method: "debito" | "credito" | "pix", extra: object = {}) => ({ id, kind: "despesa" as const, desc: id, amount, date, method, category: "ifood", ...(method === "credito" ? { cardId: "c1" } : { accountId: "acc" }), ...extra });
+  const base = (): FinanceState => ({ ...state(), plans: [], goals: [{ id: "m", kind: "limite_categoria", title: "iFood", target: 200, current: 0, category: "ifood" }],
+    transactions: [tx("d1", 60, "2026-11-10", "debito"), tx("p1", 40, "2026-11-12", "pix"), tx("c1", 30, "2026-11-04", "credito"), tx("c2", 50, "2026-11-06", "credito"), tx("outra", 999, "2026-11-10", "debito", { category: "mercado" })] });
+  it("débito e Pix contam no mês da data; crédito conta no mês em que a fatura fecha", () => {
+    const s = base();
+    // 04/11 (antes de fechar dia 5) → novembro · 06/11 (depois) → dezembro
+    expect(categorySpent(s, "ifood", "2026-11")).toBe(60 + 40 + 30);
+    expect(categorySpent(s, "ifood", "2026-12")).toBe(50);
+    expect(categorySpent(s, "mercado", "2026-11")).toBe(999);
+  });
+  it("mostra quanto falta, quando passa e como fica com a compra nova", () => {
+    const s = base(), [g] = spendGoals(s, "2026-11");
+    expect(g).toMatchObject({ spent: 130, left: 70, over: false });
+    expect(spendGoals(s, "2026-11", { category: "ifood", amount: 50 })[0]).toMatchObject({ spent: 180, left: 20, over: false });
+    expect(spendGoals(s, "2026-11", { category: "ifood", amount: 90 })[0]).toMatchObject({ spent: 220, left: 0, over: true });
+    expect(spendMonthOf(s, { method: "credito", cardId: "c1", date: "2026-11-06" })).toBe("2026-12");
+    expect(spendMonthOf(s, { method: "pix", date: "2026-11-30" })).toBe("2026-11");
+  });
+  it("conta só a sua parte de gasto dividido, parcelas no mês do fechamento e fixas", () => {
+    const s: FinanceState = { ...base(), transactions: [tx("div", 100, "2026-11-10", "debito", { shared: { person: "Marido", percent: 50 } })],
+      plans: [mk("par", 90, 3, "2026-12", { category: "ifood" })], recurring: [{ id: "r", kind: "despesa", desc: "iFood Club", amount: 20, day: 15, category: "ifood", method: "debito", accountId: "acc", startYm: "2026-01" }] };
+    expect(categorySpent(s, "ifood", "2026-11")).toBe(50 + 20);       // minha metade + a fixa de novembro
+    expect(categorySpent(s, "ifood", "2026-12")).toBe(90 + 20);       // a 1ª parcela entra na fatura que fecha em dezembro (dia 5) + a fixa
+    expect(categorySpent(s, "ifood", "2027-01")).toBe(90 + 20);
   });
 });

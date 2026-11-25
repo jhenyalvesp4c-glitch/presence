@@ -107,3 +107,9 @@ As contas ficam em `calc.ts`: `invAmount`, `linesIn`, `viewBalance` e o parâmet
 ### Contas fixas
 
 Em **Contas fixas e assinaturas** (aba antes chamada "Assinaturas") fica a lista das contas fixas e do salário: dá para ver, editar valor, dia e conta, pausar, excluir e criar. Antes isso só existia dentro de "Refazer o briefing".
+
+### Metas de gasto por categoria
+
+- A meta "Limitar gastos de uma categoria" (ex.: iFood R$ 200) soma o que você gastou na categoria no mês, em débito, Pix, dinheiro, crédito, parcelas e contas fixas, **só a sua parte** (a de outra pessoa fica de fora). Função: `categorySpent` / `spendGoals` em `calc.ts`.
+- **No crédito, a compra conta no mês em que a fatura fecha**: até o dia de fechamento do cartão entra no mês; depois do fechamento, no mês seguinte (`spendMonthOf`). Débito, Pix e dinheiro contam no mês da data.
+- A **Visão geral** mostra o bloco "Metas de gasto do mês" (barra verde, amarela perto do limite e vermelha se passar). Ao lançar uma despesa, o formulário mostra "iFood: você já gastou X de Y… com esta compra fica Z" e, ao salvar, um aviso com o que falta ou o quanto passou.

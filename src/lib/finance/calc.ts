@@ -437,6 +437,36 @@ export const totalOpenView = (s: FinanceState, today: Date, view: CofView) => su
  * saldo de hoje + o que ainda entra no mês − contas que saem da conta no mês − faturas abertas dos cartões.
  * Compras no crédito não entram à parte (já estão dentro das faturas), para não contar duas vezes.
  */
+/* ───────────── gasto por categoria no mês (metas de limite) ───────────── */
+/** Mês da meta em que uma compra cai: no crédito, o mês em que a fatura FECHA (compra depois do fechamento vai para o mês seguinte); nos demais, o mês da data. */
+export function spendMonthOf(s: FinanceState, o: { method: Transaction["method"]; cardId?: string | undefined; date: string }): string {
+  const card = o.method === "credito" && o.cardId ? s.cards.find((c) => c.id === o.cardId) : undefined;
+  return card ? ymOf(closingDateOf(card, invoiceMonthOf(card, o.date))) : ymOf(o.date);
+}
+/** Quanto foi gasto (só a sua parte) numa categoria no mês: compras, parcelas e contas fixas, no débito, no Pix, no dinheiro ou no crédito. */
+export function categorySpent(s: FinanceState, category: string, ym: string): number {
+  let v = 0;
+  for (const t of s.transactions) if (t.kind === "despesa" && t.category === category && spendMonthOf(s, t) === ym) v += myPart(t.amount, t.shared);
+  for (const p of s.plans) {
+    if (p.category !== category) continue;
+    const card = s.cards.find((c) => c.id === p.cardId);
+    for (let n = 1; n <= p.count; n++) { const dueYm = addMonths(p.first, n - 1), date = card ? closingDateOf(card, dueYm) : dayIn(dueYm, 10); if (ymOf(date) === ym) v += myPart(parcelAmount(p, n), planShare(p, n)); }
+  }
+  for (const r of s.recurring) {
+    if (r.kind !== "despesa" || r.category !== category) continue;
+    for (const m of [addMonths(ym, -1), ym, addMonths(ym, 1)]) if (recurringActiveIn(r, m) && spendMonthOf(s, { method: r.method, cardId: r.cardId, date: dayIn(m, r.day) }) === ym) v += myPart(r.amount, r.shared);
+  }
+  return round2(v);
+}
+export type SpendGoal = { goal: Goal; spent: number; left: number; pct: number; over: boolean };
+/** Metas de limite por categoria, com quanto já foi gasto no mês `ym`. `extra` soma uma compra ainda não lançada. */
+export function spendGoals(s: FinanceState, ym: string, extra: { category: string; amount: number } | null = null): SpendGoal[] {
+  return s.goals.filter((g) => g.kind === "limite_categoria" && g.category).map((goal) => {
+    const spent = round2(categorySpent(s, goal.category!, ym) + (extra && extra.category === goal.category ? extra.amount : 0));
+    return { goal, spent, left: Math.max(0, round2(goal.target - spent)), pct: goal.target ? (spent / goal.target) * 100 : 0, over: spent > goal.target };
+  }).sort((a, b) => b.pct - a.pct);
+}
+
 /* ───────────── metas que descontam da sobra (reservas do mês) ───────────── */
 export type Reserve = { id: string; title: string; amount: number; kind: Goal["kind"] };
 /**
@@ -448,7 +478,7 @@ export function reservesFor(s: FinanceState, ym: string, today: Date): Reserve[]
   for (const g of s.goals) {
     if (!g.reserve) continue;
     let amount = 0;
-    if (g.kind === "limite_categoria") { const spent = ym === cur ? total(expensesOf(monthEntries(s, ym)).filter((e) => e.category === g.category)) : 0; amount = Math.max(0, g.target - spent); }
+    if (g.kind === "limite_categoria") { const spent = ym === cur ? categorySpent(s, g.category ?? "", ym) : 0; amount = Math.max(0, g.target - spent); }
     else if (g.kind === "economizar_mensal") amount = ym === cur ? Math.max(0, g.target - g.current) : g.target;
     else amount = Math.max(0, Math.min(g.monthly ?? 0, Math.max(0, g.target - g.current)));
     if (amount > 0.004) out.push({ id: g.id, title: g.title, amount: round2(amount), kind: g.kind });
@@ -614,7 +644,7 @@ export function alertsFor(s: FinanceState, today: Date): Alert[] {
   }
   const next = commitments(s, addMonths(ym, 1), 1)[0];
   if (next && rec > 0 && next.parcelas > rec * 0.4) out.push({ id: "parc", level: "warning", title: "Parcelas pesam no próximo mês", detail: `R$ ${next.parcelas.toFixed(0)} em parcelas, ${Math.round((next.parcelas / rec) * 100)}% da sua receita mensal.` });
-  for (const g of s.goals) if (g.kind === "limite_categoria" && g.category) { const v = total(expensesOf(monthEntries(s, ym)).filter((e) => e.category === g.category)); if (v > g.target) out.push({ id: `meta:${g.id}`, level: "warning", title: `Limite de ${catOf(g.category).name} estourado`, detail: `R$ ${v.toFixed(0)} de um limite de R$ ${g.target.toFixed(0)}.` }); }
+  for (const g of s.goals) if (g.kind === "limite_categoria" && g.category) { const v = categorySpent(s, g.category, ym); if (v > g.target) out.push({ id: `meta:${g.id}`, level: "warning", title: `Limite de ${catOf(g.category).name} estourado`, detail: `R$ ${v.toFixed(0)} de um limite de R$ ${g.target.toFixed(0)}.` }); }
   const rank = { danger: 0, warning: 1, info: 2 } as const;
   return out.sort((a, b) => rank[a.level] - rank[b.level]);
 }

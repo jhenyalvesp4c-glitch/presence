@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CalendarDays, CreditCard, Gauge, PiggyBank, Plus, Pencil, Shield, Target, Trash2, TrendingUp } from "lucide-react";
-import { brl, dateBR, expensesOf, monthEntries, monthsBetween, total, ymOf } from "@/lib/finance/calc";
+import { brl, categorySpent, dateBR, monthsBetween, ymOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Goal, GoalKind } from "@/lib/finance/types";
@@ -16,7 +16,7 @@ const ROSE = "oklch(0.72 0.18 10)";
 export function GoalCard({ goal, onEdit, onDelete, onAdd, index = 0 }: { goal: Goal; onEdit?: (g: Goal) => void; onDelete?: (g: Goal) => void; onAdd?: (g: Goal) => void; index?: number }) {
   const fin = useFinance(), { state, today } = fin, I = ICON[goal.kind];
   const limit = goal.kind === "limite_categoria";
-  const current = limit ? total(expensesOf(monthEntries(state, ymOf(today))).filter((e) => e.category === goal.category)) : goal.current;
+  const current = limit ? categorySpent(state, goal.category ?? "", ymOf(today)) : goal.current;
   const pct = goal.target ? (current / goal.target) * 100 : 0, over = limit && current > goal.target, color = over ? ROSE : COLOR[goal.kind];
   const left = Math.max(0, goal.target - current);
   const months = goal.deadline ? Math.max(1, monthsBetween(ymOf(today), goal.deadline.slice(0, 7))) : 0;
@@ -56,7 +56,7 @@ export function GoalCard({ goal, onEdit, onDelete, onAdd, index = 0 }: { goal: G
 function GoalsHero() {
   const { state, today } = useFinance();
   const rows = state.goals.map((g) => {
-    const limit = g.kind === "limite_categoria", cur = limit ? total(expensesOf(monthEntries(state, ymOf(today))).filter((e) => e.category === g.category)) : g.current;
+    const limit = g.kind === "limite_categoria", cur = limit ? categorySpent(state, g.category ?? "", ymOf(today)) : g.current;
     return { g, limit, cur, pct: g.target ? (cur / g.target) * 100 : 0 };
   });
   const saving = rows.filter((r) => !r.limit), saved = saving.reduce((a, r) => a + r.cur, 0), target = saving.reduce((a, r) => a + r.g.target, 0), done = saving.filter((r) => r.pct >= 100).length;

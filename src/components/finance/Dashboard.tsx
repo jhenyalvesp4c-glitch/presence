@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CalendarDays, CreditCard, Gauge as GaugeIcon, Info, Layers, PiggyBank, Scale, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { type CofView, viewBalance, addMonths, alertsFor, brl, cashflow, categoryTotals, commitments, dateBR, isoOf, monthName, monthSummary, monthClose, monthlySeries, openInvoice, parseIso, sameDayPrev, reservedBalance, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
 import { CofFilter, ReservesSwitch } from "./CofFilter";
+import { SpendGoalsPanel } from "./SpendGoals";
 import { useCofView, useReservesOn } from "@/lib/finance/cof-view";
 import { useFinance } from "@/lib/finance/store";
 import { AreaChart, BarsChart, Donut, Gauge, Heatmap, Money, RadialRings, Sparkline, StackedBars } from "./charts";
@@ -157,6 +158,8 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2"><CofFilter /><ReservesSwitch possible={model.close.reservasPossiveis} /></div>
       <Hero model={model} cards={state.cards.length} accounts={state.accounts.filter((a) => a.kind !== "cofrinho").length} today={today} onDetail={() => setDetail(true)} />
       <MonthBreakdownModal open={detail} onClose={() => setDetail(false)} onTab={onTab} />
+
+      <SpendGoalsPanel onOpen={() => onTab("metas")} />
 
       <Panel glow="var(--violet)" className="!p-4 sm:!p-5"><NaturalComposer onOpenForm={onDraft} /></Panel>
 

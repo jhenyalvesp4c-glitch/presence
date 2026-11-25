@@ -2,7 +2,8 @@ import { BrandTile, brandOf, brandsFor } from "./brands";
 import { CategoryEditor } from "./CategoryEditor";
 import { useMemo, useState, type ReactNode } from "react";
 import { Banknote, Landmark, PiggyBank, Plus, Wallet } from "lucide-react";
-import { addMonths, brl, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, fixedCoverage, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
+import { toast } from "sonner";
+import { addMonths, brl, spendGoals, spendMonthOf, closingDateOf, closingYmOf, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthLabel, firstFromPaid, fixedCoverage, planForInvoice, planInfo, subscriptionForInvoice, withDeclaredTotal, ymOf } from "@/lib/finance/calc";
 import { CATS, EXPENSE_CATS, INCOME_CATS, catOf, guessCategory, hasCat } from "@/lib/finance/categories";
 import { uid, useFinance } from "@/lib/finance/store";
 import type { Account, AccountKind, Card, CardBrand, Goal, GoalKind, Method, Plan, Recurring, Shared, Tone, Transaction, TxKind } from "@/lib/finance/types";
@@ -329,7 +330,13 @@ export function TxForm({ initial, onSave, onCancel, lockMethod, initialMethod, s
   const card = state.cards.find((c) => c.id === cardId);
   const needsPay = credit ? !!cardId : method === "dinheiro" ? true : !!accountId;
   const methods: { value: Method; label: string }[] = kind === "receita" ? [{ value: "pix", label: "Pix" }, { value: "debito", label: "Conta" }, { value: "dinheiro", label: "Dinheiro" }] : [{ value: "debito", label: "Débito" }, { value: "credito", label: "Crédito" }, { value: "dinheiro", label: "Dinheiro" }, { value: "pix", label: "Pix" }];
+  // meta de gasto da categoria: quanto já gastou no mês em que esta compra cai (e como fica com ela)
+  const goalKey = kind === "despesa" ? { method, cardId: credit ? cardId : undefined, date } : null;
+  const goalYm = goalKey ? spendMonthOf(state, goalKey) : "";
+  const goalNow = kind === "despesa" ? spendGoals(state, goalYm).find((g) => g.goal.category === catV) : undefined;
+  const goalWith = goalNow && amount ? spendGoals(state, goalYm, { category: catV, amount: initial?.id ? 0 : amount * (parcelado && credit ? 1 / n : 1) }).find((g) => g.goal.category === catV) : undefined;
   const save = () => {
+    if (goalNow && goalWith && amount) { const g = goalWith; if (g.over) toast.warning(`${catOf(catV).name}: passou do limite`, { description: `${brl(g.spent)} de ${brl(g.goal.target)} (passou ${brl(g.spent - g.goal.target)})` }); else toast.info(`${catOf(catV).name}: ${brl(g.spent)} de ${brl(g.goal.target)}`, { description: `Faltam ${brl(g.left)} da meta do mês.` }); }
     const base = { desc: desc.trim(), category: catV, ...(kind === "despesa" && share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent } } : {}) };
     if (credit && parcelado && amount && card) {
       const first = invoiceMonthOf(card, date), per = Math.round((amount / n) * 100) / 100;
@@ -365,6 +372,12 @@ export function TxForm({ initial, onSave, onCancel, lockMethod, initialMethod, s
       )}
       {kind === "despesa" && <SharePicker value={share} onChange={setShare} amount={amount} />}
       <Field group label="Categoria da despesa"><CategoryPicker value={catV} onChange={(c) => { setCat(c); setCatTouched(true); }} income={kind === "receita"} /></Field>
+      {goalNow && (
+        <p className="rounded-2xl border px-3.5 py-2.5 text-sm" style={{ borderColor: `color-mix(in oklab, ${(goalWith ?? goalNow).over ? "oklch(0.72 0.18 10)" : (goalWith ?? goalNow).pct >= 80 ? "var(--amber)" : "var(--emerald)"} 45%, transparent)` }} data-testid="fin-form-meta-aviso">
+          <b>{catOf(catV).name}</b>: você já gastou <b className="tabular-nums">{brl(goalNow.spent)}</b> de <b className="tabular-nums">{brl(goalNow.goal.target)}</b> {credit && goalKey && goalYm !== ymOf(date) ? `na meta de ${monthLabel(goalYm)} (a fatura fecha antes desta data)` : "neste mês"}.
+          {goalWith && amount ? <> Com esta compra fica <b className="tabular-nums">{brl(goalWith.spent)}</b> {goalWith.over ? <span style={{ color: "oklch(0.72 0.18 10)" }}>· passa {brl(goalWith.spent - goalWith.goal.target)}</span> : <>· faltam {brl(goalWith.left)}</>}.</> : null}
+        </p>
+      )}
       <Actions onCancel={onCancel} onSave={save} saveLabel={credit && parcelado ? "Adicionar compra parcelada" : saveLabel} disabled={!desc.trim() || !amount || !needsPay} extra={extraActions} />
     </div>
   );
