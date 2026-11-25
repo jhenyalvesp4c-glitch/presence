@@ -21,3 +21,14 @@ describe("logins e senhas (só neste navegador)", () => {
     expect(readLoginDocs().map((d) => d.id).sort()).toEqual(["a-2", "l-Santos"]); expect(loginsOfDossier("Santos")).toHaveLength(2);
   });
 });
+
+describe("editar login da ficha", () => {
+  it("salvar de novo atualiza usuário e senha no mesmo login, sem duplicar", () => {
+    localStorage.clear();
+    saveAccessLogin({ accessId: "9", label: "Painel", user: "a@x.com", pass: "velha", owner: "M", dossier: "Pituba" });
+    saveAccessLogin({ accessId: "9", label: "Painel de anúncios", user: "b@x.com", pass: "nova", owner: "M", dossier: "Pituba" });
+    expect(readLoginDocs()).toHaveLength(1);
+    expect(passwordOfAccess("9")).toBe("nova");
+    expect(loginsOfDossier("Pituba")[0]).toMatchObject({ title: "Painel de anúncios", user: "b@x.com" });
+  });
+});

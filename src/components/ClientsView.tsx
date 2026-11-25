@@ -384,15 +384,28 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 
 function AccessTab({ client, access, acts, err, dossierName }: { client: Client; access: import("@/lib/clients").ClientAccess[]; acts: Acts; err: (e: unknown) => void; dossierName: string | undefined }) {
   const [label, setLabel] = useState(""), [user, setUser] = useState(""), [pass, setPass] = useState(""), [note, setNote] = useState(""), [shown, setShown] = useState<Record<string, boolean>>({});
+  const [edit, setEdit] = useState<{ id: string; label: string; user: string; pass: string; note: string } | null>(null);
+  const saveEdit = () => {
+    if (!edit || !edit.label.trim()) return;
+    acts.updateAccess.mutate({ id: edit.id, label: edit.label, username: edit.user, note: edit.note }, { onSuccess: () => { saveAccessLogin({ accessId: edit.id, label: edit.label, user: edit.user, pass: edit.pass, owner: client.contactName, dossier: dossierName ?? client.name, note: edit.note }); setEdit(null); }, onError: err });
+  };
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60";
   return (
     <div className="space-y-2">
       <p className="rounded-xl border border-amber/25 bg-amber/5 px-3 py-2 text-[0.7rem] text-muted-foreground">Guarde aqui <b className="text-foreground">onde</b> fica cada acesso, o usuário e a <b className="text-foreground">senha</b>. A senha fica <b className="text-foreground">só neste navegador</b> (não vai para o banco nem para a IA) e o acesso já aparece em <b className="text-foreground">Logins e senhas</b>, na Documentação.</p>
-      {access.map((a) => { const pw = passwordOfAccess(a.id); const on = shown[a.id] !== false; return (
+      {access.map((a) => { const pw = passwordOfAccess(a.id); const on = shown[a.id] !== false; return edit?.id === a.id ? (
+        <form key={a.id} onSubmit={(e) => { e.preventDefault(); saveEdit(); }} className="space-y-2 rounded-2xl border border-cyan/50 bg-black/20 p-3" data-testid="acesso-editando">
+          <input value={edit.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} placeholder="Onde" aria-label="Editar onde" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
+          <div className="flex gap-2"><input value={edit.user} onChange={(e) => setEdit({ ...edit, user: e.target.value })} placeholder="Usuário" aria-label="Editar usuário" autoComplete="off" className={field} /><input value={edit.pass} onChange={(e) => setEdit({ ...edit, pass: e.target.value })} placeholder="Senha" aria-label="Editar senha" autoComplete="new-password" className={`${field} font-mono`} /></div>
+          <input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} placeholder="Observação (opcional)" aria-label="Editar observação" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
+          <div className="flex gap-2"><button type="button" onClick={() => setEdit(null)} className="flex-1 rounded-full border border-white/10 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancelar</button><button type="submit" disabled={!edit.label.trim() || acts.updateAccess.isPending} className="flex-1 rounded-full border border-cyan/60 py-1.5 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">Salvar</button></div>
+        </form>
+      ) : (
         <div key={a.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.label}</p><p className="truncate font-mono text-xs text-muted-foreground">{a.username || "—"}{a.note && ` · ${a.note}`}</p>
             {pw !== null && <p className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-amber" data-testid="acesso-senha"><span className="text-muted-foreground">Senha:</span> {pw ? (on ? pw : "••••••••••") : "—"}{pw && <button type="button" onClick={() => setShown((m) => ({ ...m, [a.id]: !on }))} aria-label={on ? "Ocultar senha" : "Mostrar senha"} className="text-muted-foreground transition hover:text-cyan">{on ? <EyeOff size={12} /> : <Eye size={12} />}</button>}</p>}</div>
           <CopyPass user={a.username} pass={pw ?? ""} />
+          <button onClick={() => setEdit({ id: a.id, label: a.label, user: a.username, pass: pw ?? "", note: a.note })} aria-label={`Editar ${a.label}`} data-testid="acesso-editar" className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
           <button onClick={() => acts.removeAccess.mutate(a.id, { onSuccess: () => removeAccessLogin(a.id), onError: err })} aria-label={`Apagar ${a.label}`} className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
         </div>); })}
       <form onSubmit={(e) => { e.preventDefault(); if (!label.trim()) return; acts.addAccess.mutate({ clientId: client.id, label, username: user, note }, { onSuccess: (id) => { saveAccessLogin({ accessId: id, label, user, pass, owner: client.contactName, dossier: dossierName ?? client.name, note }); setLabel(""); setUser(""); setPass(""); setNote(""); }, onError: err }); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
