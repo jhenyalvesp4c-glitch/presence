@@ -157,9 +157,10 @@ export function TrainingGenerator({ folders, defaultFolder, onCreate, onOpen, on
           <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="relative mt-4">
             <label className="block text-xs text-muted-foreground">Explique do seu jeito (pode ser bagunçado) <span className="opacity-60">— o Orion organiza em blocos, na ordem certa</span>
               <div className="relative">
-                <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={9} disabled={transcribing} data-testid="roteiro-conteudo" autoFocus
+                <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={9} maxLength={80000} disabled={transcribing} data-testid="roteiro-conteudo" autoFocus
                   placeholder={"Ex.: Preciso de um vídeo ensinando a fazer o disparo em massa. Primeiro tem que importar a base. A planilha precisa ter uma coluna para cada variável do template (se o template tem {curso}, a planilha tem a coluna curso). Não esquecer de avisar que o número tem que estar com +55. Depois de importar, atualizar os contatos e colocar uma tag em todos para segmentar…"}
                   className={`${field} resize-y pr-12 leading-relaxed`} />
+                <span className={`pointer-events-none absolute bottom-2 right-4 font-mono text-[0.62rem] ${brief.length > 70000 ? "text-destructive" : "text-muted-foreground/70"}`} data-testid="roteiro-contagem">{brief.length.toLocaleString("pt-BR")} / 80.000</span>
                 {rec.supported && !recording && <button type="button" onClick={startVoice} disabled={transcribing} aria-label="Falar em vez de digitar" title="Gravar sua explicação em áudio" data-testid="roteiro-gravar" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg border border-border bg-background/70 text-muted-foreground transition enabled:hover:border-violet/60 enabled:hover:text-violet disabled:opacity-40">{transcribing ? <Loader2 size={14} className="animate-spin" /> : <Mic size={15} />}</button>}
                 {recording && (
                   <div className="absolute inset-x-3 bottom-3 flex items-center gap-3 rounded-xl border border-destructive/50 bg-background/90 px-3 py-2 backdrop-blur" data-testid="roteiro-gravando">

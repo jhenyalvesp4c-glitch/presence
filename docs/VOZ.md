@@ -152,3 +152,6 @@ O fim da fala não é mais um silêncio fixo: `silenceFor(texto)` espera **2,6 s
 ## "Minha parte" do cartão e agradecer
 - **Minha parte:** gastos divididos do cartão (`shared`: pessoa + %) têm `Invoice.mine` (total do banco − a parte dos outros) e `othersOwe`. A voz (`financeiro/fatura`, `resumo`, `cobrir_falta`) devolve `minha_parte`, `parte_dos_outros` e `quem_deve` por fatura e os totais; o painel mostra "Só a sua parte". O total do banco não muda.
 - **Agradecer:** "obrigada", "valeu", "tchau", "não preciso mais", "isso era só", "pode parar" (`endsConversation`, `dismiss.ts`) fecham os cartões da tela, o Orion responde UMA frase curta ("De nada! Pode contar comigo.") e **para de ouvir** (`endAfter`). "Pode fechar" sozinho só fecha a tela e continua ouvindo. Agradecer e já pedir outra coisa ("valeu, e o financeiro?") não encerra.
+
+## Roteiro de treinamento com o Orion: texto longo
+O campo "Conte o que precisa ensinar" aceita até **80 mil caracteres** (antes 12 mil, e dava erro `too_big`), com contador no canto do campo (`training-ai.functions.ts`).

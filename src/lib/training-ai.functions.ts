@@ -6,7 +6,7 @@ import type { Draft } from "./training-ai";
 
 const file = z.object({ name: z.string().min(1).max(200), mime: z.string().min(1).max(100), data: z.string().max(4_200_000) });
 const input = z.object({
-  brief: z.string().trim().min(10, "Conte um pouco mais sobre o que o treinamento precisa ensinar.").max(12000),
+  brief: z.string().trim().min(10, "Conte um pouco mais sobre o que o treinamento precisa ensinar.").max(80000, "O texto passou de 80 mil caracteres. Divida em dois roteiros."),
   title: z.string().max(120).optional(), audience: z.string().max(120).optional(),
   files: z.array(file).max(8).refine((l) => l.reduce((n, f) => n + f.data.length, 0) <= 4_200_000, "Arquivos grandes demais (máx. ~3 MB no total)."),
 });
