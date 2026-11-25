@@ -117,3 +117,5 @@ Em **Contas fixas e assinaturas** (aba antes chamada "Assinaturas") fica a lista
 ### Acerto de contas: compra parcelada
 
 No acerto de contas, uma compra com **Parcela "9/18"** (ou "9 de 18") gera sozinha uma parcela por mês nos meses seguintes ("10/18" em dezembro, até "18/18"), no mesmo dia, com o mesmo cartão e a mesma divisão (`expandInstallments` em `settle.ts`). As parcelas automáticas aparecem com a etiqueta "parcela automática", entram na conta do mês e no texto do WhatsApp, e mudam editando a primeira parcela lançada. Não duplica se a parcela do mês já foi lançada à mão. Só vale em acertos abertos.
+
+No mesmo formulário, **Como se repete?**: *Só esta vez*, *Parcelada* (9/18) ou *Fixa (todo mês)*. O gasto fixo entra todo mês, no mesmo dia, com o mesmo cartão e a mesma divisão, até o mês "até" (opcional); fica guardado como parcela `fixa` ou `fixa:AAAA-MM`. Cada mês entra na conta do acerto. O acerto não mexe nos saldos do financeiro (só o Pix que você registrar para ele, quando existir essa ligação).

@@ -83,3 +83,30 @@ describe("Compra parcelada no acerto de contas", () => {
     expect(expandInstallments([{ ...watch, installment: "" }, { ...watch, kind: "pagamento", installment: "2/5" }, { ...watch, pending: true }], "2027-12")).toEqual([]);
   });
 });
+
+import { installmentLabel, parseFixed } from "@/lib/finance/settle";
+
+describe("Gasto fixo no acerto de contas", () => {
+  const net: SettleItem = { id: "n", kind: "compra", date: "2026-11-10", description: "Internet", amount: 120, payer: "outro", otherShare: 50, installment: "fixa" };
+  it("entende fixa e fixa até um mês, e escreve o rótulo", () => {
+    expect(parseFixed("fixa")).toEqual({ until: null }); expect(parseFixed("fixa:2027-06")).toEqual({ until: "2027-06" });
+    expect(parseFixed("9/18")).toBeNull(); expect(parseFixed("")).toBeNull();
+    expect([installmentLabel("fixa"), installmentLabel("fixa:2027-06"), installmentLabel("9/18")]).toEqual(["fixa", "fixa até 06/27", "9/18"]);
+  });
+  it("entra todo mês, sem fim, até o mês que está sendo visto", () => {
+    const m = expandInstallments([net], "2027-02");
+    expect(m.map((i) => i.date)).toEqual(["2026-12-10", "2027-01-10", "2027-02-10"]);
+    expect(m.every((i) => i.auto && i.amount === 120 && i.payer === "outro" && i.otherShare === 50)).toBe(true);
+    expect(expandInstallments([net], "2026-11")).toEqual([]);
+  });
+  it("para no mês 'até', não duplica o mês já lançado à mão e cada mês pesa na conta", () => {
+    expect(expandInstallments([{ ...net, installment: "fixa:2027-01" }], "2027-12").map((i) => i.date)).toEqual(["2026-12-10", "2027-01-10"]);
+    const manualDez: SettleItem = { ...net, id: "m", date: "2026-12-12" };
+    expect(expandInstallments([net, manualDez], "2026-12")).toEqual([]);
+    const all = [net, ...expandInstallments([net], "2027-01")]; // nov, dez, jan: eu pago 50% de 120 = 60 em cada
+    expect(balance(all).owedByMe).toBe(6000 * 3);
+  });
+  it("aparece no texto do WhatsApp como fixa", () => {
+    expect(statementText({ me: "Eu", person: "Felipe", items: [net], generatedOn: "2026-11-25" })).toContain("Internet (fixa)");
+  });
+});

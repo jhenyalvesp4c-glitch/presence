@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { readFiles, type LocalFile } from "@/components/inbox/files";
 import { monthLabel } from "@/lib/finance/calc";
 import { readStatement, type StatementLine } from "@/lib/finance/statement.functions";
-import { balance, brl, expandInstallments, fromCents, parseBills, parseInstallment, parseMoney, split, statementText, toCents, type Payer, type SettleItem } from "@/lib/finance/settle";
+import { balance, brl, expandInstallments, fromCents, installmentLabel, parseBills, parseFixed, parseInstallment, parseMoney, split, statementText, toCents, type Payer, type SettleItem } from "@/lib/finance/settle";
 import { download, printStatement, statementCard, type CardRow } from "@/lib/finance/settle-export";
 import { useSettleActions, useSettlementItems, useSettlements, type ItemDraft, type Settlement } from "@/lib/finance/settle-data";
 import { Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TextInput, btn } from "./ui";
@@ -55,7 +55,7 @@ export function SettleView() {
       const row = (it: SettleItem): CardRow => {
         const sp = split(it), pix = it.kind === "pagamento", part = pix ? toCents(it.amount) : it.payer === "eu" ? sp.other : sp.mine, parcial = !pix && part !== toCents(it.amount), pct = it.payer === "eu" ? it.otherShare : 100 - it.otherShare;
         const who = it.payer === "eu" ? sel.person : "você";
-        return { title: `${it.description || (pix ? "Pix" : "Compra")}${it.installment ? ` (${it.installment})` : ""}`, date: dm(it.date), value: part, tone: pix ? "neutro" : it.payer === "eu" ? "verde" : "roxo",
+        return { title: `${it.description || (pix ? "Pix" : "Compra")}${it.installment ? ` (${installmentLabel(it.installment)})` : ""}`, date: dm(it.date), value: part, tone: pix ? "neutro" : it.payer === "eu" ? "verde" : "roxo",
           sub: pix ? (it.payer === "eu" ? `Pix seu → ${sel.person}` : `Pix de ${sel.person} → você`) : parcial ? `Compra de ${brl(it.amount)} · ${who} fica com ${pct}%` : `${who === "você" ? "Você paga" : `${sel.person} paga`} tudo` };
       };
       const ok = items.filter((i) => !(i.kind === "pagamento" && i.pending));
@@ -180,7 +180,7 @@ function ItemRow({ it, person, onEdit, onDelete, onConfirm }: { it: SettleItem; 
   return (
     <li className="flex items-center gap-3 py-2.5" data-testid="acerto-item">
       <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{dm(it.date)}</span>
-      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (pix ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({it.installment})</span>}{it.pending && <span className="ml-1.5 rounded-full border border-amber/40 px-1.5 py-0.5 text-[0.62rem] text-amber">aguardando</span>}{it.auto ? <span className="ml-1.5 rounded-full border border-cyan/40 px-1.5 py-0.5 text-[0.62rem] text-cyan" title="Parcela gerada sozinha pela compra parcelada. Para mudar, edite a primeira parcela lançada." data-testid="acerto-parcela-auto">parcela automática</span> : it.linked && <span className="ml-1.5 rounded-full border border-emerald/40 px-1.5 py-0.5 text-[0.62rem] text-emerald" title="Vem de uma compra dividida no financeiro. Para mudar, edite a compra.">da compra</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
+      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (pix ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({installmentLabel(it.installment)})</span>}{it.pending && <span className="ml-1.5 rounded-full border border-amber/40 px-1.5 py-0.5 text-[0.62rem] text-amber">aguardando</span>}{it.auto ? <span className="ml-1.5 rounded-full border border-cyan/40 px-1.5 py-0.5 text-[0.62rem] text-cyan" title="Gerada sozinha pela compra parcelada ou pelo gasto fixo. Para mudar, edite o primeiro lançamento." data-testid="acerto-parcela-auto">{parseFixed(it.installment) ? "fixa do mês" : "parcela automática"}</span> : it.linked && <span className="ml-1.5 rounded-full border border-emerald/40 px-1.5 py-0.5 text-[0.62rem] text-emerald" title="Vem de uma compra dividida no financeiro. Para mudar, edite a compra.">da compra</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
       <b className={`tabular-nums text-sm ${!pix ? (it.payer === "eu" ? "text-emerald" : "text-violet") : ""}`} data-testid="acerto-item-valor">{brl(fromCents(part))}</b>
       {onConfirm && <button className={`${btn.ghost} !px-2.5 !py-1 text-xs`} onClick={onConfirm} data-testid="acerto-confirmar-pix">Recebi</button>}
       {!it.linked && <button className={btn.icon} onClick={onEdit} aria-label="Editar"><Pencil size={14} /></button>}
@@ -196,7 +196,7 @@ function ItemEditor({ person, defaultShare, initial, kind, onSave, onClose }: { 
   // compra nova: começa pela divisão padrão do acerto (se houver); compra existente: como foi lançada
   const start = initial ? initial.otherShare : defaultShare;
   const [who, setWho] = useState<"tudo" | "metade" | "pct">(() => (start === null ? "tudo" : start === 50 ? "metade" : start === 100 || start === 0 ? "tudo" : "pct"));
-  const [pct, setPct] = useState(start !== null && ![0, 50, 100].includes(start) ? start : 30), [inst, setInst] = useState(initial?.installment ?? ""), [pend, setPend] = useState(!!initial?.pending);
+  const [pct, setPct] = useState(start !== null && ![0, 50, 100].includes(start) ? start : 30), [inst, setInst] = useState(parseFixed(initial?.installment) ? "" : initial?.installment ?? ""), [repeat, setRepeat] = useState<"avista" | "parcela" | "fixa">(parseFixed(initial?.installment) ? "fixa" : initial?.installment ? "parcela" : "avista"), [until, setUntil] = useState(parseFixed(initial?.installment)?.until ?? ""), [pend, setPend] = useState(!!initial?.pending);
   const pix = kind === "pagamento";
   // para quem é a compra: "tudo" = a parte inteira do OUTRO lado do cartão (se paguei eu, é dela; se ela pagou, é minha)
   const otherShare = pix ? 100 : who === "metade" ? 50 : who === "pct" ? Math.min(100, Math.max(0, pct)) : payer === "eu" ? 100 : 0;
@@ -204,7 +204,7 @@ function ItemEditor({ person, defaultShare, initial, kind, onSave, onClose }: { 
   const parts = amount && !pix ? split({ amount, otherShare }) : null;
   return (
     <Modal open onClose={onClose} title={initial ? "Editar lançamento" : pix ? "Registrar pix" : "Lançar compra"} width="max-w-lg"
-      footer={<><button className={btn.ghost} onClick={onClose}>Cancelar</button><button className={btn.primary} disabled={!ok} data-testid="acerto-salvar-item" onClick={() => amount && onSave({ kind, date: date || null, description: desc, amount, payer, otherShare, installment: inst, pending: pix && pend })}>Salvar</button></>}>
+      footer={<><button className={btn.ghost} onClick={onClose}>Cancelar</button><button className={btn.primary} disabled={!ok} data-testid="acerto-salvar-item" onClick={() => amount && onSave({ kind, date: date || null, description: desc, amount, payer, otherShare, installment: pix ? "" : repeat === "fixa" ? (until ? `fixa:${until}` : "fixa") : repeat === "parcela" ? inst : "", pending: pix && pend })}>Salvar</button></>}>
       <div className="space-y-4">
         <Field label={pix ? "Quem fez o pix?" : "Em qual cartão foi?"} group>
           <Segmented value={payer} onChange={setPayer} options={[{ value: "eu", label: pix ? "Eu" : "No meu cartão" }, { value: "outro", label: pix ? person : `No cartão de ${person}` }]} />
@@ -220,7 +220,13 @@ function ItemEditor({ person, defaultShare, initial, kind, onSave, onClose }: { 
         </div>
         <Field label={pix ? "Observação (opcional)" : "Descrição"}><TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={pix ? "Ex.: pix de quitação" : "Ex.: Mercado, farmácia…"} maxLength={200} data-testid="acerto-desc" /></Field>
         {parts && <p className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm" data-testid="acerto-divisor">Parte de {person}: <b className="text-emerald">{brl(fromCents(parts.other))}</b> · Sua parte: <b>{brl(fromCents(parts.mine))}</b> <span className="text-xs text-muted-foreground">({otherShare}% / {100 - otherShare}%)</span></p>}
-        {!pix && <Field label="Parcela (opcional)" hint={parseInstallment(inst) ? `As parcelas ${parseInstallment(inst)!.n + 1} a ${parseInstallment(inst)!.total} entram sozinhas, uma por mês, nos meses seguintes. Para mudar, edite esta.` : "Ex.: 9/18 = nona parcela de 18. As próximas entram sozinhas, uma por mês."}><TextInput value={inst} onChange={(e) => setInst(e.target.value)} placeholder="Ex.: 9/18" maxLength={20} data-testid="acerto-parcela" /></Field>}
+        {!pix && (
+          <Field label="Como se repete?" group>
+            <Segmented value={repeat} onChange={setRepeat} options={[{ value: "avista", label: "Só esta vez" }, { value: "parcela", label: "Parcelada" }, { value: "fixa", label: "Fixa (todo mês)" }]} />
+            {repeat === "parcela" && <label className="mt-2 block"><TextInput value={inst} onChange={(e) => setInst(e.target.value)} placeholder="Ex.: 9/18" maxLength={20} data-testid="acerto-parcela" aria-label="Parcela" /><span className="mt-1 block text-[0.7rem] text-muted-foreground">{parseInstallment(inst) ? `As parcelas ${parseInstallment(inst)!.n + 1} a ${parseInstallment(inst)!.total} entram sozinhas, uma por mês, nos meses seguintes. Para mudar, edite esta.` : "Ex.: 9/18 = nona parcela de 18. As próximas entram sozinhas, uma por mês."}</span></label>}
+            {repeat === "fixa" && <label className="mt-2 block"><span className="mb-1 block text-xs text-muted-foreground">Até quando? (opcional)</span><TextInput type="month" value={until} onChange={(e) => setUntil(e.target.value)} data-testid="acerto-fixa-ate" aria-label="Até o mês" /><span className="mt-1 block text-[0.7rem] text-muted-foreground">Entra todo mês, no mesmo dia, com o mesmo cartão e a mesma divisão, até você encerrar. Para mudar o valor dali em diante, defina o “até” aqui e lance a nova.</span></label>}
+          </Field>
+        )}
       </div>
     </Modal>
   );

@@ -77,7 +77,7 @@ export function statementText(opts: { me: string; person: string; items: SettleI
   const { me, person, items } = opts, b = balance(items);
   const compras = items.filter((i) => i.kind === "compra"), pix = items.filter((i) => i.kind === "pagamento" && !i.pending);
   const mine = compras.filter((i) => i.payer === "eu"), theirs = compras.filter((i) => i.payer === "outro");
-  const line = (i: SettleItem, share: number) => `• ${dm(i.date)} ${i.description || "Compra"}${i.installment ? ` (${i.installment})` : ""} — ${brl(i.amount)}${share === 100 ? "" : ` · ${pct(share)} = ${brl(fromCents(Math.round((toCents(i.amount) * share) / 100)))}`}`;
+  const line = (i: SettleItem, share: number) => `• ${dm(i.date)} ${i.description || "Compra"}${i.installment ? ` (${installmentLabel(i.installment)})` : ""} — ${brl(i.amount)}${share === 100 ? "" : ` · ${pct(share)} = ${brl(fromCents(Math.round((toCents(i.amount) * share) / 100)))}`}`;
   const out: string[] = [`*Acerto de contas — ${me} e ${person}*`, `Gerado em ${opts.generatedOn.split("-").reverse().join("/")}`, ""];
   if (mine.length) out.push(`*Compras no cartão de ${me} (parte de ${person})*`, ...mine.map((i) => line(i, i.otherShare)), `Total: ${brl(fromCents(b.owedToMe))}`, "");
   if (theirs.length) out.push(`*Compras no cartão de ${person} (parte de ${me})*`, ...theirs.map((i) => line(i, 100 - i.otherShare)), `Total: ${brl(fromCents(b.owedByMe))}`, "");
@@ -125,11 +125,34 @@ export function parseInstallment(s: string | null | undefined): { n: number; tot
  * Compras parceladas viram uma parcela por mês, sozinhas: uma compra "9/18" lançada em novembro gera "10/18" em dezembro, "11/18" em janeiro…
  * até a última parcela ou até o mês `throughYm`. Se já existir um lançamento igual (mesma descrição, cartão e parcela), não duplica.
  */
+/** Gasto fixo (todo mês): a parcela vale "fixa" (sem fim) ou "fixa:2027-06" (até o mês indicado). */
+export function parseFixed(s: string | null | undefined): { until: string | null } | null {
+  const m = /^\s*fixa(?::(\d{4}-\d{2}))?\s*$/i.exec(s ?? "");
+  return m ? { until: m[1] ?? null } : null;
+}
+/** Texto da parcela para mostrar: "9/18", "fixa" ou "fixa até 06/27". */
+export function installmentLabel(s: string): string {
+  const f = parseFixed(s);
+  return f ? (f.until ? `fixa até ${f.until.slice(5, 7)}/${f.until.slice(2, 4)}` : "fixa") : s;
+}
 export function expandInstallments(items: SettleItem[], throughYm: string): SettleItem[] {
   const norm = (it: SettleItem, label: string) => `${it.description.trim().toLowerCase()}|${it.payer}|${label.replace(/\s+/g, "")}`;
-  const seen = new Set(items.filter((i) => i.installment).map((i) => norm(i, i.installment)));
+  const seen = new Set(items.filter((i) => i.installment && !parseFixed(i.installment)).map((i) => norm(i, i.installment)));
+  const monthSeen = new Set(items.filter((i) => parseFixed(i.installment) && i.date).map((i) => `${norm(i, "fixa")}|${i.date!.slice(0, 7)}`));
   const out: SettleItem[] = [];
   for (const it of items) {
+    // gasto fixo: um lançamento por mês, no mesmo dia, até o mês pedido (ou o "até" do gasto)
+    const fx = it.kind === "compra" && !it.pending && !it.linked && !it.auto && it.date ? parseFixed(it.installment) : null;
+    if (fx && it.date) {
+      const day = Number(it.date.slice(8, 10)), startYm = it.date.slice(0, 7), last = fx.until && fx.until < throughYm ? fx.until : throughYm;
+      for (let ym = addMonths(startYm, 1); ym <= last; ym = addMonths(ym, 1)) {
+        const key = `${norm(it, "fixa")}|${ym}`;
+        if (monthSeen.has(key)) continue;
+        monthSeen.add(key);
+        out.push({ ...it, id: `${it.id}~${ym}`, date: dayIn(ym, day), auto: true, linked: true });
+      }
+      continue;
+    }
     const p = it.kind === "compra" && !it.pending && !it.linked && !it.auto && it.date ? parseInstallment(it.installment) : null;
     if (!p || !it.date) continue;
     const day = Number(it.date.slice(8, 10)), startYm = it.date.slice(0, 7);
