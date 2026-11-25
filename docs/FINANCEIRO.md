@@ -97,3 +97,13 @@ O filtro **Ver: Tudo · Sem cofrinho · Só cofrinho** (`CofFilter`, `useCofView
 - **Só cofrinho:** o dinheiro guardado e o que os cofrinhos pagam.
 
 As contas ficam em `calc.ts`: `invAmount`, `linesIn`, `viewBalance` e o parâmetro `view` de `monthClose`, `cashBreakdown`, `monthPlan` e `cashflow`.
+
+### Metas que descontam da sobra de caixa
+
+- Cada meta tem o liga/desliga **Descontar da sobra de caixa** (`fin_goals.reserve`), no formulário e no cartão da meta. Há também um liga/desliga geral na Visão geral e em Próximos meses ("Descontar minhas metas da sobra", guardado no navegador).
+- O que cada meta ligada reserva (`reservesFor`): **limite de categoria** = o que ainda não foi gasto do limite no mês atual (e o limite inteiro nos meses seguintes); **economizar por mês** = o que falta guardar no mês; **guardar, reserva e quitar cartão** = "Reservar por mês" (até completar a meta).
+- A sobra de caixa mostra a linha "− Minhas metas do mês" e o detalhe ganha o grupo "Minhas metas do mês". Em Próximos meses, cada mês traz as metas ligadas. Com a visão "Só cofrinho" as metas não entram.
+
+### Contas fixas
+
+Em **Contas fixas e assinaturas** (aba antes chamada "Assinaturas") fica a lista das contas fixas e do salário: dá para ver, editar valor, dia e conta, pausar, excluir e criar. Antes isso só existia dentro de "Refazer o briefing".

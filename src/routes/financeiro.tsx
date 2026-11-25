@@ -22,7 +22,7 @@ const TABS = ["visao", "contas", "parcelas", "meses", "movimentacoes", "assinatu
 type Tab = (typeof TABS)[number];
 const TAB_META: Record<Tab, { label: string; icon: typeof Gauge }> = {
   visao: { label: "Visão geral", icon: LayoutDashboard }, contas: { label: "Contas e cartões", icon: CreditCard }, parcelas: { label: "Parcelas", icon: Layers }, meses: { label: "Próximos meses", icon: CalendarRange },
-  movimentacoes: { label: "Movimentações", icon: Receipt }, assinaturas: { label: "Assinaturas", icon: Repeat }, acerto: { label: "Acerto de contas", icon: Handshake }, metas: { label: "Metas", icon: Target },
+  movimentacoes: { label: "Movimentações", icon: Receipt }, assinaturas: { label: "Contas fixas e assinaturas", icon: Repeat }, acerto: { label: "Acerto de contas", icon: Handshake }, metas: { label: "Metas", icon: Target },
 };
 
 /** Indicador de onde os dados estão sendo guardados. */

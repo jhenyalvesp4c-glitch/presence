@@ -59,6 +59,8 @@ export type Recurring = {
 export type Goal = {
   id: string; kind: GoalKind; title: string; target: number; current: number; deadline?: string | undefined;
   category?: string | undefined; cardId?: string | undefined; monthly?: number | undefined;
+  /** Liga/desliga: desconta esta meta da sobra de caixa (limite do mês ainda não gasto, ou o valor reservado por mês). */
+  reserve?: boolean | undefined;
 };
 
 export type FinanceState = {

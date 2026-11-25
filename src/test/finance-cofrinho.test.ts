@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountBalance, cashflow, cashOut, cofrinhoInfo, invAmount, invoiceFor, linesIn, monthClose, monthPlan, reservedBalance, sum, totalBalance } from "@/lib/finance/calc";
+import { accountBalance, cashBreakdown, cashflow, cashOut, reservesFor, round2, totalReserves, cofrinhoInfo, invAmount, invoiceFor, linesIn, monthClose, monthPlan, reservedBalance, sum, totalBalance } from "@/lib/finance/calc";
 import { fromRows, toRows } from "@/lib/finance/db-map";
 import { EMPTY_STATE, type FinanceState, type Plan } from "@/lib/finance/types";
 
@@ -104,5 +104,42 @@ describe("Filtro: tudo, sem cofrinho, só cofrinho", () => {
     expect(dez("cofrinho").entradas).toBe(0);
     expect(cashflow(s, today, 40, "cofrinho").start).toBe(1000);
     expect(cashflow(s, today, 40, "tudo").start).toBe(1500);
+  });
+});
+
+describe("Metas que descontam da sobra de caixa (liga e desliga)", () => {
+  const goals = [
+    { id: "g1", kind: "limite_categoria" as const, title: "iFood", target: 200, current: 0, category: "restaurantes", reserve: true },
+    { id: "g2", kind: "guardar" as const, title: "Juntar", target: 5000, current: 4900, monthly: 300, reserve: true },
+    { id: "g3", kind: "limite_categoria" as const, title: "Desligada", target: 999, current: 0, category: "compras" },
+  ];
+  const withGoals = (): FinanceState => ({ ...state(), goals, transactions: [{ id: "x", kind: "despesa", desc: "iFood", amount: 80, date: "2026-11-20", method: "debito", accountId: "acc", category: "restaurantes" }] });
+
+  it("só as metas ligadas reservam: o limite que falta gastar e o valor por mês (até completar a meta)", () => {
+    const s = withGoals();
+    expect(reservesFor(s, "2026-11", today).map((r) => [r.title, r.amount])).toEqual([["iFood", 120], ["Juntar", 100]]); // 200−80 gastos · faltam 100 para os 5000
+    expect(reservesFor(s, "2026-12", today).map((r) => [r.title, r.amount])).toEqual([["iFood", 200], ["Juntar", 100]]);
+    expect(totalReserves(s, today)).toBe(220);
+  });
+  it("a sobra desconta quando ligado e volta ao valor de antes quando desligado", () => {
+    const s = withGoals(), off = monthClose(s, today, "bolso", false), on = monthClose(s, today, "bolso", true);
+    expect(off.reservas).toBe(0); expect(on.reservas).toBe(220); expect(on.reservasPossiveis).toBe(220);
+    expect(round2(off.sobra - on.sobra)).toBe(220);
+    expect(monthClose(s, today, "cofrinho", true).reservas).toBe(0);
+  });
+  it("próximos meses e o detalhe da sobra trazem as metas só quando ligado", () => {
+    const s = withGoals();
+    expect(monthPlan(s, today, 2, "bolso", false)[0]!.metas).toBe(0);
+    const m = monthPlan(s, today, 3, "bolso", true);
+    expect(m.map((x) => x.metas)).toEqual([220, 300, 300]);
+    expect(m[1]!.items.filter((i) => i.group === "metas")).toHaveLength(2);
+    expect(round2(monthPlan(s, today, 2, "bolso", false)[1]!.resultado - m[1]!.resultado)).toBe(300);
+    const b = cashBreakdown(s, today, "bolso", true);
+    expect(b.groups.find((g) => g.id === "metas")?.total).toBe(220);
+    expect(cashBreakdown(s, today, "bolso", false).groups.find((g) => g.id === "metas")).toBeUndefined();
+  });
+  it("a meta guarda o liga/desliga no banco", () => {
+    const back = fromRows(toRows(withGoals()));
+    expect(back.goals.map((g) => !!g.reserve)).toEqual([true, true, false]);
   });
 });

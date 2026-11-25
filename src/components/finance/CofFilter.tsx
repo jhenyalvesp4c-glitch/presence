@@ -1,7 +1,8 @@
 import { PiggyBank } from "lucide-react";
 
 import type { CofView } from "@/lib/finance/calc";
-import { useCofView } from "@/lib/finance/cof-view";
+import { brl as brlN } from "@/lib/finance/calc";
+import { useCofView, useReservesOn } from "@/lib/finance/cof-view";
 import { useFinance } from "@/lib/finance/store";
 
 const OPTIONS: { v: CofView; label: string }[] = [{ v: "tudo", label: "Tudo" }, { v: "bolso", label: "Sem cofrinho" }, { v: "cofrinho", label: "Só cofrinho" }];
@@ -23,5 +24,19 @@ export function CofFilter({ className = "" }: { className?: string }) {
       </div>
       <span className="hidden text-[0.7rem] text-muted-foreground md:inline">{COF_HINT[view]}</span>
     </div>
+  );
+}
+
+/** Liga/desliga geral das metas que descontam da sobra de caixa. */
+export function ReservesSwitch({ possible, className = "" }: { possible: number; className?: string }) {
+  const { state } = useFinance(), [on, setOn] = useReservesOn();
+  const any = state.goals.some((g) => g.reserve);
+  if (!any) return null;
+  return (
+    <label className={`flex cursor-pointer flex-wrap items-center gap-2 text-xs ${className}`} data-testid="fin-descontar-metas">
+      <button type="button" role="switch" aria-checked={on} aria-label="Descontar minhas metas da sobra" onClick={() => setOn(!on)} className={`relative h-5 w-9 rounded-full border transition ${on ? "border-emerald bg-emerald/30" : "border-white/15 bg-white/10"}`}><span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all ${on ? "left-[1.1rem]" : "left-0.5"}`} /></button>
+      <span className={on ? "text-foreground" : "text-muted-foreground"}>Descontar minhas metas da sobra</span>
+      <span className="text-muted-foreground">· {possible > 0 ? `${brlN(possible)} reservado${on ? "" : " (desligado)"} neste mês` : "nada a reservar neste mês"}</span>
+    </label>
   );
 }

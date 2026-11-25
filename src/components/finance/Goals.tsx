@@ -14,7 +14,7 @@ const COLOR: Record<GoalKind, string> = { guardar: "var(--cyan)", reserva: "var(
 const ROSE = "oklch(0.72 0.18 10)";
 
 export function GoalCard({ goal, onEdit, onDelete, onAdd, index = 0 }: { goal: Goal; onEdit?: (g: Goal) => void; onDelete?: (g: Goal) => void; onAdd?: (g: Goal) => void; index?: number }) {
-  const { state, today } = useFinance(), I = ICON[goal.kind];
+  const fin = useFinance(), { state, today } = fin, I = ICON[goal.kind];
   const limit = goal.kind === "limite_categoria";
   const current = limit ? total(expensesOf(monthEntries(state, ymOf(today))).filter((e) => e.category === goal.category)) : goal.current;
   const pct = goal.target ? (current / goal.target) * 100 : 0, over = limit && current > goal.target, color = over ? ROSE : COLOR[goal.kind];
@@ -35,6 +35,12 @@ export function GoalCard({ goal, onEdit, onDelete, onAdd, index = 0 }: { goal: G
             {over ? <Pill color={ROSE}>passou {brl(current - goal.target)}</Pill> : <Pill color={color}>{limit ? `ainda pode gastar ${brl(left)}` : pct >= 100 ? "meta atingida 🎉" : `faltam ${brl(left)}`}</Pill>}
             {goal.deadline && !limit && <Pill color="var(--violet)"><CalendarDays size={11} /> até {dateBR(goal.deadline).slice(3)}</Pill>}
           </div>
+          {onEdit && (
+            <button type="button" role="switch" aria-checked={!!goal.reserve} onClick={() => fin.upsertGoal({ ...goal, reserve: !goal.reserve })} data-testid="fin-meta-descontar-card" title="Liga ou desliga o desconto desta meta na sobra de caixa" className="mt-2 flex items-center gap-2 text-xs text-muted-foreground transition hover:text-foreground">
+              <span className={`relative h-4 w-7 rounded-full border transition ${goal.reserve ? "border-emerald bg-emerald/30" : "border-white/15 bg-white/10"}`}><span className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-all ${goal.reserve ? "left-[0.95rem]" : "left-0.5"}`} /></span>
+              {goal.reserve ? "Desconta da sobra de caixa" : "Não desconta da sobra"}
+            </button>
+          )}
         </div>
       </div>
       {goal.deadline && !limit && left > 0 && <p className="relative mt-3 rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-muted-foreground">Para chegar lá, guarde cerca de <b className="text-foreground tabular-nums">{brl(left / months)}</b> por mês durante {months} {months === 1 ? "mês" : "meses"}.</p>}

@@ -102,7 +102,36 @@ export function SubscriptionsView() {
       <Modal open={edit !== null} onClose={() => setEdit(null)} title={edit === "new" ? "Nova assinatura" : "Editar assinatura"} subtitle="Entra todo mês na fatura do cartão (ou na conta) no dia da cobrança." width="max-w-xl">
         {edit !== null && <RecurringForm subscription initial={edit === "new" ? undefined : edit} onCancel={() => setEdit(null)} onSave={(r) => { f.upsertRecurring(r); setEdit(null); setFilter(isPaused(r) ? "pausadas" : "ativas"); }} />}
       </Modal>
+      <FixedBills />
       <ConfirmDelete open={!!del} what={del ? `a assinatura “${del.desc}”` : ""} onCancel={() => setDel(null)} onConfirm={() => { if (del) f.removeRecurring(del.id); setDel(null); }} />
     </div>
+  );
+}
+
+/** Contas fixas e salário (aluguel, contas de casa, salário…): tudo que se repete todo mês e não é assinatura. Dá para ver, editar o valor e o dia, pausar e excluir. */
+function FixedBills() {
+  const f = useFinance(), { state, today } = f, [edit, setEdit] = useState<Recurring | "new" | null>(null), [del, setDel] = useState<Recurring | null>(null);
+  const list = state.recurring.filter((r) => !isSubscription(r)).sort((a, b) => Number(isPaused(a)) - Number(isPaused(b)) || a.kind.localeCompare(b.kind) || b.amount - a.amount);
+  const out = list.filter((r) => r.kind === "despesa" && !isPaused(r)).reduce((a, r) => a + r.amount, 0), inn = list.filter((r) => r.kind === "receita" && !isPaused(r)).reduce((a, r) => a + r.amount, 0);
+  const where = (r: Recurring) => (r.cardId ? state.cards.find((c) => c.id === r.cardId)?.name : state.accounts.find((a) => a.id === r.accountId)?.name) ?? "";
+  const toggle = (r: Recurring) => { if (isPaused(r)) { f.upsertRecurring(resumeRecurring(r, today)); toast.success(`${r.desc} reativada`); } else { f.upsertRecurring(pauseRecurring(r, today)); toast.info(`${r.desc} pausada`); } };
+  return (
+    <section className="space-y-3" data-testid="fin-contas-fixas">
+      <SectionTitle kicker="Todo mês" title="Contas" accent="fixas" sub={`Saem ${brl(out)} e entram ${brl(inn)} por mês (sem as pausadas). Aqui você muda o valor, o dia e a conta.`}
+        right={<button className={btn.primary} onClick={() => setEdit("new")} data-testid="fin-add-fixa"><Plus size={16} /> Nova conta fixa</button>} />
+      {list.length === 0 ? <Empty icon={Repeat} title="Nenhuma conta fixa" hint="Aluguel, contas de casa, salário e o que mais se repete todo mês." action={<button className={btn.primary} onClick={() => setEdit("new")}><Plus size={16} /> Nova conta fixa</button>} /> : (
+        <ul className="grid gap-2 md:grid-cols-2">{list.map((r) => (
+          <li key={r.id} className={`flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 ${isPaused(r) ? "opacity-60" : ""}`} data-testid="fin-conta-fixa">
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{r.desc}{isPaused(r) && <span className="ml-2 text-[0.65rem] text-muted-foreground">pausada</span>}</span><span className="block truncate text-xs text-muted-foreground">{catOf(r.category).name} · todo dia {r.day}{where(r) ? ` · ${where(r)}` : ""}</span></span>
+            <b className="tabular-nums" style={{ color: r.kind === "receita" ? "var(--emerald)" : undefined }}>{r.kind === "receita" ? "+" : "−"}{brl(r.amount)}</b>
+            <button className={btn.icon} aria-label={`Editar ${r.desc}`} onClick={() => setEdit(r)} data-testid="fin-editar-fixa"><Pencil size={14} /></button>
+            <button className={btn.icon} aria-label={isPaused(r) ? `Reativar ${r.desc}` : `Pausar ${r.desc}`} onClick={() => toggle(r)}>{isPaused(r) ? <Play size={14} /> : <Pause size={14} />}</button>
+            <button className={`${btn.icon} hover:!border-destructive/50 hover:!text-destructive`} aria-label={`Excluir ${r.desc}`} onClick={() => setDel(r)}><Trash2 size={14} /></button>
+          </li>))}</ul>)}
+      <Modal open={edit !== null} onClose={() => setEdit(null)} title={edit === "new" ? "Nova conta fixa" : "Editar conta fixa"} subtitle="Vale daqui para frente: entra todo mês na previsão, na sobra de caixa e nos próximos meses." width="max-w-xl">
+        {edit !== null && <RecurringForm initial={edit === "new" ? undefined : edit} onCancel={() => setEdit(null)} onSave={(r) => { f.upsertRecurring(r); setEdit(null); }} />}
+      </Modal>
+      <ConfirmDelete open={!!del} what={del ? `a conta fixa “${del.desc}”` : ""} onCancel={() => setDel(null)} onConfirm={() => { if (del) f.removeRecurring(del.id); setDel(null); }} />
+    </section>
   );
 }

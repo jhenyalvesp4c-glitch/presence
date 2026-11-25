@@ -288,9 +288,10 @@ export function GoalForm({ initial, onSave, onCancel }: { initial?: Goal | undef
   const { state } = useFinance();
   const [kind, setKind] = useState<GoalKind>(initial?.kind ?? "guardar"), [title, setTitle] = useState(initial?.title ?? ""), [target, setTarget] = useState<number | undefined>(initial?.target), [current, setCurrent] = useState<number | undefined>(initial?.current ?? 0);
   const [deadline, setDeadline] = useState(initial?.deadline ?? ""), [cardId, setCardId] = useState(initial?.cardId ?? state.cards[0]?.id ?? ""), [category, setCategory] = useState(initial?.category ?? "restaurantes");
+  const [monthly, setMonthly] = useState<number | undefined>(initial?.kind === "economizar_mensal" ? undefined : initial?.monthly), [reserve, setReserve] = useState(!!initial?.reserve);
   const info = GOAL_KINDS.find((g) => g.value === kind)!;
   const auto = kind === "limite_categoria" ? `Limite de ${catOf(category).name}` : kind === "reserva" ? "Reserva de emergência" : kind === "economizar_mensal" ? "Economizar todo mês" : kind === "quitar_cartao" ? `Quitar o cartão ${state.cards.find((c) => c.id === cardId)?.name ?? ""}`.trim() : "";
-  const save = () => onSave({ id: initial?.id ?? uid("goal-"), kind, title: title.trim() || auto || "Nova meta", target: target ?? 0, current: kind === "limite_categoria" ? 0 : current ?? 0, deadline: deadline || undefined, category: kind === "limite_categoria" ? category : undefined, cardId: kind === "quitar_cartao" ? cardId : undefined, monthly: kind === "economizar_mensal" ? target : undefined });
+  const save = () => onSave({ id: initial?.id ?? uid("goal-"), kind, title: title.trim() || auto || "Nova meta", target: target ?? 0, current: kind === "limite_categoria" ? 0 : current ?? 0, deadline: deadline || undefined, category: kind === "limite_categoria" ? category : undefined, cardId: kind === "quitar_cartao" ? cardId : undefined, monthly: kind === "economizar_mensal" ? target : kind === "limite_categoria" ? undefined : monthly, reserve: reserve || undefined });
   return (
     <div className="space-y-4">
       <Field label="Tipo de meta" hint={info.hint}><Select value={kind} onChange={(e) => setKind(e.target.value as GoalKind)} data-testid="fin-meta-tipo">{GOAL_KINDS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</Select></Field>
@@ -300,8 +301,13 @@ export function GoalForm({ initial, onSave, onCancel }: { initial?: Goal | undef
         {kind === "limite_categoria" && <Field label="Categoria"><Select value={category} onChange={(e) => setCategory(e.target.value)}>{CATS.filter((c) => !c.income).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>}
         <Field label={kind === "limite_categoria" ? "Limite por mês" : kind === "economizar_mensal" ? "Quanto guardar por mês" : kind === "quitar_cartao" ? "Valor a quitar" : "Valor da meta"}><MoneyInput value={target} onChange={setTarget} data-testid="fin-meta-valor" /></Field>
         {kind !== "limite_categoria" && <Field label={kind === "economizar_mensal" ? "Já guardado neste mês" : kind === "quitar_cartao" ? "Já pago" : "Já guardado"}><MoneyInput value={current} onChange={setCurrent} /></Field>}
+        {(kind === "guardar" || kind === "reserva" || kind === "quitar_cartao") && <Field label="Reservar por mês (opcional)" hint="Quanto desconta da sobra de caixa todo mês, se a meta estiver ligada."><MoneyInput value={monthly} onChange={setMonthly} data-testid="fin-meta-mensal" /></Field>}
         {(kind === "guardar" || kind === "reserva" || kind === "quitar_cartao") && <Field label="Prazo (opcional)"><TextInput type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></Field>}
       </Grid>
+      <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+        <button type="button" role="switch" aria-checked={reserve} aria-label="Descontar da sobra de caixa" data-testid="fin-meta-descontar" onClick={() => setReserve(!reserve)} className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition ${reserve ? "border-emerald bg-emerald/30" : "border-white/15 bg-white/10"}`}><span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-all ${reserve ? "left-[1.1rem]" : "left-0.5"}`} /></button>
+        <div><p className="text-sm font-medium">Descontar da sobra de caixa</p><p className="text-xs text-muted-foreground">{kind === "limite_categoria" ? "A sobra já sai descontando o que ainda não foi gasto deste limite." : kind === "economizar_mensal" ? "A sobra desconta o que ainda falta guardar neste mês." : "A sobra desconta o valor reservado por mês (preencha “Reservar por mês”)."} Dá para ligar e desligar quando quiser.</p></div>
+      </div>
       <Actions onCancel={onCancel} onSave={save} disabled={!target} />
     </div>
   );
