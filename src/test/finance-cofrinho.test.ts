@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountBalance, cofrinhoInfo, invoiceFor, totalBalance } from "@/lib/finance/calc";
+import { accountBalance, cashOut, cofrinhoInfo, invoiceFor, monthClose, monthPlan, reservedBalance, totalBalance } from "@/lib/finance/calc";
 import { fromRows, toRows } from "@/lib/finance/db-map";
 import { EMPTY_STATE, type FinanceState, type Plan } from "@/lib/finance/types";
 
@@ -41,7 +41,7 @@ describe("Cofrinho que paga parcelas", () => {
     const later = new Date("2027-01-15T12:00:00"); // venceu dez (12/12) e jan (12/01)
     expect(accountBalance(s, cofre, later)).toBe(1000 - 175 - 175);
     expect(accountBalance(s, conta, later)).toBe(500);
-    expect(totalBalance(s, today)).toBe(1500);
+    expect(totalBalance(s, today)).toBe(500); expect(reservedBalance(s, today)).toBe(1000);
   });
 
   it("guarda e lê quem paga a compra no banco", () => {
@@ -63,5 +63,24 @@ describe("Cofrinho que cobre só a partir de certa parcela", () => {
     expect(accountBalance(s, cofre, new Date("2026-12-20T12:00:00"))).toBe(1000); // dez ainda é do bolso
     expect(accountBalance(s, cofre, new Date("2027-01-20T12:00:00"))).toBe(900);
     expect(fromRows(toRows(s)).plans[0]?.fundedFrom).toBe(2);
+  });
+});
+
+describe("Saldo livre e sobra de caixa sem o dinheiro dos cofrinhos", () => {
+  it("o saldo não soma o cofrinho e a sobra desconta só o que sai do bolso", () => {
+    const s = state();
+    expect(totalBalance(s, today)).toBe(500); expect(reservedBalance(s, today)).toBe(1000);
+    const inv = invoiceFor(s, card, "2026-12");
+    expect(cashOut(inv)).toBe(275);                    // 450 do banco − 175 do cofrinho
+    const c = monthClose(s, today);
+    expect(c.faturas).toBe(275); expect(c.cofrinhosPagam).toBe(175); expect(c.sobra).toBe(225); // 500 − 275
+  });
+  it("próximos meses: a fatura sai do saldo só pela parte do bolso e mostra o que o cofrinho paga", () => {
+    const s = state();
+    const dez = monthPlan(s, today, 3).find((m) => m.ym === "2026-12")!;
+    expect(dez.faturas).toBe(275); expect(dez.cofrinhos).toBe(175);
+    expect(dez.items.find((i) => i.group === "faturas")).toMatchObject({ amount: 275, funded: 175 });
+    const jan = monthPlan(s, today, 3).find((m) => m.ym === "2027-01")!;
+    expect(jan.faturas).toBe(275); expect(jan.cofrinhos).toBe(175);
   });
 });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarRange, ChevronDown, CreditCard, Layers, Repeat, TrendingDown, TrendingUp } from "lucide-react";
+import { CalendarRange, ChevronDown, CreditCard, Layers, PiggyBank, Repeat, TrendingDown, TrendingUp } from "lucide-react";
 import { brl, closingYmOf, dateBR, invoiceLabel, monthName, monthPlan, type MonthPlan, type PlanItem } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
 import { AreaChart, BarsChart, Money } from "./charts";
@@ -32,6 +32,7 @@ function MonthCard({ m, open, onToggle, first }: { m: MonthPlan; open: boolean; 
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-[0.72rem] text-muted-foreground">
             <span className="inline-flex items-center gap-1.5"><Layers size={12} className="text-amber" />Parcelas nas faturas: <b className="text-foreground">{brl(m.parcelas)}</b></span>
             <span className="inline-flex items-center gap-1.5"><Repeat size={12} className="text-cyan" />Assinaturas no total: <b className="text-foreground">{brl(assinTotal)}</b>{m.assinaturasCartao > 0 && ` (${brl(m.assinaturasCartao)} no cartão)`}</span>
+            {m.cofrinhos > 0 && <span className="inline-flex items-center gap-1.5" data-testid="fin-mes-cofrinhos"><PiggyBank size={12} className="text-cyan" />Cofrinhos pagam: <b className="text-foreground">{brl(m.cofrinhos)}</b> (não sai do saldo)</span>}
             <span>Saldo projetado no fim do mês: <b className="text-foreground">{brl(m.saldoFinal)}</b></span>
           </p>
           {m.items.length === 0 ? <p className="text-sm text-muted-foreground">Nada previsto para este mês.</p> : (
@@ -46,7 +47,7 @@ function MonthCard({ m, open, onToggle, first }: { m: MonthPlan; open: boolean; 
                   </div>
                   {it.lines && it.lines.length > 0 && (
                     <ul className="mt-2 space-y-0.5 border-t border-white/[0.06] pt-2 text-[0.72rem] text-muted-foreground">
-                      {it.lines.map((l) => <li key={l.id} className="flex justify-between gap-3"><span className="truncate">{l.desc}{l.parcel ? ` (parcela ${l.parcel})` : ""}{l.source === "recorrente" ? " · fixa" : ""}{l.source === "ajuste" ? " · a detalhar" : ""}</span><span className="tabular-nums">{brl(l.amount)}</span></li>)}
+                      {it.lines.map((l) => <li key={l.id} className="flex justify-between gap-3"><span className="truncate">{l.desc}{l.parcel ? ` (parcela ${l.parcel})` : ""}{l.source === "recorrente" ? " · fixa" : ""}{l.source === "ajuste" ? " · a detalhar" : ""}{l.funded ? " · cofrinho" : ""}</span><span className="tabular-nums" style={l.funded ? { color: "var(--cyan)" } : undefined}>{brl(l.amount)}</span></li>)}
                     </ul>
                   )}
                 </li>);

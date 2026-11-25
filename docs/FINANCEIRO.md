@@ -81,3 +81,9 @@ A pessoa renomeia, troca cor/ícone/palavras-chave, oculta e cria categorias (bo
 - A **fatura** continua com o valor do banco. Ela mostra quanto o cofrinho paga e quanto **sai do seu bolso** (`Invoice.funded` / `own`, sempre só a sua parte; a de outra pessoa fica de fora) e tem o filtro Tudo / Do cofrinho / Do meu bolso. A tela de **Compras parceladas** tem o mesmo filtro.
 - Quando a fatura é paga (data de pagamento depois da data do saldo informado), as parcelas saem do cofrinho sozinhas (`accountBalance`). Os totais gerais não mudam: o saldo do cofrinho conta como dinheiro e a fatura como saída.
 - A conta do cofrinho mostra o painel "Cofrinho das parcelas": quanto tem, quanto ainda vai sair, sobra ou falta, e mês a mês até quando cobre (`cofrinhoInfo`).
+
+### Saldo livre × cofrinhos
+
+- **Saldo disponível** (`totalBalance`) é só o dinheiro livre das contas e carteiras. O que está nos cofrinhos aparece à parte ("Guardado nos cofrinhos", `reservedBalance`).
+- Nas contas de caixa (sobra de caixa, próximos meses, fluxo de caixa, simulação de compra), cada fatura entra só pela parte que **sai do saldo**: valor do banco menos o que o cofrinho paga (`cashOut`). As parcelas do cofrinho saem do cofrinho, nunca do saldo.
+- Em **Próximos meses**, cada mês mostra "Cofrinhos pagam" e marca as parcelas do cofrinho dentro da fatura. Na aba **Próximas** do cartão, cada fatura mostra "Cofrinho paga X · Do seu saldo Y".

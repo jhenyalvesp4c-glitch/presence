@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, CalendarDays, CreditCard, Gauge as GaugeIcon, Info, Layers, PiggyBank, Scale, Sparkles, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { addMonths, alertsFor, brl, cashflow, categoryTotals, commitments, dateBR, isoOf, monthName, monthSummary, monthClose, monthlySeries, openInvoice, parseIso, sameDayPrev, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
+import { addMonths, alertsFor, brl, cashflow, categoryTotals, commitments, dateBR, isoOf, monthName, monthSummary, monthClose, monthlySeries, openInvoice, parseIso, sameDayPrev, reservedBalance, totalBalance, totalFutureParcels, totalOpenInvoices, whyChanged, ymOf, monthEntries, incomeOf, expensesOf, total, cardAvailable } from "@/lib/finance/calc";
 import { useFinance } from "@/lib/finance/store";
 import { AreaChart, BarsChart, Donut, Gauge, Heatmap, Money, RadialRings, Sparkline, StackedBars } from "./charts";
 import { HeroPanel, OrbitArt, Tilt } from "./fx";
@@ -71,7 +71,7 @@ function FlowPanel({ flow, today, onAddMov }: { flow: ReturnType<typeof cashflow
   );
 }
 
-type Model = { close: ReturnType<typeof monthClose>; sum: ReturnType<typeof monthSummary>; series: ReturnType<typeof monthlySeries>; saldo: number; faturas: number; parcelas: number; flow: ReturnType<typeof cashflow> };
+type Model = { close: ReturnType<typeof monthClose>; sum: ReturnType<typeof monthSummary>; series: ReturnType<typeof monthlySeries>; saldo: number; reserved: number; faturas: number; parcelas: number; flow: ReturnType<typeof cashflow> };
 /** Topo da visão geral: saldo gigante, ritmo do mês e a órbita com o que sobra no fim do mês. */
 function Hero({ model, cards, accounts, today, onDetail }: { model: Model; cards: number; accounts: number; today: Date; onDetail: () => void }) {
   const c = model.close, good = c.sobra >= 0;
@@ -90,6 +90,7 @@ function Hero({ model, cards, accounts, today, onDetail }: { model: Model; cards
             <span className="text-gradient drop-shadow-[0_0_40px_color-mix(in_oklab,var(--cyan)_35%,transparent)]"><Money value={model.saldo} /></span>
           </p>
           <p className="mt-3 text-sm text-muted-foreground">Em {accounts} {accounts === 1 ? "conta" : "contas e carteiras"} · {cards} {cards === 1 ? "cartão" : "cartões"} · {today.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
+          {model.reserved > 0 && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-cyan/30 bg-cyan/[0.07] px-3 py-1 text-xs" data-testid="fin-guardado-cofrinhos"><PiggyBank size={13} className="text-cyan" /> Guardado nos cofrinhos <b className="tabular-nums">{brl(model.reserved)}</b> <span className="text-muted-foreground">· separado, não entra no saldo</span></p>}
           <div className="mt-4 overflow-hidden"><Sparkline values={model.series.map((p) => p.acumulado)} color="var(--cyan)" width={420} height={56} /></div>
           <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {stats.map((k, i) => (
@@ -115,7 +116,7 @@ function Hero({ model, cards, accounts, today, onDetail }: { model: Model; cards
             </button>
           </OrbitArt>
           <dl className="mt-3 w-full max-w-[19rem] space-y-1 text-xs tabular-nums" data-testid="fin-sobra-conta" aria-label="Como chegamos nesse número">
-            {[["Saldo hoje", c.saldo, ""], ["+ Ainda entra no mês", c.aReceber, "var(--emerald)"], ["− Contas a pagar no mês", -c.aPagarConta, ROSE], ["− Faturas dos cartões", -c.faturas, ROSE]].map(([l, v, col]) => (
+            {[["Saldo hoje", c.saldo, ""], ["+ Ainda entra no mês", c.aReceber, "var(--emerald)"], ["− Contas a pagar no mês", -c.aPagarConta, ROSE], ["− Faturas dos cartões (sem a parte dos cofrinhos)", -c.faturas, ROSE]].map(([l, v, col]) => (
               <div key={String(l)} className="flex items-baseline justify-between gap-3"><dt className="text-muted-foreground">{l}</dt><dd className="font-medium" style={col ? { color: String(col) } : undefined}><Money value={Number(v)} cents={false} /></dd></div>
             ))}
             <div className="flex items-baseline justify-between gap-3 border-t border-white/10 pt-1"><dt className="font-semibold">= Resultado</dt><dd className="font-semibold" style={{ color: good ? "var(--emerald)" : ROSE }}><Money value={c.sobra} cents={false} /></dd></div>
@@ -135,7 +136,7 @@ export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: 
     const series = monthlySeries(state, ym, 6, todayIso), cats = categoryTotals(state, ym, todayIso), future = commitments(state, ym, 12);
     return {
       close: monthClose(state, today), sum, prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
-      series, cats, future, saldo: totalBalance(state, today), faturas: totalOpenInvoices(state, today), parcelas: totalFutureParcels(state, today),
+      series, cats, future, saldo: totalBalance(state, today), reserved: reservedBalance(state, today), faturas: totalOpenInvoices(state, today), parcelas: totalFutureParcels(state, today),
       alerts: alertsFor(state, today), why: whyChanged(state, ym, todayIso), flow: cashflow(state, today, 60),
       daily: expensesOf(monthEntries(state, ym, todayIso)).reduce<Record<number, number>>((m, e) => { const d = Number(e.date.slice(8, 10)); m[d] = (m[d] ?? 0) + e.amount; return m; }, {}),
     };

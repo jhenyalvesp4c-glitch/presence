@@ -3,7 +3,7 @@
  * plano do dia, financeiro e acertos de contas. Vira "documentos" pesquisáveis, para o Perguntar e o orbe (buscar_no_orion)
  * enxergarem o MESMO sistema. Funções puras: quem lê o banco é `orion.functions.ts`.
  */
-import { accountBalance, brl, dateBR, isoOf, isPaused, isSubscription, monthName, monthSummary, openInvoice, recurringActiveIn, round2, totalBalance, ymOf } from "./finance/calc";
+import { accountBalance, brl, dateBR, isoOf, isPaused, isSubscription, monthName, monthSummary, openInvoice, recurringActiveIn, reservedBalance, round2, totalBalance, ymOf } from "./finance/calc";
 import { balance, fromCents, type SettleItem } from "./finance/settle";
 import type { FinanceState } from "./finance/types";
 import { budgetLines, budgetTotals, cleanBudget } from "./ideas";
@@ -88,7 +88,7 @@ export function extraDocs(raw: ExtraRaw, finance: FinanceState | null, today: Da
     docs.push({
       id: "financeiro:resumo", kind: "financeiro", title: "Financeiro: saldo das contas, faturas dos cartões, assinaturas e o mês", date: todayIso, link: "/financeiro",
       text: [
-        `Saldo total nas contas: ${brl(totalBalance(finance, today))}. ${finance.accounts.map((a) => `${a.name}: ${brl(accountBalance(finance, a, today))}`).join("; ")}.`,
+        `Saldo livre nas contas (sem os cofrinhos): ${brl(totalBalance(finance, today))}. Guardado nos cofrinhos (separado para pagar parcelas): ${brl(reservedBalance(finance, today))}. ${finance.accounts.map((a) => `${a.name}: ${brl(accountBalance(finance, a, today))}`).join("; ")}.`,
         finance.cards.length ? `Faturas abertas: ${finance.cards.map((c) => { const i = openInvoice(finance, c, today); return `${c.name} ${brl(i.total)} (vence ${dateBR(i.due)}${i.othersOwe > 0 ? `; ${brl(i.othersOwe)} a receber de outras pessoas, minha parte ${brl(i.mine)}` : ""})`; }).join("; ")}.` : "",
         `${monthName(ym)}: entrou ${brl(sm.receitas)}, saiu ${brl(sm.despesas)}, ainda a receber ${brl(sm.aReceber)} e a pagar ${brl(sm.aPagar)}; previsto ${brl(sm.previsto)}.`,
         `Assinaturas ativas (${ativas.length}): ${ativas.map((r) => `${r.desc} ${brl(r.amount)}`).join("; ") || "nenhuma"}; total ${brl(round2(ativas.reduce((n, r) => n + r.amount, 0)))} por mês.${subs.some(isPaused) ? ` Pausadas: ${subs.filter(isPaused).map((r) => r.desc).join(", ")}.` : ""}`,
