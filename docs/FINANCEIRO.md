@@ -119,3 +119,10 @@ Em **Contas fixas e assinaturas** (aba antes chamada "Assinaturas") fica a lista
 No acerto de contas, uma compra com **Parcela "9/18"** (ou "9 de 18") gera sozinha uma parcela por mês nos meses seguintes ("10/18" em dezembro, até "18/18"), no mesmo dia, com o mesmo cartão e a mesma divisão (`expandInstallments` em `settle.ts`). As parcelas automáticas aparecem com a etiqueta "parcela automática", entram na conta do mês e no texto do WhatsApp, e mudam editando a primeira parcela lançada. Não duplica se a parcela do mês já foi lançada à mão. Só vale em acertos abertos.
 
 No mesmo formulário, **Como se repete?**: *Só esta vez*, *Parcelada* (9/18) ou *Fixa (todo mês)*. O gasto fixo entra todo mês, no mesmo dia, com o mesmo cartão e a mesma divisão, até o mês "até" (opcional); fica guardado como parcela `fixa` ou `fixa:AAAA-MM`. Cada mês entra na conta do acerto. O acerto não mexe nos saldos do financeiro (só o Pix que você registrar para ele, quando existir essa ligação).
+
+### Acerto de contas na sobra de caixa
+
+O que o acerto de contas pede de você entra na **sobra de caixa** e em **Próximos meses**, mês a mês, do mês atual em diante (`acertoByMonth` em `settle.ts`, `useAcertoByMonth` em `settle-data.ts`):
+- **O que você paga:** compras no cartão do outro (a sua parte), parcelas automáticas e gastos fixos, líquido por pessoa e já abatidos os pix feitos no mês. Aparece como "− Acerto de contas (o que você paga)" no detalhe da sobra e como "Acerto de contas" em cada mês.
+- **O que vão te pagar:** entra junto do "a receber".
+- Ficam de fora os itens que já vêm do financeiro (compras divididas no seu cartão: já estão na fatura e no a receber), os pix "aguardando" e os acertos encerrados. Meses antes do atual também ficam de fora. Os saldos das contas não mudam.

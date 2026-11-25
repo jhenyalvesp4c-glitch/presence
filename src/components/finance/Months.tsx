@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useCofView, useReservesOn } from "@/lib/finance/cof-view";
+import { useAcertoByMonth } from "@/lib/finance/settle-data";
 import { CofFilter, ReservesSwitch } from "./CofFilter";
 import { CalendarRange, ChevronDown, CreditCard, Layers, PiggyBank, Repeat, TrendingDown, TrendingUp } from "lucide-react";
 import { brl, closingYmOf, dateBR, invoiceLabel, monthName, monthPlan, totalReserves, type MonthPlan, type PlanItem } from "@/lib/finance/calc";
@@ -8,13 +9,13 @@ import { AreaChart, BarsChart, Money } from "./charts";
 import { Empty, Head, Panel, Pill, TONES } from "./ui";
 
 const ROSE = "oklch(0.72 0.18 10)";
-const GROUP: Record<PlanItem["group"], string> = { entradas: "Entradas", fixas: "Contas fixas", assinaturas: "Assinaturas", faturas: "Faturas dos cartões", avulsas: "Outros gastos", metas: "Minhas metas" };
+const GROUP: Record<PlanItem["group"], string> = { entradas: "Entradas", fixas: "Contas fixas", assinaturas: "Assinaturas", faturas: "Faturas dos cartões", avulsas: "Outros gastos", metas: "Minhas metas", acerto: "Acerto de contas" };
 
 /** Um mês da projeção: as linhas do que entra e sai, e dentro de cada fatura o que ela traz (parcelas, assinaturas, compras). */
 function MonthCard({ m, open, onToggle, first }: { m: MonthPlan; open: boolean; onToggle: () => void; first: boolean }) {
   const { state } = useFinance(), good = m.resultado >= 0;
   const assinTotal = m.assinaturas + m.assinaturasCartao;
-  const rows: [string, number, string | undefined][] = [["Entradas", m.entradas, "var(--emerald)"], ["Contas fixas", m.fixas, undefined], ["Assinaturas em conta", m.assinaturas, undefined], ["Faturas dos cartões", m.faturas, undefined], ["Outros gastos", m.avulsas, undefined], ...(m.metas > 0 ? [["Minhas metas", m.metas, "var(--emerald)"] as [string, number, string]] : [])];
+  const rows: [string, number, string | undefined][] = [["Entradas", m.entradas, "var(--emerald)"], ["Contas fixas", m.fixas, undefined], ["Assinaturas em conta", m.assinaturas, undefined], ["Faturas dos cartões", m.faturas, undefined], ["Outros gastos", m.avulsas, undefined], ...(m.metas > 0 ? [["Minhas metas", m.metas, "var(--emerald)"] as [string, number, string]] : []), ...(m.acerto > 0 ? [["Acerto de contas", m.acerto, "var(--pink)"] as [string, number, string]] : [])];
   return (
     <section className="overflow-hidden rounded-[1.4rem] border bg-white/[0.02] transition" style={{ borderColor: open ? "color-mix(in oklab, var(--cyan) 35%, transparent)" : "oklch(1 0 0 / 8%)" }} data-testid={`fin-mes-${m.ym}`}>
       <button type="button" onClick={onToggle} aria-expanded={open} className="grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3.5 text-left transition hover:bg-white/[0.03] sm:grid-cols-[1.1fr_repeat(4,minmax(0,1fr))_auto]">
@@ -64,7 +65,7 @@ function MonthCard({ m, open, onToggle, first }: { m: MonthPlan; open: boolean; 
 /** Próximos meses: quanto entra, quanto sai (fixas, assinaturas, faturas, parcelas) e quanto sobra, mês a mês. */
 export function MonthsView() {
   const { state, today } = useFinance(), [openYm, setOpenYm] = useState<string | null>(null), [n, setN] = useState(12);
-  const [view] = useCofView(), [reservesOn] = useReservesOn(), plan = useMemo(() => monthPlan(state, today, n, view, reservesOn), [state, today, n, view, reservesOn]);
+  const acerto = useAcertoByMonth(), [view] = useCofView(), [reservesOn] = useReservesOn(), plan = useMemo(() => monthPlan(state, today, n, view, reservesOn, acerto), [state, today, n, view, reservesOn, acerto]);
   const reservesNow = totalReserves(state, today), empty = state.accounts.length + state.cards.length + state.recurring.length + state.plans.length === 0;
   if (empty) return <Empty icon={CalendarRange} title="Ainda não há o que projetar" hint="Cadastre contas, cartões, salário e despesas fixas para ver os próximos meses." />;
   const worst = plan.reduce((a, b) => (b.saldoFinal < a.saldoFinal ? b : a), plan[0]!), firstNeg = plan.find((m) => m.saldoFinal < 0);

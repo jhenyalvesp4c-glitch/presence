@@ -167,3 +167,29 @@ export function expandInstallments(items: SettleItem[], throughYm: string): Sett
   }
   return out;
 }
+
+/** O que o acerto de contas pesa em cada mês no caixa: o que você paga (pagar) e o que vai receber (receber), líquido por pessoa. */
+export type AcertoMonth = { pagar: number; receber: number; itens: { person: string; desc: string; amount: number; date: string | null }[] };
+export type AcertoByMonth = Record<string, AcertoMonth>;
+/**
+ * Soma, mês a mês (do mês atual em diante), o que os acertos abertos pedem: compras no cartão do outro (você deve a sua parte), compras no seu cartão
+ * que são da outra pessoa (ela te deve), parcelas e gastos fixos que se repetem e pix já feitos. Os itens que vêm do financeiro (`linked`) ficam de fora:
+ * esses já estão nas contas do financeiro. Pix aguardando não conta.
+ */
+export function acertoByMonth(groups: { person: string; items: SettleItem[] }[], nowYm: string, throughYm: string): AcertoByMonth {
+  const out: AcertoByMonth = {};
+  for (const g of groups) {
+    const items = [...g.items, ...expandInstallments(g.items, throughYm)].filter((it) => (!it.linked || it.auto) && !(it.kind === "pagamento" && it.pending));
+    const per = new Map<string, number>();
+    for (const it of items) {
+      const ym = it.date?.slice(0, 7) ?? nowYm;
+      if (ym < nowYm || ym > throughYm) continue;
+      const e = effect(it);
+      per.set(ym, (per.get(ym) ?? 0) + e);
+      if (e !== 0 && it.kind === "compra") (out[ym] ??= { pagar: 0, receber: 0, itens: [] }).itens.push({ person: g.person, desc: it.description || "Compra", amount: Math.abs(e) / 100, date: it.date });
+    }
+    for (const [ym, net] of per) { const m = (out[ym] ??= { pagar: 0, receber: 0, itens: [] }); if (net < 0) m.pagar += -net / 100; else m.receber += net / 100; }
+  }
+  for (const m of Object.values(out)) { m.pagar = Math.round(m.pagar * 100) / 100; m.receber = Math.round(m.receber * 100) / 100; }
+  return out;
+}
