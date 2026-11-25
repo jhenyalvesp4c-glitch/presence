@@ -194,3 +194,14 @@ describe("Detalhes de cada item no 'por que sobra'", () => {
     expect(m.detail!.map((d) => d.amount)).toEqual([200, -80, 120]);
   });
 });
+
+describe("Rótulo da parte do outro na visão sem cofrinho", () => {
+  it("a metade do outro numa parcela do cofrinho aparece como parte dele, não como cofrinho", () => {
+    const s = state();
+    const bolso = cashBreakdown(s, today, "bolso", false).groups.find((g) => g.id === "faturas")!.items[0]!.detail!;
+    const l = bolso.find((d) => d.desc === "L")!;
+    expect(l.note).toContain("parte de Marido"); expect(l.note).not.toContain("cofrinho");
+    const cof = cashBreakdown(s, today, "cofrinho", false).groups.find((g) => g.id === "faturas")!.items[0]!.detail!;
+    expect(cof.find((d) => d.desc === "L")!.note).toContain("cofrinho");
+  });
+});

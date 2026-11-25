@@ -506,7 +506,7 @@ export function monthClose(s: FinanceState, today: Date, view: CofView = "bolso"
 function invoiceDetail(inv: Invoice, view: CofView): EntryDetail[] {
   return linesIn(inv.lines, view).sort((a, b) => b.amount - a.amount).map((l) => ({
     id: l.id, desc: l.desc, amount: l.amount, date: l.date, category: l.category,
-    note: [l.parcel ? `parcela ${l.parcel}` : "", l.source === "recorrente" ? "fixa" : "", l.source === "ajuste" ? "a detalhar" : "", l.funded ? "cofrinho" : "", l.shared ? `com ${l.shared.person}` : ""].filter(Boolean).join(" · ") || undefined,
+    note: [l.parcel ? `parcela ${l.parcel}` : "", l.source === "recorrente" ? "fixa" : "", l.source === "ajuste" ? "a detalhar" : "", ...(l.funded && view === "bolso" && l.shared ? [`parte de ${l.shared.person} (ele te paga)`] : [l.funded ? "cofrinho" : "", l.shared ? `com ${l.shared.person}` : ""])].filter(Boolean).join(" · ") || undefined,
   }));
 }
 /** O que forma o acerto de contas do mês; a diferença para o total (pix já feitos, o que vai e volta) aparece como ajuste. */
