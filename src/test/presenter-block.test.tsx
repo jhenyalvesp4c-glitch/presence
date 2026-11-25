@@ -21,3 +21,22 @@ describe("Tela do bloco", () => {
     expect(screen.getByTestId("bloco-completo")).toHaveTextContent("Clicar em Marketing");
   });
 });
+
+import { fireEvent } from "@testing-library/react";
+
+describe("Editar dentro da apresentação", () => {
+  it("abre os campos, troca a fala e salva o bloco", async () => {
+    let saved: import("@/lib/training-library").Block | undefined;
+    render(<TrainingPresenter script={script} examples={[]} shown={{}} onToggle={() => {}} onClose={() => {}} onSaveBlock={(b) => { saved = b; }} />);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    fireEvent.click(await screen.findByTestId("editar-bloco"));
+    fireEvent.change(screen.getByLabelText("O que falar"), { target: { value: "Fala nova, com espaço e → letras n g f." } });
+    fireEvent.change(screen.getByLabelText("Passo 1"), { target: { value: "Clicar em Segmentação" } });
+    fireEvent.change(screen.getByLabelText("Linha 1, coluna 2"), { target: { value: "Filtrar por etiqueta" } });
+    fireEvent.click(screen.getByTestId("salvar-bloco-inline"));
+    expect(saved?.say).toBe("Fala nova, com espaço e → letras n g f.");
+    expect(saved?.show).toEqual(["Clicar em Segmentação"]);
+    expect(saved?.tables?.[0]?.rows[0]).toEqual(["Tags", "Filtrar por etiqueta"]);
+    expect(screen.queryByTestId("editar-bloco-inline")).toBeNull();
+  });
+});

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy, Eye, GraduationCap, Grid3x3, Lightbulb, Maximize, MessageCircleQuestion,
-  Minimize, MousePointerClick, Mic, Sparkles, StickyNote, Target, ThumbsUp, Users, X, Image as ImageIcon,
+  Minimize, MousePointerClick, Mic, Pencil, Sparkles, StickyNote, Target, ThumbsUp, Users, X, Image as ImageIcon,
 } from "lucide-react";
 
 import { mediaOf, type Block, type Example, type Faq, type MediaFile, type Panel, type Script, type Table, type Visual } from "@/lib/training-library";
 import { MediaViewer } from "./media-viewer";
+import { BlockEditInline } from "./training-block-edit";
 import { mediaUrl, primePaths, visualSrc } from "./training-images";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -284,8 +285,8 @@ function SlideBody({ s, script, examples, shown, onToggle, pct, onRestart, onClo
 }
 
 /** Apresentação em tela cheia do roteiro: um slide por vez, passa com setas, espaço ou deslizando. */
-export function TrainingPresenter({ script, examples, shown, onToggle, onClose }: {
-  script: Script; examples: Example[]; shown: Record<string, boolean>; onToggle: (k: string) => void; onClose: () => void;
+export function TrainingPresenter({ script, examples, shown, onToggle, onClose, onSaveBlock }: {
+  script: Script; examples: Example[]; shown: Record<string, boolean>; onToggle: (k: string) => void; onClose: () => void; onSaveBlock?: ((b: Block) => void) | undefined;
 }) {
   const slides = useMemo(() => buildSlides(script, examples), [script, examples]);
   const [i, setI] = useState(0);
@@ -293,10 +294,11 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
   const [overview, setOverview] = useState(false);
   const [notes, setNotes] = useState(false);
   const [full, setFull] = useState(false);
+  const [editing, setEditing] = useState(false);
   const touch = useRef<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLElement>(null);
-  useEffect(() => { stage.current?.scrollTo({ top: 0 }); }, [i]);
+  useEffect(() => { stage.current?.scrollTo({ top: 0 }); setEditing(false); }, [i]);
 
   const go = useCallback((n: number) => setI((cur) => { const t = Math.max(0, Math.min(slides.length - 1, n)); if (t !== cur) setDir(t > cur ? 1 : -1); return t; }), [slides.length]);
   const next = useCallback(() => setI((c) => { const t = Math.min(slides.length - 1, c + 1); if (t !== c) setDir(1); return t; }), [slides.length]);
@@ -309,6 +311,8 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (editing || t?.isContentEditable || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) { if (e.key === "Escape" && editing) setEditing(false); return; }
       if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); next(); }
       else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); prev(); }
       else if (e.key === "Home") go(0);
@@ -323,7 +327,7 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
     document.addEventListener("fullscreenchange", fs);
     const prevOverflow = document.body.style.overflow; document.body.style.overflow = "hidden";
     return () => { window.removeEventListener("keydown", h); document.removeEventListener("fullscreenchange", fs); document.body.style.overflow = prevOverflow; if (document.fullscreenElement) void document.exitFullscreen(); };
-  }, [next, prev, go, slides.length, overview, onClose, toggleFull]);
+  }, [next, prev, go, slides.length, overview, onClose, toggleFull, editing]);
 
   const s = slides[i]!;
   const items = script.blocks.flatMap((b) => b.show.map((_, k) => `${b.id}:${k}`));
@@ -353,6 +357,9 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
           <p className="truncate text-[0.68rem] text-muted-foreground">{bi >= 0 && s.k !== "end" ? `Bloco ${bi + 1}/${script.blocks.length} · ${script.blocks[bi]!.title}` : KIND_LABEL[s.k]}</p>
         </div>
         <span className="rounded-full border border-border bg-background/60 px-3 py-1 font-mono text-xs tabular-nums backdrop-blur" data-testid="contador-slide">{String(i + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
+        {onSaveBlock && s.k === "block" && (
+          <button onClick={() => setEditing((e) => !e)} data-testid="editar-bloco" className={`flex h-9 items-center gap-1.5 rounded-xl border px-3 text-sm transition hover:scale-105 ${editing ? "border-[var(--glow)] bg-[color-mix(in_oklab,var(--glow)_15%,transparent)] text-[var(--glow)]" : "border-border bg-background/60 text-muted-foreground backdrop-blur hover:border-[var(--glow)] hover:text-[var(--glow)]"}`}><Pencil size={14} /> Editar</button>
+        )}
         {([[() => setNotes((n) => !n), StickyNote, "Notas do apresentador (N)", notes], [() => setOverview(true), Grid3x3, "Todos os slides (G)", false], [toggleFull, full ? Minimize : Maximize, "Tela cheia (F)", full], [onClose, X, "Encerrar (Esc)", false]] as const).map(([fn, Icon, label, on], k) => (
           <button key={k} onClick={fn} aria-label={label} title={label} data-testid={k === 3 ? "fechar-apresentacao" : undefined}
             className={`grid h-9 w-9 place-items-center rounded-xl border transition hover:scale-105 ${on ? "border-amber/60 bg-amber/15 text-amber" : "border-border bg-background/60 text-muted-foreground backdrop-blur hover:border-[var(--glow)] hover:text-[var(--glow)]"}`}><Icon size={15} /></button>
@@ -362,7 +369,7 @@ export function TrainingPresenter({ script, examples, shown, onToggle, onClose }
       {/* palco */}
       <main ref={stage} className="scroll-neon relative z-10 flex flex-1 overflow-y-auto px-4 pb-4 sm:px-10 lg:px-16">
         <div key={slideKey} data-testid="slide" data-kind={s.k} className="mx-auto my-auto w-full max-w-7xl py-4" style={{ animation: `${dir === 1 ? "pres-in-r" : "pres-in-l"} .55s cubic-bezier(.2,.7,.2,1) both` }}>
-          <SlideBody s={s} script={script} examples={examples} shown={shown} onToggle={onToggle} pct={pct} onRestart={() => go(0)} onClose={onClose} />
+          {editing && s.k === "block" && onSaveBlock ? <BlockEditInline key={s.block.id} block={s.block} onCancel={() => setEditing(false)} onSave={(nb) => { onSaveBlock(nb); setEditing(false); }} /> : <SlideBody s={s} script={script} examples={examples} shown={shown} onToggle={onToggle} pct={pct} onRestart={() => go(0)} onClose={onClose} />}
         </div>
       </main>
 

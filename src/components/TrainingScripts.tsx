@@ -551,7 +551,7 @@ export function TrainingScripts({ projectId }: { projectId: string }) {
         onCreate={(script, exs) => { setLib((l) => { let n = { ...l, examples: [...l.examples, ...exs] }; if (script.folder) n = addFolder(n, script.folder); return upsertScript(n, script); }); setSelId(script.id); }} />}
       <input ref={itemInput} type="file" multiple hidden data-testid="passo-arquivo-lista" onChange={(e) => { void attachToItem([...(e.target.files ?? [])]); e.target.value = ""; }} />
       {viewer && !presenting && <MediaViewer title={viewer.title} files={viewer.files} onClose={() => setViewer(null)} />}
-      {presenting && sel && <TrainingPresenter script={sel} examples={examples} shown={shown} onToggle={toggle} onClose={() => setPresenting(false)} />}
+      {presenting && sel && <TrainingPresenter script={sel} examples={examples} shown={shown} onToggle={toggle} onClose={() => setPresenting(false)} onSaveBlock={(b) => { setLib((l) => upsertBlock(l, sel.id, b)); toast.success("Bloco salvo"); }} />}
       {zoom && <Lightbox visual={zoom} onClose={() => setZoom(null)} />}
       {editScript && (
         <ScriptEditor folders={folderNames(lib)} initial={editScript === "new" ? undefined : editScript} onClose={() => setEditScript(null)} onSave={saveScript}
