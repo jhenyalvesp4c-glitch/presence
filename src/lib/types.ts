@@ -26,6 +26,10 @@ export type Task = {
   demand_code?: string | null;
   related_task_id?: string | null;
   kind?: "tarefa" | "lembrete";
+  /** Avisos antes da hora (minutos). */
+  remind_before?: number[] | null;
+  /** Cliente a que a tarefa pertence (aparece na ficha dele). */
+  client_id?: string | null;
 };
 
 export type RoutineItem = {

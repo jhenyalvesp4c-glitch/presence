@@ -17,6 +17,10 @@ import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/chart
 import { PortfolioHealth } from "@/components/PortfolioHealth";
 import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCategories, useCreateTask, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { RemindPicker } from "@/components/RemindPicker";
+import { beforeWords } from "@/lib/reminders";
+import type { Task } from "@/lib/types";
 import { applyDefaultToAll, useSetupSummaries } from "@/lib/data/client-setup";
 import { loginsOfDossier, passwordOfAccess, removeAccessLogin, saveAccessLogin } from "@/lib/login-store";
 import { FinBackdrop, HeroPanel, LiveDot, OrbitArt, SectionTitle, Tilt } from "@/components/finance/fx";
@@ -34,7 +38,7 @@ const ini = (n: string) => n.split(" ").filter((w) => w.length > 2).slice(0, 2).
 const cssColor = (tone: string) => `var(--${tone})`;
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-type Tab = "docs" | "reun" | "dem" | "ace" | "lin" | "imp";
+type Tab = "docs" | "reun" | "dem" | "tar" | "ace" | "lin" | "imp";
 const BLANK: Omit<Client, "id" | "projectId"> = { dossierId: null, name: "", segment: "", contactName: "", email: "", phone: "", docNumber: "", status: "ativo", plan: "", monthlyValue: 0, contractEnd: null, notes: "" };
 
 function StatusTag({ s }: { s: ClientStatus }) { return <span className="tag whitespace-nowrap !py-0.5 !text-[0.7rem]" style={tint(STATUS_TONE[s])}>{STATUS_LABEL[s]}</span>; }
@@ -253,8 +257,9 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
   // os acessos criados aqui (id "a-…") já aparecem na lista de acessos; aqui ficam só os cadastrados na Documentação
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const logins = useMemo(() => (dossierName ? loginsOfDossier(dossierName).filter((l) => !l.id.startsWith("a-")) : []), [dossierName, loginTick]);
+  const tasksQ = useTasks(), clientTasks = useMemo(() => (tasksQ.data ?? []).filter((t) => t.client_id === c.id).sort((a, b) => Number(a.done) - Number(b.done) || `${a.due_date ?? "9"}${a.due_time ?? ""}`.localeCompare(`${b.due_date ?? "9"}${b.due_time ?? ""}`)), [tasksQ.data, c.id]);
   const [confirm, setConfirm] = useState(false), tone = colorOf(c.id);
-  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
+  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["tar", `Tarefas (${clientTasks.filter((t) => !t.done).length})`, ListChecks], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
   return (
     <aside className="glass space-y-4 rounded-3xl p-5 animate-rise xl:sticky xl:top-4 xl:self-start" data-testid="cliente-ficha">
       <div className="flex items-start gap-3">
@@ -273,6 +278,7 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
       {tab === "docs" && <><DocsTab client={c} docs={docs} acts={acts} err={err} />{(links?.libDocs.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-docs-dossie"><p className="mono-caps">Da pasta do dossiê (Biblioteca)</p>{links!.libDocs.map((d) => <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><FileText size={14} className="shrink-0 text-cyan" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{d.title}</p><p className="truncate text-xs text-muted-foreground">{d.kind}{d.folder && ` · ${d.folder}`}{d.updated && ` · ${d.updated}`}</p></div></div>)}</div>}</>}
       {tab === "reun" && <MeetingsTab client={c} meets={meets} acts={acts} err={err} />}
       {tab === "dem" && <div className="space-y-2">{!c.dossierId ? <p className="rounded-xl border border-dashed border-white/15 p-4 text-center text-xs text-muted-foreground">Vincule um dossiê a este cliente (botão de editar) e as demandas dele aparecem aqui.</p> : dem.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma demanda neste dossiê.</p> : dem.map((d) => <button key={d.code} onClick={() => acts.setDemand.mutate({ code: d.code, status: d.status === "done" ? "todo" : "done" }, { onError: err })} className="ex-card flex w-full items-center gap-3 p-3 text-left" style={{ "--rail": "var(--emerald)" } as CSSProperties}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${d.status === "done" ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{d.status === "done" && <Check size={12} />}</span><div className="min-w-0"><p className={`truncate text-sm font-medium ${d.status === "done" ? "text-muted-foreground line-through" : ""}`}>{d.title}</p><p className="text-xs text-muted-foreground">{d.code}{d.deadline && ` · prazo ${d.deadline}`}</p></div></button>)}<Link to="/demandas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as demandas</Link></div>}
+      {tab === "tar" && <ClientTasks client={c} tasks={clientTasks} />}
       {tab === "ace" && <><AccessTab client={c} access={access} acts={acts} err={err} dossierName={dossierName} />{logins.length > 0 && <div className="mt-4 space-y-2" data-testid="cliente-logins-dossie"><p className="mono-caps">Logins do dossiê (Documentação)</p>{logins.map((l) => <div key={l.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}><KeyRound size={14} className="shrink-0 text-amber" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{l.title}</p><p className="truncate font-mono text-xs text-muted-foreground">{l.user}{l.owner && ` · ${l.owner}`}</p><p className="truncate font-mono text-xs text-amber" data-testid="cliente-login-senha">Senha: {l.pass || "—"}</p></div><CopyPass user={l.user} pass={l.pass} /></div>)}<p className="text-[0.65rem] text-muted-foreground">As senhas ficam só neste navegador (não vão para o banco nem para a IA).</p></div>}</>}
       {tab === "lin" && <><LogTab client={c} log={log} acts={acts} err={err} />{(links?.records.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-registros-dossie"><p className="mono-caps">Registros e notas do dossiê</p>{links!.records.slice(0, 12).map((r) => <div key={r.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"><p className="mono-caps">{r.kind === "nota" ? "Nota" : "Registro"} · {r.kind === "nota" ? r.date : dateBR(r.date)}</p><p className="line-clamp-2 whitespace-pre-wrap text-sm">{r.text}</p></div>)}</div>}</>}
       <div className="border-t border-white/10 pt-3">{confirm ? <div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-muted-foreground">Apagar o cliente, documentos e histórico? Não dá para desfazer.</span><button onClick={onDelete} data-testid="cliente-apagar-ok" className="rounded-full border border-destructive/60 px-3 py-1 text-destructive hover:bg-destructive/10">Apagar</button><button onClick={() => setConfirm(false)} className="rounded-full border border-white/15 px-3 py-1">Cancelar</button></div> : <button onClick={() => setConfirm(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"><Trash2 size={12} /> Apagar cliente</button>}</div>
@@ -380,6 +386,43 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
   // pronto para colar e enviar: usuário e senha, um embaixo do outro
   const text = [user && `Usuário: ${user}`, pass && `Senha: ${pass}`].filter(Boolean).join("\n");
   return <button type="button" onClick={() => { void copyText(text).then((done) => { if (done) { setOk(true); toast.success(pass ? "Usuário e senha copiados" : "Usuário copiado"); setTimeout(() => setOk(false), 1400); } else toast.error("Não consegui copiar. Selecione o texto e copie manualmente."); }); }} aria-label="Copiar usuário e senha" title="Copiar usuário e senha" data-testid="copiar-usuario-senha" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground transition hover:text-cyan active:scale-90">{ok ? <Check size={13} className="text-emerald" /> : <Copy size={13} />}</button>;
+}
+
+/** Tarefas, compromissos, treinamentos e implantações ligados ao cliente — e um jeito rápido de criar mais, já vinculadas. */
+function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
+  const create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [];
+  const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false);
+  const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
+  const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
+  const add = () => {
+    if (!title.trim() || create.isPending) return;
+    create.mutate({ title: title.trim(), category_id: cat || null, due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
+      { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); toast.success("Tarefa criada neste cliente"); }, onError: (e) => toast.error((e as Error).message) });
+  };
+  return (
+    <div className="space-y-2" data-testid="cliente-tarefas">
+      <form onSubmit={(e) => { e.preventDefault(); add(); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+        <div className="flex gap-2"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Nova tarefa para ${client.name} (ex.: Treinamento)`} aria-label="Nova tarefa do cliente" data-testid="cliente-tarefa-titulo" className={field} /><button type="submit" disabled={!title.trim() || create.isPending} className="rounded-full border border-cyan/60 px-4 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">Criar</button></div>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="text-[0.7rem] text-muted-foreground hover:text-cyan">{open ? "Menos opções" : "Data, hora, categoria e lembrete"}</button>
+        {open && (
+          <div className="space-y-2">
+            <div className="flex gap-2"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Data" className={field} /><input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Hora" className={field} /></div>
+            <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={`${field} w-full`}><option value="" className="bg-popover">Sem categoria</option>{cats.map((x) => <option key={x.id} value={x.id} className="bg-popover">{x.name}</option>)}</select>
+            <div><p className="mb-1 text-[0.7rem] text-muted-foreground">Lembrar antes {(!date || !time) && "(precisa de data e hora)"}</p><RemindPicker value={remind} onChange={setRemind} disabled={!date || !time} /></div>
+          </div>
+        )}
+      </form>
+      {tasks.length === 0 && <p className="py-3 text-center text-sm text-muted-foreground">Nenhuma tarefa vinculada a este cliente ainda.</p>}
+      {tasks.map((t) => (
+        <div key={t.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
+          <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{t.done && <Check size={12} />}</button>
+          <div className="min-w-0 flex-1"><p className={`truncate text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
+            <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
+        </div>
+      ))}
+      <Link to="/tarefas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as tarefas</Link>
+    </div>
+  );
 }
 
 function AccessTab({ client, access, acts, err, dossierName }: { client: Client; access: import("@/lib/clients").ClientAccess[]; acts: Acts; err: (e: unknown) => void; dossierName: string | undefined }) {

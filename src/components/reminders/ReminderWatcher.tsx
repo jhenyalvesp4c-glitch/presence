@@ -3,10 +3,10 @@ import { createPortal } from "react-dom";
 import { AlarmClock, BellRing, Check, Clock, X } from "lucide-react";
 
 import { ownerId, supabase } from "@/lib/data/db";
-import { alertKey, dueReminders, hhmm, localDay, spokenReminder, type Due, type ReminderRow } from "@/lib/reminders";
+import { alertKey, beforeWords, dueBefore, dueReminders, hhmm, localDay, spokenReminder, type BeforeRow, type Due, type ReminderRow } from "@/lib/reminders";
 import { useVoice } from "@/lib/voice/use-voice";
 
-const SEEN = "presence.lembretes.avisados", SNOOZE = "presence.lembretes.adiados", ASKED = "presence.lembretes.perguntou";
+const SEEN_B = "presence.lembretes.antes.avisados", SEEN = "presence.lembretes.avisados", SNOOZE = "presence.lembretes.adiados", ASKED = "presence.lembretes.perguntou";
 const read = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : d; } catch { return d; } };
 const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
 
@@ -65,9 +65,20 @@ export function ReminderWatcher() {
       if (error || !data) return;
       const seen = read<Record<string, string>>(SEEN, {}), snoozed = read<Record<string, number>>(SNOOZE, {});
       const due = dueReminders(data as ReminderRow[], now, seen, snoozed);
+      // Avisos antecipados ("30 min antes", "2 dias antes") de qualquer tarefa com hora.
+      const ahead = new Date(now.getTime() + 8 * 86_400_000);
+      const bq = await supabase.from("tasks").select("id, title, due_date, due_time, done, remind_before")
+        .eq("done", false).not("due_time", "is", null).not("remind_before", "is", null).gte("due_date", localDay(now)).lte("due_date", localDay(ahead)).limit(200);
+      const seenB = read<Record<string, string>>(SEEN_B, {});
+      const early = bq.error || !bq.data ? { due: [] as Due[], keys: [] as string[] } : dueBefore(bq.data as BeforeRow[], now, seenB, snoozed);
+      const aheadRows = new Map(((bq.data ?? []) as BeforeRow[]).map((r) => [r.id, r]));
+      for (const k of early.keys) { const r = aheadRows.get(k.split("~")[0]!); if (r?.due_time) seenB[k] = `${r.due_date} ${r.due_time.slice(0, 5)}`; delete snoozed[k]; }
+      write(SEEN_B, seenB);
+      const at = new Set(due.map((d) => d.id));
+      due.push(...early.due.filter((d) => !at.has(d.id)));
       if (!due.length) return;
       const keys = new Map<string, string>();
-      for (const d of due) { keys.set(d.id, alertKey(d, snoozed[d.id])); seen[d.id] = d.key; delete snoozed[d.id]; }
+      for (const d of due) { keys.set(d.id, alertKey(d, snoozed[d.id])); if (d.before == null) { seen[d.id] = d.key; delete snoozed[d.id]; } }
       write(SEEN, seen); write(SNOOZE, snoozed);
       setCards((c) => [...c.filter((x) => !due.some((d) => d.id === x.id)), ...due]);
       // Com o Orion aberto em mais de um lugar, só o primeiro a "reservar" o aviso fala e notifica (os outros só mostram o cartão).
@@ -75,7 +86,7 @@ export function ReminderWatcher() {
       const mine = claimed ? due.filter((d) => claimed.has(d.id)) : due;
       if (!mine.length) return;
       if ("Notification" in window && Notification.permission === "granted") {
-        for (const d of mine) { try { new Notification("Lembrete", { body: `${d.title}\n${hhmm(d.at)}`, tag: `lembrete-${d.id}`, requireInteraction: true, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png" }); } catch { /* sem notificação */ } }
+        for (const d of mine) { try { new Notification(d.before ? `Daqui a ${beforeWords(d.before)}` : "Lembrete", { body: `${d.title}\n${d.before ? `em ${beforeWords(d.before)} · ` : ""}${hhmm(d.at)}`, tag: `lembrete-${d.id}`, requireInteraction: true, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png" }); } catch { /* sem notificação */ } }
       }
       speakSoon(mine);
     } finally { busy.current = false; }
@@ -95,7 +106,7 @@ export function ReminderWatcher() {
 
   const close = (id: string) => setCards((c) => c.filter((x) => x.id !== id));
   const done = async (d: Due) => { close(d.id); await supabase.from("tasks").update({ done: true, done_at: new Date().toISOString() }).eq("id", d.id); };
-  const snooze = (d: Due, min: number) => { close(d.id); const s = read<Record<string, number>>(SNOOZE, {}); s[d.id] = Date.now() + min * 60_000; write(SNOOZE, s); };
+  const snooze = (d: Due, min: number) => { close(d.id); const s = read<Record<string, number>>(SNOOZE, {}); s[d.before != null ? `${d.id}~${d.before}` : d.id] = Date.now() + min * 60_000; write(SNOOZE, s); };
   const enable = async () => { setAskPerm(false); write(ASKED, 1); try { await Notification.requestPermission(); } catch { /* sem notificação */ } };
 
   if (typeof document === "undefined" || (!cards.length && !askPerm)) return null;
@@ -121,7 +132,7 @@ export function ReminderWatcher() {
               <BellRing size={18} className="relative" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="mono-caps !text-[0.6rem] !text-[oklch(0.82_0.15_75)]">Lembrete · {hhmm(d.at)}</p>
+              <p className="mono-caps !text-[0.6rem] !text-[oklch(0.82_0.15_75)]">{d.before ? `Daqui a ${beforeWords(d.before)}` : "Lembrete"} · {hhmm(d.at)}</p>
               <p className="mt-0.5 break-words text-sm font-medium leading-snug">{d.title}</p>
             </div>
             <button onClick={() => close(d.id)} aria-label="Fechar aviso" className="text-muted-foreground hover:text-foreground"><X size={15} /></button>

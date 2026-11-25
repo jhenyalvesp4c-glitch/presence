@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  AlarmClock, BarChart3, Repeat, CalendarDays, Check, CheckCircle2, Clock, Flag, Layers, ListTodo, ListChecks, Loader2, Plus, Search,
+  AlarmClock, BarChart3, BellRing, Repeat, CalendarDays, Check, CheckCircle2, Clock, Flag, Layers, ListTodo, ListChecks, Loader2, Plus, Search,
   SlidersHorizontal, Sparkles, Target, Trash2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +16,10 @@ import { getIcon } from "@/lib/icons";
 import type { Color, Priority } from "@/lib/types";
 import { useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
+import { RemindPicker } from "@/components/RemindPicker";
+import { beforeWords } from "@/lib/reminders";
+import { useClients } from "@/lib/data/clients";
+import { defaultProjectId } from "@/lib/dossiers";
 import { ListsView } from "@/components/lists/ListsView";
 import { FixedTasksPanel } from "@/components/FixedTasksPanel";
 import { useFixedActions, useFixedDone, useFixedTasks } from "@/lib/data/fixed-tasks";
@@ -40,7 +44,7 @@ export const Route = createFileRoute("/tarefas")({
 
 type C = Color;
 type Row = {
-  id: string; t: string; d: string; tag: string; c: C; Icon: ReturnType<typeof getIcon>; time: string; done: boolean; cat: string; date: string; priority: Priority; fixed?: boolean;
+  id: string; t: string; d: string; tag: string; c: C; Icon: ReturnType<typeof getIcon>; time: string; done: boolean; cat: string; date: string; priority: Priority; fixed?: boolean; remind?: number[]; client?: string;
 };
 
 const tabs = ["Hoje", "Esta semana", "Este mês", "Todas"];
@@ -69,6 +73,10 @@ function TarefasPage() {
   const [newCat, setNewCat] = useState("");
   const [newPrio, setNewPrio] = useState<Priority>("media");
   const [time, setTime] = useState("");
+  const [newRemind, setNewRemind] = useState<number[]>([]);
+  const [newClient, setNewClient] = useState("");
+  const clientsQ = useClients(defaultProjectId()), clientList = clientsQ.data ?? [];
+  const clientName = useMemo(() => new Map(clientList.map((c) => [c.id, c.name])), [clientList]);
   const [day, setDay] = useState<Date>(T0);
   const [newDate, setNewDate] = useState<Date | undefined>();
   const [addingCat, setAddingCat] = useState(false);
@@ -87,11 +95,11 @@ function TarefasPage() {
           return {
             id: t.id, t: t.title, d: t.description ?? c?.name ?? "Sem categoria", tag: c ? c.name.split(" ")[0]! : "Tarefa",
             c: (c?.color ?? "cyan") as C, Icon: getIcon(c?.icon ?? "check"), time: t.due_time ? hhmm(t.due_time) : "—",
-            done: t.done, cat: t.category_id ?? "", date: t.due_date ?? "", priority: t.priority,
+            done: t.done, cat: t.category_id ?? "", date: t.due_date ?? "", priority: t.priority, ...(t.remind_before?.length ? { remind: t.remind_before } : {}), ...(t.client_id && clientName.get(t.client_id) ? { client: clientName.get(t.client_id)! } : {}),
           };
         })
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
-    [tasksQ.data, catById],
+    [tasksQ.data, catById, clientName],
   );
 
   const cats = useMemo(
@@ -159,11 +167,11 @@ function TarefasPage() {
   const add = () => {
     if (!title.trim() || createTask.isPending) return;
     createTask.mutate(
-      { title: title.trim(), category_id: catId || null, priority: newPrio, due_date: iso(newDate ?? day), due_time: time || null },
+      { title: title.trim(), category_id: catId || null, priority: newPrio, due_date: iso(newDate ?? day), due_time: time || null, remind_before: time && newRemind.length ? newRemind : null, client_id: newClient || null },
       {
         onSuccess: () => {
           if (newDate) setDay(newDate);
-          setTitle(""); setTime(""); setNewDate(undefined); setNewPrio("media");
+          setTitle(""); setTime(""); setNewDate(undefined); setNewPrio("media"); setNewRemind([]); setNewClient("");
           toast.success("Tarefa adicionada");
         },
         onError: (e) => toast.error(`Não consegui salvar: ${e.message}`),
@@ -292,12 +300,12 @@ function TarefasPage() {
                   </span>
                   <button type="button" onClick={() => { if (!tk.fixed) setEditingId(tk.id); }} aria-label={tk.fixed ? `Tarefa fixa ${tk.t}` : `Editar tarefa ${tk.t}`} className={`min-w-0 text-left ${tk.fixed ? "cursor-default" : ""}`}>
                     <b className={`block truncate text-sm font-semibold transition ${tk.done ? "text-muted-foreground line-through" : ""}`}>{tk.t}</b>
-                    <span className="block truncate text-xs text-muted-foreground">{tk.d}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{tk.d}{tk.client && <span className="ml-1.5 text-violet" data-testid="tarefa-cliente">· {tk.client}</span>}</span>
                   </button>
                   <span className={`tag hidden sm:inline ${tk.fixed ? "!text-emerald" : ""}`}>{tk.fixed && <Repeat size={10} className="mr-1 inline" />}{tk.tag}</span>
                   <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tab !== 0 && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
                   <span className="hidden items-center gap-2 text-muted-foreground sm:flex">
-                    <AlarmClock size={15} className="text-[color:var(--glow)]" />
+                    {tk.remind?.length ? <span title={`Avisa ${tk.remind.map((m) => beforeWords(m)).join(", ")} antes`} data-testid="tarefa-lembrar-antes" className="flex items-center gap-1 text-[0.65rem] text-cyan"><BellRing size={13} /> {tk.remind.length > 1 ? `${tk.remind.length}×` : beforeWords(tk.remind[0]!)}</span> : <AlarmClock size={15} className="text-[color:var(--glow)]" />}
                     {tk.fixed ? <span title="Tarefa fixa: gerencie em Tarefas fixas" className="opacity-60"><Repeat size={15} className="text-emerald" /></span> : <button aria-label="Excluir tarefa" onClick={() => del.mutate(tk.id, { onError: (e) => toast.error(e.message) })} className="opacity-40 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={15} /></button>}
                   </span>
                 </li>
@@ -349,6 +357,8 @@ function TarefasPage() {
               </Popover>
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full min-w-0 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none [color-scheme:dark] focus:border-violet" />
               </div>
+              {clientList.length > 0 && <select value={newClient} onChange={(e) => setNewClient(e.target.value)} aria-label="Cliente" data-testid="nova-tarefa-cliente" className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-violet"><option value="" className="bg-popover">Sem cliente</option>{clientList.map((c) => <option key={c.id} value={c.id} className="bg-popover">Cliente: {c.name}</option>)}</select>}
+              <div><p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground"><BellRing size={12} /> Lembrar antes {!time && <span className="text-amber">(escolha a hora)</span>}</p><RemindPicker value={newRemind} onChange={setNewRemind} disabled={!time} /></div>
               <button type="button" onClick={() => setNewPrio(prioNext[newPrio])} className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-left text-sm text-muted-foreground transition hover:border-violet"><Flag size={14} style={{ color: newPrio === "alta" ? colorVar("rose") : newPrio === "baixa" ? colorVar("emerald") : undefined }} /> {prioLabel[newPrio]}</button>
               <button onClick={add} disabled={createTask.isPending} className="shine flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--cyan)] transition hover:scale-[1.02] disabled:opacity-60">
                 {createTask.isPending ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Adicionar tarefa
@@ -422,7 +432,7 @@ function TarefasPage() {
       </>
       )}
       {editingTask && (
-        <TaskEditDialog task={editingTask} categories={categories} saving={updateTask.isPending} onClose={() => setEditingId(null)}
+        <TaskEditDialog task={editingTask} categories={categories} clients={clientList} saving={updateTask.isPending} onClose={() => setEditingId(null)}
           onSave={(patch) => updateTask.mutate({ id: editingTask.id, patch }, { onSuccess: () => { setEditingId(null); toast.success("Tarefa atualizada"); }, onError: (e) => toast.error(e.message) })}
           onDelete={() => del.mutate(editingTask.id, { onSuccess: () => { setEditingId(null); toast.success("Tarefa excluída"); }, onError: (e) => toast.error(e.message) })} />
       )}

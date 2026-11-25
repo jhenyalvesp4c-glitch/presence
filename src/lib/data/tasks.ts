@@ -4,7 +4,7 @@ import { deadlineIso, type Demand } from "../demands";
 import type { Category, Color, Priority, Task } from "../types";
 import { must, supabase } from "./db";
 
-const TASK_COLS = "id, title, description, category_id, priority, due_date, due_time, done, done_at, position, created_at, end_time, place, color, project_id, dossier_id";
+const TASK_COLS = "id, title, description, category_id, priority, due_date, due_time, done, done_at, position, created_at, end_time, place, color, project_id, dossier_id, remind_before, client_id";
 
 export function useCategories() {
   return useQuery({
@@ -40,6 +40,8 @@ export type NewTask = {
   priority?: Priority;
   due_date?: string | null;
   due_time?: string | null;
+  remind_before?: number[] | null;
+  client_id?: string | null;
 };
 
 /** Cria a tarefa no topo da lista manual (usado pela tela e pelo MCP). `extra` leva os campos novos (origem, vínculos). */
@@ -131,7 +133,7 @@ export function useCreateCategory() {
 export function useUpdateTask() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<Task, "title" | "description" | "category_id" | "priority" | "due_date" | "due_time">> }) => {
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<Pick<Task, "title" | "description" | "category_id" | "priority" | "due_date" | "due_time" | "remind_before" | "client_id">> }) => {
       const clean = { ...patch, ...(patch.title !== undefined ? { title: patch.title.trim().slice(0, 200) } : {}) };
       must(await supabase.from("tasks").update(clean).eq("id", id).select("id"));
     },
