@@ -62,4 +62,24 @@ describe("voz: por que sobra ou falta", () => {
     expect(r.result["ok"]).toBe(true); expect(["sobra", "falta"]).toContain(r.result["situacao"]);
     expect((r.result["onde_vai"] as { grupo: string }[]).some((g) => g.grupo.startsWith("Faturas"))).toBe(true);
   });
+
+  it("cobrir_falta: quanto pegar no Pix no crédito e como fica a fatura (sem gravar)", () => {
+    // uma conta grande a pagar antes do fim do mês: o saldo fica negativo e a resposta diz quanto pegar, em múltiplos de 10, e a fatura antes/depois
+    const pobre = { ...s, transactions: [...s.transactions, { id: "aluguel-x", kind: "despesa", desc: "Aluguel", amount: 9000, date: "2026-11-25", method: "pix", accountId: s.accounts[0]!.id, category: "moradia" }] } as typeof s;
+    const r = answer(pobre, { acao: "cobrir_falta", cartao: "nubank" }, today);
+    expect(r.result["precisa_pegar"]).toBeGreaterThan(0);
+    expect(r.result["ok"]).toBe(true);
+    const pegar = r.result["precisa_pegar"] as number; expect(pegar % 10).toBe(0); expect(pegar).toBeGreaterThanOrEqual(r.result["falta_exata"] as number);
+    const f = r.result["fatura_que_recebe"] as { antes: number; depois: number }; expect(f.depois).toBeGreaterThan(f.antes);
+    expect(Math.round((f.depois - f.antes) * 100) / 100).toBeCloseTo(pegar, 0);
+    expect(r.panel?.titulo).toContain("Pix no crédito");
+    // com taxa o valor lançado no cartão sobe
+    const t = answer(pobre, { acao: "cobrir_falta", cartao: "nubank", taxa_percent: 10 }, today);
+    expect(t.result["valor_lancado_no_cartao"]).toBeCloseTo(pegar * 1.1, 0);
+  });
+  it("cobrir_falta com sobra diz que não precisa pegar nada", () => {
+    const rico = { ...s, accounts: s.accounts.map((a) => ({ ...a, balance: 1_000_000, initialBalance: 1_000_000 })) } as typeof s;
+    const r = answer(rico, { acao: "cobrir_falta", cartao: "nubank" }, today);
+    expect(r.result["precisa_pegar"]).toBe(0);
+  });
 });

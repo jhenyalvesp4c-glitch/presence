@@ -1,6 +1,6 @@
 /** Ferramenta de voz "financeiro": responde com os números reais do financeiro (nuvem) e lança gastos por frase. */
 import { addMonths, alertsFor, brl, cashBreakdown, cashflow, categoryTotals, dateBR, dueYmOfClosing, invoiceFor, invoiceLabel, isPaused, isSubscription, monthEntries, monthName, monthClose, monthPlan, monthSummary, nextCharge, openInvoice, planInfo, recurringActiveIn, round2, sum, totalBalance, accountBalance, isoOf, ymOf } from "../finance/calc";
-import { dayIn, dueDateOf, monthsBetween, payDateOf, simulatePurchase } from "../finance/calc";
+import { closingYmOf, dayIn, dueDateOf, invoiceMonthOf, monthsBetween, payDateOf, simulatePurchase } from "../finance/calc";
 import { cloudFinanceRepo, persistChange } from "../finance/cloud-repo";
 import { READ_ACTIONS_V2, WRITE_ACTIONS, applyWrite, readMore, shareProp } from "./finance-write";
 import { catOf } from "../finance/categories";
@@ -45,6 +45,38 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
     const b = cashBreakdown(s, today), c = monthClose(s, today);
     return { result: { ok: true, resultado: c.sobra, situacao: c.sobra >= 0 ? "sobra" : "falta", tem_na_conta: c.saldo, ainda_entra: c.aReceber, ainda_sai: b.expenses, onde_vai: b.groups.map((g) => ({ grupo: g.label, valor: g.total })), maiores: b.biggest.map((e) => ({ item: e.desc, valor: e.amount })), dica: "Explique em 2 ou 3 frases: o que tem, o que entra, o que mais pesa (normalmente as faturas) e quanto falta ou sobra." },
       panel: panel(c.sobra >= 0 ? "Por que sobra" : "Por que falta", [{ titulo: "A conta", itens: [item("Tem hoje", brl(c.saldo)), item("Ainda entra", brl(c.aReceber)), ...b.groups.map((g) => item(g.label, `− ${brl(g.total)}`)), item(c.sobra >= 0 ? "Sobra" : "Falta", brl(Math.abs(c.sobra)))] }]) };
+  }
+
+  /** "Quanto preciso pegar (Pix no crédito) para fechar o mês, e como fica a fatura?" — a conta de caixa de sempre (salário, contas, faturas), sem gravar nada. */
+  if (acao === "cobrir_falta") {
+    const q = String(args["cartao"] ?? "nubank").trim(), cards = find(s.cards, q);
+    if (!cards.length) return { result: { ok: false, erro: `Não achei o cartão "${q}".`, cartoes: s.cards.map((c) => c.name) } };
+    if (cards.length > 1) return { result: { ok: false, erro: "Em qual cartão seria o Pix no crédito?", cartoes: cards.map((c) => c.name) } };
+    const card = cards[0]!;
+    const toEnd = Math.max(7, new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate() + 1);
+    const dias = Math.min(120, Math.max(7, Math.round(Number(args["dias"]) || toEnd)));
+    const cf = cashflow(s, today, dias), folga = Math.max(0, Number(args["folga"]) || 0), taxa = Math.max(0, Number(args["taxa_percent"]) || 0) / 100;
+    const falta = round2(Math.max(0, -cf.min)), preciso = round2(falta + (falta > 0 || folga > 0 ? folga : 0));
+    // Pix no crédito costuma vir em múltiplos redondos: arredonda para cima de R$ 10 em R$ 10
+    const pegar = preciso > 0 ? Math.ceil(preciso / 10) * 10 : 0, n = Math.max(1, Math.round(Number(args["parcelas_total"]) || 1));
+    const mp = monthPlan(s, today, 2)[0]!;
+    const peso = mp.items.filter((x) => x.group === "faturas" || x.group === "fixas" || x.group === "avulsas").sort((a, b) => b.amount - a.amount).slice(0, 6).map((x) => ({ item: x.label, valor: x.amount, data: dateBR(x.date) }));
+    const base = { tem_hoje: cf.start, ate: dateBR(cf.until), menor_saldo: cf.min, fica_negativo: cf.firstNegative ? { quando: dateBR(cf.firstNegative.date), por_causa_de: cf.firstNegative.label } : null, entradas_do_mes: mp.entradas, faturas_que_pagam_no_mes: mp.faturas, contas_e_fixas: round2(mp.fixas + mp.assinaturas + mp.avulsas), o_que_mais_pesa: peso };
+    if (pegar <= 0) return { result: { ok: true, precisa_pegar: 0, ...base, dica: "Não precisa pegar nada: o saldo não fica negativo até essa data. Diga quanto sobra (menor_saldo) em uma frase." } };
+    // o Pix cai na fatura aberta do cartão (a que fecha logo): o crédito vira compra nela; se for taxa, o valor lançado é maior que o que entra
+    const dueYm = invoiceMonthOf(card, isoOf(today)), closeYm = closingYmOf(card, dueYm), lancado = round2(pegar * (1 + taxa));
+    const sim = simulatePurchase(s, today, { cardId: card.id, amount: lancado, closeYm, parcelas: n, desc: "Pix no crédito" }, Math.max(6, n + 3));
+    if (!sim) return { result: { ok: false, erro: "Não consegui simular o Pix no crédito." } };
+    // o dinheiro do Pix entra na conta hoje: soma ao saldo "depois" (a simulação só conta a compra no cartão)
+    const meses = sim.rows.slice(0, Math.max(3, Math.min(6, n + 1))).map((r) => ({ mes: monthName(r.ym), fatura_que_sai: { antes: r.fatura, depois: r.faturaDepois }, saldo_no_fim: { sem_o_pix: r.saldoFim, com_o_pix: round2(r.saldoFimDepois + pegar) } }));
+    const result = { ok: true, precisa_pegar: pegar, falta_exata: falta, ...(folga ? { folga } : {}), ...base, cartao: card.name, parcelas: n, por_parcela: sim.porParcela, ...(taxa ? { taxa_percent: round2(taxa * 100), valor_lancado_no_cartao: lancado } : { aviso_taxas: "Sem juros nem IOF na conta: o Pix no crédito costuma ter taxa. Peça para ela olhar o total que o Nubank mostra antes de confirmar, ou dizer a taxa para recalcular." }),
+      fatura_que_recebe: { fecha_em: dateBR(dayIn(closeYm, card.closingDay)), vence_em: dateBR(dueDateOf(card, dueYm)), voce_paga_em: dateBR(sim.pagaEm), antes: sim.faturaAntes, depois: sim.faturaDepois }, meses,
+      dica: "Responda em poucas frases: quanto falta, quanto pegar de Pix no crédito, e como fica a fatura (antes e depois) e o saldo do fim do mês com o Pix. Avise das taxas se não foram consideradas." };
+    return { result, panel: panel(`Pix no crédito: pegar ${brl(pegar)}`, [
+      { titulo: "A conta do mês", itens: [item("Você tem hoje", brl(cf.start)), item("Entra até lá", brl(mp.entradas)), item("Sai (faturas, contas e fixas)", brl(round2(mp.faturas + mp.fixas + mp.assinaturas + mp.avulsas))), item("Menor saldo no período", brl(cf.min), cf.firstNegative ? `fica negativo em ${dateBR(cf.firstNegative.date)}` : undefined)] },
+      { titulo: `Pegar no ${card.name}`, itens: [item("Valor do Pix no crédito", brl(pegar), n > 1 ? `${n}x de ${brl(sim.porParcela)}` : "paga na próxima fatura"), item("Fatura sem o Pix", brl(sim.faturaAntes)), item("Fatura com o Pix", brl(sim.faturaDepois), `você paga em ${dateBR(sim.pagaEm)}`)] },
+      ...meses.map((m) => ({ titulo: m.mes, itens: [item("Fatura que sai", `${brl(m.fatura_que_sai.antes)} → ${brl(m.fatura_que_sai.depois)}`), item("Saldo no fim do mês", `${brl(m.saldo_no_fim.sem_o_pix)} → ${brl(m.saldo_no_fim.com_o_pix)}`)] })),
+    ]) };
   }
 
   if (acao === "simular") {

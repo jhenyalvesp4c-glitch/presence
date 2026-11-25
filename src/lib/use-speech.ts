@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { transcribeAudio } from "./audio.functions";
+import { silenceForSpeech } from "./voice/endpoint";
 
 // Web Speech API (Chrome, Edge, Safari). Não existe nos tipos do TS, então tipamos o mínimo.
 type Recognition = {
@@ -88,9 +89,9 @@ export function useSpeech(onFinal: (text: string) => void) {
       const rms = Math.sqrt(sum / buf.length), now = performance.now();
       if (now - t0 < 400) { noise = Math.max(noise, rms); return; }
       if (rms > Math.max(0.025, noise * 2.5)) { loud += 50; quiet = 0; if (!started && loud >= 150) { started = true; setInterim("Ouvindo você…"); } } else if (started) quiet += 50;
-      if (started && quiet >= 1800) void finish("enviar");           // parou de falar
+      if (started && quiet >= silenceForSpeech(loud)) void finish("enviar"); // parou de falar (espera mais se falou muito)
       else if (!started && now - t0 > 10_000) void finish("enviar");   // ninguém falou
-      else if (now - t0 > 60_000) void finish("enviar");              // limite
+      else if (now - t0 > 120_000) void finish("enviar");             // limite
     }, 50);
     stopRec.current = () => { void finish(started ? "enviar" : "cancelar"); };
     return true;

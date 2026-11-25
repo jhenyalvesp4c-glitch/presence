@@ -142,3 +142,9 @@ No quadro de Demandas (cartões pequenos e grandes): **arraste o cartão** para 
 
 ### Ditado quando o reconhecimento do navegador não funciona (app Presence/Electron)
 `useSpeech` tenta o reconhecimento do navegador; se der erro de rede/serviço (acontece no app instalado, que não tem o serviço de voz do Google), troca sozinho para **gravar o microfone e transcrever no servidor** (`transcribeAudio`, OpenAI), o mesmo caminho da conversa com o Orion, e lembra a escolha (`presence.stt = gravado`). A gravação termina quando você para de falar (1,8 s de silêncio) ou toca de novo; mostra "Ouvindo… / Transcrevendo…".
+
+## Esperar a pessoa terminar de falar (`src/lib/voice/endpoint.ts`)
+O fim da fala não é mais um silêncio fixo: `silenceFor(texto)` espera **2,6 s** + 70 ms por palavra acima de 6 (até +2 s) e **+1,8 s se a frase ficou no meio** (terminou em "e", "porque", "que", "tipo"…); pergunta curta e completa responde mais cedo; teto de 6,5 s. Na gravação (`silenceForSpeech`) a pausa tolerada cresce com o quanto a pessoa já falou, e o limite de fala subiu de 25 s para 2 min. Se o navegador encerrar o reconhecimento sozinho no meio da fala, o Orion **religa e continua de onde parou** (`carry`) em vez de responder só com o começo.
+
+## Financeiro: "quanto preciso pegar para fechar o mês" (`cobrir_falta`)
+`financeiro` ação `cobrir_falta` (cartao padrão Nubank; opcionais `parcelas_total`, `folga`, `taxa_percent`, `dias`): usa o fluxo de caixa real (`cashflow`: salário, contas, faturas que vencem), acha o **menor saldo** até o fim do mês (ou `dias`), calcula quanto pegar (arredondado para cima de R$ 10 em R$ 10, + folga) e simula o Pix no crédito como compra na fatura aberta do cartão (`simulatePurchase`): fatura antes/depois, vencimento, e o saldo do fim de cada mês com e sem o Pix (somando o dinheiro que entra). Não grava nada. Juros/IOF do Pix no crédito só entram se a pessoa disser a taxa.

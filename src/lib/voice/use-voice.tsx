@@ -15,6 +15,7 @@ import type { Panel, Turn, VoiceEvent } from "./agent";
 import { takeSentences } from "./sentences";
 import { SLOW_AFTER_MS, SLOW_FILLER } from "./filler";
 import { isDismiss } from "./dismiss";
+import { silenceFor, silenceForSpeech } from "./endpoint";
 import { markStt, recordPerf, takeStt } from "./perf";
 
 /** Marcas de tempo do pedido em andamento (para o medidor de velocidade). */
@@ -170,8 +171,7 @@ class Speaker {
 }
 
 const MAX_IDLE = 3;
-/** Quanto silêncio (ms) o Orion espera antes de achar que a pessoa terminou de falar. */
-const SILENCE_MS = 2500;
+/** O silêncio que o Orion espera antes de achar que a pessoa terminou de falar vem de `silenceFor` (voice/endpoint.ts): pedidos longos e frases no meio esperam mais. */
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -200,6 +200,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const speaker = useRef<Speaker | null>(null);
   const mic = useRef<MediaStream | null>(null);
   const vadStop = useRef<(() => void) | null>(null);
+  const carry = useRef(""); // o que já foi dito quando o navegador encerrou o reconhecimento cedo demais
   const sttMode = useRef<"nativo" | "gravado">("nativo");
   const askRef = useRef<(t: string) => Promise<void>>(async () => undefined);
   const listenRef = useRef<() => void>(() => undefined);
@@ -230,14 +231,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     if (!C) { setP("idle"); return; }
     stopListening();
     const r = new C();
-    r.lang = "pt-BR"; r.interimResults = true; r.continuous = true; // continua ouvindo nas pausas; quem decide o fim é o silêncio de SILENCE_MS
-    let finalText = "", endTimer: ReturnType<typeof setTimeout> | null = null;
+    r.lang = "pt-BR"; r.interimResults = true; r.continuous = true; // continua ouvindo nas pausas; quem decide o fim é o silêncio (silenceFor)
+    let finalText = carry.current, endTimer: ReturnType<typeof setTimeout> | null = null, lastAt = performance.now(), byTimer = false;
+    carry.current = "";
     r.onresult = (e) => {
-      let partial = "";
+      let partial = ""; lastAt = performance.now();
       for (let i = 0; i < e.results.length; i++) { const x = e.results[i]!; if (x.isFinal) finalText += x[0]!.transcript; else partial += x[0]!.transcript; }
       setInterim(finalText + partial);
       if (endTimer) clearTimeout(endTimer);
-      if ((finalText + partial).trim()) endTimer = setTimeout(() => { try { r.stop(); } catch { /* já parou */ } }, SILENCE_MS);
+      if ((finalText + partial).trim()) endTimer = setTimeout(() => { byTimer = true; try { r.stop(); } catch { /* já parou */ } }, silenceFor(finalText + partial)); // pedido longo ou frase no meio: espera mais
     };
     let switched = false;
     r.onerror = (e) => {
@@ -259,7 +261,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       rec.current = null; setInterim("");
       if (switched) { if (activeRef.current) listenRef.current(); return; }
       const text = finalText.trim();
-      if (text) { idle.current = 0; void askRef.current(text); return; }
+      // o navegador encerrou sozinho (limite dele) no meio da fala: não responde ainda, religa e continua de onde parou
+      if (text && !byTimer && activeRef.current && performance.now() - lastAt < silenceFor(text) - 300) { carry.current = `${text} `; setTimeout(() => { if (activeRef.current) listenRef.current(); }, 120); return; }
+      if (text) { idle.current = 0; carry.current = ""; void askRef.current(text); return; }
       if (!activeRef.current) return;
       if (++idle.current >= MAX_IDLE) { endSession(); return; }
       setTimeout(() => { if (activeRef.current && phaseRef.current === "listening") listenRef.current(); }, 200);
@@ -319,9 +323,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       const rms = Math.sqrt(sum / data.length), now = performance.now();
       if (now - t0 < 400) { noise = Math.max(noise, rms); return; } // mede o ruído do ambiente
       if (rms > Math.max(0.025, noise * 2.5)) { loud += 50; quiet = 0; if (!started && loud >= 150) { started = true; setInterim("…"); } } else if (started) quiet += 50;
-      if (started && quiet >= SILENCE_MS) void finish(loud >= 300 ? "enviar" : "silencio");
+      if (started && quiet >= silenceForSpeech(loud)) void finish(loud >= 300 ? "enviar" : "silencio");
       else if (!started && now - t0 > 10_000) void finish("silencio");
-      else if (now - t0 > 25_000) void finish(started ? "enviar" : "silencio");
+      else if (now - t0 > (started ? 120_000 : 25_000)) void finish(started ? "enviar" : "silencio"); // pedido longo: até 2 minutos falando
     }, 50);
     vadStop.current = () => { void finish("cancelar"); };
   }, [endSession, stopListening]);
