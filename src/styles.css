@@ -645,8 +645,11 @@ html, body { max-width: 100%; overflow-x: clip; }
    Também evita o "pulo" de tamanho de texto ao girar a tela e o toque duplo que dá zoom nos botões. */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @media (pointer: coarse) {
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, 1em); }
   button, a, [role="button"], [role="tab"] { touch-action: manipulation; }
+}
+/* Campos com letra de pelo menos 16px em tela pequena OU de toque (o !important vence qualquer classe de tamanho): é o que impede o zoom do iPhone ao tocar num campo. */
+@media (max-width: 900px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea { font-size: max(16px, 1em) !important; }
 }
 
 /* Janela aberta no celular: a barra de baixo e os botões flutuantes saem de cena (ver ModalGuard.tsx). */
