@@ -1,7 +1,7 @@
 /** Cálculos do módulo financeiro: faturas, parcelas, projeções, categorias e alertas. Puro (recebe `today`), fácil de testar. */
 import { catOf } from "./categories";
 import type { AcertoByMonth } from "./settle";
-import type { Account, Card, Entry, FinanceState, Goal, Plan, Recurring, Shared, Transaction } from "./types";
+import type { Account, Card, Entry, EntryDetail, FinanceState, Goal, Plan, Recurring, Shared, Transaction } from "./types";
 
 /* ───────────── datas ───────────── */
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -502,6 +502,26 @@ export function monthClose(s: FinanceState, today: Date, view: CofView = "bolso"
  * Detalhamento da SOBRA DE CAIXA (a mesma conta de `monthClose`): o que já está nas contas + o que ainda entra no mês,
  * menos o que ainda sai das contas e as faturas dos cartões. Compras e parcelas no crédito aparecem dentro das faturas.
  */
+/** Compras, parcelas e fixas que formam uma fatura (na visão escolhida), da maior para a menor. */
+function invoiceDetail(inv: Invoice, view: CofView): EntryDetail[] {
+  return linesIn(inv.lines, view).sort((a, b) => b.amount - a.amount).map((l) => ({
+    id: l.id, desc: l.desc, amount: l.amount, date: l.date, category: l.category,
+    note: [l.parcel ? `parcela ${l.parcel}` : "", l.source === "recorrente" ? "fixa" : "", l.source === "ajuste" ? "a detalhar" : "", l.funded ? "cofrinho" : "", l.shared ? `com ${l.shared.person}` : ""].filter(Boolean).join(" · ") || undefined,
+  }));
+}
+/** O que forma o acerto de contas do mês; a diferença para o total (pix já feitos, o que vai e volta) aparece como ajuste. */
+function acertoDetail(m: { itens: { person: string; desc: string; amount: number; date: string | null; receber: boolean }[] } | undefined, receber: boolean, totalAmount: number): EntryDetail[] {
+  const rows = (m?.itens ?? []).filter((i) => i.receber === receber).sort((a, b) => b.amount - a.amount).map((i, n): EntryDetail => ({ id: `ac:${n}`, desc: i.desc, note: i.person, amount: i.amount, ...(i.date ? { date: i.date } : {}) }));
+  const diff = round2(totalAmount - sum(rows.map((r) => r.amount)));
+  return Math.abs(diff) > 0.004 ? [...rows, { id: "ac:ajuste", desc: "Pix já feitos e acertos entre os lançamentos", note: "abate do mês", amount: diff }] : rows;
+}
+/** Como a meta chegou nesse valor. */
+function metaDetail(s: FinanceState, r: Reserve, ym: string): EntryDetail[] | undefined {
+  const g = s.goals.find((x) => x.id === r.id);
+  if (!g) return undefined;
+  if (g.kind === "limite_categoria") { const spent = categorySpent(s, g.category ?? "", ym); return [{ id: "l", desc: "Limite do mês", amount: g.target }, { id: "g", desc: "Já gasto até agora", amount: -spent }, { id: "f", desc: "Ainda pode gastar (é o que fica reservado)", amount: r.amount }]; }
+  return [{ id: "r", desc: g.kind === "economizar_mensal" ? "O que falta guardar neste mês" : "Reservado por mês", amount: r.amount }, { id: "a", desc: "Já guardado", amount: g.current, note: `de ${brl(g.target)}` }];
+}
 export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth): MonthBreakdown {
   const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today, view, withReserves, acerto);
   const later = (view === "cofrinho" ? [] : monthEntries(s, ym)).filter((e) => e.date > todayIso).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
@@ -512,12 +532,12 @@ export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bol
   for (const card of s.cards) {
     const inv = openInvoice(s, card, today);
     if (inv.total <= 0) continue;
-    if (invAmount(inv, view) > 0) faturas.push(mk(`fat:${card.id}`, `Fatura ${card.name} · ${invoiceLabel(card, inv.ym)}${view !== "tudo" && inv.funded > 0 ? (view === "bolso" ? ` (o cofrinho paga ${brl(inv.funded)})` : " (só a parte do cofrinho)") : ""}`, invAmount(inv, view), "despesa", { date: inv.due, method: "credito", cardId: card.id }));
+    if (invAmount(inv, view) > 0) faturas.push(mk(`fat:${card.id}`, `Fatura ${card.name} · ${invoiceLabel(card, inv.ym)}${view !== "tudo" && inv.funded > 0 ? (view === "bolso" ? ` (o cofrinho paga ${brl(inv.funded)})` : " (só a parte do cofrinho)") : ""}`, invAmount(inv, view), "despesa", { date: inv.due, method: "credito", cardId: card.id, detail: invoiceDetail(inv, view) }));
     for (const l of linesIn(inv.lines, view)) catItems.push(mk(l.id, l.desc, l.amount, "despesa", { date: l.date, category: l.category, method: "credito", cardId: card.id, source: l.source === "parcela" ? "parcela" : "tx", parcel: l.parcel }));
   }
-  const metas: Entry[] = withReserves && view !== "cofrinho" ? reservesFor(s, ym, today).map((r) => mk(`meta:${r.id}`, `Meta · ${r.title}`, r.amount, "despesa")) : [];
-  const acertoOut: Entry[] = c.acertoPagar > 0 ? [mk("acerto:pagar", `Acerto de contas · o que você paga`, c.acertoPagar, "despesa")] : [];
-  if (c.acertoReceber > 0) items.push(mk("acerto:receber", "Acerto de contas · o que vão te pagar", c.acertoReceber, "receita"));
+  const metas: Entry[] = withReserves && view !== "cofrinho" ? reservesFor(s, ym, today).map((r) => mk(`meta:${r.id}`, `Meta · ${r.title}`, r.amount, "despesa", { detail: metaDetail(s, r, ym) })) : [];
+  const acertoOut: Entry[] = c.acertoPagar > 0 ? [mk("acerto:pagar", `Acerto de contas · o que você paga`, c.acertoPagar, "despesa", { detail: acertoDetail(acerto?.[ym], false, c.acertoPagar) })] : [];
+  if (c.acertoReceber > 0) items.push(mk("acerto:receber", "Acerto de contas · o que vão te pagar", c.acertoReceber, "receita", { detail: acertoDetail(acerto?.[ym], true, c.acertoReceber) }));
   const buckets: Record<string, Entry[]> = { fixas: [], assinaturas: [], avulsas: [], faturas, metas, acerto: acertoOut };
   for (const e of outAcct) buckets[groupOf(s, e)]!.push(e);
   if (c.saldo < 0) buckets["avulsas"]!.push(mk("saldo-neg", "Saldo negativo nas contas", -c.saldo, "despesa"));

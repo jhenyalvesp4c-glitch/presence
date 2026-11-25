@@ -149,3 +149,17 @@ describe("Acerto de contas na sobra de caixa, mês a mês", () => {
     expect(monthClose(st, today, "cofrinho", false, ac).acertoPagar).toBe(0); // visão só cofrinho não mistura
   });
 });
+
+describe("Detalhe do acerto de contas no 'por que sobra'", () => {
+  it("lista o que você paga, lançamento a lançamento", () => {
+    const s: FinanceState = { ...EMPTY_STATE, onboarded: true, accounts: [{ id: "a", name: "Conta", kind: "banco", tone: "roxo", balanceBase: 1000, baseDate: "2026-11-25" }] };
+    const items: SettleItem[] = [
+      { id: "m", kind: "compra", date: "2026-11-29", description: "Mounjaro", amount: 140, payer: "outro", otherShare: 0, installment: "fixa" },
+      { id: "w", kind: "compra", date: "2026-11-25", description: "Apple Watch", amount: 66.11, payer: "outro", otherShare: 0, installment: "9/18" },
+    ];
+    const ac = acertoByMonth([{ person: "Felipe", items }], "2026-11", "2026-12");
+    const b = cashBreakdown(s, new Date("2026-11-25T12:00:00"), "bolso", false, ac).groups.find((g) => g.id === "acerto")!.items[0]!;
+    expect(b.amount).toBe(206.11);
+    expect(b.detail!.map((d) => [d.desc, d.amount, d.note])).toEqual([["Mounjaro", 140, "Felipe"], ["Apple Watch", 66.11, "Felipe"]]);
+  });
+});

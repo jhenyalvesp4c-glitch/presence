@@ -126,12 +126,13 @@ function IncomeBar({ b }: { b: MonthBreakdown }) {
 }
 
 function ItemRow({ e, today, income, color, i }: { e: Entry; today: string; income: number; color: string; i: number }) {
-  const { state } = useFinance();
+  const { state } = useFinance(), [open, setOpen] = useState(false), has = !!e.detail?.length;
   const done = e.date <= today, where = e.cardId ? state.cards.find((c) => c.id === e.cardId)?.name : e.accountId ? state.accounts.find((a) => a.id === e.accountId)?.name : undefined;
   const method = { credito: "crédito", debito: "débito", pix: "pix", dinheiro: "dinheiro" }[e.method];
   const isIn = e.kind === "receita";
   return (
-    <li className="group/item relative flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5 transition hover:border-white/15 hover:bg-white/[0.05]" style={{ animation: `fin-slide .4s ${Math.min(i, 12) * 0.035}s both` }}>
+    <li className={`group/item relative flex flex-wrap items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5 transition hover:border-white/15 hover:bg-white/[0.05] ${has ? "cursor-pointer" : ""}`} style={{ animation: `fin-slide .4s ${Math.min(i, 12) * 0.035}s both` }}
+      {...(has ? { role: "button", tabIndex: 0, "aria-expanded": open, "data-testid": "fin-item-detalhavel", onClick: () => setOpen((o) => !o), onKeyDown: (ev: React.KeyboardEvent) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setOpen((o) => !o); } } } : {})}>
       <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-full opacity-0 transition group-hover/item:opacity-100" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
       <CatBadge id={e.category} size={34} />
       <span className="min-w-0 flex-1">
@@ -146,6 +147,18 @@ function ItemRow({ e, today, income, color, i }: { e: Entry; today: string; inco
         {!isIn && income > 0 && <span className="block text-[0.66rem] tabular-nums text-muted-foreground">{pctTxt((e.amount / income) * 100)} da renda</span>}
         {(isIn || income <= 0) && <span className="block text-[0.66rem] tabular-nums text-muted-foreground">{dateBR(e.date).slice(0, 5)}</span>}
       </span>
+      {has && <ChevronDown size={15} className={`shrink-0 text-muted-foreground transition-transform duration-300 ${open ? "rotate-180" : ""}`} aria-hidden />}
+      {has && open && (
+        <div className="basis-full cursor-default border-t border-white/[0.07] pt-2" onClick={(ev) => ev.stopPropagation()} data-testid="fin-item-detalhes">
+          <p className="mb-1 text-[0.66rem] uppercase tracking-[0.12em] text-muted-foreground">{e.detail!.length} {e.detail!.length === 1 ? "item" : "itens"} incluídos</p>
+          <ul className="space-y-1">{e.detail!.map((d) => (
+            <li key={d.id} className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-2.5 py-1.5 text-[0.78rem]">
+              {d.category ? <CatBadge id={d.category} size={22} /> : <span className="h-[22px] w-[22px] shrink-0" />}
+              <span className="min-w-0 flex-1"><span className="block truncate">{d.desc}</span>{(d.note || d.date) && <span className="block truncate text-[0.66rem] text-muted-foreground">{[d.date ? dateBR(d.date).slice(0, 5) : "", d.note].filter(Boolean).join(" · ")}</span>}</span>
+              <b className={`shrink-0 tabular-nums ${d.amount < 0 ? "text-emerald" : ""}`}>{d.amount < 0 ? "−" : ""}{brl(Math.abs(d.amount))}</b>
+            </li>))}</ul>
+        </div>
+      )}
     </li>
   );
 }

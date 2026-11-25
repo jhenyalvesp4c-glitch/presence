@@ -126,3 +126,7 @@ O que o acerto de contas pede de você entra na **sobra de caixa** e em **Próxi
 - **O que você paga:** compras no cartão do outro (a sua parte), parcelas automáticas e gastos fixos, líquido por pessoa e já abatidos os pix feitos no mês. Aparece como "− Acerto de contas (o que você paga)" no detalhe da sobra e como "Acerto de contas" em cada mês.
 - **O que vão te pagar:** entra junto do "a receber".
 - Ficam de fora os itens que já vêm do financeiro (compras divididas no seu cartão: já estão na fatura e no a receber), os pix "aguardando" e os acertos encerrados. Meses antes do atual também ficam de fora. Os saldos das contas não mudam.
+
+### "Por que sobra": detalhes de cada item
+
+Em Visão geral → "ver detalhes", tocar numa fatura abre as compras, parcelas e fixas que ela traz (com valor, data e etiquetas "parcela 4/15", "fixa", "cofrinho", "com Felipe"), na visão escolhida: a soma dos itens é o valor da linha. O acerto de contas lista os lançamentos do mês e as metas mostram como chegaram ao valor (limite, já gasto, o que falta). Fica em `Entry.detail`, montado em `cashBreakdown`.

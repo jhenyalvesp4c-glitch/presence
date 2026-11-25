@@ -172,3 +172,25 @@ describe("Meta de gasto por categoria", () => {
     expect(categorySpent(s, "ifood", "2027-01")).toBe(90 + 20);
   });
 });
+
+describe("Detalhes de cada item no 'por que sobra'", () => {
+  it("a fatura lista as compras e parcelas que a formam, e a soma bate com o valor da visão", () => {
+    const s = state();
+    for (const [view, total] of [["tudo", 450], ["bolso", 275], ["cofrinho", 175]] as const) {
+      const f = cashBreakdown(s, today, view, false).groups.find((g) => g.id === "faturas")!.items[0]!;
+      expect(f.amount).toBe(total);
+      expect(f.detail!.length).toBeGreaterThan(0);
+      expect(sum(f.detail!.map((d) => d.amount))).toBe(total);
+    }
+    const tudo = cashBreakdown(s, today, "tudo", false).groups.find((g) => g.id === "faturas")!.items[0]!.detail!;
+    expect(tudo.map((d) => d.desc)).toEqual(["B", "L", "A"]);                 // maior para a menor
+    expect(tudo.find((d) => d.desc === "L")!.note).toContain("parcela 1/2");
+    expect(tudo.find((d) => d.desc === "L")!.note).toContain("com Marido");
+  });
+  it("metas mostram como chegaram ao valor", () => {
+    const s: FinanceState = { ...state(), goals: [{ id: "g", kind: "limite_categoria", title: "iFood", target: 200, current: 0, category: "ifood", reserve: true }],
+      transactions: [{ id: "x", kind: "despesa", desc: "iFood", amount: 80, date: "2026-11-20", method: "debito", accountId: "acc", category: "ifood" }] };
+    const m = cashBreakdown(s, today, "bolso", true).groups.find((g) => g.id === "metas")!.items[0]!;
+    expect(m.detail!.map((d) => d.amount)).toEqual([200, -80, 120]);
+  });
+});
