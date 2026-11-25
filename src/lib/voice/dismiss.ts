@@ -15,3 +15,17 @@ export function isDismiss(text: string): boolean {
   if (REQUEST.test(t)) return false;
   return PATTERNS.some((r) => r.test(t));
 }
+
+/** Agradeceu ou se despediu: depois da resposta curta ("de nada, pode contar comigo") o Orion para de ouvir. "Pode fechar" sozinho só fecha a tela e continua ouvindo. */
+const GOODBYE: RegExp[] = [/\bobrigad[oa]s?\b/, /\bvaleu\b/, /\bvalew\b/, /\bagradec/, /\btchau\b/, /\bate (mais|logo|amanha)\b/, /\bnao (preciso|precisa|quero) mais\b/, /\b(isso|era|e) (so|tudo)\b/, /\bpode (parar|encerrar)\b/, /\bpor enquanto (e|eh) so\b/, /\bja deu\b/];
+export function endsConversation(text: string): boolean {
+  const t = norm(text);
+  if (t.trim().length < 3 || t.length > 160 || REQUEST.test(t) || /\?/.test(text)) return false;
+  if (!GOODBYE.some((r) => r.test(t))) return false;
+  // sobrou algo além de "ok, Orion, muito obrigada"? então tem um pedido junto ("valeu, e o financeiro") e a conversa continua
+  let rest = t;
+  for (const r of GOODBYE) rest = rest.replace(new RegExp(r.source, "g"), " ");
+  const words = rest.split(" ").filter((w) => w && !FILLER.has(w));
+  return words.length <= 1;
+}
+const FILLER = new Set(["ok", "orion", "muito", "muitissimo", "ta", "tah", "beleza", "certo", "entao", "por", "favor", "tudo", "bem", "de", "nada", "pra", "voce", "vc", "viu", "ne", "mesmo", "demais", "mais"]);

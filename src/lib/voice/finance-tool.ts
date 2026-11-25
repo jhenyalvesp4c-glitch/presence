@@ -11,6 +11,12 @@ import type { Panel, PanelItem } from "./agent";
 
 const strip = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const LINK = { rotulo: "Abrir o Financeiro", para: "/financeiro" };
+/** Quanto cada pessoa deve numa fatura (gastos divididos). */
+const owedBy = (lines: { shared?: { person: string; part: number } | undefined }[]): { pessoa: string; valor: number }[] => {
+  const m = new Map<string, number>();
+  for (const l of lines) if (l.shared) m.set(l.shared.person, round2((m.get(l.shared.person) ?? 0) + l.shared.part));
+  return [...m].map(([pessoa, valor]) => ({ pessoa, valor }));
+};
 const item = (rotulo: string, detalhe?: string, link?: string): PanelItem => ({ rotulo, ...(detalhe ? { detalhe } : {}), ...(link ? { link } : {}) });
 const panel = (titulo: string, secoes: Panel["secoes"], link = "/financeiro"): Panel => ({ titulo, secoes, abrir: { ...LINK, para: link } });
 
@@ -35,9 +41,9 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
 
   if (acao === "resumo") {
     const close = monthClose(s, today), m = monthSummary(s, ym, todayIso), saldo = totalBalance(s, today), cf = cashflow(s, today, 60);
-    const faturas = sum(s.cards.map((c) => openInvoice(s, c, today).total));
+    const faturas = sum(s.cards.map((c) => openInvoice(s, c, today).total)), faturasMinha = sum(s.cards.map((c) => openInvoice(s, c, today).mine));
     const alertas = alertsFor(s, today).slice(0, 3);
-    return { result: { ok: true, mes: monthName(ym), saldo_hoje: saldo, entrou: m.receitas, saiu: m.despesas, a_receber_ate_fim_do_mes: m.aReceber, a_pagar_ate_fim_do_mes: m.aPagar, sobra_de_caixa_depois_de_pagar_as_faturas: close.sobra, faturas_abertas: faturas, menor_saldo_nos_proximos_60_dias: cf.min, fica_negativo: cf.firstNegative ? { quando: dateBR(cf.firstNegative.date), motivo: cf.firstNegative.label } : null, alertas: alertas.map((a) => a.title), dica: "Fale poucos números: saldo, o que saiu e a sobra (ou falta) de caixa depois de pagar as faturas; nunca chame de sobra o resultado do mês sem as faturas. Se o saldo ficar negativo, avise quando." },
+    return { result: { ok: true, mes: monthName(ym), saldo_hoje: saldo, entrou: m.receitas, saiu: m.despesas, a_receber_ate_fim_do_mes: m.aReceber, a_pagar_ate_fim_do_mes: m.aPagar, sobra_de_caixa_depois_de_pagar_as_faturas: close.sobra, faturas_abertas: faturas, faturas_abertas_so_minha_parte: faturasMinha, menor_saldo_nos_proximos_60_dias: cf.min, fica_negativo: cf.firstNegative ? { quando: dateBR(cf.firstNegative.date), motivo: cf.firstNegative.label } : null, alertas: alertas.map((a) => a.title), dica: "Fale poucos números: saldo, o que saiu e a sobra (ou falta) de caixa depois de pagar as faturas; nunca chame de sobra o resultado do mês sem as faturas. Se o saldo ficar negativo, avise quando." },
       panel: panel(`Resumo · ${monthName(ym)}`, [{ titulo: "Agora", itens: [item("Saldo nas contas", brl(saldo)), item("Entrou no mês", brl(m.receitas)), item("Saiu no mês", brl(m.despesas)), item("Ainda a pagar no mês", brl(m.aPagar)), item("Faturas abertas", brl(faturas))] }, ...(alertas.length ? [{ titulo: "Atenção", itens: alertas.map((a) => item(a.title, a.detail)) }] : [])]) };
   }
 
@@ -61,7 +67,8 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
     const pegar = preciso > 0 ? Math.ceil(preciso / 10) * 10 : 0, n = Math.max(1, Math.round(Number(args["parcelas_total"]) || 1));
     const mp = monthPlan(s, today, 2)[0]!;
     const peso = mp.items.filter((x) => x.group === "faturas" || x.group === "fixas" || x.group === "avulsas").sort((a, b) => b.amount - a.amount).slice(0, 6).map((x) => ({ item: x.label, valor: x.amount, data: dateBR(x.date) }));
-    const base = { tem_hoje: cf.start, ate: dateBR(cf.until), menor_saldo: cf.min, fica_negativo: cf.firstNegative ? { quando: dateBR(cf.firstNegative.date), por_causa_de: cf.firstNegative.label } : null, entradas_do_mes: mp.entradas, faturas_que_pagam_no_mes: mp.faturas, contas_e_fixas: round2(mp.fixas + mp.assinaturas + mp.avulsas), o_que_mais_pesa: peso };
+    const faturasMinhaParte = round2(mp.items.filter((x) => x.group === "faturas" && x.cardId).reduce((n, x) => { const c = s.cards.find((k) => k.id === x.cardId); const m = /^fat:[^:]+:(\d{4}-\d{2})$/.exec(x.id); return n + (c && m ? invoiceFor(s, c, m[1]!).mine : x.amount); }, 0));
+    const base = { tem_hoje: cf.start, faturas_so_minha_parte: faturasMinhaParte, ate: dateBR(cf.until), menor_saldo: cf.min, fica_negativo: cf.firstNegative ? { quando: dateBR(cf.firstNegative.date), por_causa_de: cf.firstNegative.label } : null, entradas_do_mes: mp.entradas, faturas_que_pagam_no_mes: mp.faturas, contas_e_fixas: round2(mp.fixas + mp.assinaturas + mp.avulsas), o_que_mais_pesa: peso };
     if (pegar <= 0) return { result: { ok: true, precisa_pegar: 0, ...base, dica: "Não precisa pegar nada: o saldo não fica negativo até essa data. Diga quanto sobra (menor_saldo) em uma frase." } };
     // o Pix cai na fatura aberta do cartão (a que fecha logo): o crédito vira compra nela; se for taxa, o valor lançado é maior que o que entra
     const dueYm = invoiceMonthOf(card, isoOf(today)), closeYm = closingYmOf(card, dueYm), lancado = round2(pegar * (1 + taxa));
@@ -121,8 +128,10 @@ export function answer(s: FinanceState, args: Record<string, unknown>, today: Da
     const q = String(args["cartao"] ?? "").trim(), cards = q ? find(s.cards, q) : s.cards;
     if (q && !cards.length) return { result: { ok: false, erro: `Não achei o cartão "${q}".`, cartoes: s.cards.map((c) => c.name) } };
     const byMonth = !!String(args["mes"] ?? "").trim();
-    const inv = cards.map((c) => { const i = byMonth ? invoiceFor(s, c, dueYmOfClosing(c, ym)) : openInvoice(s, c, today); return { cartao: c.name, total: i.total, periodo: invoiceLabel(c, i.ym), vence: dateBR(i.due), maiores: [...i.lines].sort((a, b) => b.amount - a.amount).slice(0, 3).map((l) => `${l.desc} ${brl(l.amount)}`) }; });
-    return { result: { ok: true, faturas: inv }, panel: panel("Faturas abertas", inv.map((i) => ({ titulo: i.cartao, itens: [item(brl(i.total), `${i.periodo}`), ...i.maiores.map((m) => item(m))] })), "/financeiro?aba=contas") };
+    // "minha parte" = o total do banco menos o que é da outra pessoa nos gastos divididos (o total do banco não muda)
+    const inv = cards.map((c) => { const i = byMonth ? invoiceFor(s, c, dueYmOfClosing(c, ym)) : openInvoice(s, c, today); return { cartao: c.name, total: i.total, minha_parte: i.mine, parte_dos_outros: i.othersOwe, quem_deve: owedBy(i.lines), periodo: invoiceLabel(c, i.ym), vence: dateBR(i.due), maiores: [...i.lines].sort((a, b) => b.amount - a.amount).slice(0, 3).map((l) => `${l.desc} ${brl(l.amount)}${l.shared ? ` (sua parte ${brl(round2(l.amount - l.shared.part))}, ${l.shared.person} ${brl(l.shared.part)})` : ""}`) }; });
+    const tot = round2(inv.reduce((n, i) => n + i.total, 0)), minha = round2(inv.reduce((n, i) => n + i.minha_parte, 0));
+    return { result: { ok: true, faturas: inv, total_todas: tot, minha_parte_todas: minha, parte_dos_outros_todas: round2(tot - minha), dica: "Se ela pedir 'só a minha parte', use minha_parte (total do banco menos a parte das outras pessoas nos gastos divididos). Diga os dois valores quando houver divisão." }, panel: panel("Faturas abertas", inv.map((i) => ({ titulo: i.cartao, itens: [item(brl(i.total), `${i.periodo}`), ...(i.parte_dos_outros > 0 ? [item(`Só a sua parte: ${brl(i.minha_parte)}`, `${i.quem_deve.map((q) => `${q.pessoa} ${brl(q.valor)}`).join(" · ")}`)] : []), ...i.maiores.map((m) => item(m))] })), "/financeiro?aba=contas") };
   }
 
   if (acao === "parcelas") {

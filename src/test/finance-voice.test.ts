@@ -82,4 +82,14 @@ describe("voz: por que sobra ou falta", () => {
     const r = answer(rico, { acao: "cobrir_falta", cartao: "nubank" }, today);
     expect(r.result["precisa_pegar"]).toBe(0);
   });
+
+  it("fatura traz só a minha parte quando há gasto dividido", () => {
+    const card = s.cards[0]!;
+    const comDivisao = { ...s, transactions: [...s.transactions, { id: "div-x", kind: "despesa", desc: "Jantar", amount: 200, date: "2026-11-10", method: "credito", cardId: card.id, category: "alimentacao", shared: { person: "Ana", percent: 50 } }] } as typeof s;
+    const antes = answer(s, { acao: "fatura", cartao: card.name }, today).result, depois = answer(comDivisao, { acao: "fatura", cartao: card.name }, today).result;
+    const f = (depois["faturas"] as { total: number; minha_parte: number; parte_dos_outros: number; quem_deve: { pessoa: string; valor: number }[] }[])[0]!;
+    expect(f.parte_dos_outros).toBe(100); expect(f.minha_parte).toBeCloseTo(f.total - 100, 2); expect(f.quem_deve).toEqual([{ pessoa: "Ana", valor: 100 }]);
+    expect(depois["minha_parte_todas"]).toBeLessThan(depois["total_todas"] as number); expect(antes["parte_dos_outros_todas"]).toBe(0);
+    expect(answer(comDivisao, { acao: "resumo" }, today).result["faturas_abertas_so_minha_parte"]).toBeLessThan(answer(comDivisao, { acao: "resumo" }, today).result["faturas_abertas"] as number);
+  });
 });

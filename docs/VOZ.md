@@ -148,3 +148,7 @@ O fim da fala não é mais um silêncio fixo: `silenceFor(texto)` espera **2,6 s
 
 ## Financeiro: "quanto preciso pegar para fechar o mês" (`cobrir_falta`)
 `financeiro` ação `cobrir_falta` (cartao padrão Nubank; opcionais `parcelas_total`, `folga`, `taxa_percent`, `dias`): usa o fluxo de caixa real (`cashflow`: salário, contas, faturas que vencem), acha o **menor saldo** até o fim do mês (ou `dias`), calcula quanto pegar (arredondado para cima de R$ 10 em R$ 10, + folga) e simula o Pix no crédito como compra na fatura aberta do cartão (`simulatePurchase`): fatura antes/depois, vencimento, e o saldo do fim de cada mês com e sem o Pix (somando o dinheiro que entra). Não grava nada. Juros/IOF do Pix no crédito só entram se a pessoa disser a taxa.
+
+## "Minha parte" do cartão e agradecer
+- **Minha parte:** gastos divididos do cartão (`shared`: pessoa + %) têm `Invoice.mine` (total do banco − a parte dos outros) e `othersOwe`. A voz (`financeiro/fatura`, `resumo`, `cobrir_falta`) devolve `minha_parte`, `parte_dos_outros` e `quem_deve` por fatura e os totais; o painel mostra "Só a sua parte". O total do banco não muda.
+- **Agradecer:** "obrigada", "valeu", "tchau", "não preciso mais", "isso era só", "pode parar" (`endsConversation`, `dismiss.ts`) fecham os cartões da tela, o Orion responde UMA frase curta ("De nada! Pode contar comigo.") e **para de ouvir** (`endAfter`). "Pode fechar" sozinho só fecha a tela e continua ouvindo. Agradecer e já pedir outra coisa ("valeu, e o financeiro?") não encerra.

@@ -14,7 +14,7 @@ import { transcribeAudio } from "@/lib/audio.functions";
 import type { Panel, Turn, VoiceEvent } from "./agent";
 import { takeSentences } from "./sentences";
 import { SLOW_AFTER_MS, SLOW_FILLER } from "./filler";
-import { isDismiss } from "./dismiss";
+import { endsConversation, isDismiss } from "./dismiss";
 import { silenceFor, silenceForSpeech } from "./endpoint";
 import { markStt, recordPerf, takeStt } from "./perf";
 
@@ -350,6 +350,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     const ctrl = new AbortController(); abort.current = ctrl;
     let said = "", buffer = "", first = true;
     endAfter.current = false;
+    if (!greeting && endsConversation(text)) endAfter.current = true; // "obrigada": responde curto e PARA de ouvir
     const say = (chunks: string[]) => chunks.forEach((c) => sp.enqueue(c));
     // se a resposta está demorando e ainda não veio nada, avisa em voz alta (nunca fica em silêncio)
     let gotAny = false;
