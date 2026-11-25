@@ -34,3 +34,10 @@ Por padrão mostra a **Saúde da carteira** (`PortfolioHealth`): implantação m
 
 ## Onde fica a página de Clientes
 **Demandas → botão "Clientes"** (no lugar do botão "Notas"), em `/demandas?aba=clientes`. Saiu da aba Documentação (que ficou com Biblioteca, Treinamentos e Playbooks); os vínculos com dossiês, reuniões e demandas não mudaram. As **notas** continuam na Visão geral (faixa "Notas", "ver mais"). Links antigos `?secao=cli` abrem a página nova.
+
+O botão de copiar de cada acesso (ficha do cliente → Acessos) copia **usuário e senha** prontos para enviar:
+```
+Usuário: fulano@empresa.com
+Senha: ********
+```
+(sem senha cadastrada, copia só o usuário).
