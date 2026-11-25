@@ -1,6 +1,5 @@
 /** Cálculos do módulo financeiro: faturas, parcelas, projeções, categorias e alertas. Puro (recebe `today`), fácil de testar. */
 import { catOf } from "./categories";
-import type { AcertoByMonth } from "./settle";
 import type { Account, Card, Entry, FinanceState, Goal, Plan, Recurring, Shared, Transaction } from "./types";
 
 /* ───────────── datas ───────────── */
@@ -175,7 +174,7 @@ export function monthSummary(s: FinanceState, ym: string, todayIso: string): Mon
   return { receitas, despesas, aReceber, aPagar, resultado: round2(receitas - despesas), previsto: round2(receitas + aReceber - despesas - aPagar) };
 }
 /* ───────────── detalhamento da sobra/falta do mês ───────────── */
-export type BreakdownGroupId = "fixas" | "assinaturas" | "parcelas" | "cartao" | "avulsas" | "faturas" | "metas" | "acerto";
+export type BreakdownGroupId = "fixas" | "assinaturas" | "parcelas" | "cartao" | "avulsas" | "faturas" | "metas";
 export type BreakdownGroup = { id: BreakdownGroupId; label: string; hint: string; total: number; done: number; later: number; pct: number; items: Entry[] };
 export type MonthBreakdown = {
   ym: string; income: { total: number; done: number; later: number; items: Entry[] };
@@ -488,22 +487,21 @@ export function reservesFor(s: FinanceState, ym: string, today: Date): Reserve[]
 }
 export const totalReserves = (s: FinanceState, today: Date) => sum(reservesFor(s, ymOf(today), today).map((r) => r.amount));
 
-export type MonthClose = { saldo: number; aReceber: number; aPagarConta: number; faturas: number; sobra: number; /** Das faturas abertas, quanto os cofrinhos pagam (já separado; fora da conta acima). */ cofrinhosPagam: number; /** Acerto de contas do mês: o que você paga e o que vai receber (já dentro da sobra). */ acertoPagar: number; acertoReceber: number; /** Metas ligadas que estão descontando da sobra (0 se o desconto estiver desligado). */ reservas: number; /** O que as metas ligadas reservariam (mostra mesmo com o desconto desligado). */ reservasPossiveis: number };
-export function monthClose(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth): MonthClose {
+export type MonthClose = { saldo: number; aReceber: number; aPagarConta: number; faturas: number; sobra: number; /** Das faturas abertas, quanto os cofrinhos pagam (já separado; fora da conta acima). */ cofrinhosPagam: number; /** Metas ligadas que estão descontando da sobra (0 se o desconto estiver desligado). */ reservas: number; /** O que as metas ligadas reservariam (mostra mesmo com o desconto desligado). */ reservasPossiveis: number };
+export function monthClose(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false): MonthClose {
   const todayIso = isoOf(today), later = view === "cofrinho" ? [] : monthEntries(s, ymOf(today)).filter((e) => e.date > todayIso);
   const saldo = viewBalance(s, today, view), aReceber = total(incomeOf(later));
   const aPagarConta = total(expensesOf(later).filter((e) => !e.cardId && e.method !== "credito")), faturas = totalOpenView(s, today, view);
   const reservasPossiveis = view === "cofrinho" ? 0 : totalReserves(s, today), reservas = withReserves ? reservasPossiveis : 0;
-  const ac = view === "cofrinho" ? undefined : acerto?.[ymOf(today)], acertoPagar = ac?.pagar ?? 0, acertoReceber = ac?.receber ?? 0;
-  return { saldo, aReceber, aPagarConta, faturas, reservas, reservasPossiveis, acertoPagar, acertoReceber, sobra: round2(saldo + aReceber + acertoReceber - aPagarConta - faturas - reservas - acertoPagar), cofrinhosPagam: sum(s.cards.map((c) => openInvoice(s, c, today).funded)) };
+  return { saldo, aReceber, aPagarConta, faturas, reservas, reservasPossiveis, sobra: round2(saldo + aReceber - aPagarConta - faturas - reservas), cofrinhosPagam: sum(s.cards.map((c) => openInvoice(s, c, today).funded)) };
 }
 
 /**
  * Detalhamento da SOBRA DE CAIXA (a mesma conta de `monthClose`): o que já está nas contas + o que ainda entra no mês,
  * menos o que ainda sai das contas e as faturas dos cartões. Compras e parcelas no crédito aparecem dentro das faturas.
  */
-export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth): MonthBreakdown {
-  const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today, view, withReserves, acerto);
+export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false): MonthBreakdown {
+  const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today, view, withReserves);
   const later = (view === "cofrinho" ? [] : monthEntries(s, ym)).filter((e) => e.date > todayIso).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
   const incLater = incomeOf(later), outAcct = expensesOf(later).filter((e) => !e.cardId && e.method !== "credito");
   const mk = (id: string, desc: string, amount: number, kind: "receita" | "despesa", over: Partial<Entry> = {}): Entry => ({ id, kind, desc, amount, date: todayIso, category: "outros", method: "debito", source: "tx", ...over });
@@ -516,18 +514,16 @@ export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bol
     for (const l of linesIn(inv.lines, view)) catItems.push(mk(l.id, l.desc, l.amount, "despesa", { date: l.date, category: l.category, method: "credito", cardId: card.id, source: l.source === "parcela" ? "parcela" : "tx", parcel: l.parcel }));
   }
   const metas: Entry[] = withReserves && view !== "cofrinho" ? reservesFor(s, ym, today).map((r) => mk(`meta:${r.id}`, `Meta · ${r.title}`, r.amount, "despesa")) : [];
-  const acertoOut: Entry[] = c.acertoPagar > 0 ? [mk("acerto:pagar", `Acerto de contas · o que você paga`, c.acertoPagar, "despesa")] : [];
-  if (c.acertoReceber > 0) items.push(mk("acerto:receber", "Acerto de contas · o que vão te pagar", c.acertoReceber, "receita"));
-  const buckets: Record<string, Entry[]> = { fixas: [], assinaturas: [], avulsas: [], faturas, metas, acerto: acertoOut };
+  const buckets: Record<string, Entry[]> = { fixas: [], assinaturas: [], avulsas: [], faturas, metas };
   for (const e of outAcct) buckets[groupOf(s, e)]!.push(e);
   if (c.saldo < 0) buckets["avulsas"]!.push(mk("saldo-neg", "Saldo negativo nas contas", -c.saldo, "despesa"));
-  const incomeTotal = round2(Math.max(c.saldo, 0) + c.aReceber + c.acertoReceber);
-  const labels: Record<string, { label: string; hint: string }> = { ...Object.fromEntries(GROUPS.map((g) => [g.id, { label: g.label, hint: g.hint }])), avulsas: { label: "Outros gastos das contas", hint: "pix, débito e dinheiro que ainda vão sair" }, acerto: { label: "Acerto de contas", hint: "o que você paga a outras pessoas neste mês (compras no cartão delas, parcelas e gastos fixos)" }, metas: { label: "Minhas metas do mês", hint: "o que você separou para limites e para guardar (liga e desliga na Visão geral)" }, faturas: { label: "Faturas dos cartões", hint: "o que você paga pelos cartões; compras e parcelas já estão dentro delas" } };
+  const incomeTotal = round2(Math.max(c.saldo, 0) + c.aReceber);
+  const labels: Record<string, { label: string; hint: string }> = { ...Object.fromEntries(GROUPS.map((g) => [g.id, { label: g.label, hint: g.hint }])), avulsas: { label: "Outros gastos das contas", hint: "pix, débito e dinheiro que ainda vão sair" }, metas: { label: "Minhas metas do mês", hint: "o que você separou para limites e para guardar (liga e desliga na Visão geral)" }, faturas: { label: "Faturas dos cartões", hint: "o que você paga pelos cartões; compras e parcelas já estão dentro delas" } };
   const groups = (Object.keys(buckets) as BreakdownGroupId[]).map((id) => { const xs = buckets[id]!, t = total(xs); return { id, label: labels[id]!.label, hint: labels[id]!.hint, items: xs, total: t, done: 0, later: t, pct: incomeTotal > 0 ? (t / incomeTotal) * 100 : 0 }; }).filter((g) => g.items.length > 0).sort((a, b) => b.total - a.total);
   const expenses = round2(sum(groups.map((g) => g.total)));
   const subscriptions = sum(s.recurring.filter((r) => isSubscription(r) && recurringActiveIn(r, ym)).map((r) => r.amount));
   return {
-    ym, income: { total: incomeTotal, done: Math.max(c.saldo, 0), later: round2(c.aReceber + c.acertoReceber), items }, groups, expenses, previsto: round2(incomeTotal - expenses),
+    ym, income: { total: incomeTotal, done: Math.max(c.saldo, 0), later: c.aReceber, items }, groups, expenses, previsto: round2(incomeTotal - expenses),
     spentPct: incomeTotal > 0 ? (expenses / incomeTotal) * 100 : expenses > 0 ? 100 : 0,
     biggest: groups.flatMap((g) => g.items).sort((a, b) => b.amount - a.amount).slice(0, 3), subscriptions, catItems,
   };
@@ -535,15 +531,13 @@ export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bol
 
 
 /* ───────────── projeção mês a mês ───────────── */
-export type PlanItem = { id: string; group: "entradas" | "fixas" | "assinaturas" | "faturas" | "avulsas" | "metas" | "acerto"; label: string; amount: number; date: string; detail?: string | undefined; cardId?: string | undefined; lines?: InvoiceLine[] | undefined; /** Fatura: quanto um cofrinho paga (fora do saldo). */ funded?: number | undefined };
+export type PlanItem = { id: string; group: "entradas" | "fixas" | "assinaturas" | "faturas" | "avulsas" | "metas"; label: string; amount: number; date: string; detail?: string | undefined; cardId?: string | undefined; lines?: InvoiceLine[] | undefined; /** Fatura: quanto um cofrinho paga (fora do saldo). */ funded?: number | undefined };
 export type MonthPlan = {
   ym: string; label: string; entradas: number; fixas: number; assinaturas: number; faturas: number; avulsas: number;
   /** Parte das faturas que são parcelas de compras parceladas (já dentro de `faturas`). */
   parcelas: number;
   /** Metas ligadas que descontam neste mês. */
   metas: number;
-  /** Acerto de contas: o que você paga neste mês (já dentro de `saidas`). */
-  acerto: number;
   /** Das faturas pagas no mês, quanto os cofrinhos pagam (não sai do saldo). */
   cofrinhos: number;
   /** Assinaturas cobradas no cartão (já dentro de `faturas`); somadas a `assinaturas` dão o custo total de assinaturas do mês. */
@@ -555,7 +549,7 @@ export type MonthPlan = {
  * contas fixas e assinaturas pagas em conta, avulsos futuros e as faturas dos cartões que vencem no mês (compras, parcelas,
  * assinaturas e fixas no cartão já estão dentro delas). No mês atual só entra o que ainda não aconteceu.
  */
-export function monthPlan(s: FinanceState, today: Date, months = 12, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth): MonthPlan[] {
+export function monthPlan(s: FinanceState, today: Date, months = 12, view: CofView = "bolso", withReserves = false): MonthPlan[] {
   const todayIso = isoOf(today), cur = ymOf(today), out: MonthPlan[] = [];
   let bal = viewBalance(s, today, view);
   for (let i = 0; i < months; i++) {
@@ -571,9 +565,6 @@ export function monthPlan(s: FinanceState, today: Date, months = 12, view: CofVi
       items.push({ id: t.id, group: t.kind === "receita" ? "entradas" : "avulsas", label: t.desc, amount: t.amount, date: t.date });
     }
     if (withReserves && view !== "cofrinho") for (const r of reservesFor(s, ym, today)) items.push({ id: `meta:${r.id}:${ym}`, group: "metas", label: `Meta · ${r.title}`, amount: r.amount, date: i === 0 ? todayIso : `${ym}-01`, detail: i === 0 ? "o que ainda falta deste mês" : undefined });
-    const acm = view === "cofrinho" ? undefined : acerto?.[ym];
-    if (acm?.pagar) items.push({ id: `acerto:pagar:${ym}`, group: "acerto", label: "Acerto de contas", amount: acm.pagar, date: i === 0 ? todayIso : `${ym}-01`, detail: acm.itens.length ? `${acm.itens.length} ${acm.itens.length === 1 ? "lançamento" : "lançamentos"}` : undefined });
-    if (acm?.receber) items.push({ id: `acerto:receber:${ym}`, group: "entradas", label: "Acerto de contas · a receber", amount: acm.receber, date: i === 0 ? todayIso : `${ym}-01` });
     let parcelas = 0, assinCartao = 0, cofre = 0;
     for (const c of s.cards) {
       const dueYm = dueYmPaidIn(c, ym), inv = invoiceFor(s, c, dueYm), pay = payDateOf(c, dueYm);
@@ -584,10 +575,10 @@ export function monthPlan(s: FinanceState, today: Date, months = 12, view: CofVi
     }
     items.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
     const g = (id: PlanItem["group"]) => sum(items.filter((x) => x.group === id).map((x) => x.amount));
-    const entradas = g("entradas"), fixas = g("fixas"), assinaturas = g("assinaturas"), faturas = g("faturas"), avulsas = g("avulsas"), metas = g("metas"), acertoPag = g("acerto");
-    const saidas = round2(fixas + assinaturas + faturas + avulsas + metas + acertoPag), resultado = round2(entradas - saidas);
+    const entradas = g("entradas"), fixas = g("fixas"), assinaturas = g("assinaturas"), faturas = g("faturas"), avulsas = g("avulsas"), metas = g("metas");
+    const saidas = round2(fixas + assinaturas + faturas + avulsas + metas), resultado = round2(entradas - saidas);
     bal = round2(bal + resultado);
-    out.push({ ym, label: monthLabel(ym), entradas, fixas, assinaturas, faturas, avulsas, metas, acerto: acertoPag, parcelas: round2(parcelas), cofrinhos: round2(cofre), assinaturasCartao: round2(assinCartao), saidas, resultado, saldoFinal: bal, items });
+    out.push({ ym, label: monthLabel(ym), entradas, fixas, assinaturas, faturas, avulsas, metas, parcelas: round2(parcelas), cofrinhos: round2(cofre), assinaturasCartao: round2(assinCartao), saidas, resultado, saldoFinal: bal, items });
   }
   return out;
 }

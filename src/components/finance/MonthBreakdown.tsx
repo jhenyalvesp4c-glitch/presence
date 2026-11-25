@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useCofView, useReservesOn } from "@/lib/finance/cof-view";
-import { useAcertoByMonth } from "@/lib/finance/settle-data";
-import { ArrowDownRight, ArrowUpRight, ChevronDown, CircleCheck, Clock3, CreditCard, Equal, Flame, Home, Layers, Lightbulb, Minus, Repeat, ShoppingBag, Handshake, Sparkles, Target, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ChevronDown, CircleCheck, Clock3, CreditCard, Equal, Flame, Home, Layers, Lightbulb, Minus, Repeat, ShoppingBag, Sparkles, Target, Wallet } from "lucide-react";
 import { brl, cashBreakdown, dateBR, monthName, type BreakdownGroupId, type MonthBreakdown } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
@@ -20,7 +19,6 @@ const LOOK: Record<BreakdownGroupId, { color: string; icon: typeof Home; short: 
   avulsas: { color: "oklch(0.78 0.13 235)", icon: ShoppingBag, short: "Dia a dia" },
   faturas: { color: "oklch(0.7 0.19 300)", icon: CreditCard, short: "Faturas" },
   metas: { color: "var(--emerald)", icon: Target, short: "Metas" },
-  acerto: { color: "var(--pink)", icon: Handshake, short: "Acerto" },
 };
 const pctTxt = (n: number) => `${n >= 10 || n === 0 ? Math.round(n) : n.toFixed(1).replace(".", ",")}%`;
 
@@ -184,7 +182,7 @@ function Section({ title, hint, icon: I, color, totalValue, sign, pct, done, lat
 export function MonthBreakdownModal({ open, onClose, onTab }: { open: boolean; onClose: () => void; onTab: (t: string) => void }) {
   const { state, today } = useFinance();
   const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`, ym = todayIso.slice(0, 7);
-  const acerto = useAcertoByMonth(), [view] = useCofView(), [reservesOn] = useReservesOn(), b = useMemo(() => cashBreakdown(state, today, view, reservesOn, acerto), [state, today, view, reservesOn, acerto]);
+  const [view] = useCofView(), [reservesOn] = useReservesOn(), b = useMemo(() => cashBreakdown(state, today, view, reservesOn), [state, today, view, reservesOn]);
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
   const firstId = b.groups[0]?.id;
   const isOpen = (id: string) => (openIds.has(id) ? !(id === firstId) : id === firstId); // o grupo que mais pesa já vem aberto

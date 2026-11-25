@@ -3,8 +3,7 @@ import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { must, supabase } from "../data/db";
-import { acertoByMonth, type AcertoByMonth, type SettleItem } from "./settle";
-import { addMonths, ymOf } from "./calc";
+import type { SettleItem } from "./settle";
 
 export type Settlement = { id: string; person: string; note: string; closed: boolean; createdAt: string; /** % das contas da casa que fica com a outra pessoa (null = não definido). */ defaultShare: number | null };
 export type ItemDraft = Omit<SettleItem, "id" | "linked">;
@@ -38,7 +37,7 @@ export function useSettlementItems(id: string | null) {
 
 export function useSettleActions() {
   const qc = useQueryClient();
-  const refresh = useCallback((id?: string) => Promise.all([qc.invalidateQueries({ queryKey: ["acerto-months"] }), qc.invalidateQueries({ queryKey: LIST }), id ? qc.invalidateQueries({ queryKey: itemsKey(id) }) : Promise.resolve()]), [qc]);
+  const refresh = useCallback((id?: string) => Promise.all([qc.invalidateQueries({ queryKey: LIST }), id ? qc.invalidateQueries({ queryKey: itemsKey(id) }) : Promise.resolve()]), [qc]);
   const create = useMutation({ mutationFn: async (person: string) => (must(await supabase.from("fin_settlements").insert({ person: person.trim().slice(0, 80) }).select("id, person, note, closed, created_at, default_share")) as SRow[]).map(toSettlement)[0]!, onSuccess: () => void refresh() });
   const patch = useMutation({
     mutationFn: async (v: { id: string; person?: string; closed?: boolean; note?: string; defaultShare?: number | null }) => { const { id, defaultShare, ...rest } = v; must(await supabase.from("fin_settlements").update({ ...rest, ...(defaultShare !== undefined ? { default_share: defaultShare } : {}), updated_at: new Date().toISOString() }).eq("id", id).select("id")); },
@@ -58,19 +57,4 @@ export function useSettleActions() {
     onSuccess: (_d, v) => void refresh(v.settlementId),
   });
   return { create, patch, remove, addItems, updateItem, removeItem };
-}
-
-/** O que o acerto de contas pesa em cada mês (do mês atual a 12 meses à frente), para a sobra de caixa e os próximos meses. Acertos encerrados ficam de fora. */
-export function useAcertoByMonth(): AcertoByMonth {
-  const q = useQuery({
-    queryKey: ["acerto-months"], staleTime: 30_000,
-    queryFn: async (): Promise<AcertoByMonth> => {
-      const open = must(await supabase.from("fin_settlements").select("id, person").eq("closed", false)) as { id: string; person: string }[];
-      if (!open.length) return {};
-      const rows = must(await supabase.from("fin_settlement_items").select("id, settlement_id, kind, item_date, description, amount, payer, other_share, installment, source_ref, pending").in("settlement_id", open.map((o) => o.id))) as (IRow & { settlement_id: string })[];
-      const now = ymOf(new Date());
-      return acertoByMonth(open.map((o) => ({ person: o.person, items: rows.filter((r) => r.settlement_id === o.id).map(toItem) })), now, addMonths(now, 12));
-    },
-  });
-  return q.data ?? {};
 }

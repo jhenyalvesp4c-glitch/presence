@@ -4,7 +4,6 @@ import { type CofView, viewBalance, addMonths, alertsFor, brl, cashflow, categor
 import { CofFilter, ReservesSwitch } from "./CofFilter";
 import { SpendGoalsPanel } from "./SpendGoals";
 import { useCofView, useReservesOn } from "@/lib/finance/cof-view";
-import { useAcertoByMonth } from "@/lib/finance/settle-data";
 import { useFinance } from "@/lib/finance/store";
 import { AreaChart, BarsChart, Donut, Gauge, Heatmap, Money, RadialRings, Sparkline, StackedBars } from "./charts";
 import { HeroPanel, OrbitArt, Tilt } from "./fx";
@@ -120,7 +119,7 @@ function Hero({ model, cards, accounts, today, onDetail }: { model: Model; cards
             </button>
           </OrbitArt>
           <dl className="mt-3 w-full max-w-[19rem] space-y-1 text-xs tabular-nums" data-testid="fin-sobra-conta" aria-label="Como chegamos nesse número">
-            {[[model.view === "cofrinho" ? "Nos cofrinhos hoje" : "Saldo hoje", c.saldo, ""], ["+ Ainda entra no mês", c.aReceber + c.acertoReceber, "var(--emerald)"], ["− Contas a pagar no mês", -c.aPagarConta, ROSE], [model.view === "tudo" ? "− Faturas dos cartões" : model.view === "cofrinho" ? "− O que os cofrinhos pagam" : "− Faturas dos cartões (sem a parte dos cofrinhos)", -c.faturas, ROSE], ...(c.reservas > 0 ? [["− Minhas metas do mês", -c.reservas, ROSE]] : []), ...(c.acertoPagar > 0 ? [["− Acerto de contas (o que você paga)", -c.acertoPagar, ROSE]] : [])].map(([l, v, col]) => (
+            {[[model.view === "cofrinho" ? "Nos cofrinhos hoje" : "Saldo hoje", c.saldo, ""], ["+ Ainda entra no mês", c.aReceber, "var(--emerald)"], ["− Contas a pagar no mês", -c.aPagarConta, ROSE], [model.view === "tudo" ? "− Faturas dos cartões" : model.view === "cofrinho" ? "− O que os cofrinhos pagam" : "− Faturas dos cartões (sem a parte dos cofrinhos)", -c.faturas, ROSE], ...(c.reservas > 0 ? [["− Minhas metas do mês", -c.reservas, ROSE]] : [])].map(([l, v, col]) => (
               <div key={String(l)} className="flex items-baseline justify-between gap-3"><dt className="text-muted-foreground">{l}</dt><dd className="font-medium" style={col ? { color: String(col) } : undefined}><Money value={Number(v)} cents={false} /></dd></div>
             ))}
             <div className="flex items-baseline justify-between gap-3 border-t border-white/10 pt-1"><dt className="font-semibold">= Resultado</dt><dd className="font-semibold" style={{ color: good ? "var(--emerald)" : ROSE }}><Money value={c.sobra} cents={false} /></dd></div>
@@ -133,18 +132,18 @@ function Hero({ model, cards, accounts, today, onDetail }: { model: Model; cards
 }
 
 export function Dashboard({ onOpenCard, onOpenAccount, onAdd, onTab, onDraft }: { onOpenCard: (id: string) => void; onOpenAccount: (id: string) => void; onAdd: () => void; onTab: (t: string) => void; onDraft: (d: Draft) => void }) {
-  const { state, today } = useFinance(), [view] = useCofView(), [reservesOn] = useReservesOn(), acerto = useAcertoByMonth();
+  const { state, today } = useFinance(), [view] = useCofView(), [reservesOn] = useReservesOn();
   const ym = ymOf(today), [active, setActive] = useState<string | null>(null), [detail, setDetail] = useState(false);
   const model = useMemo(() => {
     const todayIso = isoOf(today), sum = monthSummary(state, ym, todayIso), prevEs = monthEntries(state, addMonths(ym, -1), sameDayPrev(ym, todayIso));
     const series = monthlySeries(state, ym, 6, todayIso), cats = categoryTotals(state, ym, todayIso), future = commitments(state, ym, 12);
     return {
-      close: monthClose(state, today, view, reservesOn, acerto), sum, prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
+      close: monthClose(state, today, view, reservesOn), sum, prevR: total(incomeOf(prevEs)), prevD: total(expensesOf(prevEs)),
       series, cats, future, saldo: viewBalance(state, today, view), reserved: reservedBalance(state, today), view, faturas: totalOpenInvoices(state, today), parcelas: totalFutureParcels(state, today),
       alerts: alertsFor(state, today), why: whyChanged(state, ym, todayIso), flow: cashflow(state, today, 60, view),
       daily: expensesOf(monthEntries(state, ym, todayIso)).reduce<Record<number, number>>((m, e) => { const d = Number(e.date.slice(8, 10)); m[d] = (m[d] ?? 0) + e.amount; return m; }, {}),
     };
-  }, [state, ym, today, view, reservesOn, acerto]);
+  }, [state, ym, today, view, reservesOn]);
   const nowCard = model.cats.find((c) => c.id === active);
   const upcoming = useMemo(() => state.cards.map((c) => ({ card: c, inv: openInvoice(state, c, today) })).filter((x) => x.inv.total > 0).sort((a, b) => a.inv.due.localeCompare(b.inv.due)), [state, today]);
   const net = model.sum.resultado;
