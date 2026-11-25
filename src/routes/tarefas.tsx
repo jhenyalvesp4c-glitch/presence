@@ -75,6 +75,7 @@ function TarefasPage() {
   const [time, setTime] = useState("");
   const [newRemind, setNewRemind] = useState<number[]>([]);
   const [newClient, setNewClient] = useState("");
+  const [dayFilter, setDayFilter] = useState<string | null>(null), [openFixed, setOpenFixed] = useState<Set<string>>(new Set());
   const clientsQ = useClients(defaultProjectId()), clientList = clientsQ.data ?? [];
   const clientName = useMemo(() => new Map(clientList.map((c) => [c.id, c.name])), [clientList]);
   const [day, setDay] = useState<Date>(T0);
@@ -151,9 +152,27 @@ function TarefasPage() {
   const upcoming = tasks.filter((t) => t.date && !t.done && fromIso(t.date) >= T0 && t.cat === compId).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 3);
   const done = tasks.filter((t) => t.done).length;
   const pct = dayTasks.length ? Math.round((dayTasks.filter((t) => t.done).length / dayTasks.length) * 100) : 0;
-  const shown = useMemo(() => [...tasks, ...(tab < 2 ? fixedRows : [])].filter((t) => inRange(t) && (!cat || t.cat === cat) && t.t.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), [tasks, fixedRows, cat, q, tab, day]);
+  const shown = useMemo(() => [...tasks, ...(tab < 2 ? fixedRows : [])].filter((t) => inRange(t) && (tab !== 1 || !dayFilter || t.date === dayFilter) && (!cat || t.cat === cat) && t.t.toLowerCase().includes(q.toLowerCase())).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), [tasks, fixedRows, cat, q, tab, day, dayFilter]);
   const nDone = shown.filter((t) => t.done).length;
   const visible = showDone ? shown : shown.filter((t) => !t.done || leaving.has(t.id));
+  // Semana, mês e todas: agrupa por dia; as tarefas fixas de cada dia viram uma linha só ("Rotina fixa · 2/6"), que abre ao clicar.
+  type View = { k: "head"; date: string; pend: number } | { k: "fixed"; date: string; total: number; done: number; open: boolean } | { k: "row"; row: Row };
+  const rowsView: View[] = useMemo(() => {
+    if (tab === 0) return visible.map((row): View => ({ k: "row", row }));
+    const out: View[] = [];
+    const dates = [...new Set(visible.map((t) => t.date))].sort((a, b) => (a || "9").localeCompare(b || "9"));
+    for (const d of dates) {
+      const mine = visible.filter((t) => t.date === d), own = mine.filter((t) => !t.fixed), fx = mine.filter((t) => t.fixed);
+      out.push({ k: "head", date: d, pend: own.filter((t) => !t.done).length });
+      own.forEach((row) => out.push({ k: "row", row }));
+      if (fx.length) { const open = openFixed.has(d); out.push({ k: "fixed", date: d, total: fx.length, done: fx.filter((t) => t.done).length, open }); if (open) fx.forEach((row) => out.push({ k: "row", row })); }
+    }
+    return out;
+  }, [visible, tab, openFixed]);
+  const weekChips = useMemo(() => weekLabels.map((label, i) => {
+    const d = addDays(startOfWeek(day, { weekStartsOn: 1 }), i), key = iso(d);
+    return { key, label, n: tasks.filter((t) => t.date === key && !t.done).length, today: isSameDay(d, T0), num: format(d, "dd") };
+  }), [tasks, day]);
   const lastTime = shown.length ? shown.map((t) => t.time).filter((t) => t !== "—").sort().at(-1) : null;
 
   const weekStart = startOfWeek(day, { weekStartsOn: 1 });
@@ -286,9 +305,37 @@ function TarefasPage() {
                 <button aria-label="Filtros" className="grid h-8 w-8 place-items-center rounded-full border border-border text-muted-foreground hover:text-cyan"><SlidersHorizontal size={14} /></button>
               </div>
             </div>
+            {tab === 1 && (
+              <div className="mt-3 flex flex-wrap gap-1.5" data-testid="semana-dias">
+                <button onClick={() => setDayFilter(null)} aria-pressed={!dayFilter} className={`rounded-full border px-3 py-1 text-xs transition ${!dayFilter ? "border-cyan bg-cyan/10 text-cyan" : "border-border text-muted-foreground hover:text-foreground"}`}>Semana toda</button>
+                {weekChips.map((w) => (
+                  <button key={w.key} onClick={() => setDayFilter(dayFilter === w.key ? null : w.key)} aria-pressed={dayFilter === w.key} data-testid="semana-dia"
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${dayFilter === w.key ? "border-cyan bg-cyan/10 text-cyan" : w.today ? "border-violet/60 text-foreground" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                    {w.label} {w.num}{w.n > 0 && <span className="rounded-full bg-cyan/20 px-1.5 text-[0.65rem] text-cyan">{w.n}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
             <ul className="mt-4 divide-y divide-border">
-              {visible.map((tk, i) => (
-                <li key={tk.id} style={{ "--glow": colorVar(tk.c), animationDelay: `${i * 0.05}s`, ...(leaving.has(tk.id) && tk.done ? { animation: "task-out .6s .25s ease-in forwards" } : {}) } as React.CSSProperties}
+              {rowsView.map((it, i) => {
+                if (it.k === "head") return (
+                  <li key={`h${it.date}`} className="flex items-baseline gap-2 pb-1.5 pt-4 first:pt-0" data-testid="dia-grupo">
+                    <span className="font-display text-sm font-semibold">{it.date ? cap(format(fromIso(it.date), "EEEE, dd/MM", { locale: ptBR })) : "Sem data"}</span>
+                    {it.date && isSameDay(fromIso(it.date), T0) && <span className="rounded-full bg-violet/20 px-2 text-[0.65rem] text-violet">hoje</span>}
+                    <span className="text-xs text-muted-foreground">{it.pend > 0 ? `${it.pend} ${it.pend === 1 ? "pendente" : "pendentes"}` : "nada pendente"}</span>
+                  </li>
+                );
+                if (it.k === "fixed") return (
+                  <li key={`f${it.date}`}>
+                    <button type="button" onClick={() => setOpenFixed((o) => { const n = new Set(o); if (n.has(it.date)) n.delete(it.date); else n.add(it.date); return n; })} aria-expanded={it.open} data-testid="fixas-do-dia"
+                      className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary/30 hover:text-foreground">
+                      <Repeat size={14} className="text-emerald" /> Rotina fixa · {it.done}/{it.total} feitas <span className="ml-auto text-xs">{it.open ? "Esconder" : "Ver"}</span>
+                    </button>
+                  </li>
+                );
+                const tk = it.row;
+                return (
+                <li key={tk.id} style={{ "--glow": colorVar(tk.c), animationDelay: `${Math.min(i, 8) * 0.05}s`, ...(leaving.has(tk.id) && tk.done ? { animation: "task-out .6s .25s ease-in forwards" } : {}) } as React.CSSProperties}
                   className={`${leaving.has(tk.id) ? "overflow-hidden " : ""}group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 py-3 animate-rise sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto]`}>
                   <button aria-label="Concluir" onClick={() => toggleRow(tk)}
                     className={`grid h-5 w-5 place-items-center rounded-md border transition ${tk.done ? "border-cyan bg-cyan text-background shadow-[0_0_12px_var(--cyan)]" : "border-muted-foreground/50 hover:border-cyan"}`}>
@@ -303,13 +350,14 @@ function TarefasPage() {
                     <span className="block truncate text-xs text-muted-foreground">{tk.d}{tk.client && <span className="ml-1.5 text-violet" data-testid="tarefa-cliente">· {tk.client}</span>}</span>
                   </button>
                   <span className={`tag hidden sm:inline ${tk.fixed ? "!text-emerald" : ""}`}>{tk.fixed && <Repeat size={10} className="mr-1 inline" />}{tk.tag}</span>
-                  <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tab !== 0 && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
+                  <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground"><Clock size={13} /> {tk.time}</span>
                   <span className="hidden items-center gap-2 text-muted-foreground sm:flex">
                     {tk.remind?.length ? <span title={`Avisa ${tk.remind.map((m) => beforeWords(m)).join(", ")} antes`} data-testid="tarefa-lembrar-antes" className="flex items-center gap-1 text-[0.65rem] text-cyan"><BellRing size={13} /> {tk.remind.length > 1 ? `${tk.remind.length}×` : beforeWords(tk.remind[0]!)}</span> : <AlarmClock size={15} className="text-[color:var(--glow)]" />}
                     {tk.fixed ? <span title="Tarefa fixa: gerencie em Tarefas fixas" className="opacity-60"><Repeat size={15} className="text-emerald" /></span> : <button aria-label="Excluir tarefa" onClick={() => del.mutate(tk.id, { onError: (e) => toast.error(e.message) })} className="opacity-40 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={15} /></button>}
                   </span>
                 </li>
-              ))}
+                );
+              })}
               {tasksQ.isPending && <li className="flex justify-center py-10"><Loader2 className="animate-spin text-cyan" /></li>}
               {tasksQ.isError && <li className="py-10 text-center text-sm text-destructive">Não consegui carregar as tarefas: {tasksQ.error.message}</li>}
               {tasksQ.isSuccess && shown.length === 0 && <li className="py-10 text-center text-sm text-muted-foreground">{tasks.length === 0 ? "Você ainda não tem tarefas. Crie a primeira ao lado." : "Nenhuma tarefa encontrada."}</li>}
