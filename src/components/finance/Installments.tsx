@@ -23,7 +23,7 @@ export function PlanCard({ plan, onEdit, onDelete, index = 0 }: { plan: Plan; on
           <div className="flex items-center gap-2"><CatBadge id={plan.category} size={26} /><h4 className="truncate font-medium">{plan.desc}</h4></div>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1"><CreditCard size={12} />{card ? `${card.name} •••• ${card.last4}` : "cartão removido"}</span><span>· comprado em {monthLabel(plan.purchaseYm)}</span></p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {plan.fundedBy ? <Pill color="var(--cyan)">paga pelo cofrinho{(() => { const a = state.accounts.find((x) => x.id === plan.fundedBy); return a ? ` · ${a.name}` : ""; })()}</Pill> : null}
+            {plan.fundedBy ? <Pill color="var(--cyan)">paga pelo cofrinho{(() => { const a = state.accounts.find((x) => x.id === plan.fundedBy); return a ? ` · ${a.name}` : ""; })()}{plan.fundedFrom && plan.fundedFrom > 1 ? ` · a partir da ${plan.fundedFrom}ª` : ""}</Pill> : null}
             {info.done ? <Pill color="var(--emerald)">quitada</Pill> : <><Pill color="var(--amber)">{info.remaining} restantes</Pill><Pill color="var(--violet)">termina em {monthLabel(info.lastYm)}</Pill></>}
           </div>
         </div>

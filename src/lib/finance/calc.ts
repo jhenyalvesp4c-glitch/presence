@@ -243,14 +243,14 @@ export function monthlySeries(s: FinanceState, currentYm: string, n = 6, upTo?: 
 }
 
 /* ───────────── cofrinho: dinheiro separado para pagar parcelas ───────────── */
-export type FundedParcel = { planId: string; desc: string; n: number; count: number; ym: string; pay: string; amount: number; mine: number };
+export type FundedParcel = { planId: string; desc: string; n: number; count: number; ym: string; pay: string; amount: number; mine: number; /** O cofrinho paga esta parcela (a partir de `fundedFrom`). */ covered: boolean };
 /** Parcelas de uma compra, com a data em que você paga a fatura e a sua parte (a do cofrinho; a de outra pessoa fica de fora). */
 export function fundedParcels(s: FinanceState, p: Plan): FundedParcel[] {
   const card = s.cards.find((c) => c.id === p.cardId);
   if (!card) return [];
   return Array.from({ length: p.count }, (_, i) => {
     const n = i + 1, ym = addMonths(p.first, i), amount = parcelAmount(p, n);
-    return { planId: p.id, desc: p.desc, n, count: p.count, ym, pay: payDateOf(card, ym), amount, mine: myPart(amount, planShare(p, n)) };
+    return { planId: p.id, desc: p.desc, n, count: p.count, ym, pay: payDateOf(card, ym), amount, mine: myPart(amount, planShare(p, n)), covered: n >= (p.fundedFrom ?? 1) };
   });
 }
 export type CofrinhoInfo = {
@@ -262,7 +262,7 @@ export function cofrinhoInfo(s: FinanceState, a: Account, today: Date = new Date
   const todayIso = isoOf(today), balance = accountBalance(s, a, today), byYm = new Map<string, number>(), plans: CofrinhoInfo["plans"] = [];
   for (const p of s.plans) {
     if (p.fundedBy !== a.id) continue;
-    const left = fundedParcels(s, p).filter((x) => x.pay > todayIso);
+    const left = fundedParcels(s, p).filter((x) => x.covered && x.pay > todayIso);
     plans.push({ id: p.id, desc: p.desc, remaining: sum(left.map((x) => x.mine)), left: left.length });
     for (const x of left) byYm.set(ymOf(x.pay), round2((byYm.get(ymOf(x.pay)) ?? 0) + x.mine));
   }
@@ -290,7 +290,7 @@ export function accountBalance(s: FinanceState, a: Account, today: Date = new Da
     }
   }
   // cofrinho que paga parcelas: cada parcela já paga (data de pagamento depois do saldo informado) sai do cofrinho sozinha
-  for (const p of s.plans) if (p.fundedBy === a.id) for (const x of fundedParcels(s, p)) if (x.pay > a.baseDate && x.pay <= todayIso) v -= x.mine;
+  for (const p of s.plans) if (p.fundedBy === a.id) for (const x of fundedParcels(s, p)) if (x.covered && x.pay > a.baseDate && x.pay <= todayIso) v -= x.mine;
   return round2(v);
 }
 export const totalBalance = (s: FinanceState, today: Date = new Date()) => sum(s.accounts.map((a) => accountBalance(s, a, today)));
@@ -317,7 +317,7 @@ const shareOf = (amount: number, sh: { person: string; percent: number } | undef
 export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice {
   const lines: InvoiceLine[] = [];
   for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx", ...shareOf(t.amount, t.shared) });
-  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...(p.fundedBy ? { funded: p.fundedBy } : {}), ...shareOf(parcelAmount(p, n), planShare(p, n)) });
+  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...(p.fundedBy && n >= (p.fundedFrom ?? 1) ? { funded: p.fundedBy } : {}), ...shareOf(parcelAmount(p, n), planShare(p, n)) });
   // cobrança fixa no cartão: cada cobrança (mês do calendário `m`) cai na fatura que contém a data dela. Assim, pausar depois do dia da renovação
   // mantém a cobrança já feita na fatura certa e só tira as próximas; pausar antes do dia tira também a que ainda não aconteceu.
   for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa") for (let k = -3; k <= 1; k++) {

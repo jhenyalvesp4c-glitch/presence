@@ -51,3 +51,17 @@ describe("Cofrinho que paga parcelas", () => {
     expect(back.accounts.find((a) => a.id === "cof")?.kind).toBe("cofrinho");
   });
 });
+
+describe("Cofrinho que cobre só a partir de certa parcela", () => {
+  it("a parcela da fatura aberta sai do bolso e o cofrinho paga as seguintes", () => {
+    const s: FinanceState = { ...state(), plans: [mk("P", 100, 4, "2026-12", { fundedBy: "cof", fundedFrom: 2 })] };
+    const dez = invoiceFor(s, card, "2026-12"), jan = invoiceFor(s, card, "2027-01");
+    expect(dez.funded).toBe(0); expect(dez.own).toBe(100);
+    expect(jan.funded).toBe(100); expect(jan.own).toBe(0);
+    const i = cofrinhoInfo(s, cofre, today);
+    expect(i.committed).toBe(300);
+    expect(accountBalance(s, cofre, new Date("2026-12-20T12:00:00"))).toBe(1000); // dez ainda é do bolso
+    expect(accountBalance(s, cofre, new Date("2027-01-20T12:00:00"))).toBe(900);
+    expect(fromRows(toRows(s)).plans[0]?.fundedFrom).toBe(2);
+  });
+});

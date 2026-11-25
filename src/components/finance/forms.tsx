@@ -146,7 +146,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const [first, setFirst] = useState(initial?.first ?? addMonths(todayYm, -1)), [firstTouched, setFirstTouched] = useState(!!initial);
   const [mode, setMode] = useState<"datas" | "manual">("datas"), [paid, setPaid] = useState(String(initial ? planInfo(initial, state.cards.find((c) => c.id === initial.cardId), today).paid : 3));
   const [cat, setCat] = useState(initial?.category ?? "compras"), [share, setShare] = useState<Shared | undefined>(initial?.shared);
-  const [fundedBy, setFundedBy] = useState(initial?.fundedBy ?? "");
+  const [fundedBy, setFundedBy] = useState(initial?.fundedBy ?? ""), [fundedFrom, setFundedFrom] = useState(String(initial?.fundedFrom ?? 1));
   const cofrinhos = state.accounts.filter((a) => a.kind === "cofrinho");
   const card = state.cards.find((c) => c.id === cardId);
   const n = Math.max(1, Math.min(60, Math.round(Number(count) || 1)));
@@ -155,7 +155,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const paidN = Math.max(0, Math.min(n, Math.round(Number(paid) || 0)));
   // "já paguei N": a próxima parcela (N+1) cai na próxima fatura a vencer; o mês da 1ª parcela sai dessa conta
   const firstV = mode === "manual" ? firstFromPaid(card, today, paidN) : firstTouched ? first : card ? invoiceMonthOf(card, `${purchaseYm}-15`) : first;
-  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today), ...(fundedBy && cofrinhos.some((a) => a.id === fundedBy) ? { fundedBy } : {}), ...(share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent, ...(share.fixed ? { fixed: share.fixed } : {}) } } : {}) } : null;
+  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today), ...(fundedBy && cofrinhos.some((a) => a.id === fundedBy) ? { fundedBy, ...(Number(fundedFrom) > 1 ? { fundedFrom: Math.min(n, Math.round(Number(fundedFrom))) } : {}) } : {}), ...(share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent, ...(share.fixed ? { fixed: share.fixed } : {}) } } : {}) } : null;
   const info = useMemo(() => (draft ? planInfo(draft, card, today) : null), [draft, card, today]);
   return (
     <div className="space-y-4">
@@ -172,6 +172,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
       {mode === "manual" && <Field label="Quantas parcelas já foram pagas?"><TextInput type="number" min={0} max={n} value={paid} onChange={(e) => setPaid(e.target.value)} /></Field>}
       <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} /></Field>
       {cofrinhos.length > 0 && <Field label="Quem paga as parcelas" hint="Se o dinheiro já está num cofrinho, escolha ele: a parcela sai de lá e não do seu bolso."><Select value={fundedBy} onChange={(e) => setFundedBy(e.target.value)} data-testid="fin-plano-cofrinho"><option value="">Do meu bolso</option>{cofrinhos.map((a) => <option key={a.id} value={a.id}>Cofrinho: {a.name}</option>)}</Select></Field>}
+      {fundedBy && <Field label="O cofrinho paga a partir da parcela" hint="Use quando a parcela que já está na fatura aberta sai do seu bolso e o cofrinho só cobre as seguintes. 1 = todas."><TextInput type="number" min={1} max={n} value={fundedFrom} onChange={(e) => setFundedFrom(e.target.value)} data-testid="fin-plano-cofrinho-parcela" /></Field>}
       <SharePicker value={share} onChange={setShare} amount={total} plan={total && perV ? { total, per: perV, count: n } : undefined} label="Dividir esta compra com alguém" />
       {info && draft && (
         <div className="rounded-2xl border border-cyan/25 bg-cyan/[0.06] p-4" data-testid="fin-plano-previa" style={{ animation: "fin-fade .4s both" }}>

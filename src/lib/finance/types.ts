@@ -43,6 +43,8 @@ export type Plan = {
   shared?: Shared | undefined;
   /** Cofrinho (id de uma conta) que paga as parcelas desta compra: o dinheiro já está separado, não sai do seu bolso. */
   fundedBy?: string | undefined;
+  /** O cofrinho paga a partir desta parcela (as anteriores saem do seu bolso). Sem valor = desde a 1ª. */
+  fundedFrom?: number | undefined;
 };
 /** Pausa de uma recorrente: não conta nos meses de `from` até `to` (inclusive). Sem `to` = continua pausada. */
 export type RecurringPause = { from: string; to?: string | undefined };
