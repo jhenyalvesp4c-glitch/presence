@@ -242,6 +242,37 @@ export function monthlySeries(s: FinanceState, currentYm: string, n = 6, upTo?: 
   });
 }
 
+/* ───────────── cofrinho: dinheiro separado para pagar parcelas ───────────── */
+export type FundedParcel = { planId: string; desc: string; n: number; count: number; ym: string; pay: string; amount: number; mine: number };
+/** Parcelas de uma compra, com a data em que você paga a fatura e a sua parte (a do cofrinho; a de outra pessoa fica de fora). */
+export function fundedParcels(s: FinanceState, p: Plan): FundedParcel[] {
+  const card = s.cards.find((c) => c.id === p.cardId);
+  if (!card) return [];
+  return Array.from({ length: p.count }, (_, i) => {
+    const n = i + 1, ym = addMonths(p.first, i), amount = parcelAmount(p, n);
+    return { planId: p.id, desc: p.desc, n, count: p.count, ym, pay: payDateOf(card, ym), amount, mine: myPart(amount, planShare(p, n)) };
+  });
+}
+export type CofrinhoInfo = {
+  balance: number; /** Parcelas que ainda vão sair do cofrinho (a partir de hoje). */ committed: number; /** Saldo depois de pagar todas. Negativo = falta. */ sobra: number;
+  plans: { id: string; desc: string; remaining: number; left: number }[]; byMonth: { ym: string; amount: number }[]; /** Último mês com parcela do cofrinho. */ lastYm: string | null;
+  /** Primeiro mês em que o cofrinho não cobre a parcela (null = cobre tudo). */ shortYm: string | null;
+};
+export function cofrinhoInfo(s: FinanceState, a: Account, today: Date = new Date()): CofrinhoInfo {
+  const todayIso = isoOf(today), balance = accountBalance(s, a, today), byYm = new Map<string, number>(), plans: CofrinhoInfo["plans"] = [];
+  for (const p of s.plans) {
+    if (p.fundedBy !== a.id) continue;
+    const left = fundedParcels(s, p).filter((x) => x.pay > todayIso);
+    plans.push({ id: p.id, desc: p.desc, remaining: sum(left.map((x) => x.mine)), left: left.length });
+    for (const x of left) byYm.set(ymOf(x.pay), round2((byYm.get(ymOf(x.pay)) ?? 0) + x.mine));
+  }
+  const byMonth = [...byYm.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([ym, amount]) => ({ ym, amount }));
+  const committed = sum(byMonth.map((m) => m.amount));
+  let run = balance, shortYm: string | null = null;
+  for (const m of byMonth) { run = round2(run - m.amount); if (run < 0 && !shortYm) shortYm = m.ym; }
+  return { balance, committed, sobra: round2(balance - committed), plans: plans.sort((x, y) => y.remaining - x.remaining), byMonth, lastYm: byMonth.at(-1)?.ym ?? null, shortYm };
+}
+
 /* ───────────── saldos, limites e faturas ───────────── */
 export function accountBalance(s: FinanceState, a: Account, today: Date = new Date()): number {
   let v = a.balanceBase;
@@ -258,6 +289,8 @@ export function accountBalance(s: FinanceState, a: Account, today: Date = new Da
       if (d >= a.baseDate && d <= todayIso) v += r.kind === "receita" ? r.amount : -r.amount;
     }
   }
+  // cofrinho que paga parcelas: cada parcela já paga (data de pagamento depois do saldo informado) sai do cofrinho sozinha
+  for (const p of s.plans) if (p.fundedBy === a.id) for (const x of fundedParcels(s, p)) if (x.pay > a.baseDate && x.pay <= todayIso) v -= x.mine;
   return round2(v);
 }
 export const totalBalance = (s: FinanceState, today: Date = new Date()) => sum(s.accounts.map((a) => accountBalance(s, a, today)));
@@ -277,14 +310,14 @@ export function cardAvailable(s: FinanceState, c: Card): number {
   return Math.max(0, round2(c.availableBase - cardUsed(s, c)));
 }
 
-export type InvoiceLine = { id: string; desc: string; amount: number; date: string; category: string; parcel?: string | undefined; source: Entry["source"] | "ajuste"; /** Gasto dividido: quanto é da outra pessoa. */ shared?: { person: string; percent: number; part: number } | undefined };
+export type InvoiceLine = { id: string; desc: string; amount: number; /** Parcela paga por um cofrinho (id da conta). */ funded?: string | undefined; date: string; category: string; parcel?: string | undefined; source: Entry["source"] | "ajuste"; /** Gasto dividido: quanto é da outra pessoa. */ shared?: { person: string; percent: number; part: number } | undefined };
 /** `declared` = total informado (se houver); `adjustment` = parte ainda não detalhada; `over` = quanto os itens passam do total informado. */
-export type Invoice = { cardId: string; ym: string; due: string; lines: InvoiceLine[]; total: number; adjustment: number; declared?: number | undefined; over: number; /** Quanto dos itens é da(s) outra(s) pessoa(s) (o total do banco não muda). */ othersOwe: number; /** Total do banco menos a parte das outras pessoas. */ mine: number };
+export type Invoice = { cardId: string; ym: string; due: string; lines: InvoiceLine[]; total: number; adjustment: number; declared?: number | undefined; over: number; /** Quanto dos itens é da(s) outra(s) pessoa(s) (o total do banco não muda). */ othersOwe: number; /** Total do banco menos a parte das outras pessoas. */ mine: number; /** Da minha parte, quanto os cofrinhos pagam (dinheiro já separado). */ funded: number; /** Da minha parte, quanto sai do meu bolso (minha parte menos o cofrinho). */ own: number };
 const shareOf = (amount: number, sh: { person: string; percent: number } | undefined): { shared?: { person: string; percent: number; part: number } } => { const part = sharedPart(amount, sh); return sh && part > 0 ? { shared: { person: sh.person, percent: sh.percent, part } } : {}; };
 export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice {
   const lines: InvoiceLine[] = [];
   for (const t of s.transactions) if (t.cardId === card.id && t.method === "credito" && t.kind === "despesa" && invoiceMonthOf(card, t.date) === dueYm) lines.push({ id: t.id, desc: t.desc, amount: t.amount, date: t.date, category: t.category, source: "tx", ...shareOf(t.amount, t.shared) });
-  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...shareOf(parcelAmount(p, n), planShare(p, n)) });
+  for (const p of s.plans) if (p.cardId === card.id) for (let n = 1; n <= p.count; n++) if (addMonths(p.first, n - 1) === dueYm) lines.push({ id: `${p.id}:${n}`, desc: p.desc, amount: parcelAmount(p, n), date: dayIn(dueYm, card.dueDay), category: p.category, parcel: `${n}/${p.count}`, source: "parcela", ...(p.fundedBy ? { funded: p.fundedBy } : {}), ...shareOf(parcelAmount(p, n), planShare(p, n)) });
   // cobrança fixa no cartão: cada cobrança (mês do calendário `m`) cai na fatura que contém a data dela. Assim, pausar depois do dia da renovação
   // mantém a cobrança já feita na fatura certa e só tira as próximas; pausar antes do dia tira também a que ainda não aconteceu.
   for (const r of s.recurring) if (r.cardId === card.id && r.kind === "despesa") for (let k = -3; k <= 1; k++) {
@@ -297,7 +330,8 @@ export function invoiceFor(s: FinanceState, card: Card, dueYm: string): Invoice 
   const over = declared !== undefined ? round2(Math.max(0, items - declared)) : 0;
   if (adjustment) lines.push({ id: `adj:${dueYm}`, desc: declared !== undefined ? "Outros valores (ainda não detalhados)" : "Outros valores pendentes", amount: adjustment, date: dueDateOf(card, dueYm), category: "outros", source: "ajuste" });
   const total = sum(lines.map((l) => l.amount)), othersOwe = sum(lines.map((l) => l.shared?.part ?? 0));
-  return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total, adjustment, declared, over, othersOwe, mine: round2(total - othersOwe) };
+  const funded = sum(lines.filter((l) => l.funded).map((l) => l.amount - (l.shared?.part ?? 0))), mine = round2(total - othersOwe);
+  return { cardId: card.id, ym: dueYm, due: dueDateOf(card, dueYm), lines: lines.sort((a, b) => b.date.localeCompare(a.date)), total, adjustment, declared, over, othersOwe, mine, funded, own: round2(mine - funded) };
 }
 /** Data de fechamento da fatura que vence em `dueYm`. */
 /**

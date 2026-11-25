@@ -54,7 +54,7 @@ export function AccountForm({ initial, onSave, onCancel }: { initial?: Account |
   return (
     <div className="space-y-4">
       <Field label="Nome do banco ou carteira"><TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Nubank, PicPay, Mercado Pago" autoFocus data-testid="fin-conta-nome" /></Field>
-      <Field group label="Tipo"><Segmented value={kind} onChange={setKind} options={[{ value: "banco", label: "Banco", icon: Landmark }, { value: "carteira", label: "Carteira", icon: Wallet }, { value: "dinheiro", label: "Dinheiro", icon: Banknote }, { value: "investimento", label: "Invest.", icon: PiggyBank }]} /></Field>
+      <Field group label="Tipo"><Segmented value={kind} onChange={setKind} options={[{ value: "banco", label: "Banco", icon: Landmark }, { value: "carteira", label: "Carteira", icon: Wallet }, { value: "dinheiro", label: "Dinheiro", icon: Banknote }, { value: "investimento", label: "Invest.", icon: PiggyBank }, { value: "cofrinho", label: "Cofrinho", icon: PiggyBank }]} /></Field>
       <Field label="Saldo disponível hoje"><MoneyInput value={bal} onChange={setBal} data-testid="fin-conta-saldo" /></Field>
       <Field group label="Cor"><TonePicker value={tone} onChange={setTone} /></Field>
       <Actions onCancel={onCancel} onSave={save} disabled={!name.trim()} />
@@ -146,6 +146,8 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const [first, setFirst] = useState(initial?.first ?? addMonths(todayYm, -1)), [firstTouched, setFirstTouched] = useState(!!initial);
   const [mode, setMode] = useState<"datas" | "manual">("datas"), [paid, setPaid] = useState(String(initial ? planInfo(initial, state.cards.find((c) => c.id === initial.cardId), today).paid : 3));
   const [cat, setCat] = useState(initial?.category ?? "compras"), [share, setShare] = useState<Shared | undefined>(initial?.shared);
+  const [fundedBy, setFundedBy] = useState(initial?.fundedBy ?? "");
+  const cofrinhos = state.accounts.filter((a) => a.kind === "cofrinho");
   const card = state.cards.find((c) => c.id === cardId);
   const n = Math.max(1, Math.min(60, Math.round(Number(count) || 1)));
   const perV = perTouched && per !== undefined ? per : total ? Math.round((total / n) * 100) / 100 : undefined;
@@ -153,7 +155,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
   const paidN = Math.max(0, Math.min(n, Math.round(Number(paid) || 0)));
   // "já paguei N": a próxima parcela (N+1) cai na próxima fatura a vencer; o mês da 1ª parcela sai dessa conta
   const firstV = mode === "manual" ? firstFromPaid(card, today, paidN) : firstTouched ? first : card ? invoiceMonthOf(card, `${purchaseYm}-15`) : first;
-  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today), ...(share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent, ...(share.fixed ? { fixed: share.fixed } : {}) } } : {}) } : null;
+  const draft: Plan | null = total && perV && card ? { id: initial?.id ?? uid("plan-"), desc: desc.trim(), cardId, total, count: n, per: perV, purchaseYm, first: firstV, category: cat, createdAt: initial?.createdAt ?? isoOf(today), ...(fundedBy && cofrinhos.some((a) => a.id === fundedBy) ? { fundedBy } : {}), ...(share && share.person.trim() ? { shared: { person: share.person.trim(), percent: share.percent, ...(share.fixed ? { fixed: share.fixed } : {}) } } : {}) } : null;
   const info = useMemo(() => (draft ? planInfo(draft, card, today) : null), [draft, card, today]);
   return (
     <div className="space-y-4">
@@ -169,6 +171,7 @@ export function PlanForm({ initial, onSave, onCancel, defaultCardId }: { initial
       <Field group label="Situação atual"><Segmented value={mode} onChange={setMode} options={[{ value: "datas", label: "Calcular pelas datas" }, { value: "manual", label: "Informar parcelas pagas" }]} /></Field>
       {mode === "manual" && <Field label="Quantas parcelas já foram pagas?"><TextInput type="number" min={0} max={n} value={paid} onChange={(e) => setPaid(e.target.value)} /></Field>}
       <Field group label="Categoria"><CategoryPicker value={cat} onChange={setCat} /></Field>
+      {cofrinhos.length > 0 && <Field label="Quem paga as parcelas" hint="Se o dinheiro já está num cofrinho, escolha ele: a parcela sai de lá e não do seu bolso."><Select value={fundedBy} onChange={(e) => setFundedBy(e.target.value)} data-testid="fin-plano-cofrinho"><option value="">Do meu bolso</option>{cofrinhos.map((a) => <option key={a.id} value={a.id}>Cofrinho: {a.name}</option>)}</Select></Field>}
       <SharePicker value={share} onChange={setShare} amount={total} plan={total && perV ? { total, per: perV, count: n } : undefined} label="Dividir esta compra com alguém" />
       {info && draft && (
         <div className="rounded-2xl border border-cyan/25 bg-cyan/[0.06] p-4" data-testid="fin-plano-previa" style={{ animation: "fin-fade .4s both" }}>

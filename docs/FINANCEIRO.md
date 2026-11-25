@@ -74,3 +74,10 @@ O painel separa **o que já aconteceu até hoje** do que ainda vai acontecer no 
 
 ## Categorias editáveis
 A pessoa renomeia, troca cor/ícone/palavras-chave, oculta e cria categorias (botão "Editar / criar" no seletor de categoria de qualquer formulário). Os ajustes ficam em `fin_settings.categories` (jsonb; `FinanceState.categories`) e valem em cartão, débito, fixas, assinaturas, metas e filtros. Código: `src/lib/finance/categories.ts` (listas vivas `CATS`/`EXPENSE_CATS`/`INCOME_CATS` reescritas por `applyCategories` no `FinanceProvider`), `category-edit.ts` (uso e apagar → "Outros"/"Renda extra"), `src/components/finance/CategoryEditor.tsx`. "Outros" e "Renda extra" nunca somem. A voz e o MCP (servidor) ainda enxergam só as categorias de fábrica; um id desconhecido cai em "Outros".
+
+## Cofrinho (dinheiro separado para parcelas)
+
+- Uma conta do tipo **Cofrinho** guarda dinheiro reservado. Em cada compra parcelada, o campo **Quem paga as parcelas** liga a compra a um cofrinho (`fin_plans.funded_by`).
+- A **fatura** continua com o valor do banco. Ela mostra quanto o cofrinho paga e quanto **sai do seu bolso** (`Invoice.funded` / `own`, sempre só a sua parte; a de outra pessoa fica de fora) e tem o filtro Tudo / Do cofrinho / Do meu bolso. A tela de **Compras parceladas** tem o mesmo filtro.
+- Quando a fatura é paga (data de pagamento depois da data do saldo informado), as parcelas saem do cofrinho sozinhas (`accountBalance`). Os totais gerais não mudam: o saldo do cofrinho conta como dinheiro e a fatura como saída.
+- A conta do cofrinho mostra o painel "Cofrinho das parcelas": quanto tem, quanto ainda vai sair, sobra ou falta, e mês a mês até quando cobre (`cofrinhoInfo`).

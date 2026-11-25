@@ -1,6 +1,6 @@
 import type { CatDef } from "./categories";
 /** Tipos do módulo financeiro. Tudo é local por enquanto; a forma dos dados já é a que irá para o Supabase. */
-export type AccountKind = "banco" | "carteira" | "dinheiro" | "investimento";
+export type AccountKind = "banco" | "carteira" | "dinheiro" | "investimento" | "cofrinho";
 export type CardBrand = "visa" | "mastercard" | "elo" | "amex" | "outro";
 export type Method = "debito" | "credito" | "dinheiro" | "pix";
 export type TxKind = "despesa" | "receita";
@@ -41,6 +41,8 @@ export type Plan = {
   /** Já estava dentro do limite informado do cartão (ex.: detalhamento de uma fatura): não consome o limite de novo. */
   inLimit?: boolean | undefined;
   shared?: Shared | undefined;
+  /** Cofrinho (id de uma conta) que paga as parcelas desta compra: o dinheiro já está separado, não sai do seu bolso. */
+  fundedBy?: string | undefined;
 };
 /** Pausa de uma recorrente: não conta nos meses de `from` até `to` (inclusive). Sem `to` = continua pausada. */
 export type RecurringPause = { from: string; to?: string | undefined };

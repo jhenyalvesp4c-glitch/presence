@@ -43,8 +43,8 @@ export function CardVisual({ card, usedPct, selected = false, onClick, compact =
   );
 }
 
-const KIND_ICON = { banco: Landmark, carteira: Wallet, dinheiro: Banknote, investimento: PiggyBank } as const;
-export const KIND_LABEL = { banco: "Conta bancária", carteira: "Carteira digital", dinheiro: "Dinheiro", investimento: "Investimento" } as const;
+const KIND_ICON = { banco: Landmark, carteira: Wallet, dinheiro: Banknote, investimento: PiggyBank, cofrinho: PiggyBank } as const;
+export const KIND_LABEL = { banco: "Conta bancária", carteira: "Carteira digital", dinheiro: "Dinheiro", investimento: "Investimento", cofrinho: "Cofrinho" } as const;
 
 /** Conta ou carteira: ícone com brilho na cor da marca e o saldo em destaque. */
 export function AccountTile({ account, balance, selected = false, onClick }: { account: Account; balance: number; selected?: boolean; onClick?: () => void }) {

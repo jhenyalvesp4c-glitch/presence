@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, ChevronLeft, ChevronRight, CreditCard, Landmark, Pencil, Plus, Receipt, Trash2 } from "lucide-react";
-import { sum, accountBalance, addMonths, brl, cardAvailable, closingDateOf, closingYmOf, dateBR, invoiceFor, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
+import { sum, accountBalance, addMonths, brl, cardAvailable, closingDateOf, closingYmOf, dateBR, invoiceFor, type Invoice, invoiceLabel, invoiceMonthOf, isoOf, monthEntries, monthLabel, monthName, openInvoice, parseIso, total, upcomingInvoices, withDeclaredTotal, ymOf, expensesOf, incomeOf } from "@/lib/finance/calc";
 import { catOf } from "@/lib/finance/categories";
 import { useFinance } from "@/lib/finance/store";
 import type { Account, Card, Entry, Transaction } from "@/lib/finance/types";
@@ -8,6 +8,7 @@ import { AccountTile, CardVisual, KIND_LABEL } from "./CardVisual";
 import { Donut, Meter, Money, RadialRings } from "./charts";
 import { HeroPanel, SectionTitle, Tilt } from "./fx";
 import { AccountForm, CardForm, InvoiceItemForm, TxForm } from "./forms";
+import { CofrinhoPanel } from "./Cofrinho";
 import { PlanCard } from "./Installments";
 import { EntryRow } from "./rows";
 import { CatBadge, ConfirmDelete, Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TONES, btn } from "./ui";
@@ -138,13 +139,15 @@ function Detail({ sel, onBack }: { sel: NonNullable<Sel>; onBack: () => void }) 
           <div className="flex gap-2"><button className={`${btn.ghost} flex-1`} onClick={() => setEdit(true)}><Pencil size={14} /> Editar</button><button className={`${btn.danger} flex-1`} onClick={() => setDel(true)}><Trash2 size={14} /> Excluir</button></div>
         </div>
         {card ? <CardStats card={card} /> : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="space-y-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Stat label="Saldo atual" color={accountBalance(state, acc!, today) < 0 ? ROSE : undefined}><Money value={accountBalance(state, acc!, today)} /></Stat>
             <Stat label="Despesas do mês" color={ROSE}><Money value={monthExp} /></Stat>
             <Stat label="Entradas do mês" color="var(--emerald)"><Money value={monthInc} /></Stat>
             <Stat label="Tipo"><span className="font-sans text-base">{KIND_LABEL[acc!.kind]}</span></Stat>
             <Stat label="Movimentações"><span>{history.length}</span></Stat>
             <Stat label="Compras no débito"><span>{history.filter((e) => e.method === "debito" && e.kind === "despesa").length}</span></Stat>
+          </div>
+          {acc!.kind === "cofrinho" && <CofrinhoPanel account={acc!} />}
           </div>
         )}
       </div>
@@ -201,6 +204,10 @@ function InvoiceView({ card }: { card: Card }) {
   const inv = invoiceFor(state, card, ym), months = Array.from({ length: 9 }, (_, i) => addMonths(open, i - 2));
   const typed = card.declared?.[ym], isOpen = ym === open;
   const itemized = inv.lines.filter((l) => l.source !== "ajuste");
+  const [fund, setFund] = useState<"todas" | "cofrinho" | "bolso">("todas");
+  const hasFund = inv.funded > 0 || inv.lines.some((l) => l.funded), fundView = hasFund ? fund : "todas";
+  const showLine = (l: Invoice["lines"][number]) => (fundView === "cofrinho" ? !!l.funded : fundView === "bolso" ? !l.funded && l.source !== "ajuste" && !(l.shared && l.shared.part >= l.amount) : !(onlyMine && l.shared && l.shared.part >= l.amount));
+  const mineView = onlyMine || fundView !== "todas";
   return (
     <div className="space-y-4" data-testid="fin-fatura">
       <div className="flex gap-2 overflow-x-auto pb-1 scroll-neon" data-testid="fin-fatura-meses">
@@ -231,13 +238,24 @@ function InvoiceView({ card }: { card: Card }) {
             <p className="mt-1.5 text-[0.7rem] text-muted-foreground">Você paga o valor do banco; a parte dos outros entra como receita a receber.</p>
           </div>
         )}
+        {hasFund && (
+          <div className="mb-3 rounded-2xl border border-cyan/25 bg-cyan/[0.05] p-3" data-testid="fin-fatura-cofrinho">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm">Fatura <b className="tabular-nums">{brl(inv.total)}</b>{inv.othersOwe > 0 ? <> · de outros <b className="tabular-nums">{brl(inv.othersOwe)}</b></> : null} · o cofrinho paga <b className="tabular-nums text-cyan">{brl(inv.funded)}</b> · sai do seu bolso <b className="tabular-nums text-amber" data-testid="fin-fatura-bolso">{brl(inv.own)}</b></p>
+              <div role="radiogroup" className="flex gap-1 rounded-full border border-white/10 bg-black/25 p-1 text-xs">
+                {([["todas", "Tudo"], ["cofrinho", "Do cofrinho"], ["bolso", "Do meu bolso"]] as const).map(([v, t]) => <button key={v} type="button" role="radio" aria-checked={fundView === v} onClick={() => setFund(v)} data-testid={`fin-fatura-filtro-${v}`} className={`rounded-full px-3 py-1 transition ${fundView === v ? "bg-cyan/20 text-cyan" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>)}
+              </div>
+            </div>
+            <p className="mt-1.5 text-[0.7rem] text-muted-foreground">As parcelas “do cofrinho” já têm o dinheiro separado. “Do meu bolso” é o que você ainda precisa tirar do saldo (a parte de outras pessoas fica de fora).</p>
+          </div>
+        )}
         {inv.lines.length === 0 ? <Empty icon={Receipt} title="Fatura vazia" hint="As compras no crédito deste cartão aparecem aqui." /> : (
-          <ul className="space-y-0.5">{inv.lines.filter((l) => !(onlyMine && l.shared && l.shared.part >= l.amount)).map((l, i) => (
+          <ul className="space-y-0.5">{inv.lines.filter(showLine).map((l, i) => (
             <li key={l.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-white/[0.04]" style={{ animation: `fin-pop .4s ${Math.min(i, 12) * 0.03}s both` }}>
               <CatBadge id={l.category} size={34} />
-              <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}{l.shared && <Pill color="var(--emerald)">com {l.shared.person} · {l.shared.percent}%</Pill>}{l.source === "ajuste" && <Pill color="var(--cyan)">a detalhar</Pill>}</p><p className="text-xs text-muted-foreground">{l.source === "ajuste" ? "total do banco menos o que já foi cadastrado" : dateBR(l.date)}</p></div>
+              <div className="min-w-0 flex-1"><p className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{l.desc}</span>{l.parcel && <Pill color="var(--amber)">parcela {l.parcel}</Pill>}{l.source === "recorrente" && <Pill color="var(--violet)">fixa</Pill>}{l.funded && <Pill color="var(--cyan)">cofrinho</Pill>}{l.shared && <Pill color="var(--emerald)">com {l.shared.person} · {l.shared.percent}%</Pill>}{l.source === "ajuste" && <Pill color="var(--cyan)">a detalhar</Pill>}</p><p className="text-xs text-muted-foreground">{l.source === "ajuste" ? "total do banco menos o que já foi cadastrado" : dateBR(l.date)}</p></div>
               {l.source === "ajuste" && <button className={`${btn.ghost} !px-3 !py-1.5 text-xs`} onClick={() => setDetail(true)} data-testid="fin-detalhar-linha">Detalhar</button>}
-              <b className="text-sm tabular-nums" title={l.shared ? `Valor do banco ${brl(l.amount)}` : undefined}>{brl(onlyMine && l.shared ? l.amount - l.shared.part : l.amount)}</b>
+              <b className="text-sm tabular-nums" title={l.shared ? `Valor do banco ${brl(l.amount)}` : undefined}>{brl(mineView && l.shared ? l.amount - l.shared.part : l.amount)}</b>
             </li>))}</ul>
         )}
       </Panel>
