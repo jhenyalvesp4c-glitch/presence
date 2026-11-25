@@ -51,3 +51,35 @@ describe("Acerto de contas", () => {
     expect(parseBills("Parcela 3/10 da TV 150,00")).toEqual([{ description: "Parcela 3/10 da TV", amount: 150 }]);
   });
 });
+
+import { expandInstallments, parseInstallment } from "@/lib/finance/settle";
+
+describe("Compra parcelada no acerto de contas", () => {
+  const watch: SettleItem = { id: "w", kind: "compra", date: "2026-11-25", description: "Apple Watch", amount: 66.11, payer: "outro", otherShare: 0, installment: "9/18" };
+  it("entende 9/18 e 9 de 18, e ignora o que não é parcela ou já acabou", () => {
+    expect(parseInstallment("9/18")).toEqual({ n: 9, total: 18 }); expect(parseInstallment(" 3 de 12 ")).toEqual({ n: 3, total: 12 });
+    expect(parseInstallment("18/18")).toBeNull(); expect(parseInstallment("")).toBeNull(); expect(parseInstallment("à vista")).toBeNull(); expect(parseInstallment("1/1")).toBeNull();
+  });
+  it("gera uma parcela por mês, no mesmo dia, até o mês pedido", () => {
+    const dez = expandInstallments([watch], "2026-12");
+    expect(dez).toHaveLength(1);
+    expect(dez[0]).toMatchObject({ date: "2026-12-25", installment: "10/18", auto: true, amount: 66.11, payer: "outro", otherShare: 0 });
+    const tudo = expandInstallments([watch], "2027-12");
+    expect(tudo.map((i) => i.installment)).toEqual(["10/18", "11/18", "12/18", "13/18", "14/18", "15/18", "16/18", "17/18", "18/18"]);
+    expect(tudo.at(-1)!.date).toBe("2027-08-25"); // 18/18 em agosto/27
+    expect(expandInstallments([watch], "2026-11")).toEqual([]);
+  });
+  it("cada parcela entra na conta do mês: eu devo a parte minha ao Felipe, mês a mês", () => {
+    const all = [watch, ...expandInstallments([watch], "2027-01")];
+    expect(balance(all).owedByMe).toBe(66.11 * 100 * 3); // nov, dez e jan
+    expect(balance(all).direction).toBe("eu_pago");
+  });
+  it("não duplica se a parcela já foi lançada à mão e respeita dia 31 e compras sem parcela", () => {
+    const manual: SettleItem = { ...watch, id: "m", date: "2026-12-26", installment: "10/18" };
+    const dez = expandInstallments([watch, manual], "2026-12");
+    expect(dez).toEqual([]);
+    const fim: SettleItem = { ...watch, id: "f", date: "2026-01-31", installment: "1/3" };
+    expect(expandInstallments([fim], "2026-03").map((i) => i.date)).toEqual(["2026-02-28", "2026-03-31"]);
+    expect(expandInstallments([{ ...watch, installment: "" }, { ...watch, kind: "pagamento", installment: "2/5" }, { ...watch, pending: true }], "2027-12")).toEqual([]);
+  });
+});

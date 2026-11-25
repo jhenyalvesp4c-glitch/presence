@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { readFiles, type LocalFile } from "@/components/inbox/files";
 import { monthLabel } from "@/lib/finance/calc";
 import { readStatement, type StatementLine } from "@/lib/finance/statement.functions";
-import { balance, brl, fromCents, parseBills, parseMoney, split, statementText, toCents, type Payer, type SettleItem } from "@/lib/finance/settle";
+import { balance, brl, expandInstallments, fromCents, parseBills, parseInstallment, parseMoney, split, statementText, toCents, type Payer, type SettleItem } from "@/lib/finance/settle";
 import { download, printStatement, statementCard, type CardRow } from "@/lib/finance/settle-export";
 import { useSettleActions, useSettlementItems, useSettlements, type ItemDraft, type Settlement } from "@/lib/finance/settle-data";
 import { Empty, Field, Head, Modal, MoneyInput, Panel, Pill, Segmented, TextInput, btn } from "./ui";
@@ -29,9 +29,11 @@ export function SettleView() {
   const [reader, setReader] = useState(false), [bills, setBills] = useState(false), [editor, setEditor] = useState<{ item: SettleItem | null; kind: SettleItem["kind"] } | null>(null);
   const settlements = list.data ?? [];
   const sel: Settlement | undefined = settlements.find((s) => s.id === selId) ?? settlements.find((s) => !s.closed) ?? settlements[0];
-  const allItems = useSettlementItems(sel?.id ?? null).data ?? [];
+  const fetched = useSettlementItems(sel?.id ?? null).data;
   // mês a mês: compras parceladas só pesam no mês em que vencem; "acumulado" soma tudo até o mês escolhido (inclui meses anteriores em aberto)
   const nowYm = todayIso().slice(0, 7), [ym, setYm] = useState(nowYm), [acc, setAcc] = useState(false);
+  // compra parcelada ("9/18") gera uma parcela por mês, sozinha, nos acertos abertos
+  const allItems = useMemo(() => { const real = fetched ?? []; return sel?.closed ? real : [...real, ...expandInstallments(real, ym > nowYm ? ym : nowYm)]; }, [fetched, sel?.closed, ym, nowYm]);
   const itemYm = (it: SettleItem) => it.date?.slice(0, 7) ?? nowYm;
   const items = useMemo(() => allItems.filter((it) => (acc ? itemYm(it) <= ym : itemYm(it) === ym)), [allItems, ym, acc, nowYm]);
   const monthsWith = useMemo(() => [...new Set([nowYm, ...allItems.map(itemYm)])].sort(), [allItems, nowYm]);
@@ -178,7 +180,7 @@ function ItemRow({ it, person, onEdit, onDelete, onConfirm }: { it: SettleItem; 
   return (
     <li className="flex items-center gap-3 py-2.5" data-testid="acerto-item">
       <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{dm(it.date)}</span>
-      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (pix ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({it.installment})</span>}{it.pending && <span className="ml-1.5 rounded-full border border-amber/40 px-1.5 py-0.5 text-[0.62rem] text-amber">aguardando</span>}{it.linked && <span className="ml-1.5 rounded-full border border-emerald/40 px-1.5 py-0.5 text-[0.62rem] text-emerald" title="Vem de uma compra dividida no financeiro. Para mudar, edite a compra.">da compra</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
+      <div className="min-w-0 flex-1"><p className="truncate text-sm">{it.description || (pix ? "Pix" : "Compra")}{it.installment && <span className="ml-1.5 text-xs text-muted-foreground">({it.installment})</span>}{it.pending && <span className="ml-1.5 rounded-full border border-amber/40 px-1.5 py-0.5 text-[0.62rem] text-amber">aguardando</span>}{it.auto ? <span className="ml-1.5 rounded-full border border-cyan/40 px-1.5 py-0.5 text-[0.62rem] text-cyan" title="Parcela gerada sozinha pela compra parcelada. Para mudar, edite a primeira parcela lançada." data-testid="acerto-parcela-auto">parcela automática</span> : it.linked && <span className="ml-1.5 rounded-full border border-emerald/40 px-1.5 py-0.5 text-[0.62rem] text-emerald" title="Vem de uma compra dividida no financeiro. Para mudar, edite a compra.">da compra</span>}</p><p className="truncate text-xs text-muted-foreground">{who}</p></div>
       <b className={`tabular-nums text-sm ${!pix ? (it.payer === "eu" ? "text-emerald" : "text-violet") : ""}`} data-testid="acerto-item-valor">{brl(fromCents(part))}</b>
       {onConfirm && <button className={`${btn.ghost} !px-2.5 !py-1 text-xs`} onClick={onConfirm} data-testid="acerto-confirmar-pix">Recebi</button>}
       {!it.linked && <button className={btn.icon} onClick={onEdit} aria-label="Editar"><Pencil size={14} /></button>}
@@ -218,7 +220,7 @@ function ItemEditor({ person, defaultShare, initial, kind, onSave, onClose }: { 
         </div>
         <Field label={pix ? "Observação (opcional)" : "Descrição"}><TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={pix ? "Ex.: pix de quitação" : "Ex.: Mercado, farmácia…"} maxLength={200} data-testid="acerto-desc" /></Field>
         {parts && <p className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm" data-testid="acerto-divisor">Parte de {person}: <b className="text-emerald">{brl(fromCents(parts.other))}</b> · Sua parte: <b>{brl(fromCents(parts.mine))}</b> <span className="text-xs text-muted-foreground">({otherShare}% / {100 - otherShare}%)</span></p>}
-        {!pix && <Field label="Parcela (opcional)"><TextInput value={inst} onChange={(e) => setInst(e.target.value)} placeholder="Ex.: 2/5" maxLength={20} /></Field>}
+        {!pix && <Field label="Parcela (opcional)" hint={parseInstallment(inst) ? `As parcelas ${parseInstallment(inst)!.n + 1} a ${parseInstallment(inst)!.total} entram sozinhas, uma por mês, nos meses seguintes. Para mudar, edite esta.` : "Ex.: 9/18 = nona parcela de 18. As próximas entram sozinhas, uma por mês."}><TextInput value={inst} onChange={(e) => setInst(e.target.value)} placeholder="Ex.: 9/18" maxLength={20} data-testid="acerto-parcela" /></Field>}
       </div>
     </Modal>
   );

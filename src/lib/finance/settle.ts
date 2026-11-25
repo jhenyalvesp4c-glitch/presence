@@ -19,7 +19,11 @@ export type SettleItem = {
   linked?: boolean | undefined;
   /** Pix combinado que ainda não aconteceu: não entra na conta até ser confirmado. */
   pending?: boolean | undefined;
+  /** Parcela gerada sozinha a partir de uma compra parcelada ("9/18" → "10/18" no mês seguinte…). Muda editando a compra original. */
+  auto?: boolean | undefined;
 };
+
+import { addMonths, dayIn } from "./calc";
 
 export const toCents = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100);
 export const fromCents = (c: number) => c / 100;
@@ -105,6 +109,38 @@ export function parseBills(text: string): { description: string; amount: number 
     if (amount === null || amount <= 0) continue;
     const description = line.slice(0, m.index).replace(/[\s:\-–—=R$]+$/g, "").trim();
     out.push({ description: description || "Conta", amount });
+  }
+  return out;
+}
+
+/** "9/18" ou "9 de 18" → parcela atual e total. Só vale se ainda restarem parcelas (atual < total). */
+export function parseInstallment(s: string | null | undefined): { n: number; total: number } | null {
+  const m = /^\s*(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})\s*$/i.exec(s ?? "");
+  if (!m) return null;
+  const n = Number(m[1]), total = Number(m[2]);
+  return n >= 1 && total >= 2 && n < total ? { n, total } : null;
+}
+
+/**
+ * Compras parceladas viram uma parcela por mês, sozinhas: uma compra "9/18" lançada em novembro gera "10/18" em dezembro, "11/18" em janeiro…
+ * até a última parcela ou até o mês `throughYm`. Se já existir um lançamento igual (mesma descrição, cartão e parcela), não duplica.
+ */
+export function expandInstallments(items: SettleItem[], throughYm: string): SettleItem[] {
+  const norm = (it: SettleItem, label: string) => `${it.description.trim().toLowerCase()}|${it.payer}|${label.replace(/\s+/g, "")}`;
+  const seen = new Set(items.filter((i) => i.installment).map((i) => norm(i, i.installment)));
+  const out: SettleItem[] = [];
+  for (const it of items) {
+    const p = it.kind === "compra" && !it.pending && !it.linked && !it.auto && it.date ? parseInstallment(it.installment) : null;
+    if (!p || !it.date) continue;
+    const day = Number(it.date.slice(8, 10)), startYm = it.date.slice(0, 7);
+    for (let k = 1; p.n + k <= p.total; k++) {
+      const ym = addMonths(startYm, k);
+      if (ym > throughYm) break;
+      const label = `${p.n + k}/${p.total}`, key = norm(it, label);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ...it, id: `${it.id}~${p.n + k}`, date: dayIn(ym, day), installment: label, auto: true, linked: true });
+    }
   }
   return out;
 }

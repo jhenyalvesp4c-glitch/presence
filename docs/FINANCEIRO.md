@@ -113,3 +113,7 @@ Em **Contas fixas e assinaturas** (aba antes chamada "Assinaturas") fica a lista
 - A meta "Limitar gastos de uma categoria" (ex.: iFood R$ 200) soma o que você gastou na categoria no mês, em débito, Pix, dinheiro, crédito, parcelas e contas fixas, **só a sua parte** (a de outra pessoa fica de fora). Função: `categorySpent` / `spendGoals` em `calc.ts`.
 - **No crédito, a compra conta no mês em que a fatura fecha**: até o dia de fechamento do cartão entra no mês; depois do fechamento, no mês seguinte (`spendMonthOf`). Débito, Pix e dinheiro contam no mês da data.
 - A **Visão geral** mostra o bloco "Metas de gasto do mês" (barra verde, amarela perto do limite e vermelha se passar). Ao lançar uma despesa, o formulário mostra "iFood: você já gastou X de Y… com esta compra fica Z" e, ao salvar, um aviso com o que falta ou o quanto passou.
+
+### Acerto de contas: compra parcelada
+
+No acerto de contas, uma compra com **Parcela "9/18"** (ou "9 de 18") gera sozinha uma parcela por mês nos meses seguintes ("10/18" em dezembro, até "18/18"), no mesmo dia, com o mesmo cartão e a mesma divisão (`expandInstallments` em `settle.ts`). As parcelas automáticas aparecem com a etiqueta "parcela automática", entram na conta do mês e no texto do WhatsApp, e mudam editando a primeira parcela lançada. Não duplica se a parcela do mês já foi lançada à mão. Só vale em acertos abertos.
