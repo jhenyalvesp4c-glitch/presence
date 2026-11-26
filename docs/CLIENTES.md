@@ -62,3 +62,7 @@ O anel de cada cartão de cliente mostra a **porcentagem das tarefas criadas par
 
 - **Filtro "Quem precisa de você (tarefas)"** na lista de clientes: Atrasadas (data já passou), Para hoje, Com pendentes, Sem tarefas e Em dia, cada um com a contagem. Ao filtrar, os clientes com mais atrasadas vêm primeiro (`clientTaskStats`, `matchesAttention`, `byAttention`).
 - **Caixa de etapa em cada cartão:** as tarefas do cliente são as etapas, na ordem em que foram criadas. O cartão mostra "Etapa atual · 3 de 4", o nome da etapa, uma barrinha com as etapas feitas e "Depois: …" com o que falta. Fica vermelha se há atrasada, azul se está andando e verde quando tudo foi feito (`clientSteps`).
+
+### Tarefas padrão dos clientes
+
+O botão **Tarefas padrão** (na lista de clientes) abre o modelo: as tarefas que **todo cliente novo ganha**, na ordem (a ordem de criação é a ordem das etapas). Dá para editar o texto, mudar a ordem, apagar, acrescentar e ligar/desligar "criar automaticamente". Depois de criadas, são tarefas normais do cliente: cada uma se edita ou se exclui na ficha. Sem nada salvo, vale o modelo que já vem com o Orion. O botão **"Criar nos clientes que ainda não têm tarefas"** aplica nos clientes que já existem (só os que não têm nenhuma); na ficha de um cliente sem tarefas há **"Criar as tarefas padrão"**. Não repete tarefa que o cliente já tem. Tabela `client_default_tasks` (RLS por dono).

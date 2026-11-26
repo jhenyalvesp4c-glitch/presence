@@ -19,6 +19,8 @@ import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensureClientCategory, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
+import { DefaultTasksDialog } from "@/components/DefaultTasksDialog";
+import { createDefaultTasks } from "@/lib/data/client-default-tasks";
 import { byAttention, clientSteps, clientTaskProgress, clientTaskStats, matchesAttention, type Attention } from "@/lib/client-progress";
 import { RemindPicker } from "@/components/RemindPicker";
 import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
@@ -76,7 +78,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
   const trocar = (v: "saude" | "receita") => { setPainel(v); try { localStorage.setItem("presence.clientes.painel", v); } catch { /* sem armazenamento */ } };
   const sel = clients.find((c) => c.id === selId) ?? null;
   // tarefas de cada cliente: filtro "quem precisa de mim" (atrasadas, hoje, pendentes, sem tarefas, em dia)
-  const allTasks = useTasks().data ?? [], [atencao, setAtencao] = useState<Attention>("todos");
+  const allTasks = useTasks().data ?? [], [atencao, setAtencao] = useState<Attention>("todos"), [padrao, setPadrao] = useState(false);
   const hoje = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   const stats = useMemo(() => new Map(clients.map((c) => [c.id, clientTaskStats(allTasks, c.id, hoje)] as const)), [clients, allTasks, hoje]);
   const baseList = (filtro: "todos" | ClientStatus) => clients.filter((c) => filtro === "todos" || c.status === filtro);
@@ -162,6 +164,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
           <label className="glass flex min-w-[200px] items-center gap-2 rounded-xl px-3 py-2"><Search size={13} className="text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar cliente, contato, documento…" aria-label="Buscar" className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground" />{q && <button onClick={() => setQ("")} aria-label="Limpar"><X size={11} /></button>}</label>
           <div className="glass flex rounded-xl p-1">{([["cards", "Cards", LayoutGrid], ["tab", "Tabela", List], ["pas", "Pastas", FolderOpen]] as const).map(([k, l, I]) => <button key={k} onClick={() => setVista(k)} aria-pressed={vista === k} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition ${vista === k ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}><I size={13} /> {l}</button>)}</div>
           <button onClick={() => setImporting(true)} data-testid="clientes-importar" className="flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-muted-foreground transition hover:border-violet/50 hover:text-foreground"><Link2 size={14} /> Importar dos dossiês</button>
+          <button onClick={() => setPadrao(true)} data-testid="tarefas-padrao-abrir" className="flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-muted-foreground transition hover:border-cyan/50 hover:text-foreground"><ListChecks size={14} /> Tarefas padrão</button>
           <button onClick={aplicarRoteiro} disabled={aplicando} data-testid="clientes-aplicar-roteiro" title="Aplica o roteiro de implantação padrão atual em todos os clientes (mantém o andamento dos passos que continuam)" className="flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-muted-foreground transition hover:border-cyan/50 hover:text-foreground disabled:opacity-60">{aplicando ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />} Aplicar roteiro padrão em todos</button>
           <button onClick={() => setForm({ edit: null })} data-testid="cliente-novo" className="flex items-center gap-1.5 rounded-full border border-cyan/60 px-4 py-2 text-sm text-cyan shadow-[0_0_24px_-10px_var(--cyan)] transition hover:bg-cyan/10"><Plus size={15} /> Novo cliente</button>
         </div>
@@ -173,6 +176,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
               className={`rounded-full border px-3 py-1 text-xs transition ${atencao === k ? `bg-white/10 ${cls || "text-foreground border-white/30"}` : "border-white/10 text-muted-foreground hover:text-foreground"}`}>{l} <b className="tabular-nums">{atencaoCount(k)}</b></button>))}
         </div>
 
+        {padrao && <DefaultTasksDialog clientIds={clients.map((c) => c.id)} onClose={() => setPadrao(false)} />}
         <div className={`grid gap-4 ${sel ? "xl:grid-cols-[minmax(0,1fr)_440px]" : ""}`}>
           <section className={vista === "cards" ? "" : "glass overflow-hidden rounded-3xl animate-rise"} data-testid="clientes-lista">
             {shown.length === 0 ? <p className="glass rounded-3xl p-8 text-center text-sm text-muted-foreground">Nenhum cliente com esse filtro.</p> : vista === "cards" ? (
@@ -452,7 +456,12 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
           </div>
         )}
       </form>
-      {tasks.length === 0 && <p className="py-3 text-center text-sm text-muted-foreground">Nenhuma tarefa vinculada a este cliente ainda.</p>}
+      {tasks.length === 0 && (
+        <div className="space-y-2 py-3 text-center">
+          <p className="text-sm text-muted-foreground">Nenhuma tarefa vinculada a este cliente ainda.</p>
+          <button type="button" data-testid="criar-tarefas-padrao" onClick={() => { void createDefaultTasks(client.id, { force: true }).then((n) => { void qc.invalidateQueries({ queryKey: ["tasks"] }); toast.success(n ? `${n} tarefas padrão criadas` : "Nada novo para criar"); }).catch((e: Error) => toast.error(e.message)); }} className="rounded-full border border-cyan/50 px-4 py-1.5 text-xs text-cyan transition hover:bg-cyan/10">Criar as tarefas padrão</button>
+        </div>
+      )}
       {tasks.map((t) => (
         <div key={t.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
           <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{t.done && <Check size={12} />}</button>

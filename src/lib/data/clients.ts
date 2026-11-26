@@ -60,7 +60,7 @@ export function useClientActions(projectId: string) {
   const m = <V, R = unknown>(fn: (v: V) => Promise<R>) => useMutation({ mutationFn: fn, onSuccess: refresh });
   return {
     importDossiers: m(async (list: { id: string; name: string }[]) => importDossiersAsClients(projectId, list)),
-    save: m(async (c: Omit<Client, "id" | "projectId"> & { id?: string | undefined }) => { const row = toRow({ ...c, projectId }); if (c.id) must(await supabase.from("clients").update(row).eq("id", c.id).select("id")); else { const id = (must(await supabase.from("clients").insert(row).select("id")) as { id: string }[])[0]?.id; if (id) { const { seedSetup } = await import("./client-setup"); await seedSetup(id, projectId).catch(() => 0); } return id; } return c.id; }),
+    save: m(async (c: Omit<Client, "id" | "projectId"> & { id?: string | undefined }) => { const row = toRow({ ...c, projectId }); if (c.id) must(await supabase.from("clients").update(row).eq("id", c.id).select("id")); else { const id = (must(await supabase.from("clients").insert(row).select("id")) as { id: string }[])[0]?.id; if (id) { const { seedSetup } = await import("./client-setup"); await seedSetup(id, projectId).catch(() => 0); const { createDefaultTasks } = await import("./client-default-tasks"); await createDefaultTasks(id).catch(() => 0); void qc.invalidateQueries({ queryKey: ["tasks"] }); } return id; } return c.id; }),
     remove: m(async (c: Client) => { const docs = must(await supabase.from("client_docs").select("attachments").eq("client_id", c.id)) as { attachments: Attachment[] | null }[]; const paths = docs.flatMap((d) => (Array.isArray(d.attachments) ? d.attachments.map((a) => a.path) : [])); must(await supabase.from("clients").delete().eq("id", c.id).select("id")); if (paths.length) await supabase.storage.from("presence-app-brain-files").remove(paths); }),
     addDoc: m(async (v: { clientId: string; title: string; kind: string; docDate: string | null; files: NewFile[]; summary: string }) => { const attachments = v.files.length ? await uploadFiles(`clientes/${v.clientId}`, v.files) : []; try { must(await supabase.from("client_docs").insert({ client_id: v.clientId, title: v.title.trim().slice(0, 200), kind: v.kind, doc_date: v.docDate || null, attachments, ai_summary: v.summary.slice(0, 20000) }).select("id")); } catch (e) { if (attachments.length) await supabase.storage.from("presence-app-brain-files").remove(attachments.map((a) => a.path)); throw e; } }),
     removeDoc: m(async (d: ClientDoc) => { must(await supabase.from("client_docs").delete().eq("id", d.id).select("id")); if (d.attachments.length) await supabase.storage.from("presence-app-brain-files").remove(d.attachments.map((a) => a.path)); }),
@@ -122,7 +122,8 @@ export async function importDossiersAsClients(projectId: string, dossiers: { id:
   if (rows.length) {
     const made = must(await supabase.from("clients").insert(rows).select("id")) as { id: string }[];
     const { seedSetup } = await import("./client-setup"); // todo cliente novo já nasce com o roteiro padrão
-    for (const m of made) await seedSetup(m.id, projectId).catch(() => 0);
+    const { createDefaultTasks } = await import("./client-default-tasks"); // e as tarefas padrão (editáveis)
+    for (const m of made) { await seedSetup(m.id, projectId).catch(() => 0); await createDefaultTasks(m.id).catch(() => 0); }
   }
   return rows.length;
 }
