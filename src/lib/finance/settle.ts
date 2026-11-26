@@ -180,15 +180,25 @@ export function acertoByMonth(groups: { person: string; items: SettleItem[] }[],
   const out: AcertoByMonth = {};
   for (const g of groups) {
     const items = [...g.items, ...expandInstallments(g.items, throughYm)].filter((it) => (!it.linked || it.auto) && !(it.kind === "pagamento" && it.pending));
-    const per = new Map<string, number>();
+    // por mês: o que você deve (compras no cartão do outro), o que ele te deve (compras no seu cartão que são dele) e os pix de cada lado
+    const per = new Map<string, { byMe: number; toMe: number; pixMe: number; pixThem: number }>();
     for (const it of items) {
       const ym = it.date?.slice(0, 7) ?? nowYm;
       if (ym < nowYm || ym > throughYm) continue;
+      const m = per.get(ym) ?? { byMe: 0, toMe: 0, pixMe: 0, pixThem: 0 };
+      if (it.kind === "pagamento") { if (it.payer === "eu") m.pixMe += toCents(it.amount); else m.pixThem += toCents(it.amount); }
+      else { const sp = split(it); if (it.payer === "eu") m.toMe += sp.other; else m.byMe += sp.mine; }
+      per.set(ym, m);
       const e = effect(it);
-      per.set(ym, (per.get(ym) ?? 0) + e);
       if (e !== 0 && it.kind === "compra") (out[ym] ??= { pagar: 0, receber: 0, itens: [] }).itens.push({ person: g.person, desc: it.description || "Compra", amount: Math.abs(e) / 100, date: it.date, receber: e > 0 });
     }
-    for (const [ym, net] of per) { const m = (out[ym] ??= { pagar: 0, receber: 0, itens: [] }); if (net < 0) m.pagar += -net / 100; else m.receber += net / 100; }
+    // as duas linhas separadas: o pix que você fez abate o que você deve; o pix dele abate o que ele te deve (o que passar de um lado vai para o outro)
+    for (const [ym, m] of per) {
+      const a1 = Math.min(m.byMe, m.pixMe), a2 = Math.min(m.toMe, m.pixThem);
+      const mo = (out[ym] ??= { pagar: 0, receber: 0, itens: [] });
+      mo.pagar += (m.byMe - a1 + (m.pixThem - a2)) / 100;
+      mo.receber += (m.toMe - a2 + (m.pixMe - a1)) / 100;
+    }
   }
   for (const m of Object.values(out)) { m.pagar = Math.round(m.pagar * 100) / 100; m.receber = Math.round(m.receber * 100) / 100; }
   return out;

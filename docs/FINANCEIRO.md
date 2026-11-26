@@ -123,8 +123,8 @@ No mesmo formulário, **Como se repete?**: *Só esta vez*, *Parcelada* (9/18) ou
 ### Acerto de contas na sobra de caixa
 
 O que o acerto de contas pede de você entra na **sobra de caixa** e em **Próximos meses**, mês a mês, do mês atual em diante (`acertoByMonth` em `settle.ts`, `useAcertoByMonth` em `settle-data.ts`):
-- **O que você paga:** compras no cartão do outro (a sua parte), parcelas automáticas e gastos fixos, líquido por pessoa e já abatidos os pix feitos no mês. Aparece como "− Acerto de contas (o que você paga)" no detalhe da sobra e como "Acerto de contas" em cada mês.
-- **O que vão te pagar:** entra junto do "a receber".
+- **O que você paga:** compras no cartão do outro (a sua parte), parcelas automáticas e gastos fixos, com o pix que você fez já abatido. Aparece como "− Acerto de contas (o que você paga)" no detalhe da sobra e como "Acerto de contas" em cada mês.
+- **O que vão te pagar:** compras no seu cartão que são dele (ex.: assinatura que ele paga), com o pix que ele fez abatido. Entra como linha **separada** ("+ Acerto de contas · o que vão te pagar"), sem ser abatida do que você deve à mesma pessoa.
 - Ficam de fora os itens que já vêm do financeiro (compras divididas no seu cartão: já estão na fatura e no a receber), os pix "aguardando" e os acertos encerrados. Meses antes do atual também ficam de fora. Os saldos das contas não mudam.
 
 ### "Por que sobra": detalhes de cada item

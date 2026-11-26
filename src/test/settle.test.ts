@@ -129,11 +129,11 @@ describe("Acerto de contas na sobra de caixa, mês a mês", () => {
     expect(m["2026-11"]!.receber).toBe(0);
     expect(acertoByMonth(groups, "2026-12", "2027-02")["2026-11"]).toBeUndefined(); // mês passado fica de fora
   });
-  it("compra no seu cartão que é do outro vira a receber; pix já feito abate o mês; pix aguardando não conta", () => {
+  it("compra no seu cartão que é do outro vira a receber (linha separada); pix já feito abate o que você deve; pix aguardando não conta", () => {
     const g = [{ person: "Felipe", items: [mk("no meu cartão", { payer: "eu", otherShare: 100, amount: 80 }), mk("eu devo", { amount: 200 }), mk("pix", { kind: "pagamento", payer: "eu", amount: 150 }), mk("pix futuro", { kind: "pagamento", payer: "eu", amount: 999, pending: true })] }];
     const m = acertoByMonth(g, "2026-11", "2026-11")["2026-11"]!;
-    expect(m.pagar).toBe(0);                    // 80 − 200 + 150 = +30 → ele ainda te deve 30
-    expect(m.receber).toBe(30);
+    expect(m.pagar).toBe(50);                   // você deve 200 e já pagou 150 de pix → faltam 50
+    expect(m.receber).toBe(80);                 // ele te deve 80 (compra no seu cartão), em linha separada
   });
   const st: FinanceState = { ...EMPTY_STATE, onboarded: true, accounts: [{ id: "a", name: "Conta", kind: "banco", tone: "roxo", balanceBase: 1000, baseDate: "2026-11-25" }] };
   const today = new Date("2026-11-25T12:00:00");
@@ -161,5 +161,21 @@ describe("Detalhe do acerto de contas no 'por que sobra'", () => {
     const b = cashBreakdown(s, new Date("2026-11-25T12:00:00"), "bolso", false, ac).groups.find((g) => g.id === "acerto")!.items[0]!;
     expect(b.amount).toBe(206.11);
     expect(b.detail!.map((d) => [d.desc, d.amount, d.note])).toEqual([["Mounjaro", 140, "Felipe"], ["Apple Watch", 66.11, "Felipe"]]);
+  });
+});
+
+describe("Acerto: as duas linhas separadas, sem abater uma da outra", () => {
+  const mk = (id: string, o: Partial<SettleItem>): SettleItem => ({ id, kind: "compra", date: "2026-11-25", description: id, amount: 100, payer: "outro", otherShare: 0, installment: "", ...o });
+  it("o que ele te deve e o que você deve aparecem cada um no seu lado", () => {
+    const g = [{ person: "Felipe", items: [mk("Meli Mais", { payer: "eu", otherShare: 100, amount: 9.9, installment: "fixa", date: "2026-11-25" }), mk("Mounjaro", { amount: 140, installment: "fixa", date: "2026-11-29" })] }];
+    const m = acertoByMonth(g, "2026-11", "2026-12");
+    expect(m["2026-11"]).toMatchObject({ pagar: 140, receber: 9.9 });
+    expect(m["2026-12"]).toMatchObject({ pagar: 140, receber: 9.9 });
+    expect(m["2026-11"]!.itens.map((i) => [i.desc, i.receber])).toEqual([["Meli Mais", true], ["Mounjaro", false]]);
+  });
+  it("pix a mais de um lado vai para o outro, e a diferença (receber − pagar) continua a mesma de antes", () => {
+    const g = [{ person: "Felipe", items: [mk("deve", { amount: 100 }), mk("pix a mais", { kind: "pagamento", payer: "eu", amount: 130 })] }];
+    const m = acertoByMonth(g, "2026-11", "2026-11")["2026-11"]!;
+    expect(m.pagar).toBe(0); expect(m.receber).toBe(30);
   });
 });
