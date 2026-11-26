@@ -23,3 +23,13 @@ export function useReservesOn(): [boolean, (v: boolean) => void] {
   const set = useCallback((v: boolean) => { try { localStorage.setItem(RKEY, v ? "1" : "0"); } catch { /* sem armazenamento */ } window.dispatchEvent(new Event(REVT)); }, []);
   return [on, set];
 }
+
+const HKEY = "fin.sobra.ciclo", HEVT = "fin:sobraciclo";
+const hRead = (): boolean => { try { return localStorage.getItem(HKEY) !== "0"; } catch { return true; } };
+const hSub = (cb: () => void) => { window.addEventListener(HEVT, cb); window.addEventListener("storage", cb); return () => { window.removeEventListener(HEVT, cb); window.removeEventListener("storage", cb); }; };
+/** Sobra "até o próximo salário" (ligado, padrão) ou "até o fim do mês" (desligado). */
+export function useSobraCiclo(): [boolean, (v: boolean) => void] {
+  const on = useSyncExternalStore(hSub, hRead, () => true);
+  const set = useCallback((v: boolean) => { try { localStorage.setItem(HKEY, v ? "1" : "0"); } catch { /* sem armazenamento */ } window.dispatchEvent(new Event(HEVT)); }, []);
+  return [on, set];
+}

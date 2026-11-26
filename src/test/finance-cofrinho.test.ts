@@ -205,3 +205,40 @@ describe("Rótulo da parte do outro na visão sem cofrinho", () => {
     expect(cof.find((d) => d.desc === "L")!.note).toContain("cofrinho");
   });
 });
+
+import { nextCycle, paydayOf } from "@/lib/finance/calc";
+import { acertoByMonth } from "@/lib/finance/settle";
+
+describe("Sobra até o próximo salário", () => {
+  const card2 = { id: "c1", name: "Nubank", brand: "mastercard" as const, last4: "1", tone: "roxo" as const, limit: 5000, availableBase: 5000, baseDate: "2026-01-01", closingDay: 29, dueDay: 5, adjustments: {}, declared: { "2026-12": 1341.97 }, payAfterClose: 1 };
+  const rec = (id: string, kind: "despesa" | "receita", amount: number, day: number, method: "debito" | "credito", x: object = {}) => ({ id, kind, desc: id, amount, day, category: "outros", method, startYm: "2026-11", ...(method === "credito" ? { cardId: "c1" } : { accountId: "acc" }), ...x });
+  const st: FinanceState = { ...EMPTY_STATE, onboarded: true, cards: [card2],
+    accounts: [{ id: "acc", name: "Nubank", kind: "carteira", tone: "roxo", balanceBase: 1113.28, baseDate: "2026-11-26" }],
+    recurring: [rec("Salário", "receita", 1500, 30, "debito", { category: "salario" }), rec("Cílios 30", "despesa", 80, 30, "debito"), rec("Cílios 15", "despesa", 80, 15, "debito"),
+      rec("Prime", "despesa", 19.9, 18, "credito", { subscription: true, category: "assinaturas" }), rec("ChatGPT", "despesa", 39.9, 17, "credito", { subscription: true, category: "assinaturas" }), rec("Drive", "despesa", 4.5, 25, "credito", { subscription: true, category: "assinaturas" }),
+      rec("Nectar", "despesa", 49.9, 23, "credito", { subscription: true, category: "assinaturas", pauses: [{ from: "2026-12" }] })] };
+  const today = new Date("2026-11-26T12:00:00");
+
+  it("acha o dia do salário e o que cai antes dele no mês seguinte (sem o que cai no dia do salário e sem o pausado)", () => {
+    expect(paydayOf(st)).toBe(30);
+    const c = nextCycle(st, today)!;
+    expect(c.items.map((i) => [i.desc, i.amount, i.date])).toEqual([["Cílios 15", 80, "2026-12-15"], ["ChatGPT", 39.9, "2026-12-17"], ["Prime", 19.9, "2026-12-18"], ["Drive", 4.5, "2026-12-25"]]);
+    expect(c.total).toBe(144.3); expect(c.until).toBe("2026-12-29");
+  });
+  it("a sobra até 29/12 desconta isso além do que sai este mês; até o fim do mês fica como antes", () => {
+    const ac = acertoByMonth([{ person: "Felipe", items: [
+      { id: "a", kind: "compra", date: "2026-11-25", description: "Apple Watch", amount: 66.11, payer: "outro", otherShare: 0, installment: "9/18" },
+      { id: "b", kind: "compra", date: "2026-11-30", description: "Contas de casa", amount: 500, payer: "outro", otherShare: 0, installment: "fixa" },
+      { id: "c", kind: "compra", date: "2026-11-29", description: "Mounjaro", amount: 140, payer: "outro", otherShare: 0, installment: "fixa" }] }], "2026-11", "2026-12");
+    const mes = monthClose(st, today, "bolso", false, ac, false), ciclo = monthClose(st, today, "bolso", false, ac, true);
+    // 1113,28 + 1500 − 80 (Cílios 30/11) − 706,11 (acerto) = 1827,17  (a fatura de R$ 1.341,97 vem da fatura declarada; aqui só as assinaturas e fixas)
+    expect(ciclo.ciclo).toBe(144.3); expect(ciclo.cicloPossivel).toBe(144.3); expect(mes.ciclo).toBe(0); expect(mes.cicloPossivel).toBe(144.3);
+    expect(round2(mes.sobra - ciclo.sobra)).toBe(144.3);
+    expect(cashBreakdown(st, today, "bolso", false, ac, true).groups.find((g) => g.id === "ciclo")?.total).toBe(144.3);
+    expect(cashBreakdown(st, today, "bolso", false, ac, false).groups.find((g) => g.id === "ciclo")).toBeUndefined();
+    expect(monthClose(st, today, "cofrinho", false, ac, true).ciclo).toBe(0);
+  });
+  it("sem salário cadastrado não há ciclo", () => {
+    expect(nextCycle({ ...st, recurring: st.recurring.filter((r) => r.kind === "despesa") }, today)).toBeNull();
+  });
+});

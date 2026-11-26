@@ -130,3 +130,7 @@ O que o acerto de contas pede de você entra na **sobra de caixa** e em **Próxi
 ### "Por que sobra": detalhes de cada item
 
 Em Visão geral → "ver detalhes", tocar numa fatura abre as compras, parcelas e fixas que ela traz (com valor, data e etiquetas "parcela 4/15", "fixa", "cofrinho", "com Felipe"), na visão escolhida: a soma dos itens é o valor da linha. O acerto de contas lista os lançamentos do mês e as metas mostram como chegaram ao valor (limite, já gasto, o que falta). Fica em `Entry.detail`, montado em `cashBreakdown`.
+
+### Sobra até o próximo salário
+
+Na Visão geral, o botão **"Sobra até: o fim do mês | o próximo salário (29/12)"** (padrão: próximo salário) escolhe até quando a sobra vale. Com "o próximo salário", a sobra desconta também as **assinaturas e contas fixas do mês seguinte que caem antes do dia do salário** (salário dia 30 → de 1/12 a 29/12; `nextCycle` em `calc.ts`; o dia do salário é o da maior receita fixa ativa). Não entram: parcelas, compras novas, o acerto de contas e o que cai no dia do salário ou depois (sai do salário seguinte). Assinaturas pausadas no mês seguinte ficam de fora. O detalhe da sobra ganha o grupo "Até o próximo salário".

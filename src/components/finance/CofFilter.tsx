@@ -1,8 +1,8 @@
 import { PiggyBank } from "lucide-react";
 
 import type { CofView } from "@/lib/finance/calc";
-import { brl as brlN } from "@/lib/finance/calc";
-import { useCofView, useReservesOn } from "@/lib/finance/cof-view";
+import { brl as brlN, dateBR, nextCycle } from "@/lib/finance/calc";
+import { useCofView, useReservesOn, useSobraCiclo } from "@/lib/finance/cof-view";
 import { useFinance } from "@/lib/finance/store";
 
 const OPTIONS: { v: CofView; label: string }[] = [{ v: "tudo", label: "Tudo" }, { v: "bolso", label: "Sem cofrinho" }, { v: "cofrinho", label: "Só cofrinho" }];
@@ -38,5 +38,20 @@ export function ReservesSwitch({ possible, className = "" }: { possible: number;
       <span className={on ? "text-foreground" : "text-muted-foreground"}>Descontar minhas metas da sobra</span>
       <span className="text-muted-foreground">· {possible > 0 ? `${brlN(possible)} reservado${on ? "" : " (desligado)"} neste mês` : "nada a reservar neste mês"}</span>
     </label>
+  );
+}
+
+/** Sobra "até o fim do mês" ou "até o próximo salário" (conta também as assinaturas e contas fixas do mês seguinte que saem antes dele). */
+export function CycleSwitch() {
+  const { state, today } = useFinance(), [on, setOn] = useSobraCiclo(), c = nextCycle(state, today);
+  if (!c || c.items.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="fin-sobra-ciclo">
+      <span className="text-muted-foreground">Sobra até</span>
+      <div role="radiogroup" aria-label="Até quando a sobra vale" className="flex gap-1 rounded-full border border-white/10 bg-black/25 p-1">
+        {([[false, "o fim do mês"], [true, `o próximo salário (${dateBR(c.until).slice(0, 5)})`]] as const).map(([v, t]) => <button key={t} type="button" role="radio" aria-checked={on === v} onClick={() => setOn(v)} data-testid={v ? "fin-ciclo-salario" : "fin-ciclo-mes"} className={`rounded-full px-3 py-1 transition ${on === v ? "bg-amber/20 text-amber" : "text-muted-foreground hover:text-foreground"}`}>{t}</button>)}
+      </div>
+      <span className="text-muted-foreground">{on ? `desconta também ${brlN(c.total)} de assinaturas e contas fixas de ${dateBR(c.from).slice(0, 5)} a ${dateBR(c.until).slice(0, 5)}` : `sem os ${brlN(c.total)} das assinaturas e contas fixas até ${dateBR(c.until).slice(0, 5)}`}</span>
+    </div>
   );
 }

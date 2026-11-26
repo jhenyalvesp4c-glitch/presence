@@ -1,7 +1,7 @@
 /** Cálculos do módulo financeiro: faturas, parcelas, projeções, categorias e alertas. Puro (recebe `today`), fácil de testar. */
 import { catOf } from "./categories";
 import type { AcertoByMonth } from "./settle";
-import type { Account, Card, Entry, EntryDetail, FinanceState, Goal, Plan, Recurring, Shared, Transaction } from "./types";
+import type { Account, Card, Entry, EntryDetail, FinanceState, Goal, Method, Plan, Recurring, Shared, Transaction } from "./types";
 
 /* ───────────── datas ───────────── */
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -175,7 +175,7 @@ export function monthSummary(s: FinanceState, ym: string, todayIso: string): Mon
   return { receitas, despesas, aReceber, aPagar, resultado: round2(receitas - despesas), previsto: round2(receitas + aReceber - despesas - aPagar) };
 }
 /* ───────────── detalhamento da sobra/falta do mês ───────────── */
-export type BreakdownGroupId = "fixas" | "assinaturas" | "parcelas" | "cartao" | "avulsas" | "faturas" | "metas" | "acerto";
+export type BreakdownGroupId = "fixas" | "assinaturas" | "parcelas" | "cartao" | "avulsas" | "faturas" | "metas" | "acerto" | "ciclo";
 export type BreakdownGroup = { id: BreakdownGroupId; label: string; hint: string; total: number; done: number; later: number; pct: number; items: Entry[] };
 export type MonthBreakdown = {
   ym: string; income: { total: number; done: number; later: number; items: Entry[] };
@@ -488,14 +488,42 @@ export function reservesFor(s: FinanceState, ym: string, today: Date): Reserve[]
 }
 export const totalReserves = (s: FinanceState, today: Date) => sum(reservesFor(s, ymOf(today), today).map((r) => r.amount));
 
-export type MonthClose = { saldo: number; aReceber: number; aPagarConta: number; faturas: number; sobra: number; /** Das faturas abertas, quanto os cofrinhos pagam (já separado; fora da conta acima). */ cofrinhosPagam: number; /** Acerto de contas do mês: o que você paga e o que vai receber (já dentro da sobra). */ acertoPagar: number; acertoReceber: number; /** Metas ligadas que estão descontando da sobra (0 se o desconto estiver desligado). */ reservas: number; /** O que as metas ligadas reservariam (mostra mesmo com o desconto desligado). */ reservasPossiveis: number };
-export function monthClose(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth): MonthClose {
+/* ───────────── até o próximo salário ───────────── */
+/** Dia do mês em que cai o salário: o da maior receita fixa ativa (a de categoria salário vem primeiro). */
+export function paydayOf(s: FinanceState): number | null {
+  const inc = s.recurring.filter((r) => r.kind === "receita" && !isPaused(r));
+  if (!inc.length) return null;
+  return [...inc].sort((a, b) => Number(b.category === "salario") - Number(a.category === "salario") || b.amount - a.amount)[0]!.day;
+}
+export type CycleItem = { id: string; desc: string; amount: number; date: string; category: string; method: Method; subscription: boolean };
+export type NextCycle = { items: CycleItem[]; total: number; from: string; until: string; payday: number };
+/**
+ * O que você ainda vai pagar com o dinheiro desta sobra até o PRÓXIMO salário: as assinaturas e contas fixas (no cartão ou na conta) do mês seguinte
+ * que caem antes do dia do salário (ex.: salário dia 30 → de 1/12 a 29/12). Parcelas, compras novas e o acerto de contas não entram:
+ * o que cai no dia do salário ou depois sai do salário seguinte.
+ */
+export function nextCycle(s: FinanceState, today: Date): NextCycle | null {
+  const pd = paydayOf(s);
+  if (!pd || pd <= 1) return null;
+  const nextYm = addMonths(ymOf(today), 1), items: CycleItem[] = [];
+  for (const r of s.recurring) {
+    if (r.kind !== "despesa" || r.day >= pd || !recurringActiveIn(r, nextYm)) continue;
+    const amount = myPart(r.amount, r.shared);
+    if (amount > 0) items.push({ id: `${r.id}:${nextYm}`, desc: r.desc, amount, date: dayIn(nextYm, r.day), category: r.category, method: r.method, subscription: isSubscription(r) });
+  }
+  items.sort((a, b) => a.date.localeCompare(b.date));
+  return { items, total: sum(items.map((x) => x.amount)), from: `${nextYm}-01`, until: dayIn(nextYm, pd - 1), payday: pd };
+}
+
+export type MonthClose = { saldo: number; aReceber: number; aPagarConta: number; faturas: number; sobra: number; /** Das faturas abertas, quanto os cofrinhos pagam (já separado; fora da conta acima). */ cofrinhosPagam: number; /** Acerto de contas do mês: o que você paga e o que vai receber (já dentro da sobra). */ acertoPagar: number; acertoReceber: number; /** Assinaturas e contas fixas até o próximo salário que já saem desta sobra (0 se estiver na visão "até o fim do mês"). */ ciclo: number; /** O que isso daria, mesmo desligado. */ cicloPossivel: number; /** Metas ligadas que estão descontando da sobra (0 se o desconto estiver desligado). */ reservas: number; /** O que as metas ligadas reservariam (mostra mesmo com o desconto desligado). */ reservasPossiveis: number };
+export function monthClose(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth, withCycle = false): MonthClose {
   const todayIso = isoOf(today), later = view === "cofrinho" ? [] : monthEntries(s, ymOf(today)).filter((e) => e.date > todayIso);
   const saldo = viewBalance(s, today, view), aReceber = total(incomeOf(later));
   const aPagarConta = total(expensesOf(later).filter((e) => !e.cardId && e.method !== "credito")), faturas = totalOpenView(s, today, view);
   const reservasPossiveis = view === "cofrinho" ? 0 : totalReserves(s, today), reservas = withReserves ? reservasPossiveis : 0;
+  const cyc = view === "cofrinho" ? null : nextCycle(s, today), cicloPossivel = cyc?.total ?? 0, ciclo = withCycle ? cicloPossivel : 0;
   const ac = view === "cofrinho" ? undefined : acerto?.[ymOf(today)], acertoPagar = ac?.pagar ?? 0, acertoReceber = ac?.receber ?? 0;
-  return { saldo, aReceber, aPagarConta, faturas, reservas, reservasPossiveis, acertoPagar, acertoReceber, sobra: round2(saldo + aReceber + acertoReceber - aPagarConta - faturas - reservas - acertoPagar), cofrinhosPagam: sum(s.cards.map((c) => openInvoice(s, c, today).funded)) };
+  return { saldo, aReceber, aPagarConta, faturas, reservas, reservasPossiveis, acertoPagar, acertoReceber, sobra: round2(saldo + aReceber + acertoReceber - aPagarConta - faturas - reservas - acertoPagar - ciclo), ciclo, cicloPossivel, cofrinhosPagam: sum(s.cards.map((c) => openInvoice(s, c, today).funded)) };
 }
 
 /**
@@ -522,8 +550,8 @@ function metaDetail(s: FinanceState, r: Reserve, ym: string): EntryDetail[] | un
   if (g.kind === "limite_categoria") { const spent = categorySpent(s, g.category ?? "", ym); return [{ id: "l", desc: "Limite do mês", amount: g.target }, { id: "g", desc: "Já gasto até agora", amount: -spent }, { id: "f", desc: "Ainda pode gastar (é o que fica reservado)", amount: r.amount }]; }
   return [{ id: "r", desc: g.kind === "economizar_mensal" ? "O que falta guardar neste mês" : "Reservado por mês", amount: r.amount }, { id: "a", desc: "Já guardado", amount: g.current, note: `de ${brl(g.target)}` }];
 }
-export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth): MonthBreakdown {
-  const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today, view, withReserves, acerto);
+export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bolso", withReserves = false, acerto?: AcertoByMonth, withCycle = false): MonthBreakdown {
+  const todayIso = isoOf(today), ym = ymOf(today), c = monthClose(s, today, view, withReserves, acerto, withCycle);
   const later = (view === "cofrinho" ? [] : monthEntries(s, ym)).filter((e) => e.date > todayIso).sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
   const incLater = incomeOf(later), outAcct = expensesOf(later).filter((e) => !e.cardId && e.method !== "credito");
   const mk = (id: string, desc: string, amount: number, kind: "receita" | "despesa", over: Partial<Entry> = {}): Entry => ({ id, kind, desc, amount, date: todayIso, category: "outros", method: "debito", source: "tx", ...over });
@@ -538,11 +566,12 @@ export function cashBreakdown(s: FinanceState, today: Date, view: CofView = "bol
   const metas: Entry[] = withReserves && view !== "cofrinho" ? reservesFor(s, ym, today).map((r) => mk(`meta:${r.id}`, `Meta · ${r.title}`, r.amount, "despesa", { detail: metaDetail(s, r, ym) })) : [];
   const acertoOut: Entry[] = c.acertoPagar > 0 ? [mk("acerto:pagar", `Acerto de contas · o que você paga`, c.acertoPagar, "despesa", { detail: acertoDetail(acerto?.[ym], false, c.acertoPagar) })] : [];
   if (c.acertoReceber > 0) items.push(mk("acerto:receber", "Acerto de contas · o que vão te pagar", c.acertoReceber, "receita", { detail: acertoDetail(acerto?.[ym], true, c.acertoReceber) }));
-  const buckets: Record<string, Entry[]> = { fixas: [], assinaturas: [], avulsas: [], faturas, metas, acerto: acertoOut };
+  const cycItems: Entry[] = withCycle && view !== "cofrinho" ? (nextCycle(s, today)?.items ?? []).map((x) => mk(`ciclo:${x.id}`, x.desc, x.amount, "despesa", { date: x.date, category: x.category, method: x.method })) : [];
+  const buckets: Record<string, Entry[]> = { fixas: [], assinaturas: [], avulsas: [], faturas, metas, acerto: acertoOut, ciclo: cycItems };
   for (const e of outAcct) buckets[groupOf(s, e)]!.push(e);
   if (c.saldo < 0) buckets["avulsas"]!.push(mk("saldo-neg", "Saldo negativo nas contas", -c.saldo, "despesa"));
   const incomeTotal = round2(Math.max(c.saldo, 0) + c.aReceber + c.acertoReceber);
-  const labels: Record<string, { label: string; hint: string }> = { ...Object.fromEntries(GROUPS.map((g) => [g.id, { label: g.label, hint: g.hint }])), avulsas: { label: "Outros gastos das contas", hint: "pix, débito e dinheiro que ainda vão sair" }, acerto: { label: "Acerto de contas", hint: "o que você paga a outras pessoas neste mês (compras no cartão delas, parcelas e gastos fixos)" }, metas: { label: "Minhas metas do mês", hint: "o que você separou para limites e para guardar (liga e desliga na Visão geral)" }, faturas: { label: "Faturas dos cartões", hint: "o que você paga pelos cartões; compras e parcelas já estão dentro delas" } };
+  const labels: Record<string, { label: string; hint: string }> = { ...Object.fromEntries(GROUPS.map((g) => [g.id, { label: g.label, hint: g.hint }])), avulsas: { label: "Outros gastos das contas", hint: "pix, débito e dinheiro que ainda vão sair" }, ciclo: { label: "Até o próximo salário", hint: "assinaturas e contas fixas do mês seguinte que saem antes do próximo salário" }, acerto: { label: "Acerto de contas", hint: "o que você paga a outras pessoas neste mês (compras no cartão delas, parcelas e gastos fixos)" }, metas: { label: "Minhas metas do mês", hint: "o que você separou para limites e para guardar (liga e desliga na Visão geral)" }, faturas: { label: "Faturas dos cartões", hint: "o que você paga pelos cartões; compras e parcelas já estão dentro delas" } };
   const groups = (Object.keys(buckets) as BreakdownGroupId[]).map((id) => { const xs = buckets[id]!, t = total(xs); return { id, label: labels[id]!.label, hint: labels[id]!.hint, items: xs, total: t, done: 0, later: t, pct: incomeTotal > 0 ? (t / incomeTotal) * 100 : 0 }; }).filter((g) => g.items.length > 0).sort((a, b) => b.total - a.total);
   const expenses = round2(sum(groups.map((g) => g.total)));
   const subscriptions = sum(s.recurring.filter((r) => isSubscription(r) && recurringActiveIn(r, ym)).map((r) => r.amount));
