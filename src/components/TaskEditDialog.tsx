@@ -4,13 +4,15 @@ import { BellRing, Flag, Loader2, Trash2, X } from "lucide-react";
 
 import { colorVar } from "@/components/PlanShell";
 import { RemindPicker } from "@/components/RemindPicker";
+import { TaskFilePicker, useTaskFiles } from "@/components/TaskFiles";
+import { toast } from "sonner";
 import type { Category, Priority, Task } from "@/lib/types";
 
 const prios: { k: Priority; l: string; c: string }[] = [
   { k: "alta", l: "Alta", c: "rose" }, { k: "media", l: "Média", c: "amber" }, { k: "baixa", l: "Baixa", c: "emerald" },
 ];
 
-export type TaskPatch = Pick<Task, "title" | "description" | "category_id" | "priority" | "due_date" | "due_time" | "remind_before" | "client_id">;
+export type TaskPatch = Pick<Task, "title" | "description" | "category_id" | "priority" | "due_date" | "due_time" | "remind_before" | "client_id" | "attachments">;
 
 /** Editar uma tarefa: título, detalhes, categoria, prioridade, data e hora. */
 export function TaskEditDialog({ task, categories, clients = [], saving, onClose, onSave, onDelete }: {
@@ -22,6 +24,7 @@ export function TaskEditDialog({ task, categories, clients = [], saving, onClose
   const [priority, setPriority] = useState<Priority>(task.priority);
   const [date, setDate] = useState(task.due_date ?? "");
   const [time, setTime] = useState(task.due_time?.slice(0, 5) ?? "");
+  const files = useTaskFiles(task.attachments ?? []);
   const [clientId, setClientId] = useState(task.client_id ?? "");
   const [remind, setRemind] = useState<number[]>(task.remind_before ?? []);
   const field = "w-full rounded-xl border border-border bg-background/40 px-4 py-2.5 text-sm outline-none focus:border-cyan [color-scheme:dark]";
@@ -29,10 +32,13 @@ export function TaskEditDialog({ task, categories, clients = [], saving, onClose
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" {...backdropProps(onClose)}>
       <form onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
+        onPaste={files.onPaste} onDrop={files.onDrop} onDragOver={files.onDragOver}
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (!title.trim()) return;
-          onSave({ title, description: description.trim() || null, category_id: categoryId || null, priority, due_date: date || null, due_time: time || null, remind_before: time && remind.length ? remind : null, client_id: clientId || null });
+          if (!title.trim() || files.busy) return;
+          let attachments: Awaited<ReturnType<typeof files.upload>>;
+          try { attachments = await files.upload(); } catch (err) { toast.error(`Não consegui enviar o arquivo: ${(err as Error).message}`); return; }
+          onSave({ attachments, title, description: description.trim() || null, category_id: categoryId || null, priority, due_date: date || null, due_time: time || null, remind_before: time && remind.length ? remind : null, client_id: clientId || null });
         }}
         className="glass w-full max-w-md space-y-4 rounded-3xl p-6 animate-rise">
         <div className="flex items-center justify-between">
@@ -41,6 +47,7 @@ export function TaskEditDialog({ task, categories, clients = [], saving, onClose
         </div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" className={field} autoFocus maxLength={200} required />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalhes (opcional)" rows={2} maxLength={2000} className={`${field} resize-none`} />
+        <TaskFilePicker files={files} />
         <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={field}>
           <option value="" className="bg-popover">Sem categoria</option>
           {categories.map((c) => <option key={c.id} value={c.id} className="bg-popover">{c.name}</option>)}
@@ -71,7 +78,7 @@ export function TaskEditDialog({ task, categories, clients = [], saving, onClose
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onDelete} className="flex items-center gap-2 rounded-full border border-destructive/50 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10"><Trash2 size={14} /> Excluir</button>
           <button type="submit" disabled={saving} className="ml-auto flex items-center gap-2 rounded-full bg-gradient-brand px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-            {saving && <Loader2 size={14} className="animate-spin" />} Salvar
+            {(saving || files.busy) && <Loader2 size={14} className="animate-spin" />} Salvar
           </button>
         </div>
       </form>

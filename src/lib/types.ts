@@ -30,6 +30,8 @@ export type Task = {
   remind_before?: number[] | null;
   /** Cliente a que a tarefa pertence (aparece na ficha dele). */
   client_id?: string | null;
+  /** Imagens (e PDFs) anexadas à tarefa. */
+  attachments?: { path: string; name: string; mime: string; size: number }[] | null;
 };
 
 export type RoutineItem = {

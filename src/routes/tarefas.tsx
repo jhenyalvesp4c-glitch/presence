@@ -21,6 +21,7 @@ import { beforeWords } from "@/lib/reminders";
 import { useAllClients } from "@/lib/data/clients";
 import { groupByPolo } from "@/lib/task-polo";
 import { useQueryClient } from "@tanstack/react-query";
+import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
 import { ListsView } from "@/components/lists/ListsView";
 import { FixedTasksPanel } from "@/components/FixedTasksPanel";
 import { useFixedActions, useFixedDone, useFixedTasks } from "@/lib/data/fixed-tasks";
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/tarefas")({
 
 type C = Color;
 type Row = {
-  id: string; t: string; d: string; tag: string; c: C; Icon: ReturnType<typeof getIcon>; time: string; done: boolean; cat: string; date: string; priority: Priority; fixed?: boolean; remind?: number[]; client?: string;
+  id: string; t: string; d: string; tag: string; c: C; Icon: ReturnType<typeof getIcon>; time: string; done: boolean; cat: string; date: string; priority: Priority; fixed?: boolean; remind?: number[]; client?: string; files?: { path: string; name: string; mime: string; size: number }[];
 };
 
 const tabs = ["Hoje", "Esta semana", "Este mês", "Todas"];
@@ -77,7 +78,7 @@ function TarefasPage() {
   const [newRemind, setNewRemind] = useState<number[]>([]);
   const [newClient, setNewClient] = useState("");
   const [dayFilter, setDayFilter] = useState<string | null>(null), [openFixed, setOpenFixed] = useState<Set<string>>(new Set());
-  const qc = useQueryClient(), clientsQ = useAllClients(), clientList = clientsQ.data ?? [];
+  const newFiles = useTaskFiles(), qc = useQueryClient(), clientsQ = useAllClients(), clientList = clientsQ.data ?? [];
   const clientName = useMemo(() => new Map(clientList.map((c) => [c.id, c.name])), [clientList]);
   const [day, setDay] = useState<Date>(T0);
   const [newDate, setNewDate] = useState<Date | undefined>();
@@ -97,7 +98,7 @@ function TarefasPage() {
           return {
             id: t.id, t: t.title, d: t.description ?? c?.name ?? "Sem categoria", tag: c ? c.name.split(" ")[0]! : "Tarefa",
             c: (c?.color ?? "cyan") as C, Icon: getIcon(c?.icon ?? "check"), time: t.due_time ? hhmm(t.due_time) : "—",
-            done: t.done, cat: t.category_id ?? "", date: t.due_date ?? "", priority: t.priority, ...(t.remind_before?.length ? { remind: t.remind_before } : {}), ...(t.client_id && clientName.get(t.client_id) ? { client: clientName.get(t.client_id)! } : {}),
+            done: t.done, cat: t.category_id ?? "", date: t.due_date ?? "", priority: t.priority, ...(t.remind_before?.length ? { remind: t.remind_before } : {}), ...(t.client_id && clientName.get(t.client_id) ? { client: clientName.get(t.client_id)! } : {}), ...(t.attachments?.length ? { files: t.attachments } : {}),
           };
         })
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)),
@@ -208,14 +209,16 @@ function TarefasPage() {
     if (!id || newCat) return;
     void ensureClientCategory().then((cid) => { setNewCat(cid); void qc.invalidateQueries({ queryKey: ["categories"] }); }).catch(() => undefined);
   };
-  const add = () => {
-    if (!title.trim() || createTask.isPending) return;
+  const add = async () => {
+    if (!title.trim() || createTask.isPending || newFiles.busy) return;
+    let attachments: Awaited<ReturnType<typeof newFiles.upload>> = [];
+    try { attachments = await newFiles.upload(); } catch (e) { toast.error(`Não consegui enviar o arquivo: ${(e as Error).message}`); return; }
     createTask.mutate(
-      { title: title.trim(), category_id: catId || null, priority: newPrio, due_date: iso(newDate ?? day), due_time: time || null, remind_before: time && newRemind.length ? newRemind : null, client_id: newClient || null },
+      { title: title.trim(), category_id: catId || null, priority: newPrio, due_date: iso(newDate ?? day), due_time: time || null, remind_before: time && newRemind.length ? newRemind : null, client_id: newClient || null, ...(attachments.length ? { attachments } : {}) },
       {
         onSuccess: () => {
           if (newDate) setDay(newDate);
-          setTitle(""); setTime(""); setNewDate(undefined); setNewPrio("media"); setNewRemind([]); setNewClient("");
+          setTitle(""); setTime(""); setNewDate(undefined); setNewPrio("media"); setNewRemind([]); setNewClient(""); newFiles.clear();
           toast.success("Tarefa adicionada");
         },
         onError: (e) => toast.error(`Não consegui salvar: ${e.message}`),
@@ -385,10 +388,10 @@ function TarefasPage() {
                     <span className="h-8 w-0.5 rounded-full bg-[color:var(--glow)] shadow-[0_0_8px_var(--glow)]" />
                     <tk.Icon size={20} className="text-[color:var(--glow)] transition group-hover:scale-110" />
                   </span>
-                  <button type="button" onClick={() => { if (!tk.fixed) setEditingId(tk.id); }} aria-label={tk.fixed ? `Tarefa fixa ${tk.t}` : `Editar tarefa ${tk.t}`} className={`min-w-0 text-left ${tk.fixed ? "cursor-default" : ""}`}>
+                  <div className="min-w-0"><button type="button" onClick={() => { if (!tk.fixed) setEditingId(tk.id); }} aria-label={tk.fixed ? `Tarefa fixa ${tk.t}` : `Editar tarefa ${tk.t}`} className={`min-w-0 text-left ${tk.fixed ? "cursor-default" : ""}`}>
                     <b className={`block truncate text-sm font-semibold transition ${tk.done ? "text-muted-foreground line-through" : ""}`}>{tk.t}</b>
                     <span className="block truncate text-xs text-muted-foreground">{tk.d}{tk.client && tk.cat !== clientsCatId && <span className="ml-1.5 text-violet" data-testid="tarefa-cliente">· {tk.client}</span>}</span>
-                  </button>
+                  </button>{tk.files?.length ? <TaskThumbs files={tk.files} title={tk.t} /> : null}</div>
                   <span className={`tag hidden sm:inline ${tk.fixed ? "!text-emerald" : ""}`}>{tk.fixed && <Repeat size={10} className="mr-1 inline" />}{tk.tag}</span>
                   <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tk.cat === clientsCatId && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
                   <span className="hidden items-center gap-2 text-muted-foreground sm:flex">
@@ -426,8 +429,8 @@ function TarefasPage() {
         <div className="flex flex-col gap-5">
           <Panel c="violet">
             <Head Icon={Sparkles} t="Criar nova tarefa" s="Adicione à sua rotina." />
-            <div className="mt-4 space-y-2.5">
-              <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Título da tarefa" maxLength={80}
+            <div className="mt-4 space-y-2.5" onPaste={newFiles.onPaste} onDrop={newFiles.onDrop} onDragOver={newFiles.onDragOver}>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void add()} onPaste={newFiles.onPaste} placeholder="Título da tarefa" maxLength={80}
                 className="w-full rounded-xl border border-border bg-secondary/40 px-3.5 py-2.5 text-sm outline-none transition focus:border-violet focus:shadow-[0_0_18px_-6px_var(--violet)]" />
               <select value={catId} onChange={(e) => setNewCat(e.target.value)} className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-violet">
                 {cats.map((c) => <option key={c.id} value={c.id} className="bg-popover">{c.t}</option>)}
@@ -448,8 +451,9 @@ function TarefasPage() {
               {clientList.length > 0 && <select value={newClient} onChange={(e) => pickClient(e.target.value)} aria-label="Cliente" data-testid="nova-tarefa-cliente" className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-violet"><option value="" className="bg-popover">Sem cliente</option>{clientList.map((c) => <option key={c.id} value={c.id} className="bg-popover">Cliente: {c.name}</option>)}</select>}
               <div><p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground"><BellRing size={12} /> Lembrar antes {!time && <span className="text-amber">(escolha a hora)</span>}</p><RemindPicker value={newRemind} onChange={setNewRemind} disabled={!time} /></div>
               <button type="button" onClick={() => setNewPrio(prioNext[newPrio])} className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-left text-sm text-muted-foreground transition hover:border-violet"><Flag size={14} style={{ color: newPrio === "alta" ? colorVar("rose") : newPrio === "baixa" ? colorVar("emerald") : undefined }} /> {prioLabel[newPrio]}</button>
-              <button onClick={add} disabled={createTask.isPending} className="shine flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--cyan)] transition hover:scale-[1.02] disabled:opacity-60">
-                {createTask.isPending ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Adicionar tarefa
+              <TaskFilePicker files={newFiles} />
+              <button onClick={() => void add()} disabled={createTask.isPending || newFiles.busy} className="shine flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--cyan)] transition hover:scale-[1.02] disabled:opacity-60">
+                {createTask.isPending || newFiles.busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Adicionar tarefa
               </button>
             </div>
           </Panel>

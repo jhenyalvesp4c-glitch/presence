@@ -49,3 +49,7 @@ Uma tarefa criada dentro da ficha do cliente (aba Tarefas) fica ligada a ele (`t
 Na página Tarefas, ao filtrar a categoria **Clientes**, a lista fica **separada por polo**: um bloco para cada um (ordem alfabética, "Sem polo" no fim), com o nome, quantas tarefas pendentes e, dentro, as tarefas por data (`groupByPolo` em `src/lib/task-polo.ts`).
 
 A lista de Tarefas é **dividida por categoria** (Clientes, Demandas, Autocuidado…, na ordem das categorias), cada uma com o seu título e quantas tarefas pendentes. Dentro de "Clientes", cada polo tem o seu bloco. Em semana, mês e todas, dentro de cada categoria as tarefas ficam separadas por dia.
+
+### Imagens e arquivos nas tarefas
+
+Ao criar ou editar uma tarefa (na ficha do cliente, em Tarefas ou na janela de editar) dá para **anexar imagens e arquivos**: botão "Anexar imagem ou arquivo", **colar um print (Ctrl+V)** ou **arrastar** para a área. Os arquivos vão para o Storage (pasta `tarefas`, até 8 por vez e 25 MB cada) e ficam em `tasks.attachments`. Na lista aparecem as miniaturas (até 4); tocar abre em tela cheia (`TaskFiles.tsx`).

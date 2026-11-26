@@ -19,6 +19,7 @@ import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensureClientCategory, useCategories, useCreateTask, useTasks, useToggleTask } from "@/lib/data/tasks";
 import { RemindPicker } from "@/components/RemindPicker";
+import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
 import { beforeWords } from "@/lib/reminders";
 import type { Task } from "@/lib/types";
 import { applyDefaultToAll, useSetupSummaries } from "@/lib/data/client-setup";
@@ -390,7 +391,7 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 
 /** Tarefas, compromissos, treinamentos e implantações ligados ao cliente — e um jeito rápido de criar mais, já vinculadas. */
 function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
-  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [];
+  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles();
   const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false);
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
@@ -398,13 +399,16 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
   const add = async () => {
     if (!title.trim() || create.isPending) return;
     const category_id = cat || (await ensureClientCategory().catch(() => null));
-    create.mutate({ title: title.trim(), category_id, due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
-      { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); void qc.invalidateQueries({ queryKey: ["categories"] }); toast.success(`Tarefa criada em Clientes · ${client.name}`); }, onError: (e) => toast.error((e as Error).message) });
+    let attachments: Awaited<ReturnType<typeof files.upload>> = [];
+    try { attachments = await files.upload(); } catch (e) { toast.error(`Não consegui enviar o arquivo: ${(e as Error).message}`); return; }
+    create.mutate({ title: title.trim(), category_id, ...(attachments.length ? { attachments } : {}), due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
+      { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); files.clear(); void qc.invalidateQueries({ queryKey: ["categories"] }); toast.success(`Tarefa criada em Clientes · ${client.name}`); }, onError: (e) => toast.error((e as Error).message) });
   };
   return (
     <div className="space-y-2" data-testid="cliente-tarefas">
-      <form onSubmit={(e) => { e.preventDefault(); void add(); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-        <div className="flex gap-2"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Nova tarefa para ${client.name} (ex.: Treinamento)`} aria-label="Nova tarefa do cliente" data-testid="cliente-tarefa-titulo" className={field} /><button type="submit" disabled={!title.trim() || create.isPending} className="rounded-full border border-cyan/60 px-4 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">Criar</button></div>
+      <form onSubmit={(e) => { e.preventDefault(); void add(); }} onPaste={files.onPaste} onDrop={files.onDrop} onDragOver={files.onDragOver} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+        <div className="flex gap-2"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Nova tarefa para ${client.name} (ex.: Treinamento)`} aria-label="Nova tarefa do cliente" data-testid="cliente-tarefa-titulo" className={field} /><button type="submit" disabled={!title.trim() || create.isPending || files.busy} className="rounded-full border border-cyan/60 px-4 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">{files.busy ? "Enviando…" : "Criar"}</button></div>
+        <TaskFilePicker files={files} />
         <button type="button" onClick={() => setOpen((o) => !o)} className="text-[0.7rem] text-muted-foreground hover:text-cyan">{open ? "Menos opções" : "Data, hora, categoria e lembrete"}</button>
         {open && (
           <div className="space-y-2">
@@ -419,6 +423,7 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
         <div key={t.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
           <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{t.done && <Check size={12} />}</button>
           <div className="min-w-0 flex-1"><p className={`truncate text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
+            <TaskThumbs files={t.attachments ?? []} title={t.title} />
             <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
         </div>
       ))}
