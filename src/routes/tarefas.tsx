@@ -157,22 +157,37 @@ function TarefasPage() {
   const nDone = shown.filter((t) => t.done).length;
   const visible = showDone ? shown : shown.filter((t) => !t.done || leaving.has(t.id));
   // Semana, mês e todas: agrupa por dia; as tarefas fixas de cada dia viram uma linha só ("Rotina fixa · 2/6"), que abre ao clicar.
-  // filtrando "Clientes": as tarefas ficam separadas por polo, um bloco para cada
-  const clientsCatId = categories.find((c) => c.slug === "clientes" || c.name.trim().toLowerCase() === "clientes")?.id, poloMode = !!cat && cat === clientsCatId;
-  type View = { k: "polo"; name: string; pend: number; total: number } | { k: "head"; date: string; pend: number } | { k: "fixed"; date: string; total: number; done: number; open: boolean } | { k: "row"; row: Row };
+  // "Clientes" é a categoria dos polos: dentro dela, cada polo tem o seu bloco
+  const clientsCatId = categories.find((c) => c.slug === "clientes" || c.name.trim().toLowerCase() === "clientes")?.id;
+  type View = { k: "cat"; name: string; icon: string; color: C; pend: number; total: number } | { k: "polo"; name: string; pend: number; total: number } | { k: "head"; date: string; pend: number } | { k: "fixed"; date: string; total: number; done: number; open: boolean } | { k: "row"; row: Row };
   const rowsView: View[] = useMemo(() => {
-    if (poloMode) return groupByPolo(visible).flatMap((g): View[] => [{ k: "polo", name: g.name, pend: g.pend, total: g.rows.length }, ...g.rows.map((row): View => ({ k: "row", row }))]);
-    if (tab === 0) return visible.map((row): View => ({ k: "row", row }));
+    // dentro de uma categoria: no "Hoje" só a lista; em semana/mês/todas, separada por dia (as fixas de cada dia numa linha só)
+    const byDay = (list: Row[]): View[] => {
+      const out: View[] = [];
+      const dates = [...new Set(list.map((t) => t.date))].sort((a, b) => (a || "9").localeCompare(b || "9"));
+      for (const d of dates) {
+        const mine = list.filter((t) => t.date === d), own = mine.filter((t) => !t.fixed), fx = mine.filter((t) => t.fixed);
+        out.push({ k: "head", date: d, pend: own.filter((t) => !t.done).length });
+        own.forEach((row) => out.push({ k: "row", row }));
+        if (fx.length) { const open = openFixed.has(`${d}`); out.push({ k: "fixed", date: d, total: fx.length, done: fx.filter((t) => t.done).length, open }); if (open) fx.forEach((row) => out.push({ k: "row", row })); }
+      }
+      return out;
+    };
+    // a lista é dividida por categoria (na ordem das categorias); em "Clientes", cada polo tem o seu bloco
+    const groups = new Map<string, Row[]>();
+    for (const r of visible) (groups.get(r.cat) ?? groups.set(r.cat, []).get(r.cat)!).push(r);
+    const order = [...categories.map((c) => c.id), ""].filter((id) => groups.has(id));
+    for (const id of groups.keys()) if (!order.includes(id)) order.push(id);
     const out: View[] = [];
-    const dates = [...new Set(visible.map((t) => t.date))].sort((a, b) => (a || "9").localeCompare(b || "9"));
-    for (const d of dates) {
-      const mine = visible.filter((t) => t.date === d), own = mine.filter((t) => !t.fixed), fx = mine.filter((t) => t.fixed);
-      out.push({ k: "head", date: d, pend: own.filter((t) => !t.done).length });
-      own.forEach((row) => out.push({ k: "row", row }));
-      if (fx.length) { const open = openFixed.has(d); out.push({ k: "fixed", date: d, total: fx.length, done: fx.filter((t) => t.done).length, open }); if (open) fx.forEach((row) => out.push({ k: "row", row })); }
+    for (const id of order) {
+      const rows = groups.get(id)!, c = categories.find((x) => x.id === id);
+      out.push({ k: "cat", name: c?.name ?? "Sem categoria", icon: c?.icon ?? "check", color: (c?.color ?? "cyan") as C, pend: rows.filter((t) => !t.done).length, total: rows.length });
+      if (id === clientsCatId) out.push(...groupByPolo(rows).flatMap((g): View[] => [{ k: "polo", name: g.name, pend: g.pend, total: g.rows.length }, ...g.rows.map((row): View => ({ k: "row", row }))]));
+      else if (tab === 0) rows.forEach((row) => out.push({ k: "row", row }));
+      else out.push(...byDay(rows));
     }
     return out;
-  }, [visible, tab, openFixed, poloMode]);
+  }, [visible, tab, openFixed, categories, clientsCatId]);
   const weekChips = useMemo(() => weekLabels.map((label, i) => {
     const d = addDays(startOfWeek(day, { weekStartsOn: 1 }), i), key = iso(d);
     return { key, label, n: tasks.filter((t) => t.date === key && !t.done).length, today: isSameDay(d, T0), num: format(d, "dd") };
@@ -328,6 +343,13 @@ function TarefasPage() {
             )}
             <ul className="mt-4 divide-y divide-border">
               {rowsView.map((it, i) => {
+                if (it.k === "cat") { const I = getIcon(it.icon); return (
+                  <li key={`c${it.name}`} className="flex items-center gap-2.5 pb-2 pt-6 first:pt-0" data-testid="categoria-grupo" style={{ "--glow": colorVar(it.color) } as React.CSSProperties}>
+                    <I size={18} className="text-[color:var(--glow)]" />
+                    <span className="font-display text-lg font-semibold">{it.name}</span>
+                    <span className="rounded-full bg-[color-mix(in_oklab,var(--glow)_18%,transparent)] px-2 text-[0.7rem] text-[color:var(--glow)]">{it.pend} {it.pend === 1 ? "pendente" : "pendentes"}</span>
+                    <span className="h-px flex-1 bg-border" />
+                  </li>); }
                 if (it.k === "polo") return (
                   <li key={`p${it.name}`} className="flex items-baseline gap-2 pb-1.5 pt-5 first:pt-0" data-testid="polo-grupo">
                     <Building2 size={15} className="self-center text-cyan" />
@@ -365,10 +387,10 @@ function TarefasPage() {
                   </span>
                   <button type="button" onClick={() => { if (!tk.fixed) setEditingId(tk.id); }} aria-label={tk.fixed ? `Tarefa fixa ${tk.t}` : `Editar tarefa ${tk.t}`} className={`min-w-0 text-left ${tk.fixed ? "cursor-default" : ""}`}>
                     <b className={`block truncate text-sm font-semibold transition ${tk.done ? "text-muted-foreground line-through" : ""}`}>{tk.t}</b>
-                    <span className="block truncate text-xs text-muted-foreground">{tk.d}{tk.client && !poloMode && <span className="ml-1.5 text-violet" data-testid="tarefa-cliente">· {tk.client}</span>}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{tk.d}{tk.client && tk.cat !== clientsCatId && <span className="ml-1.5 text-violet" data-testid="tarefa-cliente">· {tk.client}</span>}</span>
                   </button>
                   <span className={`tag hidden sm:inline ${tk.fixed ? "!text-emerald" : ""}`}>{tk.fixed && <Repeat size={10} className="mr-1 inline" />}{tk.tag}</span>
-                  <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{poloMode && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
+                  <span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">{tk.cat === clientsCatId && tk.date && <span className="text-cyan">{format(fromIso(tk.date), "dd/MM")}</span>}<Clock size={13} /> {tk.time}</span>
                   <span className="hidden items-center gap-2 text-muted-foreground sm:flex">
                     {tk.remind?.length ? <span title={`Avisa ${tk.remind.map((m) => beforeWords(m)).join(", ")} antes`} data-testid="tarefa-lembrar-antes" className="flex items-center gap-1 text-[0.65rem] text-cyan"><BellRing size={13} /> {tk.remind.length > 1 ? `${tk.remind.length}×` : beforeWords(tk.remind[0]!)}</span> : <AlarmClock size={15} className="text-[color:var(--glow)]" />}
                     {tk.fixed ? <span title="Tarefa fixa: gerencie em Tarefas fixas" className="opacity-60"><Repeat size={15} className="text-emerald" /></span> : <button aria-label="Excluir tarefa" onClick={() => del.mutate(tk.id, { onError: (e) => toast.error(e.message) })} className="opacity-40 transition hover:text-destructive group-hover:opacity-100"><Trash2 size={15} /></button>}
