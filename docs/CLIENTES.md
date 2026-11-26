@@ -57,3 +57,8 @@ Ao criar ou editar uma tarefa (na ficha do cliente, em Tarefas ou na janela de e
 Na aba **Tarefas** da ficha do cliente, cada tarefa tem **editar** (a mesma janela da página Tarefas: título, categoria, data, hora, lembrete, cliente, anexos) e **excluir** (com confirmação).
 
 O anel de cada cartão de cliente mostra a **porcentagem das tarefas criadas para ele que já foram feitas** (`clientTaskProgress`); sem tarefas aparece "—".
+
+### Clientes: quem precisa de você pelas tarefas
+
+- **Filtro "Quem precisa de você (tarefas)"** na lista de clientes: Atrasadas (data já passou), Para hoje, Com pendentes, Sem tarefas e Em dia, cada um com a contagem. Ao filtrar, os clientes com mais atrasadas vêm primeiro (`clientTaskStats`, `matchesAttention`, `byAttention`).
+- **Caixa de etapa em cada cartão:** as tarefas do cliente são as etapas, na ordem em que foram criadas. O cartão mostra "Etapa atual · 3 de 4", o nome da etapa, uma barrinha com as etapas feitas e "Depois: …" com o que falta. Fica vermelha se há atrasada, azul se está andando e verde quando tudo foi feito (`clientSteps`).

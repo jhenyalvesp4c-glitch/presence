@@ -19,7 +19,7 @@ import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensureClientCategory, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
-import { clientTaskProgress } from "@/lib/client-progress";
+import { byAttention, clientSteps, clientTaskProgress, clientTaskStats, matchesAttention, type Attention } from "@/lib/client-progress";
 import { RemindPicker } from "@/components/RemindPicker";
 import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
 import { beforeWords } from "@/lib/reminders";
@@ -75,7 +75,13 @@ export function ClientsView({ projectId }: { projectId: string }) {
   };
   const trocar = (v: "saude" | "receita") => { setPainel(v); try { localStorage.setItem("presence.clientes.painel", v); } catch { /* sem armazenamento */ } };
   const sel = clients.find((c) => c.id === selId) ?? null;
-  const shown = useMemo(() => { const n = norm(q.trim()); return clients.filter((c) => (filtro === "todos" || c.status === filtro) && (!n || norm([c.name, c.contactName, c.segment, c.email, ...docs.filter((d) => d.clientId === c.id).map((d) => d.title)].join(" ")).includes(n))); }, [clients, filtro, q, docs]);
+  // tarefas de cada cliente: filtro "quem precisa de mim" (atrasadas, hoje, pendentes, sem tarefas, em dia)
+  const allTasks = useTasks().data ?? [], [atencao, setAtencao] = useState<Attention>("todos");
+  const hoje = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const stats = useMemo(() => new Map(clients.map((c) => [c.id, clientTaskStats(allTasks, c.id, hoje)] as const)), [clients, allTasks, hoje]);
+  const baseList = (filtro: "todos" | ClientStatus) => clients.filter((c) => filtro === "todos" || c.status === filtro);
+  const atencaoCount = (a: Attention) => baseList(filtro).filter((c) => matchesAttention(stats.get(c.id)!, a)).length;
+  const shown = useMemo(() => { const n = norm(q.trim()); const list = clients.filter((c) => matchesAttention(stats.get(c.id)!, atencao) && (filtro === "todos" || c.status === filtro) && (!n || norm([c.name, c.contactName, c.segment, c.email, ...docs.filter((d) => d.clientId === c.id).map((d) => d.title)].join(" ")).includes(n))); return atencao === "todos" ? list : [...list].sort((a, b) => byAttention(stats.get(a.id)!, stats.get(b.id)!) || a.name.localeCompare(b.name, "pt-BR")); }, [clients, filtro, q, docs, atencao, stats]);
   const open = demands.filter((d) => d.status !== "done").length, sum = summarize(clients, open);
   const saude = useMemo(() => {
     const last: Record<string, string> = {}, bump = (id: string, d: string | null | undefined) => { if (d && (!last[id] || d > last[id]!)) last[id] = d; };
@@ -88,7 +94,6 @@ export function ClientsView({ projectId }: { projectId: string }) {
   const dossierName = (id: string | null) => dossiers.find((d) => d.id === id)?.name;
   const slices = clients.filter((c) => c.status === "ativo" && c.monthlyValue > 0).map((c) => ({ id: c.id, name: c.name, color: cssColor(colorOf(c.id)), value: c.monthlyValue }));
   // o anel de cada cliente mostra quanto das tarefas criadas para ele já foi feito
-  const allTasks = useTasks().data ?? [];
   const taskProg = (id: string) => clientTaskProgress(allTasks, id);
   const perClient = (id: string) => { const dm = [...demands.filter((d) => d.clientId === id), ...(links[id]?.demands ?? []).filter((d) => !demands.some((x) => x.clientId === id && x.code === d.code))]; return { total: dm.length, done: dm.filter((d) => d.status === "done").length, pct: dm.length ? Math.round((dm.filter((d) => d.status === "done").length / dm.length) * 100) : 0 }; };
 
@@ -161,6 +166,13 @@ export function ClientsView({ projectId }: { projectId: string }) {
           <button onClick={() => setForm({ edit: null })} data-testid="cliente-novo" className="flex items-center gap-1.5 rounded-full border border-cyan/60 px-4 py-2 text-sm text-cyan shadow-[0_0_24px_-10px_var(--cyan)] transition hover:bg-cyan/10"><Plus size={15} /> Novo cliente</button>
         </div>
 
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrar pelas tarefas" data-testid="clientes-atencao">
+          <span className="mr-1 text-xs text-muted-foreground">Quem precisa de você (tarefas):</span>
+          {([["todos", "Todos", ""], ["atrasadas", "Atrasadas", "text-rose-400 border-rose-400/50"], ["hoje", "Para hoje", "text-amber border-amber/50"], ["pendentes", "Com pendentes", "text-cyan border-cyan/50"], ["sem", "Sem tarefas", "text-muted-foreground border-white/20"], ["emdia", "Em dia", "text-emerald border-emerald/50"]] as const).map(([k, l, cls]) => (
+            <button key={k} onClick={() => setAtencao(atencao === k ? "todos" : k)} aria-pressed={atencao === k} data-testid={`atencao-${k}`}
+              className={`rounded-full border px-3 py-1 text-xs transition ${atencao === k ? `bg-white/10 ${cls || "text-foreground border-white/30"}` : "border-white/10 text-muted-foreground hover:text-foreground"}`}>{l} <b className="tabular-nums">{atencaoCount(k)}</b></button>))}
+        </div>
+
         <div className={`grid gap-4 ${sel ? "xl:grid-cols-[minmax(0,1fr)_440px]" : ""}`}>
           <section className={vista === "cards" ? "" : "glass overflow-hidden rounded-3xl animate-rise"} data-testid="clientes-lista">
             {shown.length === 0 ? <p className="glass rounded-3xl p-8 text-center text-sm text-muted-foreground">Nenhum cliente com esse filtro.</p> : vista === "cards" ? (
@@ -178,6 +190,23 @@ export function ClientsView({ projectId }: { projectId: string }) {
                         <div className="mt-3 flex items-end justify-between gap-3"><div><p className="mono-caps">Mensal</p><p className="font-display text-lg font-semibold tabular-nums">{c.monthlyValue ? brl(c.monthlyValue) : "—"}</p></div>
                           <div className="text-right text-xs"><p className="mono-caps">Fim do contrato</p><p className="tabular-nums"><Venc c={c} /></p></div></div>
                         <div className="mt-3"><Meter pct={d.days === null || d.days < 0 ? 100 : Math.max(4, 100 - Math.min(100, (d.days / 365) * 100))} color={d.level === "late" ? "var(--destructive)" : d.level === "soon" ? "var(--amber)" : cssColor(tone)} height={5} warn={false} /></div>
+                        {(() => {
+                          const st = stats.get(c.id)!, sp = clientSteps(allTasks, c.id);
+                          const tone2 = sp.total === 0 ? "border-white/10 bg-white/[0.03]" : sp.current === 0 ? "border-emerald/50 bg-emerald/10" : st.overdue > 0 ? "border-rose-400/60 bg-rose-400/10" : "border-cyan/50 bg-cyan/10";
+                          return (
+                            <div className={`mt-3 rounded-xl border px-3 py-2 ${tone2}`} data-testid="cliente-etapa">
+                              {sp.total === 0 ? <p className="text-[0.72rem] text-muted-foreground">Nenhuma etapa criada. Crie as tarefas deste cliente na ficha.</p> : sp.current === 0 ? (
+                                <p className="text-[0.78rem] font-semibold text-emerald">✓ Todas as {sp.total} etapas feitas</p>
+                              ) : (
+                                <>
+                                  <p className="flex items-center justify-between gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><span>Etapa atual · {sp.current} de {sp.total}</span>{st.overdue > 0 && <span className="rounded-full bg-rose-400/20 px-2 py-0.5 normal-case tracking-normal text-rose-300">{st.overdue} {st.overdue === 1 ? "atrasada" : "atrasadas"}</span>}{st.today > 0 && <span className="rounded-full bg-amber/20 px-2 py-0.5 normal-case tracking-normal text-amber">{st.today} para hoje</span>}</p>
+                                  <p className="mt-0.5 truncate text-sm font-semibold" title={sp.next!.title}>{sp.next!.title}</p>
+                                  <p className="mt-1 flex items-center gap-0.5" aria-hidden>{sp.steps.map((x, k) => <i key={x.id} className={`h-1.5 flex-1 rounded-full ${x.done ? "bg-emerald" : k + 1 === sp.current ? "bg-cyan shadow-[0_0_8px_var(--cyan)]" : "bg-white/15"}`} />)}</p>
+                                  {sp.missing.length > 1 && <p className="mt-1 truncate text-[0.66rem] text-muted-foreground" title={sp.missing.slice(1).map((x) => x.title).join(" · ")}>Depois: {sp.missing.slice(1, 3).map((x) => x.title).join(" · ")}{sp.missing.length > 3 ? ` · +${sp.missing.length - 3}` : ""}</p>}
+                                </>
+                              )}
+                            </div>);
+                        })()}
                         <p className="mt-2 flex gap-3 text-[0.68rem] text-muted-foreground"><span><FileText size={10} className="mr-1 inline" />{nDocs} docs</span><span><ClipboardList size={10} className="mr-1 inline" />{p.total - p.done} abertas</span></p>
                       </button>
                     </Tilt>
