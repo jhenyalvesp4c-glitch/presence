@@ -45,3 +45,5 @@ Senha: ********
 ### Tarefas de clientes
 
 Uma tarefa criada dentro da ficha do cliente (aba Tarefas) fica ligada a ele (`tasks.client_id`) e vai para a categoria **Clientes** das Tarefas (criada na primeira vez), não para "Demandas". Na página Tarefas, o nome do cliente aparece ao lado da tarefa (qualquer projeto: `useAllClients`) e a categoria Clientes separa tudo o que é para os clientes. Ao escolher um cliente ao criar a tarefa por lá, a categoria também vira Clientes (se você não escolheu outra).
+
+Na página Tarefas, ao filtrar a categoria **Clientes**, a lista fica **separada por polo**: um bloco para cada um (ordem alfabética, "Sem polo" no fim), com o nome, quantas tarefas pendentes e, dentro, as tarefas por data (`groupByPolo` em `src/lib/task-polo.ts`).
