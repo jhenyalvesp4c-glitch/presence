@@ -48,3 +48,6 @@ export function useSaveDefaultTemplate() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (v: { titles: string[]; auto: boolean }) => saveTemplate(v.titles, v.auto), onSuccess: () => qc.invalidateQueries({ queryKey: ["client-default-tasks"] }) });
 }
+
+/** Apaga uma tarefa (usado ao deixar um cliente igual ao padrão). */
+export async function deleteTaskById(id: string): Promise<void> { must(await supabase.from("tasks").delete().eq("id", id).select("id")); }

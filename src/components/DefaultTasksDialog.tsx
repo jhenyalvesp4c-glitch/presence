@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { backdropProps } from "@/lib/backdrop";
-import { cleanTemplate } from "@/lib/default-tasks";
-import { clientsWithoutTasks, createDefaultTasks, useDefaultTemplate, useSaveDefaultTemplate } from "@/lib/data/client-default-tasks";
+import { cleanTemplate, planApply } from "@/lib/default-tasks";
+import { clientsWithoutTasks, createDefaultTasks, deleteTaskById, useDefaultTemplate, useSaveDefaultTemplate } from "@/lib/data/client-default-tasks";
 
 /** Tarefas que todo cliente novo ganha (e que dá para editar depois, cliente a cliente, como qualquer tarefa). */
 export function DefaultTasksDialog({ clientIds, onClose }: { clientIds: string[]; onClose: () => void }) {
@@ -58,6 +58,49 @@ export function DefaultTasksDialog({ clientIds, onClose }: { clientIds: string[]
             <p className="text-[0.68rem] text-muted-foreground">Ao aplicar nos clientes que já existem, só entram os que não têm nenhuma tarefa. Salve antes para valer a lista nova.</p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Aplica o padrão num cliente que já tem tarefas: cria as que faltam e deixa escolher quais das tarefas dele que não estão no padrão apagar. */
+export function ApplyDefaultDialog({ client, tasks, onClose }: { client: { id: string; name: string }; tasks: { id: string; title: string; done: boolean }[]; onClose: () => void }) {
+  const tpl = useDefaultTemplate(), qc = useQueryClient(), [drop, setDrop] = useState<Set<string>>(new Set()), [busy, setBusy] = useState(false);
+  if (!tpl.data) return null;
+  const plan = planApply(tpl.data.titles, tasks);
+  const toggle = (id: string) => setDrop((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const apply = async () => {
+    setBusy(true);
+    try {
+      const made = await createDefaultTasks(client.id, { force: true });
+      for (const id of drop) await deleteTaskById(id);
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success(`${client.name}: ${made} ${made === 1 ? "tarefa criada" : "tarefas criadas"}${drop.size ? `, ${drop.size} ${drop.size === 1 ? "apagada" : "apagadas"}` : ""}`);
+      onClose();
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-background/70 p-4 backdrop-blur-sm" {...backdropProps(onClose)} data-testid="aplicar-padrao">
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Aplicar as tarefas padrão" className="glass w-full max-w-md space-y-4 rounded-3xl p-6 animate-rise">
+        <div className="flex items-start gap-3"><h3 className="mr-auto font-display text-lg font-semibold">Aplicar as tarefas padrão em {client.name}</h3><button onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={18} /></button></div>
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-cyan">Vão ser criadas ({plan.toCreate.length})</p>
+          {plan.toCreate.length ? <ul className="space-y-1 text-sm">{plan.toCreate.map((t) => <li key={t} className="rounded-xl bg-cyan/10 px-3 py-1.5">+ {t}</li>)}</ul> : <p className="text-sm text-muted-foreground">Ele já tem todas as tarefas do padrão.</p>}
+        </div>
+        {plan.extras.length > 0 && (
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tarefas dele que não estão no padrão ({plan.extras.length})</p>
+            <p className="mb-1.5 text-[0.72rem] text-muted-foreground">Marque as que você quer <b>apagar</b> para ele ficar igual ao padrão. As não marcadas ficam como estão.</p>
+            <ul className="space-y-1">{plan.extras.map((t) => (
+              <li key={t.id}><label className="flex cursor-pointer items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-1.5 text-sm"><input type="checkbox" checked={drop.has(t.id)} onChange={() => toggle(t.id)} data-testid="apagar-extra" /><span className={`min-w-0 flex-1 truncate ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</span>{t.done && <span className="text-[0.62rem] text-emerald">feita</span>}</label></li>))}
+            </ul>
+            <button type="button" onClick={() => setDrop(new Set(plan.extras.filter((t) => !t.done).map((t) => t.id)))} className="mt-1.5 text-[0.7rem] text-muted-foreground underline-offset-2 hover:text-cyan hover:underline">Marcar todas as que ainda não foram feitas</button>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="rounded-full border border-border px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancelar</button>
+          <button onClick={() => void apply()} disabled={busy || (plan.toCreate.length === 0 && drop.size === 0)} data-testid="aplicar-padrao-ok" className="rounded-full bg-gradient-brand px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Aplicando…" : "Aplicar"}</button>
+        </div>
       </div>
     </div>
   );

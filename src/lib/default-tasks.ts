@@ -17,3 +17,9 @@ export const missingTitles = (template: string[], existing: string[]): string[] 
 
 /** Limpa o que a pessoa editou: tira vazios e repetidos, mantém a ordem. */
 export const cleanTemplate = (titles: string[]): string[] => missingTitles(titles, []).map((t) => t.slice(0, 200));
+
+/** O que acontece ao aplicar o padrão num cliente que já tem tarefas: o que será criado e quais tarefas dele não estão no padrão. */
+export function planApply<T extends { title: string }>(template: string[], existing: T[]): { toCreate: string[]; extras: T[] } {
+  const inTemplate = new Set(template.map(norm).filter(Boolean));
+  return { toCreate: missingTitles(template, existing.map((e) => e.title)), extras: existing.filter((e) => !inTemplate.has(norm(e.title))) };
+}

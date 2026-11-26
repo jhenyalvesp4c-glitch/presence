@@ -19,7 +19,7 @@ import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensureClientCategory, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
-import { DefaultTasksDialog } from "@/components/DefaultTasksDialog";
+import { ApplyDefaultDialog, DefaultTasksDialog } from "@/components/DefaultTasksDialog";
 import { createDefaultTasks } from "@/lib/data/client-default-tasks";
 import { byAttention, clientSteps, clientTaskProgress, clientTaskStats, matchesAttention, type Attention } from "@/lib/client-progress";
 import { RemindPicker } from "@/components/RemindPicker";
@@ -429,7 +429,7 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 
 /** Tarefas, compromissos, treinamentos e implantações ligados ao cliente — e um jeito rápido de criar mais, já vinculadas. */
 function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
-  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], [editing, setEditing] = useState<Task | null>(null);
+  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], [editing, setEditing] = useState<Task | null>(null), [applying, setApplying] = useState(false);
   const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false);
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
@@ -477,6 +477,8 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
           onSave={(patch) => update.mutate({ id: editing.id, patch }, { onSuccess: () => { setEditing(null); toast.success("Tarefa atualizada"); }, onError: (e) => toast.error((e as Error).message) })}
           onDelete={() => { if (window.confirm(`Excluir a tarefa "${editing.title}"?`)) del.mutate(editing.id, { onSuccess: () => { setEditing(null); toast.success("Tarefa excluída"); }, onError: (e) => toast.error((e as Error).message) }); }} />
       )}
+      {tasks.length > 0 && <button type="button" onClick={() => setApplying(true)} data-testid="aplicar-tarefas-padrao" className="mx-auto flex items-center gap-1.5 rounded-full border border-cyan/50 px-4 py-1.5 text-xs text-cyan transition hover:bg-cyan/10"><ListChecks size={13} /> Aplicar as tarefas padrão</button>}
+      {applying && <ApplyDefaultDialog client={client} tasks={tasks.map((t) => ({ id: t.id, title: t.title, done: t.done }))} onClose={() => setApplying(false)} />}
       <Link to="/tarefas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as tarefas</Link>
     </div>
   );

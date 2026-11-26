@@ -14,3 +14,18 @@ describe("Tarefas padrão dos clientes", () => {
     expect(cleanTemplate(["x".repeat(300)])[0]).toHaveLength(200);
   });
 });
+
+import { planApply } from "@/lib/default-tasks";
+
+describe("Aplicar o padrão num cliente que já tem tarefas", () => {
+  const existing = [{ id: "1", title: "Criar usuários" }, { id: "2", title: "Implementar configurações no CRM" }, { id: "3", title: "ENVIAR os acessos ao gestor" }];
+  it("cria só o que falta e mostra as do cliente que não estão no padrão", () => {
+    const p = planApply(SEED_DEFAULT_TASKS, existing);
+    expect(p.toCreate).toEqual(["Realizar a implantação das configurações", "Perguntar quais são os gestores e vendedores"]);
+    expect(p.extras.map((e) => e.id)).toEqual(["2"]);
+  });
+  it("cliente igual ao padrão: nada a criar e nada sobrando", () => {
+    const p = planApply(SEED_DEFAULT_TASKS, SEED_DEFAULT_TASKS.map((title, i) => ({ id: String(i), title })));
+    expect(p).toEqual({ toCreate: [], extras: [] });
+  });
+});
