@@ -17,7 +17,8 @@ import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/chart
 import { PortfolioHealth } from "@/components/PortfolioHealth";
 import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
-import { ensureClientCategory, useCategories, useCreateTask, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { ensureClientCategory, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
+import { TaskEditDialog } from "@/components/TaskEditDialog";
 import { RemindPicker } from "@/components/RemindPicker";
 import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
 import { beforeWords } from "@/lib/reminders";
@@ -29,7 +30,7 @@ import { ClientsPreview } from "@/components/ClientsPreview";
 import { SetupSummary } from "@/components/SetupGuide";
 import { MAX_PENDING, readPending, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { signedUrls } from "@/lib/data/brain";
-import { useClientActions, useClientExtras, useClientLinks, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
+import { useAllClients, useClientActions, useClientExtras, useClientLinks, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
 import { DOC_KINDS, STATUS_LABEL, STATUS_TONE, brl, dateBR, dueOf, quickAnswer, summarize, todayBR, type Client, type ClientStatus, type QuickAnswer } from "@/lib/clients";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -391,7 +392,7 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 
 /** Tarefas, compromissos, treinamentos e implantações ligados ao cliente — e um jeito rápido de criar mais, já vinculadas. */
 function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
-  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles();
+  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], [editing, setEditing] = useState<Task | null>(null);
   const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false);
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
@@ -425,8 +426,15 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
           <div className="min-w-0 flex-1"><p className={`truncate text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
             <TaskThumbs files={t.attachments ?? []} title={t.title} />
             <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
+          <button type="button" onClick={() => setEditing(t)} aria-label={`Editar ${t.title}`} data-testid="cliente-tarefa-editar" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
+          <button type="button" onClick={() => { if (window.confirm(`Excluir a tarefa "${t.title}"?`)) del.mutate(t.id, { onSuccess: () => toast.success("Tarefa excluída"), onError: (e) => toast.error((e as Error).message) }); }} aria-label={`Excluir ${t.title}`} data-testid="cliente-tarefa-excluir" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
         </div>
       ))}
+      {editing && (
+        <TaskEditDialog task={editing} categories={cats} clients={allClients} saving={update.isPending} onClose={() => setEditing(null)}
+          onSave={(patch) => update.mutate({ id: editing.id, patch }, { onSuccess: () => { setEditing(null); toast.success("Tarefa atualizada"); }, onError: (e) => toast.error((e as Error).message) })}
+          onDelete={() => { if (window.confirm(`Excluir a tarefa "${editing.title}"?`)) del.mutate(editing.id, { onSuccess: () => { setEditing(null); toast.success("Tarefa excluída"); }, onError: (e) => toast.error((e as Error).message) }); }} />
+      )}
       <Link to="/tarefas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as tarefas</Link>
     </div>
   );

@@ -53,3 +53,5 @@ A lista de Tarefas é **dividida por categoria** (Clientes, Demandas, Autocuidad
 ### Imagens e arquivos nas tarefas
 
 Ao criar ou editar uma tarefa (na ficha do cliente, em Tarefas ou na janela de editar) dá para **anexar imagens e arquivos**: botão "Anexar imagem ou arquivo", **colar um print (Ctrl+V)** ou **arrastar** para a área. Os arquivos vão para o Storage (pasta `tarefas`, até 8 por vez e 25 MB cada) e ficam em `tasks.attachments`. Na lista aparecem as miniaturas (até 4); tocar abre em tela cheia (`TaskFiles.tsx`).
+
+Na aba **Tarefas** da ficha do cliente, cada tarefa tem **editar** (a mesma janela da página Tarefas: título, categoria, data, hora, lembrete, cliente, anexos) e **excluir** (com confirmação).
