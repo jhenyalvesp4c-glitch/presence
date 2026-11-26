@@ -14,12 +14,12 @@ import { ptBR } from "date-fns/locale";
 import { fromIsoDate as fromIso, hhmm, isoDate as iso } from "@/lib/dates";
 import { getIcon } from "@/lib/icons";
 import type { Color, Priority } from "@/lib/types";
-import { useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
+import { ensureClientCategory, useCategories, useCreateCategory, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
 import { RemindPicker } from "@/components/RemindPicker";
 import { beforeWords } from "@/lib/reminders";
-import { useClients } from "@/lib/data/clients";
-import { defaultProjectId } from "@/lib/dossiers";
+import { useAllClients } from "@/lib/data/clients";
+import { useQueryClient } from "@tanstack/react-query";
 import { ListsView } from "@/components/lists/ListsView";
 import { FixedTasksPanel } from "@/components/FixedTasksPanel";
 import { useFixedActions, useFixedDone, useFixedTasks } from "@/lib/data/fixed-tasks";
@@ -76,7 +76,7 @@ function TarefasPage() {
   const [newRemind, setNewRemind] = useState<number[]>([]);
   const [newClient, setNewClient] = useState("");
   const [dayFilter, setDayFilter] = useState<string | null>(null), [openFixed, setOpenFixed] = useState<Set<string>>(new Set());
-  const clientsQ = useClients(defaultProjectId()), clientList = clientsQ.data ?? [];
+  const qc = useQueryClient(), clientsQ = useAllClients(), clientList = clientsQ.data ?? [];
   const clientName = useMemo(() => new Map(clientList.map((c) => [c.id, c.name])), [clientList]);
   const [day, setDay] = useState<Date>(T0);
   const [newDate, setNewDate] = useState<Date | undefined>();
@@ -183,6 +183,12 @@ function TarefasPage() {
   });
   const dayPrios = dayTasks.filter((t) => !t.done).sort((a, b) => RANK[a.priority] - RANK[b.priority]).slice(0, 3);
 
+  // escolher um cliente leva a tarefa para a categoria "Clientes" (se você ainda não escolheu outra)
+  const pickClient = (id: string) => {
+    setNewClient(id);
+    if (!id || newCat) return;
+    void ensureClientCategory().then((cid) => { setNewCat(cid); void qc.invalidateQueries({ queryKey: ["categories"] }); }).catch(() => undefined);
+  };
   const add = () => {
     if (!title.trim() || createTask.isPending) return;
     createTask.mutate(
@@ -405,7 +411,7 @@ function TarefasPage() {
               </Popover>
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full min-w-0 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none [color-scheme:dark] focus:border-violet" />
               </div>
-              {clientList.length > 0 && <select value={newClient} onChange={(e) => setNewClient(e.target.value)} aria-label="Cliente" data-testid="nova-tarefa-cliente" className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-violet"><option value="" className="bg-popover">Sem cliente</option>{clientList.map((c) => <option key={c.id} value={c.id} className="bg-popover">Cliente: {c.name}</option>)}</select>}
+              {clientList.length > 0 && <select value={newClient} onChange={(e) => pickClient(e.target.value)} aria-label="Cliente" data-testid="nova-tarefa-cliente" className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm outline-none focus:border-violet"><option value="" className="bg-popover">Sem cliente</option>{clientList.map((c) => <option key={c.id} value={c.id} className="bg-popover">Cliente: {c.name}</option>)}</select>}
               <div><p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground"><BellRing size={12} /> Lembrar antes {!time && <span className="text-amber">(escolha a hora)</span>}</p><RemindPicker value={newRemind} onChange={setNewRemind} disabled={!time} /></div>
               <button type="button" onClick={() => setNewPrio(prioNext[newPrio])} className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-left text-sm text-muted-foreground transition hover:border-violet"><Flag size={14} style={{ color: newPrio === "alta" ? colorVar("rose") : newPrio === "baixa" ? colorVar("emerald") : undefined }} /> {prioLabel[newPrio]}</button>
               <button onClick={add} disabled={createTask.isPending} className="shine flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_0_30px_-8px_var(--cyan)] transition hover:scale-[1.02] disabled:opacity-60">

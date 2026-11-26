@@ -16,6 +16,9 @@ const toRow = (c: Omit<Client, "id"> & { id?: string | undefined }) => ({
 const KEY = ["clients"] as const;
 export const useClients = (projectId: string) => useQuery({ queryKey: [...KEY, projectId], queryFn: async () => (must(await supabase.from("clients").select(CCOLS).eq("project_id", projectId).order("name")) as CRow[]).map(toClient) });
 
+/** Todos os clientes do dono (qualquer projeto): para ligar tarefas a um cliente e mostrar o nome dele. */
+export const useAllClients = () => useQuery({ queryKey: [...KEY, "all"], queryFn: async () => must(await supabase.from("clients").select("id, name").order("name")) as { id: string; name: string }[] });
+
 /** Dossiês do projeto (para vincular o cliente). */
 export const useProjectDossiers = (projectId: string) => useQuery({ queryKey: ["client-dossiers", projectId], queryFn: async () => must(await supabase.from("dossiers").select("id, name").eq("project_id", projectId).order("position")) as { id: string; name: string }[] });
 

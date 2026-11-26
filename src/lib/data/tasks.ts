@@ -170,6 +170,15 @@ export async function ensureDemandCategory(): Promise<string> {
   return (must(await supabase.from("task_categories").insert({ name: "Demandas", color: "violet", icon: "layers", slug: "demandas", position: last + 1 }).select("id").single()) as { id: string }).id;
 }
 
+/** A categoria "Clientes" das Tarefas: tudo o que se faz para os clientes/polos (cria na primeira vez; se já existir uma com esse nome, usa ela). */
+export async function ensureClientCategory(): Promise<string> {
+  const all = must(await supabase.from("task_categories").select("id, slug, name, position")) as { id: string; slug: string; name: string; position: number }[];
+  const hit = all.find((c) => c.slug === "clientes" || c.name.trim().toLowerCase() === "clientes");
+  if (hit) return hit.id;
+  const last = all.reduce((m, c) => Math.max(m, c.position), 0);
+  return (must(await supabase.from("task_categories").insert({ name: "Clientes", color: "cyan", icon: "laptop", slug: "clientes", position: last + 1 }).select("id").single()) as { id: string }).id;
+}
+
 /** Coloca a demanda na lista de Tarefas (uma vez só: se já existe, devolve a existente). */
 export async function addDemandAsTask(projectId: string, d: Demand): Promise<{ id: string; created: boolean }> {
   const have = must(await supabase.from("tasks").select("id").eq("project_id", projectId).eq("demand_code", d.id).limit(1)) as { id: string }[];

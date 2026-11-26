@@ -17,7 +17,7 @@ import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/chart
 import { PortfolioHealth } from "@/components/PortfolioHealth";
 import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCategories, useCreateTask, useTasks, useToggleTask } from "@/lib/data/tasks";
+import { ensureClientCategory, useCategories, useCreateTask, useTasks, useToggleTask } from "@/lib/data/tasks";
 import { RemindPicker } from "@/components/RemindPicker";
 import { beforeWords } from "@/lib/reminders";
 import type { Task } from "@/lib/types";
@@ -390,24 +390,26 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 
 /** Tarefas, compromissos, treinamentos e implantações ligados ao cliente — e um jeito rápido de criar mais, já vinculadas. */
 function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
-  const create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [];
+  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [];
   const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false);
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
-  const add = () => {
+  // sem categoria escolhida, a tarefa vai para "Clientes" (não para "Demandas"): assim, nas Tarefas, dá para separar tudo o que é para os clientes
+  const add = async () => {
     if (!title.trim() || create.isPending) return;
-    create.mutate({ title: title.trim(), category_id: cat || null, due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
-      { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); toast.success("Tarefa criada neste cliente"); }, onError: (e) => toast.error((e as Error).message) });
+    const category_id = cat || (await ensureClientCategory().catch(() => null));
+    create.mutate({ title: title.trim(), category_id, due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
+      { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); void qc.invalidateQueries({ queryKey: ["categories"] }); toast.success(`Tarefa criada em Clientes · ${client.name}`); }, onError: (e) => toast.error((e as Error).message) });
   };
   return (
     <div className="space-y-2" data-testid="cliente-tarefas">
-      <form onSubmit={(e) => { e.preventDefault(); add(); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+      <form onSubmit={(e) => { e.preventDefault(); void add(); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
         <div className="flex gap-2"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Nova tarefa para ${client.name} (ex.: Treinamento)`} aria-label="Nova tarefa do cliente" data-testid="cliente-tarefa-titulo" className={field} /><button type="submit" disabled={!title.trim() || create.isPending} className="rounded-full border border-cyan/60 px-4 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">Criar</button></div>
         <button type="button" onClick={() => setOpen((o) => !o)} className="text-[0.7rem] text-muted-foreground hover:text-cyan">{open ? "Menos opções" : "Data, hora, categoria e lembrete"}</button>
         {open && (
           <div className="space-y-2">
             <div className="flex gap-2"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Data" className={field} /><input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Hora" className={field} /></div>
-            <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={`${field} w-full`}><option value="" className="bg-popover">Sem categoria</option>{cats.map((x) => <option key={x.id} value={x.id} className="bg-popover">{x.name}</option>)}</select>
+            <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={`${field} w-full`}><option value="" className="bg-popover">Clientes (padrão)</option>{cats.map((x) => <option key={x.id} value={x.id} className="bg-popover">{x.name}</option>)}</select>
             <div><p className="mb-1 text-[0.7rem] text-muted-foreground">Lembrar antes {(!date || !time) && "(precisa de data e hora)"}</p><RemindPicker value={remind} onChange={setRemind} disabled={!date || !time} /></div>
           </div>
         )}
