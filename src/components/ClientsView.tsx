@@ -19,6 +19,7 @@ import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensureClientCategory, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
+import { clientTaskProgress } from "@/lib/client-progress";
 import { RemindPicker } from "@/components/RemindPicker";
 import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
 import { beforeWords } from "@/lib/reminders";
@@ -86,6 +87,9 @@ export function ClientsView({ projectId }: { projectId: string }) {
   }, [clients, ex, links, demands, setupsQ.data]);
   const dossierName = (id: string | null) => dossiers.find((d) => d.id === id)?.name;
   const slices = clients.filter((c) => c.status === "ativo" && c.monthlyValue > 0).map((c) => ({ id: c.id, name: c.name, color: cssColor(colorOf(c.id)), value: c.monthlyValue }));
+  // o anel de cada cliente mostra quanto das tarefas criadas para ele já foi feito
+  const allTasks = useTasks().data ?? [];
+  const taskProg = (id: string) => clientTaskProgress(allTasks, id);
   const perClient = (id: string) => { const dm = [...demands.filter((d) => d.clientId === id), ...(links[id]?.demands ?? []).filter((d) => !demands.some((x) => x.clientId === id && x.code === d.code))]; return { total: dm.length, done: dm.filter((d) => d.status === "done").length, pct: dm.length ? Math.round((dm.filter((d) => d.status === "done").length / dm.length) * 100) : 0 }; };
 
   const perguntar = (t: string) => { setAsk(t); const a = quickAnswer(t, { clients, docs, demands }); setAnswer(a ?? { title: "Ainda não sei responder isso por aqui", lines: ["Tente: vencimentos, demandas abertas, receita ou “contrato do <cliente>”. Para perguntas livres, use o assistente do Orion."] }); };
@@ -169,7 +173,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
                         <div className="flex items-start gap-3">
                           <span className="icon-tile h-11 w-11 shrink-0 !rounded-2xl text-sm font-bold shadow-[0_0_20px_-6px_var(--glow)]" style={tint(tone)}>{ini(c.name)}</span>
                           <div className="min-w-0 flex-1"><p className="truncate font-display text-base font-semibold">{c.name}</p><p className="truncate text-xs text-muted-foreground">{c.contactName || "sem contato"}{c.segment && ` · ${c.segment}`}</p><div className="mt-1.5 flex flex-wrap gap-1.5"><StatusTag s={c.status} />{dossierName(c.dossierId) && <span className="tag !py-0.5 !text-[0.7rem]" style={tint("violet")}><Link2 size={9} className="mr-1 inline" />{dossierName(c.dossierId)}</span>}</div></div>
-                          <Ring pct={p.pct} color={cssColor(tone)} size={54} thickness={5}><span className="text-[0.62rem] font-semibold tabular-nums">{p.total ? `${p.pct}%` : "—"}</span></Ring>
+                          <span title={taskProg(c.id).total ? `${taskProg(c.id).done} de ${taskProg(c.id).total} tarefas feitas` : "Nenhuma tarefa criada para este cliente"} data-testid="cliente-progresso"><Ring pct={taskProg(c.id).pct} color={cssColor(tone)} size={54} thickness={5}><span className="text-[0.62rem] font-semibold tabular-nums">{taskProg(c.id).total ? `${taskProg(c.id).pct}%` : "—"}</span></Ring></span>
                         </div>
                         <div className="mt-3 flex items-end justify-between gap-3"><div><p className="mono-caps">Mensal</p><p className="font-display text-lg font-semibold tabular-nums">{c.monthlyValue ? brl(c.monthlyValue) : "—"}</p></div>
                           <div className="text-right text-xs"><p className="mono-caps">Fim do contrato</p><p className="tabular-nums"><Venc c={c} /></p></div></div>
