@@ -66,3 +66,5 @@ O anel de cada cartão de cliente mostra a **porcentagem das tarefas criadas par
 ### Tarefas padrão dos clientes
 
 O botão **Tarefas padrão** (na lista de clientes) abre o modelo: as tarefas que **todo cliente novo ganha**, na ordem (a ordem de criação é a ordem das etapas). Dá para editar o texto, mudar a ordem, apagar, acrescentar e ligar/desligar "criar automaticamente". Depois de criadas, são tarefas normais do cliente: cada uma se edita ou se exclui na ficha. Sem nada salvo, vale o modelo que já vem com o Orion. O botão **"Criar nos clientes que ainda não têm tarefas"** aplica nos clientes que já existem (só os que não têm nenhuma); na ficha de um cliente sem tarefas há **"Criar as tarefas padrão"**. Não repete tarefa que o cliente já tem. Tabela `client_default_tasks` (RLS por dono).
+
+O mesmo modelo também fica em **Documentação → Playbooks**, no cartão **"Tarefas padrão do cliente"** (abre a mesma janela do botão "Tarefas padrão" em Clientes).

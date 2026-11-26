@@ -11,6 +11,9 @@ import { addDays } from "@/lib/central";
 import { buildPlan, sanitizeSteps, stepsKey, summarizePlan, type Playbook, type PlaybookStep, type RunInput, type StepKind } from "@/lib/playbooks";
 import { runPlaybook, type RunResult } from "@/lib/data/playbooks";
 import { SetupTemplateEditor } from "@/components/SetupTemplateEditor";
+import { DefaultTasksDialog } from "@/components/DefaultTasksDialog";
+import { useDefaultTemplate } from "@/lib/data/client-default-tasks";
+import { useClients } from "@/lib/data/clients";
 import { PlaybookEditor } from "@/components/PlaybookEditor";
 import { usePlaybooks } from "@/lib/data/user-playbooks";
 import { useSetupTemplate } from "@/lib/data/setup-templates";
@@ -19,7 +22,7 @@ const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
 const BLANK: RunInput = { clientName: "", contactName: "", email: "", phone: "", monthlyValue: 0, contractEnd: null, start: todayBR() };
 
 export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { projectId: string; onOpenClients: () => void; onOpenLibrary: () => void }) {
-  const [run, setRun] = useState<Playbook | null>(null), [editTpl, setEditTpl] = useState(false), tpl = useSetupTemplate(projectId);
+  const [run, setRun] = useState<Playbook | null>(null), [editTpl, setEditTpl] = useState(false), [editTasks, setEditTasks] = useState(false), tpl = useSetupTemplate(projectId), tasksTpl = useDefaultTemplate(), clients = useClients(projectId).data ?? [];
   const pbs = usePlaybooks().data ?? [], [edit, setEdit] = useState<Playbook | "novo" | null>(null);
   const nPh = tpl.data?.phases.length ?? 7, nSt = (tpl.data?.phases ?? []).reduce((a, p) => a + p.steps.length, 0) || 29;
   return (
@@ -49,10 +52,18 @@ export function PlaybooksView({ projectId, onOpenClients, onOpenLibrary }: { pro
             <p className="mt-4 flex items-center gap-2 text-sm text-violet"><Pencil size={14} /> Editar padrão</p>
           </button>
         </Tilt>
+        <Tilt max={8}>
+          <button onClick={() => setEditTasks(true)} data-testid="tarefas-padrao-editar" className="ex-card block w-full p-5 text-left" style={{ "--rail": "var(--cyan)" } as CSSProperties}>
+            <div className="flex items-start gap-4"><span className="icon-tile h-14 w-14 shrink-0 !rounded-2xl shadow-[0_0_28px_-6px_var(--glow)]" style={tint("cyan")}><ClipboardList size={24} /></span><div className="min-w-0"><p className="mono-caps">{tasksTpl.data?.saved ? "Padrão salvo" : "Modelo inicial"}</p><h3 className="font-display text-xl font-semibold">Tarefas padrão do cliente</h3><p className="mt-1 text-xs text-muted-foreground">As tarefas que todo cliente novo recebe (implantar, enviar acessos, criar usuários…). Depois você edita em cada cliente. É o mesmo modelo do botão “Tarefas padrão” em Clientes.</p></div></div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-center">{[["Tarefas", tasksTpl.data?.titles.length ?? 0], ["Criar sozinho", tasksTpl.data?.auto === false ? "não" : "sim"]].map(([l, n]) => <div key={String(l)} className="rounded-xl border border-white/10 bg-black/20 py-2"><p className="font-display text-lg font-semibold tabular-nums">{String(n)}</p><p className="text-[0.6rem] text-muted-foreground">{String(l)}</p></div>)}</div>
+            <p className="mt-4 flex items-center gap-2 text-sm text-cyan"><Pencil size={14} /> Editar padrão</p>
+          </button>
+        </Tilt>
         <button type="button" onClick={() => setEdit("novo")} data-testid="playbook-novo" className="group grid min-h-[12rem] place-items-center rounded-[1.25rem] border border-dashed border-white/15 p-5 text-center text-xs text-muted-foreground transition hover:-translate-y-0.5 hover:border-cyan/50 hover:text-foreground active:scale-[.99]"><span><span className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full border border-white/15 text-cyan transition group-hover:scale-110 group-hover:shadow-[0_0_20px_-4px_var(--cyan)]"><Plus size={18} /></span><b className="block text-sm text-foreground">Novo playbook</b>Fechamento do mês, renovação, projeto… Monte o seu, ou diga o processo ao Orion.</span></button>
       </div>
       {edit && <PlaybookEditor key={edit === "novo" ? "novo" : edit.id} playbook={edit === "novo" ? null : edit} onClose={() => setEdit(null)} />}
       {editTpl && <SetupTemplateEditor projectId={projectId} onClose={() => setEditTpl(false)} />}
+      {editTasks && <DefaultTasksDialog clientIds={clients.map((c) => c.id)} onClose={() => setEditTasks(false)} />}
       {run && <RunDialog key={run.id} playbook={run} projectId={projectId} onClose={() => setRun(null)} onOpenClients={() => { setRun(null); onOpenClients(); }} onOpenLibrary={() => { setRun(null); onOpenLibrary(); }} />}
     </div>
   );
