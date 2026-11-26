@@ -21,10 +21,20 @@ export const byAttention = (a: TaskStats, b: TaskStats): number => b.overdue - a
 
 export type Step = { id: string; title: string; done: boolean; due?: string | null | undefined };
 export type ClientSteps = { steps: Step[]; total: number; done: number; /** posição (1…n) da etapa atual; 0 se não há etapas ou tudo foi feito. */ current: number; next: Step | null; missing: Step[] };
-type StepTask = { id: string; title: string; client_id?: string | null | undefined; done: boolean; due_date?: string | null | undefined; created_at?: string | undefined };
+type StepTask = { id: string; title: string; client_id?: string | null | undefined; done: boolean; due_date?: string | null | undefined; created_at?: string | undefined; client_order?: number | null | undefined };
+
+/** Ordem das tarefas de um cliente: a que a pessoa montou (client_order); sem ela, a ordem de criação. Tarefas novas (sem ordem) ficam no fim. */
+export function orderClientTasks<T extends { title: string; created_at?: string | undefined; client_order?: number | null | undefined }>(list: T[]): T[] {
+  return [...list].sort((a, b) => (a.client_order ?? Number.MAX_SAFE_INTEGER) - (b.client_order ?? Number.MAX_SAFE_INTEGER) || (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.title.localeCompare(b.title));
+}
+/** Move o item de `from` para `to` (índices da lista). */
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+  const n = [...list]; const [x] = n.splice(from, 1); n.splice(to, 0, x!); return n;
+}
 /** As etapas de um cliente são as tarefas dele, na ordem em que foram criadas: a atual é a primeira que ainda não foi feita. */
 export function clientSteps(tasks: StepTask[], clientId: string): ClientSteps {
-  const steps = tasks.filter((t) => t.client_id === clientId).sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.title.localeCompare(b.title))
+  const steps = orderClientTasks(tasks.filter((t) => t.client_id === clientId))
     .map((t): Step => ({ id: t.id, title: t.title, done: t.done, due: t.due_date ?? null }));
   const idx = steps.findIndex((s) => !s.done), missing = steps.filter((s) => !s.done);
   return { steps, total: steps.length, done: steps.length - missing.length, current: idx >= 0 ? idx + 1 : 0, next: idx >= 0 ? steps[idx]! : null, missing };

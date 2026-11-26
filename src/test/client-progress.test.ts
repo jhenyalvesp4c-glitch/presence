@@ -34,3 +34,22 @@ describe("Etapa atual de cada cliente e filtro de atenção", () => {
     expect([b, a, z].sort(byAttention)).toEqual([a, b, z]);
   });
 });
+
+import { moveItem, orderClientTasks } from "@/lib/client-progress";
+
+describe("Ordem das tarefas do cliente", () => {
+  const t = (id: string, created: string, order?: number | null) => ({ id, title: id, created_at: created, client_order: order ?? null, client_id: "a", done: false });
+  it("sem ordem manual vale a de criação; com ordem manual vale a que você montou; as novas ficam no fim", () => {
+    expect(orderClientTasks([t("c", "3"), t("a", "1"), t("b", "2")]).map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(orderClientTasks([t("a", "1", 2), t("b", "2", 0), t("c", "3", 1), t("nova", "9")]).map((x) => x.id)).toEqual(["b", "c", "a", "nova"]);
+  });
+  it("a etapa atual segue a ordem manual", () => {
+    const tasks = [t("a", "1", 1), t("b", "2", 0), t("c", "3", 2)];
+    expect(clientSteps(tasks, "a").next!.id).toBe("b");
+  });
+  it("move um item para cima ou para baixo sem mexer nos outros", () => {
+    expect(moveItem(["a", "b", "c", "d"], 3, 1)).toEqual(["a", "d", "b", "c"]);
+    expect(moveItem(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
+    expect(moveItem(["a", "b"], 0, 5)).toEqual(["a", "b"]);
+  });
+});

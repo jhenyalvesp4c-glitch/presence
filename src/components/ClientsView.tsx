@@ -10,18 +10,18 @@ import { toast } from "sonner";
 import { ClipboardCopy, Gavel, ListChecks, MessagesSquare, Mic } from "lucide-react";
 import { copyText } from "@/lib/clipboard";
 import { analysisToMarkdown } from "@/lib/meetings";
-import { Building2, CalendarClock, Check, ClipboardList, Copy, Eye, EyeOff, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Building2, CalendarClock, Check, ClipboardList, Copy, Eye, EyeOff, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
 import { PortfolioHealth } from "@/components/PortfolioHealth";
 import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
-import { ensureClientCategory, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
+import { ensureClientCategory, nextClientOrder, saveClientOrder, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
 import { TaskEditDialog } from "@/components/TaskEditDialog";
 import { ApplyDefaultDialog, DefaultTasksDialog } from "@/components/DefaultTasksDialog";
 import { createDefaultTasks } from "@/lib/data/client-default-tasks";
-import { byAttention, clientSteps, clientTaskProgress, clientTaskStats, matchesAttention, type Attention } from "@/lib/client-progress";
+import { byAttention, clientSteps, clientTaskProgress, clientTaskStats, matchesAttention, moveItem, orderClientTasks, type Attention } from "@/lib/client-progress";
 import { RemindPicker } from "@/components/RemindPicker";
 import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
 import { beforeWords } from "@/lib/reminders";
@@ -296,7 +296,7 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
   // os acessos criados aqui (id "a-…") já aparecem na lista de acessos; aqui ficam só os cadastrados na Documentação
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const logins = useMemo(() => (dossierName ? loginsOfDossier(dossierName).filter((l) => !l.id.startsWith("a-")) : []), [dossierName, loginTick]);
-  const tasksQ = useTasks(), clientTasks = useMemo(() => (tasksQ.data ?? []).filter((t) => t.client_id === c.id).sort((a, b) => Number(a.done) - Number(b.done) || `${a.due_date ?? "9"}${a.due_time ?? ""}`.localeCompare(`${b.due_date ?? "9"}${b.due_time ?? ""}`)), [tasksQ.data, c.id]);
+  const tasksQ = useTasks(), clientTasks = useMemo(() => orderClientTasks((tasksQ.data ?? []).filter((t) => t.client_id === c.id)), [tasksQ.data, c.id]);
   const [confirm, setConfirm] = useState(false), tone = colorOf(c.id);
   const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["tar", `Tarefas (${clientTasks.filter((t) => !t.done).length})`, ListChecks], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
   return (
@@ -429,7 +429,8 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 
 /** Tarefas, compromissos, treinamentos e implantações ligados ao cliente — e um jeito rápido de criar mais, já vinculadas. */
 function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
-  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], [editing, setEditing] = useState<Task | null>(null), [applying, setApplying] = useState(false);
+  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], [editing, setEditing] = useState<Task | null>(null), [applying, setApplying] = useState(false), [dragId, setDragId] = useState<string | null>(null);
+  const move = (from: number, to: number) => { const ids = moveItem(tasks, from, to).map((t) => t.id); if (ids.join() === tasks.map((t) => t.id).join()) return; void saveClientOrder(ids).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch((e: Error) => toast.error(e.message)); };
   const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false);
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
@@ -439,7 +440,8 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
     const category_id = cat || (await ensureClientCategory().catch(() => null));
     let attachments: Awaited<ReturnType<typeof files.upload>> = [];
     try { attachments = await files.upload(); } catch (e) { toast.error(`Não consegui enviar o arquivo: ${(e as Error).message}`); return; }
-    create.mutate({ title: title.trim(), category_id, ...(attachments.length ? { attachments } : {}), due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
+    const client_order = await nextClientOrder(client.id).catch(() => null);
+    create.mutate({ title: title.trim(), category_id, ...(client_order !== null ? { client_order } : {}), ...(attachments.length ? { attachments } : {}), due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
       { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); files.clear(); void qc.invalidateQueries({ queryKey: ["categories"] }); toast.success(`Tarefa criada em Clientes · ${client.name}`); }, onError: (e) => toast.error((e as Error).message) });
   };
   return (
@@ -462,12 +464,17 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
           <button type="button" data-testid="criar-tarefas-padrao" onClick={() => { void createDefaultTasks(client.id, { force: true }).then((n) => { void qc.invalidateQueries({ queryKey: ["tasks"] }); toast.success(n ? `${n} tarefas padrão criadas` : "Nada novo para criar"); }).catch((e: Error) => toast.error(e.message)); }} className="rounded-full border border-cyan/50 px-4 py-1.5 text-xs text-cyan transition hover:bg-cyan/10">Criar as tarefas padrão</button>
         </div>
       )}
-      {tasks.map((t) => (
-        <div key={t.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
+      {tasks.map((t, idx) => (
+        <div key={t.id} draggable onDragStart={() => setDragId(t.id)} onDragOver={(e) => { if (dragId) e.preventDefault(); }} onDrop={() => { if (dragId) { move(tasks.findIndex((x) => x.id === dragId), idx); setDragId(null); } }} onDragEnd={() => setDragId(null)} className={`ex-card flex items-center gap-3 p-3 ${dragId === t.id ? "opacity-50" : ""}`} style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
+          <GripVertical size={14} className="-ml-1 shrink-0 cursor-grab text-muted-foreground/60" aria-hidden />
           <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{t.done && <Check size={12} />}</button>
           <div className="min-w-0 flex-1"><p className={`truncate text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
             <TaskThumbs files={t.attachments ?? []} title={t.title} />
             <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
+          <span className="flex shrink-0 flex-col">
+            <button type="button" onClick={() => move(idx, idx - 1)} disabled={idx === 0} aria-label={`Subir ${t.title}`} data-testid="cliente-tarefa-subir" className="text-muted-foreground transition hover:text-cyan disabled:opacity-25"><ArrowUp size={13} /></button>
+            <button type="button" onClick={() => move(idx, idx + 1)} disabled={idx === tasks.length - 1} aria-label={`Descer ${t.title}`} data-testid="cliente-tarefa-descer" className="text-muted-foreground transition hover:text-cyan disabled:opacity-25"><ArrowDown size={13} /></button>
+          </span>
           <button type="button" onClick={() => setEditing(t)} aria-label={`Editar ${t.title}`} data-testid="cliente-tarefa-editar" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
           <button type="button" onClick={() => { if (window.confirm(`Excluir a tarefa "${t.title}"?`)) del.mutate(t.id, { onSuccess: () => toast.success("Tarefa excluída"), onError: (e) => toast.error((e as Error).message) }); }} aria-label={`Excluir ${t.title}`} data-testid="cliente-tarefa-excluir" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
         </div>

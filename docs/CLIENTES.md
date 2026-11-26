@@ -70,3 +70,5 @@ O botão **Tarefas padrão** (na lista de clientes) abre o modelo: as tarefas qu
 O mesmo modelo também fica em **Documentação → Playbooks**, no cartão **"Tarefas padrão do cliente"** (abre a mesma janela do botão "Tarefas padrão" em Clientes).
 
 Na aba **Tarefas** da ficha, quando o cliente já tem tarefas, o botão **"Aplicar as tarefas padrão"** mostra o que será criado (as do padrão que ele ainda não tem) e as tarefas dele que não estão no padrão: marque as que quer apagar para ele ficar igual ao padrão (as não marcadas ficam). Nada é apagado sem marcar.
+
+Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá para **arrastar** para outra posição. A ordem fica salva (`tasks.client_order`); a "etapa atual" do cartão segue essa ordem. Tarefa nova entra no **fim** da lista (não mais no topo).

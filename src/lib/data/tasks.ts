@@ -4,7 +4,7 @@ import { deadlineIso, type Demand } from "../demands";
 import type { Category, Color, Priority, Task } from "../types";
 import { must, supabase } from "./db";
 
-const TASK_COLS = "id, title, description, category_id, priority, due_date, due_time, done, done_at, position, created_at, end_time, place, color, project_id, dossier_id, remind_before, client_id, attachments";
+const TASK_COLS = "id, title, description, category_id, priority, due_date, due_time, done, done_at, position, created_at, end_time, place, color, project_id, dossier_id, remind_before, client_id, attachments, client_order";
 
 export function useCategories() {
   return useQuery({
@@ -43,6 +43,7 @@ export type NewTask = {
   remind_before?: number[] | null;
   client_id?: string | null;
   attachments?: { path: string; name: string; mime: string; size: number }[];
+  client_order?: number | null;
 };
 
 /** Cria a tarefa no topo da lista manual (usado pela tela e pelo MCP). `extra` leva os campos novos (origem, vínculos). */
@@ -169,6 +170,16 @@ export async function ensureDemandCategory(): Promise<string> {
   if (hit) return hit.id;
   const last = all.reduce((m, c) => Math.max(m, c.position), 0);
   return (must(await supabase.from("task_categories").insert({ name: "Demandas", color: "violet", icon: "layers", slug: "demandas", position: last + 1 }).select("id").single()) as { id: string }).id;
+}
+
+/** Próxima posição de uma tarefa nova na ficha do cliente: depois da última (nulo enquanto ninguém reorganizou, aí vale a ordem de criação). */
+export async function nextClientOrder(clientId: string): Promise<number | null> {
+  const rows = must(await supabase.from("tasks").select("client_order").eq("client_id", clientId).not("client_order", "is", null).order("client_order", { ascending: false }).limit(1)) as { client_order: number }[];
+  return rows[0] ? rows[0].client_order + 1 : null;
+}
+/** Grava a ordem das tarefas de um cliente (a primeira da lista é a 0). */
+export async function saveClientOrder(ids: string[]): Promise<void> {
+  await Promise.all(ids.map(async (id, i) => must(await supabase.from("tasks").update({ client_order: i }).eq("id", id).select("id"))));
 }
 
 /** A categoria "Clientes" das Tarefas: tudo o que se faz para os clientes/polos (cria na primeira vez; se já existir uma com esse nome, usa ela). */

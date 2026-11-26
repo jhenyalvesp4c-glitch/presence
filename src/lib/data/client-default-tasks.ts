@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { cleanTemplate, missingTitles, SEED_DEFAULT_TASKS } from "../default-tasks";
 import { must, supabase } from "./db";
-import { createTaskRow, ensureClientCategory } from "./tasks";
+import { createTaskRow, ensureClientCategory, nextClientOrder } from "./tasks";
 
 type Row = { id: string; kind: "task" | "off"; title: string; position: number };
 export type DefaultTemplate = { titles: string[]; auto: boolean; saved: boolean };
@@ -32,7 +32,9 @@ export async function createDefaultTasks(clientId: string, opts: { force?: boole
   const todo = missingTitles(tpl.titles, have.map((h) => h.title));
   if (!todo.length) return 0;
   const category_id = await ensureClientCategory().catch(() => null);
-  for (const title of todo) await createTaskRow({ title, category_id, due_date: null, due_time: null }, { client_id: clientId });
+  const base = await nextClientOrder(clientId).catch(() => null);
+  let i = 0;
+  for (const title of todo) await createTaskRow({ title, category_id, due_date: null, due_time: null }, { client_id: clientId, ...(base !== null ? { client_order: base + i++ } : {}) });
   return todo.length;
 }
 

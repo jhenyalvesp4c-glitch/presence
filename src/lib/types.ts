@@ -32,6 +32,8 @@ export type Task = {
   client_id?: string | null;
   /** Imagens (e PDFs) anexadas à tarefa. */
   attachments?: { path: string; name: string; mime: string; size: number }[] | null;
+  /** Ordem manual dentro da ficha do cliente (nulo = ordem de criação). */
+  client_order?: number | null;
 };
 
 export type RoutineItem = {
