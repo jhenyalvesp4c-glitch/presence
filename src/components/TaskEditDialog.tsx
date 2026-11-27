@@ -12,11 +12,11 @@ const prios: { k: Priority; l: string; c: string }[] = [
   { k: "alta", l: "Alta", c: "rose" }, { k: "media", l: "Média", c: "amber" }, { k: "baixa", l: "Baixa", c: "emerald" },
 ];
 
-export type TaskPatch = Pick<Task, "title" | "description" | "category_id" | "priority" | "due_date" | "due_time" | "remind_before" | "client_id" | "attachments">;
+export type TaskPatch = Pick<Task, "title" | "description" | "category_id" | "priority" | "due_date" | "due_time" | "remind_before" | "client_id" | "attachments" | "person_id">;
 
 /** Editar uma tarefa: título, detalhes, categoria, prioridade, data e hora. */
-export function TaskEditDialog({ task, categories, clients = [], saving, onClose, onSave, onDelete }: {
-  task: Task; categories: Category[]; clients?: { id: string; name: string }[]; saving: boolean; onClose: () => void; onSave: (patch: TaskPatch) => void; onDelete: () => void;
+export function TaskEditDialog({ task, categories, clients = [], people = [], saving, onClose, onSave, onDelete }: {
+  task: Task; categories: Category[]; clients?: { id: string; name: string }[]; people?: { id: string; client_id: string; name: string; role: string }[]; saving: boolean; onClose: () => void; onSave: (patch: TaskPatch) => void; onDelete: () => void;
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -26,6 +26,7 @@ export function TaskEditDialog({ task, categories, clients = [], saving, onClose
   const [time, setTime] = useState(task.due_time?.slice(0, 5) ?? "");
   const files = useTaskFiles(task.attachments ?? []);
   const [clientId, setClientId] = useState(task.client_id ?? "");
+  const [personId, setPersonId] = useState(task.person_id ?? "");
   const [remind, setRemind] = useState<number[]>(task.remind_before ?? []);
   const field = "w-full rounded-xl border border-border bg-background/40 px-4 py-2.5 text-sm outline-none focus:border-cyan [color-scheme:dark]";
 
@@ -38,7 +39,7 @@ export function TaskEditDialog({ task, categories, clients = [], saving, onClose
           if (!title.trim() || files.busy) return;
           let attachments: Awaited<ReturnType<typeof files.upload>>;
           try { attachments = await files.upload(); } catch (err) { toast.error(`Não consegui enviar o arquivo: ${(err as Error).message}`); return; }
-          onSave({ attachments, title, description: description.trim() || null, category_id: categoryId || null, priority, due_date: date || null, due_time: time || null, remind_before: time && remind.length ? remind : null, client_id: clientId || null });
+          onSave({ attachments, title, description: description.trim() || null, category_id: categoryId || null, priority, due_date: date || null, due_time: time || null, remind_before: time && remind.length ? remind : null, client_id: clientId || null, person_id: clientId && people.some((p) => p.id === personId && p.client_id === clientId) ? personId : null });
         }}
         className="glass w-full max-w-md space-y-4 rounded-3xl p-6 animate-rise">
         <div className="flex items-center justify-between">
@@ -56,6 +57,12 @@ export function TaskEditDialog({ task, categories, clients = [], saving, onClose
           <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={field} aria-label="Cliente">
             <option value="" className="bg-popover">Sem cliente</option>
             {clients.map((c) => <option key={c.id} value={c.id} className="bg-popover">Cliente: {c.name}</option>)}
+          </select>
+        )}
+        {clientId && people.some((p) => p.client_id === clientId) && (
+          <select value={personId} onChange={(e) => setPersonId(e.target.value)} className={field} aria-label="Para quem?" data-testid="editar-pessoa">
+            <option value="" className="bg-popover">Para quem? (ninguém)</option>
+            {people.filter((p) => p.client_id === clientId).map((p) => <option key={p.id} value={p.id} className="bg-popover">{p.name}{p.role ? ` · ${p.role}` : ""}</option>)}
           </select>
         )}
         <div className="grid grid-cols-2 gap-3">

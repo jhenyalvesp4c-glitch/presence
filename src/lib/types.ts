@@ -34,6 +34,8 @@ export type Task = {
   attachments?: { path: string; name: string; mime: string; size: number }[] | null;
   /** Ordem manual dentro da ficha do cliente (nulo = ordem de criação). */
   client_order?: number | null;
+  /** Pessoa (do cliente) responsável pela tarefa. */
+  person_id?: string | null;
 };
 
 export type RoutineItem = {

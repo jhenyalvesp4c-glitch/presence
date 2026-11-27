@@ -34,6 +34,7 @@ import { SetupSummary } from "@/components/SetupGuide";
 import { MAX_PENDING, readPending, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { signedUrls } from "@/lib/data/brain";
 import { useAllClients, useClientActions, useClientExtras, useClientLinks, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
+import { createNewUserTasks, createPerson, useAllPeople, usePeopleActions, type Person } from "@/lib/data/people";
 import { DOC_KINDS, STATUS_LABEL, STATUS_TONE, brl, dateBR, dueOf, quickAnswer, summarize, todayBR, type Client, type ClientStatus, type QuickAnswer } from "@/lib/clients";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -43,7 +44,7 @@ const ini = (n: string) => n.split(" ").filter((w) => w.length > 2).slice(0, 2).
 const cssColor = (tone: string) => `var(--${tone})`;
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-type Tab = "docs" | "reun" | "dem" | "tar" | "ace" | "lin" | "imp";
+type Tab = "docs" | "reun" | "dem" | "tar" | "pes" | "ace" | "lin" | "imp";
 const BLANK: Omit<Client, "id" | "projectId"> = { dossierId: null, name: "", segment: "", contactName: "", email: "", phone: "", docNumber: "", status: "ativo", plan: "", monthlyValue: 0, contractEnd: null, notes: "" };
 
 function StatusTag({ s }: { s: ClientStatus }) { return <span className="tag whitespace-nowrap !py-0.5 !text-[0.7rem]" style={tint(STATUS_TONE[s])}>{STATUS_LABEL[s]}</span>; }
@@ -297,8 +298,9 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const logins = useMemo(() => (dossierName ? loginsOfDossier(dossierName).filter((l) => !l.id.startsWith("a-")) : []), [dossierName, loginTick]);
   const tasksQ = useTasks(), clientTasks = useMemo(() => orderClientTasks((tasksQ.data ?? []).filter((t) => t.client_id === c.id)), [tasksQ.data, c.id]);
+  const people = (useAllPeople().data ?? []).filter((p) => p.client_id === c.id);
   const [confirm, setConfirm] = useState(false), tone = colorOf(c.id);
-  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["tar", `Tarefas (${clientTasks.filter((t) => !t.done).length})`, ListChecks], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
+  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["tar", `Tarefas (${clientTasks.filter((t) => !t.done).length})`, ListChecks], ["pes", `Pessoas (${people.length})`, Users], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
   return (
     <aside className="glass scroll-thin space-y-4 rounded-3xl p-5 animate-rise xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain" data-testid="cliente-ficha">
       <div className="flex items-start gap-3">
@@ -317,7 +319,8 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
       {tab === "docs" && <><DocsTab client={c} docs={docs} acts={acts} err={err} />{(links?.libDocs.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-docs-dossie"><p className="mono-caps">Da pasta do dossiê (Biblioteca)</p>{links!.libDocs.map((d) => <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><FileText size={14} className="shrink-0 text-cyan" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{d.title}</p><p className="truncate text-xs text-muted-foreground">{d.kind}{d.folder && ` · ${d.folder}`}{d.updated && ` · ${d.updated}`}</p></div></div>)}</div>}</>}
       {tab === "reun" && <MeetingsTab client={c} meets={meets} acts={acts} err={err} />}
       {tab === "dem" && <div className="space-y-2">{!c.dossierId ? <p className="rounded-xl border border-dashed border-white/15 p-4 text-center text-xs text-muted-foreground">Vincule um dossiê a este cliente (botão de editar) e as demandas dele aparecem aqui.</p> : dem.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma demanda neste dossiê.</p> : dem.map((d) => <button key={d.code} onClick={() => acts.setDemand.mutate({ code: d.code, status: d.status === "done" ? "todo" : "done" }, { onError: err })} className="ex-card flex w-full items-center gap-3 p-3 text-left" style={{ "--rail": "var(--emerald)" } as CSSProperties}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${d.status === "done" ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{d.status === "done" && <Check size={12} />}</span><div className="min-w-0"><p className={`truncate text-sm font-medium ${d.status === "done" ? "text-muted-foreground line-through" : ""}`}>{d.title}</p><p className="text-xs text-muted-foreground">{d.code}{d.deadline && ` · prazo ${d.deadline}`}</p></div></button>)}<Link to="/demandas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as demandas</Link></div>}
-      {tab === "tar" && <ClientTasks client={c} tasks={clientTasks} />}
+      {tab === "tar" && <ClientTasks client={c} tasks={clientTasks} people={people} />}
+      {tab === "pes" && <PeopleTab client={c} people={people} tasks={clientTasks} />}
       {tab === "ace" && <><AccessTab client={c} access={access} acts={acts} err={err} dossierName={dossierName} />{logins.length > 0 && <div className="mt-4 space-y-2" data-testid="cliente-logins-dossie"><p className="mono-caps">Logins do dossiê (Documentação)</p>{logins.map((l) => <div key={l.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}><KeyRound size={14} className="shrink-0 text-amber" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{l.title}</p><p className="truncate font-mono text-xs text-muted-foreground">{l.user}{l.owner && ` · ${l.owner}`}</p><p className="truncate font-mono text-xs text-amber" data-testid="cliente-login-senha">Senha: {l.pass || "—"}</p></div><CopyPass user={l.user} pass={l.pass} /></div>)}<p className="text-[0.65rem] text-muted-foreground">As senhas ficam só neste navegador (não vão para o banco nem para a IA).</p></div>}</>}
       {tab === "lin" && <><LogTab client={c} log={log} acts={acts} err={err} />{(links?.records.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-registros-dossie"><p className="mono-caps">Registros e notas do dossiê</p>{links!.records.slice(0, 12).map((r) => <div key={r.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"><p className="mono-caps">{r.kind === "nota" ? "Nota" : "Registro"} · {r.kind === "nota" ? r.date : dateBR(r.date)}</p><p className="line-clamp-2 whitespace-pre-wrap text-sm">{r.text}</p></div>)}</div>}</>}
       <div className="border-t border-white/10 pt-3">{confirm ? <div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-muted-foreground">Apagar o cliente, documentos e histórico? Não dá para desfazer.</span><button onClick={onDelete} data-testid="cliente-apagar-ok" className="rounded-full border border-destructive/60 px-3 py-1 text-destructive hover:bg-destructive/10">Apagar</button><button onClick={() => setConfirm(false)} className="rounded-full border border-white/15 px-3 py-1">Cancelar</button></div> : <button onClick={() => setConfirm(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"><Trash2 size={12} /> Apagar cliente</button>}</div>
@@ -428,10 +431,10 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 }
 
 /** Tarefas, compromissos, treinamentos e implantações ligados ao cliente — e um jeito rápido de criar mais, já vinculadas. */
-function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
-  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], [editing, setEditing] = useState<Task | null>(null), [applying, setApplying] = useState(false), [dragId, setDragId] = useState<string | null>(null);
+function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[]; people: Person[] }) {
+  const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], allPeople = useAllPeople().data ?? [], [editing, setEditing] = useState<Task | null>(null), [applying, setApplying] = useState(false), [dragId, setDragId] = useState<string | null>(null);
   const move = (from: number, to: number) => { const ids = moveItem(tasks, from, to).map((t) => t.id); if (ids.join() === tasks.map((t) => t.id).join()) return; void saveClientOrder(ids).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch((e: Error) => toast.error(e.message)); };
-  const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false), [personId, setPersonId] = useState(""), [newName, setNewName] = useState(""), [newRole, setNewRole] = useState("");
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
   // sem categoria escolhida, a tarefa vai para "Clientes" (não para "Demandas"): assim, nas Tarefas, dá para separar tudo o que é para os clientes
@@ -441,8 +444,10 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
     let attachments: Awaited<ReturnType<typeof files.upload>> = [];
     try { attachments = await files.upload(); } catch (e) { toast.error(`Não consegui enviar o arquivo: ${(e as Error).message}`); return; }
     const client_order = await nextClientOrder(client.id).catch(() => null);
-    create.mutate({ title: title.trim(), category_id, ...(client_order !== null ? { client_order } : {}), ...(attachments.length ? { attachments } : {}), due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
-      { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); files.clear(); void qc.invalidateQueries({ queryKey: ["categories"] }); toast.success(`Tarefa criada em Clientes · ${client.name}`); }, onError: (e) => toast.error((e as Error).message) });
+    let person_id: string | null = personId && personId !== NEW ? personId : null;
+    if (personId === NEW && newName.trim()) { try { person_id = (await createPerson(client.id, newName, newRole)).id; void qc.invalidateQueries({ queryKey: ["client-people"] }); } catch (e) { toast.error(`Não consegui criar a pessoa: ${(e as Error).message}`); return; } }
+    create.mutate({ title: title.trim(), category_id, ...(person_id ? { person_id } : {}), ...(client_order !== null ? { client_order } : {}), ...(attachments.length ? { attachments } : {}), due_date: date || null, due_time: time || null, remind_before: time && date && remind.length ? remind : null, client_id: client.id },
+      { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); setPersonId(""); setNewName(""); setNewRole(""); files.clear(); void qc.invalidateQueries({ queryKey: ["categories"] }); toast.success(`Tarefa criada em Clientes · ${client.name}`); }, onError: (e) => toast.error((e as Error).message) });
   };
   return (
     <div className="space-y-2" data-testid="cliente-tarefas">
@@ -453,6 +458,8 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
         {open && (
           <div className="space-y-2">
             <div className="flex gap-2"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Data" className={field} /><input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Hora" className={field} /></div>
+            <select value={personId} onChange={(e) => setPersonId(e.target.value)} aria-label="Para quem?" data-testid="tarefa-para-quem" className={`${field} w-full`}><option value="" className="bg-popover">Para quem? (ninguém)</option>{people.map((p) => <option key={p.id} value={p.id} className="bg-popover">{p.name}{p.role ? ` · ${p.role}` : ""}</option>)}<option value={NEW} className="bg-popover">+ nova pessoa…</option></select>
+            {personId === NEW && <div className="flex gap-2"><input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome" aria-label="Nome da pessoa" maxLength={120} className={field} /><input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Função" aria-label="Função da pessoa" maxLength={120} className={field} /></div>}
             <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria" className={`${field} w-full`}><option value="" className="bg-popover">Clientes (padrão)</option>{cats.map((x) => <option key={x.id} value={x.id} className="bg-popover">{x.name}</option>)}</select>
             <div><p className="mb-1 text-[0.7rem] text-muted-foreground">Lembrar antes {(!date || !time) && "(precisa de data e hora)"}</p><RemindPicker value={remind} onChange={setRemind} disabled={!date || !time} /></div>
           </div>
@@ -468,9 +475,9 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
         <div key={t.id} draggable onDragStart={() => setDragId(t.id)} onDragOver={(e) => { if (dragId) e.preventDefault(); }} onDrop={() => { if (dragId) { move(tasks.findIndex((x) => x.id === dragId), idx); setDragId(null); } }} onDragEnd={() => setDragId(null)} className={`ex-card flex items-center gap-3 p-3 ${dragId === t.id ? "opacity-50" : ""}`} style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
           <GripVertical size={14} className="-ml-1 shrink-0 cursor-grab text-muted-foreground/60" aria-hidden />
           <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{t.done && <Check size={12} />}</button>
-          <div className="min-w-0 flex-1"><p className={`truncate text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
+          <div className="min-w-0 flex-1"><p className={`break-words text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
             <TaskThumbs files={t.attachments ?? []} title={t.title} />
-            <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
+            <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : "", t.person_id && people.find((x) => x.id === t.person_id) ? `Para ${people.find((x) => x.id === t.person_id)!.name}` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
           <span className="flex shrink-0 flex-col">
             <button type="button" onClick={() => move(idx, idx - 1)} disabled={idx === 0} aria-label={`Subir ${t.title}`} data-testid="cliente-tarefa-subir" className="text-muted-foreground transition hover:text-cyan disabled:opacity-25"><ArrowUp size={13} /></button>
             <button type="button" onClick={() => move(idx, idx + 1)} disabled={idx === tasks.length - 1} aria-label={`Descer ${t.title}`} data-testid="cliente-tarefa-descer" className="text-muted-foreground transition hover:text-cyan disabled:opacity-25"><ArrowDown size={13} /></button>
@@ -480,13 +487,45 @@ function ClientTasks({ client, tasks }: { client: Client; tasks: Task[] }) {
         </div>
       ))}
       {editing && (
-        <TaskEditDialog task={editing} categories={cats} clients={allClients} saving={update.isPending} onClose={() => setEditing(null)}
+        <TaskEditDialog task={editing} categories={cats} clients={allClients} people={allPeople} saving={update.isPending} onClose={() => setEditing(null)}
           onSave={(patch) => update.mutate({ id: editing.id, patch }, { onSuccess: () => { setEditing(null); toast.success("Tarefa atualizada"); }, onError: (e) => toast.error((e as Error).message) })}
           onDelete={() => { if (window.confirm(`Excluir a tarefa "${editing.title}"?`)) del.mutate(editing.id, { onSuccess: () => { setEditing(null); toast.success("Tarefa excluída"); }, onError: (e) => toast.error((e as Error).message) }); }} />
       )}
       {tasks.length > 0 && <button type="button" onClick={() => setApplying(true)} data-testid="aplicar-tarefas-padrao" className="mx-auto flex items-center gap-1.5 rounded-full border border-cyan/50 px-4 py-1.5 text-xs text-cyan transition hover:bg-cyan/10"><ListChecks size={13} /> Aplicar as tarefas padrão</button>}
       {applying && <ApplyDefaultDialog client={client} tasks={tasks.map((t) => ({ id: t.id, title: t.title, done: t.done }))} onClose={() => setApplying(false)} />}
       <Link to="/tarefas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as tarefas</Link>
+    </div>
+  );
+}
+
+const NEW = "__nova";
+
+/** Pessoas do cliente (nome e função). Dá para criar de uma vez as tarefas de "novo usuário" de cada uma. */
+function PeopleTab({ client, people, tasks }: { client: Client; people: Person[]; tasks: Task[] }) {
+  const qc = useQueryClient(), act = usePeopleActions(), [name, setName] = useState(""), [role, setRole] = useState(""), [edit, setEdit] = useState<Person | null>(null);
+  const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60";
+  const err = (e: unknown) => toast.error((e as Error).message);
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["tasks"] });
+  return (
+    <div className="space-y-2" data-testid="cliente-pessoas">
+      <form onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; act.add.mutate({ clientId: client.id, name, role }, { onSuccess: () => { setName(""); setRole(""); }, onError: err }); }} className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-black/20 p-3">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" aria-label="Nome da pessoa" data-testid="pessoa-nome" maxLength={120} className={field} />
+        <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Função (ex.: Gerente)" aria-label="Função da pessoa" maxLength={120} className={field} />
+        <button type="submit" disabled={!name.trim() || act.add.isPending} data-testid="pessoa-adicionar" className="rounded-full border border-cyan/60 px-4 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">Adicionar</button>
+      </form>
+      {people.length === 0 && <p className="py-3 text-center text-sm text-muted-foreground">Nenhuma pessoa cadastrada neste cliente ainda.</p>}
+      {people.map((p) => edit?.id === p.id ? (
+        <form key={p.id} onSubmit={(e) => { e.preventDefault(); if (!edit.name.trim()) return; act.update.mutate({ id: p.id, name: edit.name, role: edit.role }, { onSuccess: () => setEdit(null), onError: err }); }} className="flex flex-wrap gap-2 rounded-2xl border border-cyan/50 bg-black/20 p-3">
+          <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} aria-label="Editar nome" className={field} /><input value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value })} aria-label="Editar função" className={field} />
+          <button type="button" onClick={() => setEdit(null)} className="rounded-full border border-white/10 px-3 text-sm text-muted-foreground">Cancelar</button><button type="submit" className="rounded-full border border-cyan/60 px-4 text-sm text-cyan">Salvar</button>
+        </form>
+      ) : (
+        <div key={p.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--cyan)" } as CSSProperties} data-testid="pessoa">
+          <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium">{p.name}</p><p className="text-xs text-muted-foreground">{p.role || "Sem função"} · {tasks.filter((t) => t.person_id === p.id && !t.done).length} tarefa(s) aberta(s)</p></div>
+          <button type="button" onClick={() => { void createNewUserTasks(client.id, p).then(() => { refresh(); toast.success(`Passos de novo usuário criados para ${p.name}`); }).catch(err); }} data-testid="pessoa-novo-usuario" title="Criar usuário, enviar acessos e confirmar acesso" className="rounded-full border border-cyan/40 px-3 py-1 text-xs text-cyan transition hover:bg-cyan/10">Novo usuário</button>
+          <button type="button" onClick={() => setEdit(p)} aria-label={`Editar ${p.name}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
+          <button type="button" onClick={() => { if (window.confirm(`Excluir ${p.name}? As tarefas continuam, só perdem o "para quem".`)) act.remove.mutate(p.id, { onError: err }); }} aria-label={`Excluir ${p.name}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
+        </div>))}
     </div>
   );
 }

@@ -76,3 +76,7 @@ Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá
 ## Clientes como página central
 - Em Demandas (P4C) a aba **Clientes** é a primeira e abre por padrão. A antiga "Visão geral"/Kanban virou a aba **Demandas antigas** (histórico).
 - Trabalho geral (que não é de polo): crie um cliente com o seu nome e coloque as tarefas nele.
+
+## Pessoas
+- Aba **Pessoas** na ficha (nome + função; tabela `client_people`). Cada tarefa pode ter "Para quem?" (`tasks.person_id`), com "+ nova pessoa…" na criação.
+- Botão **Novo usuário** cria os passos: Criar usuário, Enviar acessos, Confirmar acesso (ligados à pessoa).
