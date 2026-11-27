@@ -16,6 +16,12 @@ const toRow = (c: Omit<Client, "id"> & { id?: string | undefined }) => ({
 const KEY = ["clients"] as const;
 export const useClients = (projectId: string) => useQuery({ queryKey: [...KEY, projectId], queryFn: async () => (must(await supabase.from("clients").select(CCOLS).eq("project_id", projectId).order("name")) as CRow[]).map(toClient) });
 
+/** O projeto onde estão os polos de verdade (o que tem mais clientes); se não houver cliente, o padrão. */
+export const useMainProjectId = (fallback: string) => useQuery({
+  queryKey: [...KEY, "main-project"],
+  queryFn: async () => { const rows = must(await supabase.from("clients").select("project_id")) as { project_id: string }[]; const n = new Map<string, number>(); for (const r of rows) n.set(r.project_id, (n.get(r.project_id) ?? 0) + 1); return [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback; },
+});
+
 /** Todos os clientes do dono (qualquer projeto): para ligar tarefas a um cliente e mostrar o nome dele. */
 export const useAllClients = () => useQuery({ queryKey: [...KEY, "all"], queryFn: async () => must(await supabase.from("clients").select("id, name").order("name")) as { id: string; name: string }[] });
 

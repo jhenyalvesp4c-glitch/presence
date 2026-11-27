@@ -72,3 +72,8 @@ O mesmo modelo também fica em **Documentação → Playbooks**, no cartão **"T
 Na aba **Tarefas** da ficha, quando o cliente já tem tarefas, o botão **"Aplicar as tarefas padrão"** mostra o que será criado (as do padrão que ele ainda não tem) e as tarefas dele que não estão no padrão: marque as que quer apagar para ele ficar igual ao padrão (as não marcadas ficam). Nada é apagado sem marcar.
 
 Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá para **arrastar** para outra posição. A ordem fica salva (`tasks.client_order`); a "etapa atual" do cartão segue essa ordem. Tarefa nova entra no **fim** da lista (não mais no topo).
+
+## Página principal: Meu trabalho (`/trabalho`)
+- Abre ao iniciar o app (`/` redireciona para cá).
+- **Fila de trabalho**: tarefas dos polos + tarefas gerais (categoria "Trabalho"), com filtros Pendentes/Atrasadas/Para hoje/Sem data/Feitas, filtro por polo ("Só geral" incluso) e busca. Lógica pura em `src/lib/work-queue.ts`.
+- **Por polo**: a visão de clientes (`ClientsView`). As demandas antigas continuam como histórico na ficha do cliente.

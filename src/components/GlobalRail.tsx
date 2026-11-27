@@ -2,7 +2,7 @@ import { useShownPath } from "@/lib/shown-path";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { Brain, Calendar, ClipboardList, Heart, Home, ListChecks, Network, Settings, Sprout, Wallet } from "lucide-react";
+import { Brain, Briefcase, Calendar, ClipboardList, Heart, Home, ListChecks, Network, Settings, Sprout, Wallet } from "lucide-react";
 import { NavBadge } from "@/components/NavBadge";
 import { useNavBadges } from "@/lib/data/nav-badges";
 
@@ -10,6 +10,7 @@ import { useNavBadges } from "@/lib/data/nav-badges";
 export const hasOwnRail = (path: string) => path === "/" || path === "/treino";
 
 const items = [
+  { Icon: Briefcase, label: "Trabalho", c: "violet", to: "/trabalho" },
   { Icon: Home, label: "Início", c: "cyan", to: "/assistente" },
   { Icon: ClipboardList, label: "Demandas", c: "violet", to: "/projetos" },
   { Icon: ListChecks, label: "Tarefas", c: "cyan", to: "/tarefas" },

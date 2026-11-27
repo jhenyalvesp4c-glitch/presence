@@ -1,14 +1,14 @@
 import { useShownPath } from "@/lib/shown-path";
 import { Link } from "@tanstack/react-router";
-import { Brain, ClipboardList, Heart, Home, ListChecks, Wallet } from "lucide-react";
+import { Brain, Briefcase, Heart, Home, ListChecks, Wallet } from "lucide-react";
 import { NavBadge } from "@/components/NavBadge";
 import { useNavBadges } from "@/lib/data/nav-badges";
 import type { Badge } from "@/lib/nav-badges";
 
 const items = [
+  { Icon: Briefcase, label: "Trabalho", to: "/trabalho", match: ["/trabalho", "/projetos", "/demandas"], c: "violet" },
   { Icon: Home, label: "Início", to: "/assistente", match: ["/assistente"], c: "cyan" },
   { Icon: ListChecks, label: "Tarefas", to: "/tarefas", match: ["/tarefas", "/calendario", "/planejamento"], c: "cyan" },
-  { Icon: ClipboardList, label: "Demandas", to: "/projetos", match: ["/projetos", "/demandas"], c: "violet" },
   { Icon: Wallet, label: "Finanças", to: "/financeiro", match: ["/financeiro"], c: "emerald" },
   { Icon: Heart, label: "Saúde", to: "/saude", badgeOf: "/habitos", match: ["/saude", "/hoje", "/habitos", "/dieta", "/medidas", "/treino", "/programa"], c: "emerald" },
   { Icon: Brain, label: "Orion", to: "/cerebro", match: ["/cerebro"], c: "violet" },
