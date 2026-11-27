@@ -80,3 +80,8 @@ Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá
 ## Pessoas
 - Aba **Pessoas** na ficha (nome + função; tabela `client_people`). Cada tarefa pode ter "Para quem?" (`tasks.person_id`), com "+ nova pessoa…" na criação.
 - Botão **Novo usuário** cria os passos: Criar usuário, Enviar acessos, Confirmar acesso (ligados à pessoa).
+
+## Painel do topo (suporte)
+- **Prioridades**: atrasadas, para hoje, polos sem próxima etapa, % de tarefas concluídas e a lista "Quem precisa de você" (mais urgente primeiro, com a etapa atual). Lógica em `src/lib/work-panel.ts`.
+- **Esta semana**: atrasadas e os próximos 7 dias, por dia, com o polo de cada tarefa.
+- Receita/vencimentos e "sem contato" saíram do painel (o código de saúde da carteira continua em `portfolio.ts`).

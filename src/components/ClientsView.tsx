@@ -14,7 +14,8 @@ import { ArrowDown, ArrowUp, GripVertical, Building2, CalendarClock, Check, Clip
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
-import { PortfolioHealth } from "@/components/PortfolioHealth";
+import { PriorityPanel, WeekPanel } from "@/components/WorkPanel";
+import { weekPlan, workPanel } from "@/lib/work-panel";
 import { portfolioHealth } from "@/lib/portfolio";
 import { useQueryClient } from "@tanstack/react-query";
 import { ensureClientCategory, nextClientOrder, saveClientOrder, useCategories, useCreateTask, useDeleteTask, useTasks, useToggleTask, useUpdateTask } from "@/lib/data/tasks";
@@ -94,6 +95,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
     clients.forEach((c) => { const dm = [...demands.filter((d) => d.clientId === c.id), ...(links[c.id]?.demands ?? []).filter((d) => !demands.some((x) => x.clientId === c.id && x.code === d.code))]; od[c.id] = dm.filter((d) => d.status !== "done").length; });
     return portfolioHealth({ clients, setups: setupsQ.data ?? [], lastContact: last, openDemands: od });
   }, [clients, ex, links, demands, setupsQ.data]);
+  const painelDados = useMemo(() => workPanel(clients, allTasks, hoje), [clients, allTasks, hoje]), semana = useMemo(() => weekPlan(clients, allTasks, hoje), [clients, allTasks, hoje]);
   const dossierName = (id: string | null) => dossiers.find((d) => d.id === id)?.name;
   const slices = clients.filter((c) => c.status === "ativo" && c.monthlyValue > 0).map((c) => ({ id: c.id, name: c.name, color: cssColor(colorOf(c.id)), value: c.monthlyValue }));
   // o anel de cada cliente mostra quanto das tarefas criadas para ele já foi feito
@@ -125,24 +127,9 @@ export function ClientsView({ projectId }: { projectId: string }) {
         </HeroPanel>
       ) : (<>
         <HeroPanel glow="var(--cyan)" data-testid="clientes-hero">
-          <div className="mb-3 flex justify-end"><div className="flex rounded-full border border-white/10 p-0.5 text-[0.68rem]" role="radiogroup" aria-label="Painel do topo">{([["saude", "Saúde da carteira"], ["receita", "Receita e vencimentos"]] as const).map(([k, l]) => <button key={k} role="radio" aria-checked={painel === k} onClick={() => trocar(k)} data-testid={`painel-${k}`} className={`rounded-full px-3 py-1 transition ${painel === k ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>)}</div></div>
-          {painel === "saude" && <PortfolioHealth p={saude} onPick={(id) => { setSelId(id); setTab("docs"); }} />}
-          {painel === "receita" && <div className="grid items-center gap-6 lg:grid-cols-[1.25fr_auto_1fr]">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2.5"><p className="mono-caps">Receita mensal dos clientes ativos</p><LiveDot label={`${sum.active} ativo${sum.active === 1 ? "" : "s"}`} /></div>
-              <p className="mt-2 whitespace-nowrap font-display text-5xl font-semibold leading-none tracking-tight md:text-6xl"><span className="text-gradient"><Money value={sum.monthly} cents={false} /></span></p>
-              <p className="mt-2 text-sm text-muted-foreground">{sum.total} cliente{sum.total === 1 ? "" : "s"} na carteira{sum.negotiating > 0 && <> · {brl(sum.negotiating)}/mês em negociação</>}</p>
-              <div className="mt-5 grid grid-cols-3 gap-2.5">
-                {[{ l: "Vencendo", v: sum.expiring, c: "var(--amber)", hint: "em até 30 dias" }, { l: "Demandas abertas", v: sum.openDemands, c: "var(--violet)", hint: "dos dossiês" }, { l: "Documentos", v: docs.length, c: "var(--cyan)", hint: "guardados" }].map((k, i) => (
-                  <div key={k.l} className="rounded-2xl border bg-white/[0.03] px-3 py-2.5" style={{ borderColor: `color-mix(in oklab, ${k.c} 28%, transparent)`, animation: `fin-rise .6s ${0.15 + i * 0.07}s both` }}>
-                    <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: k.c }}>{k.l}</p>
-                    <p className="mt-0.5 font-display text-xl font-semibold tabular-nums">{k.v}</p><p className="text-[0.65rem] text-muted-foreground">{k.hint}</p>
-                  </div>))}
-              </div>
-            </div>
-            {slices.length > 0 && <div className="flex justify-center"><Donut data={slices} size={190} thickness={22} active={active} onActive={setActive} center={(() => { const on = slices.find((s) => s.id === active); return on ? <div><p className="max-w-[7rem] truncate text-xs text-muted-foreground">{on.name}</p><p className="font-display text-base font-semibold tabular-nums">{brl(on.value)}</p></div> : <div><p className="text-[0.62rem] uppercase tracking-wider text-muted-foreground">por cliente</p><p className="font-display text-lg font-semibold">{slices.length}</p></div>; })()} /></div>}
-            <Radar clients={clients} onPick={(id) => { setSelId(id); setTab("docs"); }} />
-          </div>}
+          <div className="mb-3 flex justify-end"><div className="flex rounded-full border border-white/10 p-0.5 text-[0.68rem]" role="radiogroup" aria-label="Painel do topo">{([["saude", "Prioridades"], ["receita", "Esta semana"]] as const).map(([k, l]) => <button key={k} role="radio" aria-checked={painel === k} onClick={() => trocar(k)} data-testid={`painel-${k}`} className={`rounded-full px-3 py-1 transition ${painel === k ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>)}</div></div>
+          {painel === "saude" && <PriorityPanel p={painelDados} onPick={(id) => { setSelId(id); setTab("tar"); }} />}
+          {painel === "receita" && <WeekPanel days={semana} onPick={(id) => { setSelId(id); setTab("tar"); }} />}
         </HeroPanel>
 
         <form onSubmit={(e) => { e.preventDefault(); if (ask.trim()) perguntar(ask); }} className="glass flex items-center gap-2 rounded-full py-1 pl-4 pr-1 animate-rise">
