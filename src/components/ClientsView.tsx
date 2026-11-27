@@ -204,7 +204,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
                               ) : (
                                 <>
                                   <p className="flex items-center justify-between gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><span>Etapa atual · {sp.current} de {sp.total}</span>{st.overdue > 0 && <span className="rounded-full bg-rose-400/20 px-2 py-0.5 normal-case tracking-normal text-rose-300">{st.overdue} {st.overdue === 1 ? "atrasada" : "atrasadas"}</span>}{st.today > 0 && <span className="rounded-full bg-amber/20 px-2 py-0.5 normal-case tracking-normal text-amber">{st.today} para hoje</span>}</p>
-                                  <p className="mt-0.5 truncate text-sm font-semibold" title={sp.next!.title}>{sp.next!.title}</p>
+                                  <p className="mt-0.5 whitespace-pre-wrap break-words text-sm font-semibold leading-snug" title={sp.next!.title}>{sp.next!.title}</p>
                                   <p className="mt-1 flex items-center gap-0.5" aria-hidden>{sp.steps.map((x, k) => <i key={x.id} className={`h-1.5 flex-1 rounded-full ${x.done ? "bg-emerald" : k + 1 === sp.current ? "bg-cyan shadow-[0_0_8px_var(--cyan)]" : "bg-white/15"}`} />)}</p>
                                   {sp.missing.length > 1 && <p className="mt-1 truncate text-[0.66rem] text-muted-foreground" title={sp.missing.slice(1).map((x) => x.title).join(" · ")}>Depois: {sp.missing.slice(1, 3).map((x) => x.title).join(" · ")}{sp.missing.length > 3 ? ` · +${sp.missing.length - 3}` : ""}</p>}
                                 </>
