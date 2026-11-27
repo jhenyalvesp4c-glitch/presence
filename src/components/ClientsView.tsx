@@ -22,7 +22,7 @@ import { ensureClientCategory, nextClientOrder, saveClientOrder, useCategories, 
 import { TaskEditDialog } from "@/components/TaskEditDialog";
 import { ApplyDefaultDialog, DefaultTasksDialog } from "@/components/DefaultTasksDialog";
 import { createDefaultTasks } from "@/lib/data/client-default-tasks";
-import { byAttention, clientSteps, clientTaskProgress, clientTaskStats, matchesAttention, moveItem, orderClientTasks, type Attention } from "@/lib/client-progress";
+import { byAttention, clientSteps, clientTaskProgress, clientTaskStats, matchesAttention, moveItem, nextDated, orderClientTasks, peopleLabel, type Attention } from "@/lib/client-progress";
 import { RemindPicker } from "@/components/RemindPicker";
 import { TaskFilePicker, TaskThumbs, useTaskFiles } from "@/components/TaskFiles";
 import { beforeWords } from "@/lib/reminders";
@@ -36,6 +36,7 @@ import { MAX_PENDING, readPending, sizeLabel, toPending, type Pending } from "@/
 import { signedUrls } from "@/lib/data/brain";
 import { useAllClients, useClientActions, useClientExtras, useClientLinks, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
 import { createNewUserTasks, createPerson, useAllPeople, usePeopleActions, type Person } from "@/lib/data/people";
+import { CreateDefaultButton, QuickTask, StepDoneButton } from "@/components/ClientCardParts";
 import { DOC_KINDS, STATUS_LABEL, STATUS_TONE, brl, dateBR, dueOf, quickAnswer, summarize, todayBR, type Client, type ClientStatus, type QuickAnswer } from "@/lib/clients";
 
 const tint = (v: string) => ({ "--glow": `var(--${v})` }) as CSSProperties;
@@ -65,6 +66,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
   const [ask, setAsk] = useState(""), [answer, setAnswer] = useState<QuickAnswer | null>(null), [active, setActive] = useState<string | null>(null);
 
   const docs = ex?.docs ?? [], demands = ex?.demands ?? [];
+  const peopleQ = useAllPeople();
   const setupsQ = useSetupSummaries(), [painel, setPainel] = useState<"saude" | "receita">(() => { try { return localStorage.getItem("presence.clientes.painel") === "receita" ? "receita" : "saude"; } catch { return "saude"; } });
   const qc = useQueryClient(), [aplicando, setAplicando] = useState(false);
   const aplicarRoteiro = async () => {
@@ -80,6 +82,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
   const trocar = (v: "saude" | "receita") => { setPainel(v); try { localStorage.setItem("presence.clientes.painel", v); } catch { /* sem armazenamento */ } };
   const sel = clients.find((c) => c.id === selId) ?? null;
   // tarefas de cada cliente: filtro "quem precisa de mim" (atrasadas, hoje, pendentes, sem tarefas, em dia)
+  const peopleByClient = useMemo(() => { const m = new Map<string, Person[]>(); for (const x of peopleQ.data ?? []) (m.get(x.client_id) ?? m.set(x.client_id, []).get(x.client_id)!).push(x); return m; }, [peopleQ.data]);
   const allTasks = useTasks().data ?? [], [atencao, setAtencao] = useState<Attention>("todos"), [padrao, setPadrao] = useState(false);
   const hoje = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   const stats = useMemo(() => new Map(clients.map((c) => [c.id, clientTaskStats(allTasks, c.id, hoje)] as const)), [clients, allTasks, hoje]);
@@ -173,34 +176,45 @@ export function ClientsView({ projectId }: { projectId: string }) {
                 return (
                   <div key={c.id} style={{ animation: `fin-pop .55s ${Math.min(i, 8) * 0.06}s both` }}>
                     <Tilt max={9}>
-                      <button onClick={() => { setSelId(c.id); setTab("docs"); }} data-testid={`cliente-${c.id}`} className={`ex-card block w-full p-4 text-left ${selId === c.id ? "ring-1 ring-cyan/60" : ""}`} style={{ "--rail": cssColor(tone) } as CSSProperties}>
+                      <div role="button" tabIndex={0} onClick={() => { setSelId(c.id); setTab("docs"); }} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setSelId(c.id); setTab("docs"); } }} data-testid={`cliente-${c.id}`} className={`ex-card block w-full cursor-pointer p-4 text-left ${selId === c.id ? "ring-1 ring-cyan/60" : ""}`} style={{ "--rail": cssColor(tone) } as CSSProperties}>
                         <div className="flex items-start gap-3">
                           <span className="icon-tile h-11 w-11 shrink-0 !rounded-2xl text-sm font-bold shadow-[0_0_20px_-6px_var(--glow)]" style={tint(tone)}>{ini(c.name)}</span>
                           <div className="min-w-0 flex-1"><p className="truncate font-display text-base font-semibold">{c.name}</p><p className="truncate text-xs text-muted-foreground">{c.contactName || "sem contato"}{c.segment && ` · ${c.segment}`}</p><div className="mt-1.5 flex flex-wrap gap-1.5"><StatusTag s={c.status} />{dossierName(c.dossierId) && <span className="tag !py-0.5 !text-[0.7rem]" style={tint("violet")}><Link2 size={9} className="mr-1 inline" />{dossierName(c.dossierId)}</span>}</div></div>
                           <span title={taskProg(c.id).total ? `${taskProg(c.id).done} de ${taskProg(c.id).total} tarefas feitas` : "Nenhuma tarefa criada para este cliente"} data-testid="cliente-progresso"><Ring pct={taskProg(c.id).pct} color={cssColor(tone)} size={54} thickness={5}><span className="text-[0.62rem] font-semibold tabular-nums">{taskProg(c.id).total ? `${taskProg(c.id).pct}%` : "—"}</span></Ring></span>
                         </div>
-                        <div className="mt-3 flex items-end justify-between gap-3"><div><p className="mono-caps">Mensal</p><p className="font-display text-lg font-semibold tabular-nums">{c.monthlyValue ? brl(c.monthlyValue) : "—"}</p></div>
-                          <div className="text-right text-xs"><p className="mono-caps">Fim do contrato</p><p className="tabular-nums"><Venc c={c} /></p></div></div>
-                        <div className="mt-3"><Meter pct={d.days === null || d.days < 0 ? 100 : Math.max(4, 100 - Math.min(100, (d.days / 365) * 100))} color={d.level === "late" ? "var(--destructive)" : d.level === "soon" ? "var(--amber)" : cssColor(tone)} height={5} warn={false} /></div>
                         {(() => {
                           const st = stats.get(c.id)!, sp = clientSteps(allTasks, c.id);
                           const tone2 = sp.total === 0 ? "border-white/10 bg-white/[0.03]" : sp.current === 0 ? "border-emerald/50 bg-emerald/10" : st.overdue > 0 ? "border-rose-400/60 bg-rose-400/10" : "border-cyan/50 bg-cyan/10";
                           return (
                             <div className={`mt-3 rounded-xl border px-3 py-2 ${tone2}`} data-testid="cliente-etapa">
-                              {sp.total === 0 ? <p className="text-[0.72rem] text-muted-foreground">Nenhuma etapa criada. Crie as tarefas deste cliente na ficha.</p> : sp.current === 0 ? (
+                              {sp.total === 0 ? <><p className="text-[0.72rem] text-muted-foreground">Nenhuma etapa criada ainda.</p><CreateDefaultButton clientId={c.id} /></> : sp.current === 0 ? (
                                 <p className="text-[0.78rem] font-semibold text-emerald">✓ Todas as {sp.total} etapas feitas</p>
                               ) : (
                                 <>
                                   <p className="flex items-center justify-between gap-2 text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><span>Etapa atual · {sp.current} de {sp.total}</span>{st.overdue > 0 && <span className="rounded-full bg-rose-400/20 px-2 py-0.5 normal-case tracking-normal text-rose-300">{st.overdue} {st.overdue === 1 ? "atrasada" : "atrasadas"}</span>}{st.today > 0 && <span className="rounded-full bg-amber/20 px-2 py-0.5 normal-case tracking-normal text-amber">{st.today} para hoje</span>}</p>
-                                  <p className="mt-0.5 whitespace-pre-wrap break-words text-sm font-semibold leading-snug" title={sp.next!.title}>{sp.next!.title}</p>
+                                  <div className="mt-0.5 flex items-start gap-2"><p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm font-semibold leading-snug" title={sp.next!.title}>{sp.next!.title}</p><StepDoneButton taskId={sp.next!.id} title={sp.next!.title} /></div>
                                   <p className="mt-1 flex items-center gap-0.5" aria-hidden>{sp.steps.map((x, k) => <i key={x.id} className={`h-1.5 flex-1 rounded-full ${x.done ? "bg-emerald" : k + 1 === sp.current ? "bg-cyan shadow-[0_0_8px_var(--cyan)]" : "bg-white/15"}`} />)}</p>
                                   {sp.missing.length > 1 && <p className="mt-1 truncate text-[0.66rem] text-muted-foreground" title={sp.missing.slice(1).map((x) => x.title).join(" · ")}>Depois: {sp.missing.slice(1, 3).map((x) => x.title).join(" · ")}{sp.missing.length > 3 ? ` · +${sp.missing.length - 3}` : ""}</p>}
                                 </>
                               )}
                             </div>);
                         })()}
-                        <p className="mt-2 flex gap-3 text-[0.68rem] text-muted-foreground"><span><FileText size={10} className="mr-1 inline" />{nDocs} docs</span><span><ClipboardList size={10} className="mr-1 inline" />{p.total - p.done} abertas</span></p>
-                      </button>
+                        {(() => {
+                          const st = stats.get(c.id)!, nx = nextDated(allTasks, c.id), who = (peopleByClient.get(c.id) ?? []).map((x) => x.name);
+                          return (
+                            <div className="mt-2.5 space-y-1.5" data-testid="cliente-resumo">
+                              {st.total > 0 && <p className="flex flex-wrap items-center gap-1.5 text-[0.68rem]">
+                                {st.overdue > 0 && <span className="rounded-full bg-rose-400/20 px-2 py-0.5 text-rose-300">{st.overdue} atrasada{st.overdue === 1 ? "" : "s"}</span>}
+                                {st.today > 0 && <span className="rounded-full bg-amber/20 px-2 py-0.5 text-amber">{st.today} hoje</span>}
+                                {st.overdue === 0 && st.today === 0 && st.pending > 0 && <span className="rounded-full bg-emerald/15 px-2 py-0.5 text-emerald">Em dia</span>}
+                                {st.pending > 0 && <span className="rounded-full bg-white/10 px-2 py-0.5 text-muted-foreground">{st.pending} aberta{st.pending === 1 ? "" : "s"}</span>}
+                              </p>}
+                              {nx && <p className="truncate text-[0.68rem] text-muted-foreground" title={nx.title}>Próxima: <span className="text-foreground/80">{nx.title}</span> · {dateBR(nx.due_date!)}{nx.due_time ? ` ${nx.due_time.slice(0, 5)}` : ""}</p>}
+                              {who.length > 0 && <p className="truncate text-[0.68rem] text-muted-foreground" data-testid="cliente-pessoas-resumo"><Users size={10} className="mr-1 inline" />{peopleLabel(who)}</p>}
+                              <div className="flex"><QuickTask clientId={c.id} /></div>
+                            </div>);
+                        })()}
+                      </div>
                     </Tilt>
                   </div>);
               })}</div>

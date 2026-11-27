@@ -85,3 +85,6 @@ Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá
 - **Prioridades**: atrasadas, para hoje, polos sem próxima etapa, % de tarefas concluídas e a lista "Quem precisa de você" (mais urgente primeiro, com a etapa atual). Lógica em `src/lib/work-panel.ts`.
 - **Esta semana**: atrasadas e os próximos 7 dias, por dia, com o polo de cada tarefa.
 - Receita/vencimentos e "sem contato" saíram do painel (o código de saúde da carteira continua em `portfolio.ts`).
+
+## Card do cliente
+- Sem "Mensal"/"Fim do contrato" (o contrato continua na ficha). O card mostra: etapa atual com botão ✓ (conclui e avança), chips de urgência (atrasadas/hoje/em dia/abertas), próxima tarefa com data, pessoas e "+ tarefa" rápida. Sem tarefas: botão "Criar as tarefas padrão". Componentes em `ClientCardParts.tsx`.

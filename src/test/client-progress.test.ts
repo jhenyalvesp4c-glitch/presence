@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientTaskProgress } from "@/lib/client-progress";
+import { clientTaskProgress, nextDated, peopleLabel } from "@/lib/client-progress";
 
 describe("Porcentagem do cliente pelas tarefas", () => {
   const tasks = [{ client_id: "a", done: true }, { client_id: "a", done: false }, { client_id: "a", done: false }, { client_id: "b", done: true }, { client_id: null, done: true }];
@@ -52,4 +52,12 @@ describe("Ordem das tarefas do cliente", () => {
     expect(moveItem(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
     expect(moveItem(["a", "b"], 0, 5)).toEqual(["a", "b"]);
   });
+});
+
+describe("card do cliente", () => {
+  it("próxima tarefa com data: a mais cedo, ignorando feitas e sem data", () => {
+    const l = [{ client_id: "a", done: false, due_date: "2026-12-12" }, { client_id: "a", done: false, due_date: "2026-12-09" }, { client_id: "a", done: true, due_date: "2026-12-01" }, { client_id: "a", done: false }, { client_id: "b", done: false, due_date: "2026-12-02" }];
+    expect(nextDated(l, "a")?.due_date).toBe("2026-12-09"); expect(nextDated(l, "c")).toBeNull();
+  });
+  it("resume as pessoas", () => { expect(peopleLabel(["A", "B"])).toBe("A, B"); expect(peopleLabel(["A", "B", "C", "D"])).toBe("A, B +2"); });
 });

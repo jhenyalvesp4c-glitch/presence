@@ -39,3 +39,13 @@ export function clientSteps(tasks: StepTask[], clientId: string): ClientSteps {
   const idx = steps.findIndex((s) => !s.done), missing = steps.filter((s) => !s.done);
   return { steps, total: steps.length, done: steps.length - missing.length, current: idx >= 0 ? idx + 1 : 0, next: idx >= 0 ? steps[idx]! : null, missing };
 }
+
+/** A próxima tarefa aberta com data do cliente (a mais próxima; atrasadas contam primeiro). */
+export function nextDated<T extends { client_id?: string | null | undefined; done: boolean; due_date?: string | null | undefined; due_time?: string | null | undefined }>(tasks: T[], clientId: string): T | null {
+  const open = tasks.filter((t) => t.client_id === clientId && !t.done && t.due_date);
+  return open.sort((a, b) => a.due_date!.localeCompare(b.due_date!) || (a.due_time ?? "99").localeCompare(b.due_time ?? "99"))[0] ?? null;
+}
+/** "Jenny, Marcos +2" — as primeiras pessoas e quantas faltam. */
+export function peopleLabel(names: string[], max = 2): string {
+  return names.length <= max ? names.join(", ") : `${names.slice(0, max).join(", ")} +${names.length - max}`;
+}
