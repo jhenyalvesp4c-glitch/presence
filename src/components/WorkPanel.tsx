@@ -1,9 +1,10 @@
 /** Painel do topo de Clientes (suporte): "Prioridades" (o que está atrasado/hoje e quem precisa de você) e "Esta semana". */
-import { AlarmClock, CalendarCheck2, Flag } from "lucide-react";
+import { AlarmClock, CalendarCheck2, ChevronDown, Flag, Hourglass } from "lucide-react";
+import { useState } from "react";
 
 import { Ring } from "@/components/finance/charts";
 import { LiveDot, OrbitArt } from "@/components/finance/fx";
-import type { Panel, WeekDay } from "@/lib/work-panel";
+import type { Panel, Stage, WeekDay } from "@/lib/work-panel";
 
 const COR = { late: "var(--destructive)", warn: "var(--amber)", ok: "var(--cyan)", idle: "var(--violet)" } as const;
 const dm = (iso: string) => { const d = new Date(`${iso}T12:00:00`); return `${["dom", "seg", "ter", "qua", "qui", "sex", "sáb"][d.getDay()]} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`; };
@@ -36,24 +37,56 @@ export function PriorityPanel({ p, onPick }: { p: Panel; onPick: (id: string) =>
             </div>))}
         </div>
       </div>
-      <div className="min-w-0" data-testid="prioridades-lista">
-        <p className="mono-caps mb-2">Quem precisa de você · mais urgente primeiro</p>
-        {p.rows.length === 0 ? <div className="grid place-items-center py-6"><OrbitArt size={120}><Flag size={22} className="text-cyan" /></OrbitArt><p className="mt-2 text-xs text-muted-foreground">Nenhum cliente ativo ainda.</p></div> : (
-          <ul className="max-h-[17rem] space-y-1.5 overflow-y-auto pr-1">
-            {p.rows.slice(0, 40).map((r, i) => (
-              <li key={r.id} style={{ animation: `fin-rise .45s ${Math.min(i, 8) * 0.04}s both` }}>
-                <button onClick={() => onPick(r.id)} className="group w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left backdrop-blur transition hover:border-white/25" data-testid={`prioridade-${r.id}`}>
-                  <span className="flex items-center gap-2 text-xs">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COR[r.level], boxShadow: `0 0 10px ${COR[r.level]}`, animation: r.level === "late" ? "fin-pulse 1.8s ease-out infinite" : undefined }} />
-                    <span className="min-w-0 flex-1 truncate font-medium">{r.name}</span>
-                    {r.overdue > 0 && <span className="shrink-0 rounded-full bg-rose-400/20 px-2 py-0.5 text-[0.62rem] text-rose-300">{r.overdue} atrasada{r.overdue === 1 ? "" : "s"}</span>}
-                    {r.today > 0 && <span className="shrink-0 rounded-full bg-amber/20 px-2 py-0.5 text-[0.62rem] text-amber">{r.today} hoje</span>}
-                  </span>
-                  <span className="mt-1 block whitespace-pre-wrap break-words text-[0.7rem] text-muted-foreground">{r.next ? <><span className="text-foreground/80">Etapa atual:</span> {r.next}</> : r.pending === 0 && r.pct === 100 ? "Tudo feito" : "Sem próxima etapa — crie as tarefas"}</span>
-                </button>
-              </li>))}
-          </ul>)}
+      <Funnel p={p} onPick={onPick} />
+    </div>
+  );
+}
+
+const daysTxt = (d: number | null) => (d === null ? "" : d === 0 ? "desde hoje" : `há ${d} d`);
+
+/** Funil por etapa: cada etapa do roteiro com quantos polos estão nela; clicar mostra quais (e há quantos dias estão parados). */
+function Funnel({ p, onPick }: { p: Panel; onPick: (id: string) => void }) {
+  const [only, setOnly] = useState<"todas" | "espera">("todas"), [openName, setOpen] = useState<string | null>(null);
+  const waitingStages = p.stages.filter((x) => x.waiting), waitN = waitingStages.reduce((n, x) => n + x.rows.length, 0);
+  const stages: Stage[] = only === "espera" ? waitingStages : p.stages, max = Math.max(1, ...stages.map((x) => x.rows.length));
+  return (
+    <div className="min-w-0" data-testid="prioridades-funil">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="mono-caps">Funil · onde cada polo está</p>
+        <div className="flex rounded-full border border-white/10 p-0.5 text-[0.66rem]" role="radiogroup" aria-label="Filtrar etapas">
+          <button role="radio" aria-checked={only === "todas"} onClick={() => setOnly("todas")} data-testid="funil-todas" className={`rounded-full px-2.5 py-1 ${only === "todas" ? "bg-white/10 text-foreground" : "text-muted-foreground"}`}>Todas</button>
+          <button role="radio" aria-checked={only === "espera"} onClick={() => setOnly("espera")} data-testid="funil-espera" className={`flex items-center gap-1 rounded-full px-2.5 py-1 ${only === "espera" ? "bg-amber/20 text-amber" : "text-muted-foreground"}`}><Hourglass size={10} /> Esperando resposta <b className="tabular-nums">{waitN}</b></button>
+        </div>
       </div>
+      {stages.length === 0 ? <div className="grid place-items-center py-6"><OrbitArt size={120}><Flag size={22} className="text-cyan" /></OrbitArt><p className="mt-2 text-xs text-muted-foreground">{only === "espera" ? "Ninguém está esperando resposta. 🎉" : "Nenhum cliente ativo ainda."}</p></div> : (
+        <ul className="max-h-[19rem] space-y-1.5 overflow-y-auto pr-1">
+          {stages.map((st, i) => {
+            const on = openName === st.name, c = st.waiting ? "var(--amber)" : st.name === "Tudo feito" ? "var(--emerald)" : st.name === "Sem tarefas" ? "var(--violet)" : "var(--cyan)";
+            return (
+              <li key={st.name} style={{ animation: `fin-rise .45s ${Math.min(i, 8) * 0.04}s both` }} data-testid="funil-etapa">
+                <button onClick={() => setOpen(on ? null : st.name)} aria-expanded={on} className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left backdrop-blur transition hover:border-white/25">
+                  <span className="flex items-start gap-2 text-xs">
+                    {st.waiting && <Hourglass size={12} className="mt-0.5 shrink-0 text-amber" />}
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-words font-medium leading-snug">{st.name}</span>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 font-display text-sm font-semibold tabular-nums" style={{ background: `color-mix(in oklab, ${c} 18%, transparent)`, color: c }}>{st.rows.length}</span>
+                    <ChevronDown size={13} className={`mt-0.5 shrink-0 text-muted-foreground transition ${on ? "rotate-180" : ""}`} />
+                  </span>
+                  <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.max(6, (st.rows.length / max) * 100)}%`, background: `linear-gradient(90deg, var(--cyan), ${c})` }} /></span>
+                </button>
+                {on && (
+                  <ul className="mt-1 space-y-0.5 pl-2" data-testid="funil-polos">
+                    {st.rows.map((r) => (
+                      <li key={r.id}><button onClick={() => onPick(r.id)} data-testid={`prioridade-${r.id}`} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-white/[0.06]">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: COR[r.level] }} />
+                        <span className="min-w-0 flex-1 truncate font-medium">{r.name}</span>
+                        {r.overdue > 0 && <span className="shrink-0 rounded-full bg-rose-400/20 px-1.5 py-0.5 text-[0.6rem] text-rose-300">{r.overdue} atrasada{r.overdue === 1 ? "" : "s"}</span>}
+                        {r.today > 0 && <span className="shrink-0 rounded-full bg-amber/20 px-1.5 py-0.5 text-[0.6rem] text-amber">hoje</span>}
+                        {st.waiting && r.days !== null && <span className={`shrink-0 text-[0.62rem] tabular-nums ${r.days >= 7 ? "text-rose-300" : "text-muted-foreground"}`} data-testid="funil-dias">{daysTxt(r.days)}</span>}
+                      </button></li>))}
+                  </ul>)}
+              </li>);
+          })}
+        </ul>)}
     </div>
   );
 }

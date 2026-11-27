@@ -25,3 +25,21 @@ describe("painel de trabalho dos clientes", () => {
     expect(w[0]?.items[0]?.clientName).toBe("Alvorada");
   });
 });
+
+import { daysInStage, isWaiting } from "@/lib/work-panel";
+describe("funil por etapa", () => {
+  const t = (id: string, client_id: string, done: boolean, title: string, done_at: string | null = null) => ({ id, title, client_id, done, due_date: null, done_at });
+  const tasks = [t("1", "a", true, "Criar usuários", "2026-12-01T15:00:00Z"), t("2", "a", false, "Aguardando retorno com os nomes"), t("3", "b", false, "Aguardando retorno com os nomes"), t("4", "c", false, "Criar usuários")];
+  it("agrupa por etapa atual, com as de espera marcadas, e conta os dias parado", () => {
+    const p = workPanel(cl, tasks, "2026-12-10");
+    const names = p.stages.map((s) => [s.name, s.rows.length, s.waiting]);
+    expect(names).toContainEqual(["Aguardando retorno com os nomes", 2, true]);
+    expect(names).toContainEqual(["Criar usuários", 1, false]);
+    const w = p.stages.find((s) => s.waiting)!;
+    expect(w.rows[0]?.id).toBe("a"); expect(w.rows[0]?.days).toBe(9); expect(w.rows[1]?.days).toBeNull();
+  });
+  it("reconhece etapas de espera e calcula dias", () => {
+    expect(isWaiting("Aguardando envio da mensagem")).toBe(true); expect(isWaiting("Criar usuários")).toBe(false);
+    expect(daysInStage(tasks, "a", "2026-12-10")).toBe(9); expect(daysInStage(tasks, "b", "2026-12-10")).toBeNull();
+  });
+});

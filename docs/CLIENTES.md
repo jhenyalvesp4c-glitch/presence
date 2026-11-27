@@ -88,3 +88,6 @@ Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá
 
 ## Card do cliente
 - Sem "Mensal"/"Fim do contrato" (o contrato continua na ficha). O card mostra: etapa atual com botão ✓ (conclui e avança), chips de urgência (atrasadas/hoje/em dia/abertas), próxima tarefa com data, pessoas e "+ tarefa" rápida. Sem tarefas: botão "Criar as tarefas padrão". Componentes em `ClientCardParts.tsx`.
+
+## Funil por etapa (painel Prioridades)
+- A lista da direita virou um **funil**: cada etapa (pelo nome) com quantos polos estão nela; clicar abre os polos. Etapas "Aguardando…" são de espera e mostram **há quantos dias** o polo está parado (desde a última tarefa concluída). Filtro "Esperando resposta". Lógica em `work-panel.ts` (`stagesOf`, `daysInStage`).
