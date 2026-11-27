@@ -150,7 +150,7 @@ function Demandas() {
   const tm = typeMetaFor(L);
   const [items, setItems, itemsReady] = useDbState<Demand[]>(pid, [], () => loadDemands(pid!), (p, n) => saveDemands(pid!, p, n));
   const ready = pid !== null && stReady && itemsReady;
-  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes" | "clientes">((abaUrl as "docs" | undefined) ?? (secaoUrl === "cli" ? "clientes" : "overview"));
+  const [tab, setTab] = useState<"overview" | DType | "notas" | "docs" | "dossies" | "agenda" | "reunioes" | "clientes">((abaUrl as "docs" | undefined) ?? "clientes");
   useEffect(() => { if (abaUrl) setTab(abaUrl as "docs"); }, [abaUrl, secaoUrl]);
   const [view, setView] = useState<"kanban" | "lista" | "matriz">("kanban");
   const [prioF, setPrioF] = useState<"todas" | Priority>("todas");
