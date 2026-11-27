@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { ClipboardCopy, Gavel, ListChecks, MessagesSquare, Mic } from "lucide-react";
 import { copyText } from "@/lib/clipboard";
 import { analysisToMarkdown } from "@/lib/meetings";
-import { ArrowDown, ArrowUp, GripVertical, Building2, CalendarClock, Check, ClipboardList, Copy, Eye, EyeOff, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
+import { GripVertical, Building2, CalendarClock, Check, ClipboardList, Copy, Eye, EyeOff, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
@@ -480,10 +480,6 @@ function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[];
           <div className="min-w-0 flex-1"><p className={`break-words text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
             <TaskThumbs files={t.attachments ?? []} title={t.title} />
             <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : "", t.person_id && people.find((x) => x.id === t.person_id) ? `Para ${people.find((x) => x.id === t.person_id)!.name}` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
-          <span className="flex shrink-0 flex-col">
-            <button type="button" onClick={() => move(idx, idx - 1)} disabled={idx === 0} aria-label={`Subir ${t.title}`} data-testid="cliente-tarefa-subir" className="text-muted-foreground transition hover:text-cyan disabled:opacity-25"><ArrowUp size={13} /></button>
-            <button type="button" onClick={() => move(idx, idx + 1)} disabled={idx === tasks.length - 1} aria-label={`Descer ${t.title}`} data-testid="cliente-tarefa-descer" className="text-muted-foreground transition hover:text-cyan disabled:opacity-25"><ArrowDown size={13} /></button>
-          </span>
           <button type="button" onClick={() => setEditing(t)} aria-label={`Editar ${t.title}`} data-testid="cliente-tarefa-editar" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
           <button type="button" onClick={() => { if (window.confirm(`Excluir a tarefa "${t.title}"?`)) del.mutate(t.id, { onSuccess: () => toast.success("Tarefa excluída"), onError: (e) => toast.error((e as Error).message) }); }} aria-label={`Excluir ${t.title}`} data-testid="cliente-tarefa-excluir" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
         </div>
