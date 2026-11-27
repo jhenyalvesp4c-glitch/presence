@@ -553,7 +553,7 @@ function PasteAccess({ client, access, acts, err, dossierName }: { client: Clien
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-base outline-none focus:border-cyan/60 md:text-sm";
   return (
     <div className="space-y-2 rounded-2xl border border-cyan/40 bg-black/20 p-3" data-testid="colar-acessos">
-      <p className="text-[0.7rem] text-muted-foreground">Cole o texto como veio (nome, tipo de acesso, e-mail e senha). Eu separo cada pessoa e mostro antes de salvar. <b className="text-foreground">Nada é enviado para a internet</b>: a leitura é feita aqui no navegador.</p>
+      <p className="text-[0.7rem] text-muted-foreground">Cole o texto como veio, com ou sem rótulos (nome, e-mail e senha; o que tem @ é o e-mail e a linha seguinte é a senha). Eu separo cada pessoa e mostro antes de salvar. <b className="text-foreground">Nada é enviado para a internet</b>: a leitura é feita aqui no navegador.</p>
       <textarea value={text} onChange={(e) => { setText(e.target.value); setRead(null); }} rows={7} placeholder={"1. Nome\n* Tipo de acesso: Gestor\n* E-mail: ...\n* Senha: ..."} aria-label="Acessos colados" data-testid="colar-acessos-texto" className={`${field} w-full resize-y font-mono`} />
       <input value={system} onChange={(e) => { setSystem(e.target.value); setRead(null); }} placeholder="Onde é esse acesso? (opcional, ex.: Painel de matrículas)" aria-label="Onde são esses acessos" className={`${field} w-full`} />
       {read && read.length > 0 && (

@@ -94,4 +94,4 @@ Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá
 
 ## Colar acessos (aba Acessos)
 - Botão "Colar e organizar acessos": cola a lista (nome, tipo de acesso, e-mail, senha), o app separa cada pessoa e mostra uma prévia antes de salvar. Campos: Onde = (sistema ·) tipo, usuário = e-mail, observação = nome, senha só no navegador.
-- A leitura é **local** (`src/lib/access-paste.ts`, sem IA externa), porque as senhas não podem sair do navegador. Formatos: lista numerada ou blocos separados por linha em branco, com rótulos Tipo/Perfil/Função, E-mail/Login/Usuário, Senha, Nome.
+- A leitura é **local** (`src/lib/access-paste.ts`, sem IA externa), porque as senhas não podem sair do navegador. Entende também sem rótulos (nome, e-mail e senha em linhas seguidas; o "@" marca o e-mail). Formatos: lista numerada ou blocos separados por linha em branco, com rótulos Tipo/Perfil/Função, E-mail/Login/Usuário, Senha, Nome.

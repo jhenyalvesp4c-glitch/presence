@@ -37,5 +37,13 @@ describe("colar acessos", () => {
     expect(accessFields({ name: "Ana", kind: "Gestor", user: "a@b.test", pass: "x" }, "Painel")).toEqual({ label: "Painel · Gestor", username: "a@b.test", note: "Ana", pass: "x" });
     expect(accessFields({ name: "N", kind: "", user: "a", pass: "" }).label).toBe("Acesso");
   });
+  it("entende sem rótulos: nome, e-mail e senha, um embaixo do outro", () => {
+    const r = parseAccessPaste("Ana\nana@exemplo.test\nsenha-um\n\nBeto\nbeto@exemplo.test\nsenha dois\nCarla\ncarla@exemplo.test\nsenha-tres");
+    expect(r.map((a) => [a.name, a.user, a.pass])).toEqual([["Ana", "ana@exemplo.test", "senha-um"], ["Beto", "beto@exemplo.test", "senha dois"], ["Carla", "carla@exemplo.test", "senha-tres"]]);
+  });
+  it("entende nome, tipo, e-mail e senha sem rótulos, e tudo na mesma linha", () => {
+    expect(parseAccessPaste("Ana\nGestor\nana@exemplo.test\nsenha-um")[0]).toEqual({ name: "Ana", kind: "Gestor", user: "ana@exemplo.test", pass: "senha-um" });
+    expect(parseAccessPaste("Beto - beto@exemplo.test / senha-dois")[0]).toEqual({ name: "Beto", kind: "", user: "beto@exemplo.test", pass: "senha-dois" });
+  });
   it("ignora texto sem usuário nem senha", () => { expect(parseAccessPaste("oi, tudo bem?")).toEqual([]); });
 });

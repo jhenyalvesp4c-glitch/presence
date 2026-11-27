@@ -8,6 +8,8 @@ const KEY: [RegExp, keyof PastedAccess][] = [
   [/^nome$/i, "name"],
 ];
 const clean = (l: string) => l.replace(/^[\s*•·▪◦–—-]+/, "").replace(/\*\*/g, "").trim();
+const EMAIL = /[^\s@<>,;:()]+@[^\s@<>,;:()]+\.[^\s@<>,;:()]+/;
+const TRIM = /^[\s\-–—/|:;,]+|[\s\-–—/|:;,]+$/g;
 const blank = (): PastedAccess => ({ name: "", kind: "", user: "", pass: "" });
 
 export function parseAccessPaste(text: string): PastedAccess[] {
@@ -28,8 +30,21 @@ export function parseAccessPaste(text: string): PastedAccess[] {
       cur[field] = m[2]!.trim();
       continue;
     }
-    // linha solta, sem rótulo: se ainda não há nome no bloco, é o nome
-    if (!cur) cur = { ...blank(), name: line }; else if (!cur.name && !cur.user && !cur.pass) cur.name = line;
+    // sem rótulo: o que tem "@" é o e-mail; depois dele vem a senha; antes, o nome (e, se houver mais uma linha, o tipo)
+    const em = EMAIL.exec(line);
+    if (em) {
+      if (cur && cur.user) flush();
+      if (!cur) cur = blank();
+      cur.user = em[0];
+      const before = line.slice(0, em.index).replace(TRIM, ""), after = line.slice(em.index + em[0].length).replace(TRIM, "").replace(/^(senha|password|pass)(\s*:\s*|\s+)/i, "");
+      if (before && !cur.name) cur.name = before;
+      if (after) cur.pass = after;
+      continue;
+    }
+    if (!cur) { cur = { ...blank(), name: line }; continue; }
+    if (cur.user && !cur.pass) { cur.pass = line; continue; }
+    if (cur.user && cur.pass) { flush(); cur = { ...blank(), name: line }; continue; }
+    if (!cur.name) cur.name = line; else if (!cur.kind) cur.kind = line;
   }
   flush();
   return out;
