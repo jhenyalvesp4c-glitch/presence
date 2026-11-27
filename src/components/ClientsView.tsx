@@ -436,7 +436,7 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[]; people: Person[] }) {
   const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], allPeople = useAllPeople().data ?? [], [editing, setEditing] = useState<Task | null>(null), [applying, setApplying] = useState(false), [dragId, setDragId] = useState<string | null>(null);
   const move = (from: number, to: number) => { const ids = moveItem(tasks, from, to).map((t) => t.id); if (ids.join() === tasks.map((t) => t.id).join()) return; void saveClientOrder(ids).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch((e: Error) => toast.error(e.message)); };
-  const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false), [personId, setPersonId] = useState(""), [newName, setNewName] = useState(""), [newRole, setNewRole] = useState("");
+  const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false), [showDone, setShowDone] = useState(false), [personId, setPersonId] = useState(""), [newName, setNewName] = useState(""), [newRole, setNewRole] = useState("");
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
   // sem categoria escolhida, a tarefa vai para "Clientes" (não para "Demandas"): assim, nas Tarefas, dá para separar tudo o que é para os clientes
@@ -473,7 +473,11 @@ function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[];
           <button type="button" data-testid="criar-tarefas-padrao" onClick={() => { void createDefaultTasks(client.id, { force: true }).then((n) => { void qc.invalidateQueries({ queryKey: ["tasks"] }); toast.success(n ? `${n} tarefas padrão criadas` : "Nada novo para criar"); }).catch((e: Error) => toast.error(e.message)); }} className="rounded-full border border-cyan/50 px-4 py-1.5 text-xs text-cyan transition hover:bg-cyan/10">Criar as tarefas padrão</button>
         </div>
       )}
-      {tasks.map((t, idx) => (
+      {tasks.some((t) => t.done) && (
+        <button type="button" onClick={() => setShowDone((v) => !v)} aria-pressed={showDone} data-testid="cliente-tarefas-concluidas" className="mx-auto flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1 text-[0.7rem] text-muted-foreground transition hover:text-cyan">{showDone ? <EyeOff size={12} /> : <Eye size={12} />} {showDone ? "Ocultar concluídas" : `Mostrar concluídas (${tasks.filter((t) => t.done).length})`}</button>
+      )}
+      {tasks.length > 0 && tasks.every((t) => t.done) && !showDone && <p className="py-2 text-center text-sm text-emerald">✓ Todas as tarefas concluídas</p>}
+      {tasks.map((t, idx) => (!t.done || showDone) && (
         <div key={t.id} draggable onDragStart={() => setDragId(t.id)} onDragOver={(e) => { if (dragId) e.preventDefault(); }} onDrop={() => { if (dragId) { move(tasks.findIndex((x) => x.id === dragId), idx); setDragId(null); } }} onDragEnd={() => setDragId(null)} className={`ex-card flex items-center gap-3 p-3 ${dragId === t.id ? "opacity-50" : ""}`} style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
           <GripVertical size={14} className="-ml-1 shrink-0 cursor-grab text-muted-foreground/60" aria-hidden />
           <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{t.done && <Check size={12} />}</button>
