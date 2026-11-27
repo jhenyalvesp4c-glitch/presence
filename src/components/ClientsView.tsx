@@ -14,6 +14,7 @@ import { ArrowDown, ArrowUp, GripVertical, Building2, CalendarClock, Check, Clip
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
+import { accessFields, parseAccessPaste, type PastedAccess } from "@/lib/access-paste";
 import { PriorityPanel, WeekPanel } from "@/components/WorkPanel";
 import { weekPlan, workPanel } from "@/lib/work-panel";
 import { portfolioHealth } from "@/lib/portfolio";
@@ -531,6 +532,48 @@ function PeopleTab({ client, people, tasks }: { client: Client; people: Person[]
   );
 }
 
+/** Cola uma lista de acessos (nome, tipo, e-mail, senha) e distribui nos campos. Lê tudo aqui no navegador: as senhas não vão para a IA nem para a rede. */
+function PasteAccess({ client, access, acts, err, dossierName }: { client: Client; access: import("@/lib/clients").ClientAccess[]; acts: Acts; err: (e: unknown) => void; dossierName: string | undefined }) {
+  const [open, setOpen] = useState(false), [text, setText] = useState(""), [system, setSystem] = useState(""), [read, setRead] = useState<PastedAccess[] | null>(null), [skip, setSkip] = useState<Set<number>>(new Set()), [busy, setBusy] = useState(false), [show, setShow] = useState(false);
+  const exists = (a: PastedAccess) => { const f = accessFields(a, system); return access.some((x) => x.label.trim() === f.label && x.username.trim() === f.username.trim()); };
+  const ler = () => { const r = parseAccessPaste(text); setRead(r); setSkip(new Set(r.flatMap((a, i) => (exists(a) ? [i] : [])))); if (!r.length) toast.error("Não encontrei e-mail/usuário nem senha no texto."); };
+  const adicionar = async () => {
+    if (!read) return; setBusy(true); let n = 0;
+    try {
+      for (const [i, a] of read.entries()) {
+        if (skip.has(i)) continue;
+        const f = accessFields(a, system);
+        const id = await acts.addAccess.mutateAsync({ clientId: client.id, label: f.label, username: f.username, note: f.note });
+        saveAccessLogin({ accessId: id, label: f.label, user: f.username, pass: f.pass, owner: client.contactName, dossier: dossierName ?? client.name, note: f.note }); n++;
+      }
+      toast.success(`${n} acesso${n === 1 ? "" : "s"} adicionado${n === 1 ? "" : "s"}`); setText(""); setRead(null); setOpen(false);
+    } catch (e) { err(e); } finally { setBusy(false); }
+  };
+  if (!open) return <button type="button" onClick={() => setOpen(true)} data-testid="colar-acessos-abrir" className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-cyan/40 px-3 py-2.5 text-sm text-cyan transition hover:bg-cyan/10"><Sparkles size={14} /> Colar e organizar acessos automaticamente</button>;
+  const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-base outline-none focus:border-cyan/60 md:text-sm";
+  return (
+    <div className="space-y-2 rounded-2xl border border-cyan/40 bg-black/20 p-3" data-testid="colar-acessos">
+      <p className="text-[0.7rem] text-muted-foreground">Cole o texto como veio (nome, tipo de acesso, e-mail e senha). Eu separo cada pessoa e mostro antes de salvar. <b className="text-foreground">Nada é enviado para a internet</b>: a leitura é feita aqui no navegador.</p>
+      <textarea value={text} onChange={(e) => { setText(e.target.value); setRead(null); }} rows={7} placeholder={"1. Nome\n* Tipo de acesso: Gestor\n* E-mail: ...\n* Senha: ..."} aria-label="Acessos colados" data-testid="colar-acessos-texto" className={`${field} w-full resize-y font-mono`} />
+      <input value={system} onChange={(e) => { setSystem(e.target.value); setRead(null); }} placeholder="Onde é esse acesso? (opcional, ex.: Painel de matrículas)" aria-label="Onde são esses acessos" className={`${field} w-full`} />
+      {read && read.length > 0 && (
+        <div className="space-y-1.5" data-testid="colar-acessos-previa">
+          <div className="flex items-center justify-between"><p className="mono-caps">{read.length - skip.size} de {read.length} para adicionar</p><button type="button" onClick={() => setShow((v) => !v)} className="flex items-center gap-1 text-[0.7rem] text-muted-foreground hover:text-cyan">{show ? <EyeOff size={12} /> : <Eye size={12} />} {show ? "Ocultar senhas" : "Mostrar senhas"}</button></div>
+          {read.map((a, i) => { const f = accessFields(a, system), dup = exists(a); return (
+            <label key={i} className={`flex items-start gap-2.5 rounded-xl border p-2.5 text-xs ${skip.has(i) ? "border-white/10 opacity-50" : "border-cyan/30 bg-cyan/5"}`}>
+              <input type="checkbox" checked={!skip.has(i)} onChange={() => setSkip((o) => { const n = new Set(o); if (n.has(i)) n.delete(i); else n.add(i); return n; })} className="mt-0.5" aria-label={`Adicionar ${f.note || f.label}`} />
+              <span className="min-w-0 flex-1"><b className="block text-sm">{f.label}{f.note && <span className="font-normal text-muted-foreground"> · {f.note}</span>}</b><span className="block break-all font-mono text-muted-foreground">{f.username || "— sem e-mail/usuário —"}</span><span className="block font-mono text-amber">Senha: {f.pass ? (show ? f.pass : "••••••••") : "—"}{/\s/.test(f.pass) && <span className="ml-1.5 font-sans text-[0.65rem] text-rose-300">tem espaço — confira</span>}</span>{dup && <span className="text-[0.65rem] text-muted-foreground">já existe neste cliente</span>}</span>
+            </label>); })}
+        </div>)}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => { setOpen(false); setRead(null); setText(""); }} className="rounded-full border border-white/10 px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancelar</button>
+        {!read || read.length === 0 ? <button type="button" onClick={ler} disabled={!text.trim()} data-testid="colar-acessos-ler" className="flex-1 rounded-full border border-cyan/60 py-1.5 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">Ler o texto</button>
+          : <button type="button" onClick={() => void adicionar()} disabled={busy || skip.size === read.length} data-testid="colar-acessos-adicionar" className="flex-1 rounded-full border border-cyan/60 py-1.5 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">{busy ? "Adicionando…" : `Adicionar ${read.length - skip.size}`}</button>}
+      </div>
+    </div>
+  );
+}
+
 function AccessTab({ client, access, acts, err, dossierName }: { client: Client; access: import("@/lib/clients").ClientAccess[]; acts: Acts; err: (e: unknown) => void; dossierName: string | undefined }) {
   const [label, setLabel] = useState(""), [user, setUser] = useState(""), [pass, setPass] = useState(""), [note, setNote] = useState(""), [shown, setShown] = useState<Record<string, boolean>>({});
   const [edit, setEdit] = useState<{ id: string; label: string; user: string; pass: string; note: string } | null>(null);
@@ -557,6 +600,7 @@ function AccessTab({ client, access, acts, err, dossierName }: { client: Client;
           <button onClick={() => setEdit({ id: a.id, label: a.label, user: a.username, pass: pw ?? "", note: a.note })} aria-label={`Editar ${a.label}`} data-testid="acesso-editar" className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
           <button onClick={() => acts.removeAccess.mutate(a.id, { onSuccess: () => removeAccessLogin(a.id), onError: err })} aria-label={`Apagar ${a.label}`} className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
         </div>); })}
+      <PasteAccess client={client} access={access} acts={acts} err={err} dossierName={dossierName} />
       <form onSubmit={(e) => { e.preventDefault(); if (!label.trim()) return; acts.addAccess.mutate({ clientId: client.id, label, username: user, note }, { onSuccess: (id) => { saveAccessLogin({ accessId: id, label, user, pass, owner: client.contactName, dossier: dossierName ?? client.name, note }); setLabel(""); setUser(""); setPass(""); setNote(""); }, onError: err }); }} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
         <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Onde (ex.: painel de anúncios)" aria-label="Onde" className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60" />
         <div className="flex gap-2"><input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Usuário" aria-label="Usuário" autoComplete="off" className={field} /><input value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Senha" aria-label="Senha" autoComplete="new-password" data-testid="acesso-nova-senha" className={`${field} font-mono`} /></div>
