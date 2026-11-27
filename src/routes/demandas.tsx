@@ -363,12 +363,12 @@ function Demandas() {
   const clientsQ = useClients(pid ?? defaultProjectId());
   const meetingsQ = useMeetings(), meetingCount = (meetingsQ.data ?? []).filter((m) => m.dossierProject === (pid ?? defaultProjectId())).length;
   const tabs = [
-    { k: "overview" as const, label: "Visão geral", sub: "Todos os tipos", icon: LayoutGrid, color: "cyan", n: items.length },
+    { k: "clientes" as const, label: "Clientes", sub: "Carteira e fichas", icon: Users, color: "amber", n: clientsQ.data?.length ?? 0 },
     { k: "agenda" as const, label: "Calendário", sub: "Compromissos", icon: Calendar, color: "emerald", n: appts.length },
     { k: "dossies" as const, label: L.plural, sub: "Cadastro", icon: Folder, color: "pink", n: ds.dossiers.length },
     { k: "docs" as const, label: "Documentação", sub: "Biblioteca", icon: FolderOpen, color: "violet", n: 19 },
     { k: "reunioes" as const, label: "Reuniões", sub: "Atas e decisões", icon: Mic, color: "violet", n: meetingCount },
-    { k: "clientes" as const, label: "Clientes", sub: "Carteira e fichas", icon: Users, color: "amber", n: clientsQ.data?.length ?? 0 },
+    { k: "overview" as const, label: "Demandas antigas", sub: "Histórico e Kanban", icon: LayoutGrid, color: "cyan", n: items.length },
   ];
   const filterBar = tab !== "notas" && tab !== "clientes" && tab !== "docs" && tab !== "dossies" && tab !== "agenda" && tab !== "reunioes";
   const boardItems = (t: typeof tab) => filtered.filter((i) => t === "overview" || i.type === t);

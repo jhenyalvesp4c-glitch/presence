@@ -35,7 +35,6 @@ import { Route as ResumoRouteImport } from './routes/resumo'
 import { Route as ReunioesRouteImport } from './routes/reunioes'
 import { Route as SaudeRouteImport } from './routes/saude'
 import { Route as TarefasRouteImport } from './routes/tarefas'
-import { Route as TrabalhoRouteImport } from './routes/trabalho'
 import { Route as TreinoRouteImport } from './routes/treino'
 import { Route as ApiMcpRouteImport } from './routes/api.mcp'
 import { Route as ApiTtsRouteImport } from './routes/api.tts'
@@ -186,11 +185,6 @@ const TarefasRoute = TarefasRouteImport.update({
   path: '/tarefas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TrabalhoRoute = TrabalhoRouteImport.update({
-  id: '/trabalho',
-  path: '/trabalho',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TreinoRoute = TreinoRouteImport.update({
   id: '/treino',
   path: '/treino',
@@ -314,7 +308,6 @@ export interface FileRoutesByFullPath {
   '/reunioes': typeof ReunioesRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
-  '/trabalho': typeof TrabalhoRoute
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
@@ -362,7 +355,6 @@ export interface FileRoutesByTo {
   '/reunioes': typeof ReunioesRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
-  '/trabalho': typeof TrabalhoRoute
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
@@ -411,7 +403,6 @@ export interface FileRoutesById {
   '/reunioes': typeof ReunioesRoute
   '/saude': typeof SaudeRoute
   '/tarefas': typeof TarefasRoute
-  '/trabalho': typeof TrabalhoRoute
   '/treino': typeof TreinoRoute
   '/api/mcp': typeof ApiMcpRouteWithChildren
   '/api/tts': typeof ApiTtsRoute
@@ -461,7 +452,6 @@ export interface FileRouteTypes {
     | '/reunioes'
     | '/saude'
     | '/tarefas'
-    | '/trabalho'
     | '/treino'
     | '/api/mcp'
     | '/api/tts'
@@ -509,7 +499,6 @@ export interface FileRouteTypes {
     | '/reunioes'
     | '/saude'
     | '/tarefas'
-    | '/trabalho'
     | '/treino'
     | '/api/mcp'
     | '/api/tts'
@@ -557,7 +546,6 @@ export interface FileRouteTypes {
     | '/reunioes'
     | '/saude'
     | '/tarefas'
-    | '/trabalho'
     | '/treino'
     | '/api/mcp'
     | '/api/tts'
@@ -606,7 +594,6 @@ export interface RootRouteChildren {
   ReunioesRoute: typeof ReunioesRoute
   SaudeRoute: typeof SaudeRoute
   TarefasRoute: typeof TarefasRoute
-  TrabalhoRoute: typeof TrabalhoRoute
   TreinoRoute: typeof TreinoRoute
   ApiMcpRoute: typeof ApiMcpRouteWithChildren
   ApiTtsRoute: typeof ApiTtsRoute
@@ -810,13 +797,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TarefasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/trabalho': {
-      id: '/trabalho'
-      path: '/trabalho'
-      fullPath: '/trabalho'
-      preLoaderRoute: typeof TrabalhoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/treino': {
       id: '/treino'
       path: '/treino'
@@ -1001,7 +981,6 @@ const rootRouteChildren: RootRouteChildren = {
   ReunioesRoute: ReunioesRoute,
   SaudeRoute: SaudeRoute,
   TarefasRoute: TarefasRoute,
-  TrabalhoRoute: TrabalhoRoute,
   TreinoRoute: TreinoRoute,
   ApiMcpRoute: ApiMcpRouteWithChildren,
   ApiTtsRoute: ApiTtsRoute,

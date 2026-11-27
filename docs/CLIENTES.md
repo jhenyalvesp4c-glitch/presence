@@ -73,7 +73,6 @@ Na aba **Tarefas** da ficha, quando o cliente já tem tarefas, o botão **"Aplic
 
 Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá para **arrastar** para outra posição. A ordem fica salva (`tasks.client_order`); a "etapa atual" do cartão segue essa ordem. Tarefa nova entra no **fim** da lista (não mais no topo).
 
-## Página principal: Meu trabalho (`/trabalho`)
-- Abre ao iniciar o app (`/` redireciona para cá).
-- **Fila de trabalho**: tarefas dos polos + tarefas gerais (categoria "Trabalho"), com filtros Pendentes/Atrasadas/Para hoje/Sem data/Feitas, filtro por polo ("Só geral" incluso) e busca. Lógica pura em `src/lib/work-queue.ts`.
-- **Por polo**: a visão de clientes (`ClientsView`). As demandas antigas continuam como histórico na ficha do cliente.
+## Clientes como página central
+- Em Demandas (P4C) a aba **Clientes** é a primeira e abre por padrão. A antiga "Visão geral"/Kanban virou a aba **Demandas antigas** (histórico).
+- Trabalho geral (que não é de polo): crie um cliente com o seu nome e coloque as tarefas nele.
