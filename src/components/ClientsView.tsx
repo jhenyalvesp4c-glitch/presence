@@ -478,18 +478,30 @@ function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[];
         <div className="space-y-2.5">
           {tasks.map((t, idx) => (filtro === "todas" || (filtro === "abertas" ? !t.done : t.done)) && (
             <div key={t.id} draggable onDragStart={() => setDragId(t.id)} onDragOver={(e) => { if (dragId) e.preventDefault(); }} onDrop={() => { if (dragId) { move(tasks.findIndex((x) => x.id === dragId), idx); setDragId(null); } }} onDragEnd={() => setDragId(null)} className={`relative ${dragId === t.id ? "opacity-50" : ""}`} data-testid="cliente-tarefa">
-              <span aria-hidden className={`absolute left-[-1.3rem] top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${t.done ? "h-1.5 w-1.5 bg-cyan/70" : t.id === tasks.find((x) => !x.done)?.id ? "h-3 w-3 border-2 border-cyan bg-background shadow-[0_0_10px_var(--cyan)]" : "h-2.5 w-2.5 border border-cyan/60 bg-background"}`} />
-              <div className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 backdrop-blur ${!t.done && t.id === tasks.find((x) => !x.done)?.id ? "border-violet/60 bg-violet/10 shadow-[0_0_28px_-10px_var(--violet)]" : "border-white/10 bg-white/[0.04]"}`}>
-                <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition active:scale-90 ${t.done ? "border-cyan bg-cyan/20 text-cyan" : "border-white/25 hover:border-cyan"}`}>{t.done && <Check size={13} />}</button>
-                <div className="min-w-0 flex-1"><p className={`break-words text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
-                  <TaskThumbs files={t.attachments ?? []} title={t.title} />
-                  {(() => { const sub = [t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : "", t.person_id && people.find((x) => x.id === t.person_id) ? `Para ${people.find((x) => x.id === t.person_id)!.name}` : ""].filter(Boolean).join(" · "); return sub ? <p className="break-words text-xs text-muted-foreground">{sub}</p> : null; })()}</div>
-                <button type="button" onClick={() => setEditing(t)} aria-label={`Editar ${t.title}`} data-testid="cliente-tarefa-editar" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:border-cyan/40 hover:text-foreground"><Pencil size={13} /></button>
-                <span className="relative shrink-0">
-                  <button type="button" onClick={() => setMenuId(menuId === t.id ? null : t.id)} aria-label={`Mais opções de ${t.title}`} aria-expanded={menuId === t.id} className="grid h-8 w-8 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:border-cyan/40 hover:text-foreground"><MoreHorizontal size={14} /></button>
-                  {menuId === t.id && <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-2xl border border-white/10 bg-popover/95 p-1.5 shadow-xl backdrop-blur-xl"><button type="button" data-testid="cliente-tarefa-excluir" onClick={() => { setMenuId(null); if (window.confirm(`Excluir a tarefa "${t.title}"?`)) del.mutate(t.id, { onSuccess: () => toast.success("Tarefa excluída"), onError: (e) => toast.error((e as Error).message) }); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-destructive transition hover:bg-destructive/10"><Trash2 size={13} /> Excluir</button></div>}
-                </span>
-              </div>
+              {(() => {
+                const cur = !t.done && t.id === tasks.find((x) => !x.done)?.id, rail = t.done ? "var(--emerald)" : cur ? "var(--violet)" : "var(--cyan)";
+                const sub = [t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : "", t.person_id && people.find((x) => x.id === t.person_id) ? `Para ${people.find((x) => x.id === t.person_id)!.name}` : ""].filter(Boolean).join(" · ");
+                const ghost = "grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition hover:bg-white/10 hover:text-foreground";
+                return (<>
+                  <span aria-hidden className={`absolute left-[-1.3rem] top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full ${t.done ? "h-1.5 w-1.5 bg-emerald/70" : cur ? "h-3 w-3 border-2 border-violet bg-background shadow-[0_0_12px_var(--violet)]" : "h-2.5 w-2.5 border border-cyan/60 bg-background"}`} />
+                  <div className={cur ? "ai-border" : ""}>
+                    <div className={`ex-card ex-glass card-sheen px-3.5 py-3 ${t.done ? "opacity-55" : ""}`} style={{ "--rail": rail } as CSSProperties}>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition active:scale-90 ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/30 hover:border-[var(--rail)] hover:shadow-[0_0_14px_-2px_var(--rail)]"}`}>{t.done && <Check size={13} style={{ animation: "ex-tick .45s both" }} />}</button>
+                        <div className="min-w-0 flex-1">
+                          {cur && <p className="mono-caps !text-[0.58rem] text-violet">Etapa atual</p>}
+                          <p className={`break-words text-[0.92rem] font-medium leading-snug tracking-tight ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
+                          <TaskThumbs files={t.attachments ?? []} title={t.title} />
+                          {sub && <p className="mt-0.5 break-words text-[0.7rem] text-muted-foreground">{sub}</p>}
+                        </div>
+                        <button type="button" onClick={() => setEditing(t)} aria-label={`Editar ${t.title}`} data-testid="cliente-tarefa-editar" className={ghost}><Pencil size={14} /></button>
+                        <button type="button" onClick={() => setMenuId(menuId === t.id ? null : t.id)} aria-label={`Mais opções de ${t.title}`} aria-expanded={menuId === t.id} className={ghost}><MoreHorizontal size={15} /></button>
+                      </div>
+                      {menuId === t.id && <div className="mt-2.5 flex justify-end border-t border-white/10 pt-2"><button type="button" data-testid="cliente-tarefa-excluir" onClick={() => { setMenuId(null); if (window.confirm(`Excluir a tarefa "${t.title}"?`)) del.mutate(t.id, { onSuccess: () => toast.success("Tarefa excluída"), onError: (e) => toast.error((e as Error).message) }); }} className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs text-destructive transition hover:bg-destructive/10"><Trash2 size={12} /> Excluir tarefa</button></div>}
+                    </div>
+                  </div>
+                </>);
+              })()}
             </div>))}
         </div>
       </div>
