@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { ClipboardCopy, Gavel, ListChecks, MessagesSquare, Mic } from "lucide-react";
 import { copyText } from "@/lib/clipboard";
 import { analysisToMarkdown } from "@/lib/meetings";
-import { GripVertical, Building2, CalendarClock, Check, ClipboardList, Copy, Eye, EyeOff, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
+import { GripVertical, Building2, CalendarClock, Check, ClipboardList, Copy, Eye, EyeOff, Download, FileText, FlaskConical, FolderOpen, KeyRound, LayoutGrid, Link2, List, Loader2, MoreHorizontal, Paperclip, Pencil, Plus, Rocket, Search, Send, Sparkles, Trash2, Users, X } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Donut, Meter, Money, Ring, Sparkline } from "@/components/finance/charts";
@@ -63,7 +63,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
   const extrasQ = useClientExtras(projectId, clients), ex = extrasQ.data, linksQ = useClientLinks(projectId, clients), links = linksQ.data ?? {};
   const dossiers = useProjectDossiers(projectId).data ?? [], acts = useClientActions(projectId);
   const [filtro, setFiltro] = useState<"todos" | ClientStatus>("todos"), [q, setQ] = useState(""), [vista, setVista] = useState<"tab" | "cards" | "pas">("cards");
-  const [importing, setImporting] = useState(false), [selId, setSelId] = useState<string | null>(null), [tab, setTab] = useState<Tab>("docs"), [form, setForm] = useState<{ edit: Client | null } | null>(null), [exemplo, setExemplo] = useState(false);
+  const [importing, setImporting] = useState(false), [selId, setSelId] = useState<string | null>(null), [tab, setTab] = useState<Tab>("tar"), [form, setForm] = useState<{ edit: Client | null } | null>(null), [exemplo, setExemplo] = useState(false);
   const [ask, setAsk] = useState(""), [answer, setAnswer] = useState<QuickAnswer | null>(null), [active, setActive] = useState<string | null>(null);
 
   const docs = ex?.docs ?? [], demands = ex?.demands ?? [];
@@ -145,7 +145,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
           <div className="rounded-2xl border border-violet/30 bg-violet/10 p-4 text-sm" data-testid="cliente-resposta" style={{ animation: "fin-rise .35s both" }}>
             <div className="flex items-start gap-2"><b className="flex-1 font-display">{answer.title}</b><button onClick={() => setAnswer(null)} aria-label="Fechar resposta" className="text-muted-foreground hover:text-foreground"><X size={13} /></button></div>
             {answer.lines.map((l) => <p key={l} className="mt-1 text-xs text-muted-foreground">• {l}</p>)}
-            <div className="mt-2 flex flex-wrap gap-2">{answer.clientId && <button onClick={() => { setSelId(answer.clientId ?? null); setTab("docs"); }} className="rounded-full border border-cyan/50 px-3 py-1 text-xs text-cyan hover:bg-cyan/10">Abrir ficha</button>}<Link to="/assistente" className="rounded-full border border-white/15 px-3 py-1 text-xs text-muted-foreground hover:text-foreground">Perguntar ao assistente</Link></div>
+            <div className="mt-2 flex flex-wrap gap-2">{answer.clientId && <button onClick={() => { setSelId(answer.clientId ?? null); setTab("tar"); }} className="rounded-full border border-cyan/50 px-3 py-1 text-xs text-cyan hover:bg-cyan/10">Abrir ficha</button>}<Link to="/assistente" className="rounded-full border border-white/15 px-3 py-1 text-xs text-muted-foreground hover:text-foreground">Perguntar ao assistente</Link></div>
           </div>)}
 
         <div className="flex flex-wrap items-center gap-3">
@@ -177,7 +177,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
                 return (
                   <div key={c.id} style={{ animation: `fin-pop .55s ${Math.min(i, 8) * 0.06}s both` }}>
                     <Tilt max={9}>
-                      <div role="button" tabIndex={0} onClick={() => { setSelId(c.id); setTab("docs"); }} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setSelId(c.id); setTab("docs"); } }} data-testid={`cliente-${c.id}`} className={`ex-card block w-full cursor-pointer p-4 text-left ${selId === c.id ? "ring-1 ring-cyan/60" : ""}`} style={{ "--rail": cssColor(tone) } as CSSProperties}>
+                      <div role="button" tabIndex={0} onClick={() => { setSelId(c.id); setTab("tar"); }} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setSelId(c.id); setTab("tar"); } }} data-testid={`cliente-${c.id}`} className={`ex-card block w-full cursor-pointer p-4 text-left ${selId === c.id ? "ring-1 ring-cyan/60" : ""}`} style={{ "--rail": cssColor(tone) } as CSSProperties}>
                         <div className="flex items-start gap-3">
                           <span className="icon-tile h-11 w-11 shrink-0 !rounded-2xl text-sm font-bold shadow-[0_0_20px_-6px_var(--glow)]" style={tint(tone)}>{ini(c.name)}</span>
                           <div className="min-w-0 flex-1"><p className="truncate font-display text-base font-semibold">{c.name}</p><p className="truncate text-xs text-muted-foreground">{c.contactName || "sem contato"}{c.segment && ` · ${c.segment}`}</p><div className="mt-1.5 flex flex-wrap gap-1.5"><StatusTag s={c.status} />{dossierName(c.dossierId) && <span className="tag !py-0.5 !text-[0.7rem]" style={tint("violet")}><Link2 size={9} className="mr-1 inline" />{dossierName(c.dossierId)}</span>}</div></div>
@@ -222,7 +222,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
             ) : vista === "tab" ? (
               <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm"><thead><tr className="border-b border-white/10 text-left">{["Cliente", "Situação", ...(sel ? [] : ["Plano", "Valor/mês"]), "Fim do contrato", ...(sel ? [] : ["Docs"])].map((h) => <th key={h} className="mono-caps whitespace-nowrap px-4 py-3 font-normal">{h}</th>)}</tr></thead>
                 <tbody>{shown.map((c) => (
-                  <tr key={c.id} onClick={() => { setSelId(c.id); setTab("docs"); }} onKeyDown={(e) => { if (e.key === "Enter") { setSelId(c.id); setTab("docs"); } }} tabIndex={0} data-testid={`cliente-${c.id}`} className={`cursor-pointer border-b border-white/5 transition last:border-0 hover:bg-white/[0.04] ${selId === c.id ? "bg-violet/10" : ""}`}>
+                  <tr key={c.id} onClick={() => { setSelId(c.id); setTab("tar"); }} onKeyDown={(e) => { if (e.key === "Enter") { setSelId(c.id); setTab("tar"); } }} tabIndex={0} data-testid={`cliente-${c.id}`} className={`cursor-pointer border-b border-white/5 transition last:border-0 hover:bg-white/[0.04] ${selId === c.id ? "bg-violet/10" : ""}`}>
                     <td className="px-4 py-3"><div className="flex items-center gap-3"><span className="icon-tile h-9 w-9 shrink-0 !rounded-xl text-[0.7rem] font-bold" style={tint(colorOf(c.id))}>{ini(c.name)}</span><div className="min-w-0"><p className="truncate font-medium">{c.name}</p><p className="truncate text-xs text-muted-foreground">{c.contactName || "sem contato"}{c.segment && ` · ${c.segment}`}</p></div></div></td>
                     <td className="px-4 py-3"><StatusTag s={c.status} /></td>
                     {!sel && <><td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{c.plan || "—"}</td><td className="px-4 py-3 tabular-nums">{c.monthlyValue ? brl(c.monthlyValue) : "—"}</td></>}
@@ -231,7 +231,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
                   </tr>))}</tbody></table></div>
             ) : (
               <div className="space-y-1 p-3">{shown.map((c) => <div key={c.id}>
-                <button onClick={() => { setSelId(selId === c.id ? null : c.id); setTab("docs"); }} aria-expanded={selId === c.id} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/[0.05]"><FolderOpen size={17} className="shrink-0 text-cyan" /><b className="min-w-0 flex-1 truncate font-medium">{c.name}</b><StatusTag s={c.status} /><span className="mono-caps">{docs.filter((x) => x.clientId === c.id).length} docs</span></button>
+                <button onClick={() => { setSelId(selId === c.id ? null : c.id); setTab("tar"); }} aria-expanded={selId === c.id} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/[0.05]"><FolderOpen size={17} className="shrink-0 text-cyan" /><b className="min-w-0 flex-1 truncate font-medium">{c.name}</b><StatusTag s={c.status} /><span className="mono-caps">{docs.filter((x) => x.clientId === c.id).length} docs</span></button>
                 {selId === c.id && <div className="ml-9 space-y-0.5 pb-2">{docs.filter((x) => x.clientId === c.id).map((d) => <div key={d.id} className="flex justify-between gap-3 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"><span className="flex min-w-0 items-center gap-2"><FileText size={12} className="shrink-0" /><span className="truncate">{d.title}</span></span><span className="mono-caps shrink-0">{d.kind}</span></div>)}</div>}</div>)}</div>
             )}
           </section>
@@ -242,7 +242,7 @@ export function ClientsView({ projectId }: { projectId: string }) {
       </>)}
 
       {importing && <ImportDossiers dossiers={dossiers} existing={new Set(clients.map((c) => c.dossierId).filter((x): x is string => !!x))} onClose={() => setImporting(false)} onImport={(list) => acts.importDossiers.mutate(list, { onSuccess: (n) => { setImporting(false); toast.success(`${n} cliente${n === 1 ? "" : "s"} criado${n === 1 ? "" : "s"} a partir dos dossiês`); }, onError: err })} busy={acts.importDossiers.isPending} />}
-      {form && <ClientForm key={form.edit?.id ?? "novo"} initial={form.edit} dossiers={dossiers} busy={acts.save.isPending} onClose={() => setForm(null)} onSave={(c) => acts.save.mutate(c, { onSuccess: (id) => { setForm(null); if (id) { setSelId(String(id)); setTab("docs"); } toast.success(c.id ? "Cliente atualizado" : "Cliente cadastrado"); }, onError: err })} />}
+      {form && <ClientForm key={form.edit?.id ?? "novo"} initial={form.edit} dossiers={dossiers} busy={acts.save.isPending} onClose={() => setForm(null)} onSave={(c) => acts.save.mutate(c, { onSuccess: (id) => { setForm(null); if (id) { setSelId(String(id)); setTab("tar"); } toast.success(c.id ? "Cliente atualizado" : "Cliente cadastrado"); }, onError: err })} />}
     </div>
   );
 }
@@ -302,21 +302,31 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
   const tasksQ = useTasks(), clientTasks = useMemo(() => orderClientTasks((tasksQ.data ?? []).filter((t) => t.client_id === c.id)), [tasksQ.data, c.id]);
   const people = (useAllPeople().data ?? []).filter((p) => p.client_id === c.id);
   const [confirm, setConfirm] = useState(false), tone = colorOf(c.id);
-  const tabs: [Tab, string, typeof FileText][] = [["imp", "Implantação", Rocket], ["docs", `Documentos (${docs.length + (links?.libDocs.length ?? 0)})`, FileText], ["reun", `Reuniões (${meets.length})`, CalendarClock], ["dem", `Demandas (${dem.filter((d) => d.status !== "done").length})`, ClipboardList], ["tar", `Tarefas (${clientTasks.filter((t) => !t.done).length})`, ListChecks], ["pes", `Pessoas (${people.length})`, Users], ["ace", `Acessos (${access.length + logins.length})`, KeyRound], ["lin", "Histórico", Sparkles]];
+  const [menu, setMenu] = useState(false);
+  const tabs: [Tab, string, number, typeof FileText][] = [["tar", "Tarefas", clientTasks.filter((t) => !t.done).length, ListChecks], ["pes", "Pessoas", people.length, Users], ["ace", "Acessos", access.length + logins.length, KeyRound], ["docs", "Documentos", docs.length + (links?.libDocs.length ?? 0), FileText], ["reun", "Reuniões", meets.length, CalendarClock], ["dem", "Demandas", dem.filter((d) => d.status !== "done").length, ClipboardList], ["imp", "Implantação", 0, Rocket], ["lin", "Histórico", 0, Sparkles]];
+  const cur = tabs.find((x) => x[0] === tab);
   return (
     <aside className="glass scroll-thin space-y-4 rounded-3xl p-5 animate-rise xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:self-start xl:overflow-y-auto xl:overscroll-contain" data-testid="cliente-ficha">
-      <div className="flex items-start gap-3">
-        <span className="icon-tile h-12 w-12 shrink-0 !rounded-2xl shadow-[0_0_24px_-6px_var(--glow)]" style={tint(tone)}><Building2 size={20} /></span>
-        <div className="min-w-0 flex-1"><p className="mono-caps">Ficha do cliente</p><h3 className="font-display text-lg font-semibold leading-tight">{c.name}</h3><div className="mt-1.5 flex flex-wrap items-center gap-1.5"><StatusTag s={c.status} />{dossierName ? <span className="tag !py-0.5 !text-[0.7rem]" style={tint("violet")}><Link2 size={9} className="mr-1 inline" />Dossiê {dossierName}</span> : <button onClick={onEdit} data-testid="cliente-vincular-dossie" className="rounded-full border border-dashed border-violet/50 px-2.5 py-0.5 text-[0.68rem] text-violet transition hover:bg-violet/10">+ Vincular a um dossiê</button>}</div></div>
-        <button onClick={onEdit} aria-label="Editar cliente" data-testid="cliente-editar" className="grid h-8 w-8 place-items-center rounded-xl border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
-        <button onClick={onClose} aria-label="Fechar ficha" className="grid h-8 w-8 place-items-center rounded-xl border border-white/10 text-muted-foreground hover:text-foreground"><X size={14} /></button>
+      <div className="flex items-start gap-4">
+        <span className="icon-tile h-16 w-16 shrink-0 !rounded-3xl shadow-[0_0_34px_-4px_var(--glow)]" style={tint(tone)}><Building2 size={26} /></span>
+        <div className="min-w-0 flex-1"><h3 className="break-words font-display text-xl font-semibold leading-tight">{c.name}</h3><div className="mt-2 flex flex-wrap items-center gap-1.5"><StatusTag s={c.status} />{dossierName ? <span className="tag !py-0.5 !text-[0.7rem]" style={tint("violet")}><Link2 size={9} className="mr-1 inline" />Dossiê {dossierName}</span> : <button onClick={onEdit} data-testid="cliente-vincular-dossie" className="rounded-full border border-dashed border-violet/50 px-2.5 py-0.5 text-[0.68rem] text-violet transition hover:bg-violet/10">+ Vincular a um dossiê</button>}</div></div>
+        <div className="flex shrink-0 gap-1.5">
+          <button onClick={onEdit} aria-label="Editar cliente" data-testid="cliente-editar" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:border-cyan/40 hover:text-foreground"><Pencil size={14} /></button>
+          <span className="relative">
+            <button onClick={() => setMenu((v) => !v)} aria-label="Mais opções" aria-expanded={menu} data-testid="cliente-mais" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:border-cyan/40 hover:text-foreground"><MoreHorizontal size={15} /></button>
+            {menu && <div className="absolute right-0 top-full z-30 mt-1.5 w-48 rounded-2xl border border-white/10 bg-popover/95 p-1.5 shadow-xl backdrop-blur-xl"><button onClick={() => { setMenu(false); setConfirm(true); }} data-testid="cliente-apagar" className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-destructive transition hover:bg-destructive/10"><Trash2 size={13} /> Apagar cliente</button></div>}
+          </span>
+          <button onClick={onClose} aria-label="Fechar ficha" className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:border-cyan/40 hover:text-foreground"><X size={15} /></button>
+        </div>
       </div>
+      {confirm && <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/5 p-3 text-xs"><span className="text-muted-foreground">Apagar o cliente, documentos e histórico? Não dá para desfazer.</span><button onClick={onDelete} data-testid="cliente-apagar-ok" className="rounded-full border border-destructive/60 px-3 py-1 text-destructive hover:bg-destructive/10">Apagar</button><button onClick={() => setConfirm(false)} className="rounded-full border border-white/15 px-3 py-1">Cancelar</button></div>}
       {(c.contactName || c.segment || c.email || c.phone || c.docNumber || c.plan || c.monthlyValue || c.contractEnd || c.notes) && <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm" data-testid="ficha-dados">
         {([["Contato", c.contactName], ["Segmento", c.segment], ["E-mail", c.email], ["Telefone", c.phone], ["CNPJ/CPF", c.docNumber], ["Plano", c.plan ? `${c.plan}${c.monthlyValue ? ` · ${brl(c.monthlyValue)}/mês` : ""}` : c.monthlyValue ? `${brl(c.monthlyValue)}/mês` : ""]] as const).filter(([, v]) => !!v).map(([k, v]) => <div key={k} className="min-w-0"><dt className="mono-caps">{k}</dt><dd className="break-words font-medium">{v}</dd></div>)}
         {c.contractEnd && <div className="col-span-2"><dt className="mono-caps">Fim do contrato</dt><dd className="font-medium tabular-nums"><Venc c={c} /></dd></div>}
         {c.notes && <div className="col-span-2"><dt className="mono-caps">Observações</dt><dd className="whitespace-pre-wrap text-xs text-muted-foreground">{c.notes}</dd></div>}
       </dl>}
-      <div role="tablist" className="flex flex-wrap gap-x-1 border-b border-white/10">{tabs.map(([k, l, I]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs transition ${tab === k ? "border-cyan text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}><I size={12} /> {l}</button>)}</div>
+      <div role="tablist" className="flex items-stretch justify-between gap-0.5 border-b border-white/10">{tabs.map(([k, l, n, I]) => <button key={k} role="tab" aria-selected={tab === k} aria-label={n ? `${l} (${n})` : l} title={l} data-testid={`ficha-aba-${k}`} onClick={() => setTab(k)} className={`relative grid h-11 min-w-0 flex-1 place-items-center border-b-2 transition ${tab === k ? "border-cyan text-cyan drop-shadow-[0_0_8px_var(--cyan)]" : "border-transparent text-muted-foreground hover:text-foreground"}`}><I size={17} />{n > 0 && <span className="absolute right-1/4 top-1 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-cyan/20 px-1 text-[0.55rem] font-semibold tabular-nums text-cyan">{n}</span>}</button>)}</div>
+      {tab !== "tar" && cur && <h4 className="flex items-center gap-2 font-display text-sm font-semibold">{(() => { const I = cur[3]; return <I size={15} className="text-cyan" />; })()} {cur[1]}{cur[2] > 0 && <span className="font-normal text-muted-foreground"> ({cur[2]})</span>}</h4>}
       {tab === "imp" && <SetupSummary clientId={c.id} clientName={c.name} projectId={c.projectId} />}
       {tab === "docs" && <><DocsTab client={c} docs={docs} acts={acts} err={err} />{(links?.libDocs.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-docs-dossie"><p className="mono-caps">Da pasta do dossiê (Biblioteca)</p>{links!.libDocs.map((d) => <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><FileText size={14} className="shrink-0 text-cyan" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{d.title}</p><p className="truncate text-xs text-muted-foreground">{d.kind}{d.folder && ` · ${d.folder}`}{d.updated && ` · ${d.updated}`}</p></div></div>)}</div>}</>}
       {tab === "reun" && <MeetingsTab client={c} meets={meets} acts={acts} err={err} />}
@@ -325,7 +335,6 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
       {tab === "pes" && <PeopleTab client={c} people={people} tasks={clientTasks} />}
       {tab === "ace" && <><AccessTab client={c} access={access} acts={acts} err={err} dossierName={dossierName} />{logins.length > 0 && <div className="mt-4 space-y-2" data-testid="cliente-logins-dossie"><p className="mono-caps">Logins do dossiê (Documentação)</p>{logins.map((l) => <div key={l.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--amber)" } as CSSProperties}><KeyRound size={14} className="shrink-0 text-amber" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{l.title}</p><p className="truncate font-mono text-xs text-muted-foreground">{l.user}{l.owner && ` · ${l.owner}`}</p><p className="truncate font-mono text-xs text-amber" data-testid="cliente-login-senha">Senha: {l.pass || "—"}</p></div><CopyPass user={l.user} pass={l.pass} /></div>)}<p className="text-[0.65rem] text-muted-foreground">As senhas ficam só neste navegador (não vão para o banco nem para a IA).</p></div>}</>}
       {tab === "lin" && <><LogTab client={c} log={log} acts={acts} err={err} />{(links?.records.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-registros-dossie"><p className="mono-caps">Registros e notas do dossiê</p>{links!.records.slice(0, 12).map((r) => <div key={r.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2"><p className="mono-caps">{r.kind === "nota" ? "Nota" : "Registro"} · {r.kind === "nota" ? r.date : dateBR(r.date)}</p><p className="line-clamp-2 whitespace-pre-wrap text-sm">{r.text}</p></div>)}</div>}</>}
-      <div className="border-t border-white/10 pt-3">{confirm ? <div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-muted-foreground">Apagar o cliente, documentos e histórico? Não dá para desfazer.</span><button onClick={onDelete} data-testid="cliente-apagar-ok" className="rounded-full border border-destructive/60 px-3 py-1 text-destructive hover:bg-destructive/10">Apagar</button><button onClick={() => setConfirm(false)} className="rounded-full border border-white/15 px-3 py-1">Cancelar</button></div> : <button onClick={() => setConfirm(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"><Trash2 size={12} /> Apagar cliente</button>}</div>
           </aside>
   );
 }
@@ -436,7 +445,7 @@ function CopyPass({ user, pass }: { user: string; pass: string }) {
 function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[]; people: Person[] }) {
   const qc = useQueryClient(), create = useCreateTask(), toggle = useToggleTask(), cats = useCategories().data ?? [], files = useTaskFiles(), update = useUpdateTask(), del = useDeleteTask(), allClients = useAllClients().data ?? [], allPeople = useAllPeople().data ?? [], [editing, setEditing] = useState<Task | null>(null), [applying, setApplying] = useState(false), [dragId, setDragId] = useState<string | null>(null);
   const move = (from: number, to: number) => { const ids = moveItem(tasks, from, to).map((t) => t.id); if (ids.join() === tasks.map((t) => t.id).join()) return; void saveClientOrder(ids).then(() => qc.invalidateQueries({ queryKey: ["tasks"] })).catch((e: Error) => toast.error(e.message)); };
-  const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false), [showDone, setShowDone] = useState(false), [personId, setPersonId] = useState(""), [newName, setNewName] = useState(""), [newRole, setNewRole] = useState("");
+  const [title, setTitle] = useState(""), [date, setDate] = useState(""), [time, setTime] = useState(""), [cat, setCat] = useState(""), [remind, setRemind] = useState<number[]>([]), [open, setOpen] = useState(false), [filtro, setFiltro] = useState<"abertas" | "todas" | "feitas">("abertas"), [adding, setAdding] = useState(false), [menuId, setMenuId] = useState<string | null>(null), [personId, setPersonId] = useState(""), [newName, setNewName] = useState(""), [newRole, setNewRole] = useState("");
   const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none focus:border-cyan/60 [color-scheme:dark]";
   const catName = (id: string | null | undefined) => cats.find((x) => x.id === id)?.name;
   // sem categoria escolhida, a tarefa vai para "Clientes" (não para "Demandas"): assim, nas Tarefas, dá para separar tudo o que é para os clientes
@@ -452,9 +461,42 @@ function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[];
       { onSuccess: () => { setTitle(""); setDate(""); setTime(""); setRemind([]); setPersonId(""); setNewName(""); setNewRole(""); files.clear(); void qc.invalidateQueries({ queryKey: ["categories"] }); toast.success(`Tarefa criada em Clientes · ${client.name}`); }, onError: (e) => toast.error((e as Error).message) });
   };
   return (
-    <div className="space-y-2" data-testid="cliente-tarefas">
-      <form onSubmit={(e) => { e.preventDefault(); void add(); }} onPaste={files.onPaste} onDrop={files.onDrop} onDragOver={files.onDragOver} className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-        <div className="flex gap-2"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Nova tarefa para ${client.name} (ex.: Treinamento)`} aria-label="Nova tarefa do cliente" data-testid="cliente-tarefa-titulo" className={field} /><button type="submit" disabled={!title.trim() || create.isPending || files.busy} className="rounded-full border border-cyan/60 px-4 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">{files.busy ? "Enviando…" : "Criar"}</button></div>
+    <div className="space-y-3" data-testid="cliente-tarefas">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="flex items-center gap-2 font-display text-sm font-semibold"><ListChecks size={15} className="text-cyan" /> Tarefas <span className="font-normal text-muted-foreground">({tasks.length})</span></h4>
+        {tasks.length > 0 && <select value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} aria-label="Mostrar tarefas" data-testid="cliente-tarefas-filtro" className="rounded-full border border-white/15 bg-black/25 px-3 py-1 text-xs outline-none focus:border-cyan/60"><option value="abertas" className="bg-popover">Abertas</option><option value="todas" className="bg-popover">Todas</option><option value="feitas" className="bg-popover">Concluídas</option></select>}
+      </div>
+      {tasks.length === 0 && (
+        <div className="space-y-2 py-3 text-center">
+          <p className="text-sm text-muted-foreground">Nenhuma tarefa vinculada a este cliente ainda.</p>
+          <button type="button" data-testid="criar-tarefas-padrao" onClick={() => { void createDefaultTasks(client.id, { force: true }).then((n) => { void qc.invalidateQueries({ queryKey: ["tasks"] }); toast.success(n ? `${n} tarefas padrão criadas` : "Nada novo para criar"); }).catch((e: Error) => toast.error(e.message)); }} className="rounded-full border border-cyan/50 px-4 py-1.5 text-xs text-cyan transition hover:bg-cyan/10">Criar as tarefas padrão</button>
+        </div>
+      )}
+      {tasks.length > 0 && tasks.every((t) => t.done) && filtro === "abertas" && <p className="py-2 text-center text-sm text-emerald">✓ Todas as tarefas concluídas</p>}
+      <div className="relative pl-7">
+        <span aria-hidden className="absolute bottom-3 left-[0.45rem] top-3 w-px bg-gradient-to-b from-cyan/60 via-violet/40 to-transparent" />
+        <div className="space-y-2.5">
+          {tasks.map((t, idx) => (filtro === "todas" || (filtro === "abertas" ? !t.done : t.done)) && (
+            <div key={t.id} draggable onDragStart={() => setDragId(t.id)} onDragOver={(e) => { if (dragId) e.preventDefault(); }} onDrop={() => { if (dragId) { move(tasks.findIndex((x) => x.id === dragId), idx); setDragId(null); } }} onDragEnd={() => setDragId(null)} className={`relative ${dragId === t.id ? "opacity-50" : ""}`} data-testid="cliente-tarefa">
+              <span aria-hidden className={`absolute left-[-1.3rem] top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${t.done ? "h-1.5 w-1.5 bg-cyan/70" : t.id === tasks.find((x) => !x.done)?.id ? "h-3 w-3 border-2 border-cyan bg-background shadow-[0_0_10px_var(--cyan)]" : "h-2.5 w-2.5 border border-cyan/60 bg-background"}`} />
+              <div className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 backdrop-blur ${!t.done && t.id === tasks.find((x) => !x.done)?.id ? "border-violet/60 bg-violet/10 shadow-[0_0_28px_-10px_var(--violet)]" : "border-white/10 bg-white/[0.04]"}`}>
+                <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition active:scale-90 ${t.done ? "border-cyan bg-cyan/20 text-cyan" : "border-white/25 hover:border-cyan"}`}>{t.done && <Check size={13} />}</button>
+                <div className="min-w-0 flex-1"><p className={`break-words text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
+                  <TaskThumbs files={t.attachments ?? []} title={t.title} />
+                  {(() => { const sub = [t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : "", t.person_id && people.find((x) => x.id === t.person_id) ? `Para ${people.find((x) => x.id === t.person_id)!.name}` : ""].filter(Boolean).join(" · "); return sub ? <p className="break-words text-xs text-muted-foreground">{sub}</p> : null; })()}</div>
+                <button type="button" onClick={() => setEditing(t)} aria-label={`Editar ${t.title}`} data-testid="cliente-tarefa-editar" className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:border-cyan/40 hover:text-foreground"><Pencil size={13} /></button>
+                <span className="relative shrink-0">
+                  <button type="button" onClick={() => setMenuId(menuId === t.id ? null : t.id)} aria-label={`Mais opções de ${t.title}`} aria-expanded={menuId === t.id} className="grid h-8 w-8 place-items-center rounded-full border border-white/10 text-muted-foreground transition hover:border-cyan/40 hover:text-foreground"><MoreHorizontal size={14} /></button>
+                  {menuId === t.id && <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-2xl border border-white/10 bg-popover/95 p-1.5 shadow-xl backdrop-blur-xl"><button type="button" data-testid="cliente-tarefa-excluir" onClick={() => { setMenuId(null); if (window.confirm(`Excluir a tarefa "${t.title}"?`)) del.mutate(t.id, { onSuccess: () => toast.success("Tarefa excluída"), onError: (e) => toast.error((e as Error).message) }); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-destructive transition hover:bg-destructive/10"><Trash2 size={13} /> Excluir</button></div>}
+                </span>
+              </div>
+            </div>))}
+        </div>
+      </div>
+      {adding && (
+      <form onSubmit={(e) => { e.preventDefault(); void add(); }} onPaste={files.onPaste} onDrop={files.onDrop} onDragOver={files.onDragOver} className="space-y-2 rounded-2xl border border-cyan/30 bg-black/25 p-3 backdrop-blur" data-testid="cliente-tarefa-form">
+        <div className="flex items-center justify-between"><p className="mono-caps">Nova tarefa</p><button type="button" onClick={() => setAdding(false)} aria-label="Fechar" className="text-muted-foreground hover:text-foreground"><X size={14} /></button></div>
+        <div className="flex gap-2"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Nova tarefa para ${client.name} (ex.: Treinamento)`} aria-label="Nova tarefa do cliente" data-testid="cliente-tarefa-titulo" autoFocus className={field} /><button type="submit" disabled={!title.trim() || create.isPending || files.busy} className="rounded-full border border-cyan/60 px-4 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">{files.busy ? "Enviando…" : "Criar"}</button></div>
         <TaskFilePicker files={files} />
         <button type="button" onClick={() => setOpen((o) => !o)} className="text-[0.7rem] text-muted-foreground hover:text-cyan">{open ? "Menos opções" : "Data, hora, categoria e lembrete"}</button>
         {open && (
@@ -467,27 +509,11 @@ function ClientTasks({ client, tasks, people }: { client: Client; tasks: Task[];
           </div>
         )}
       </form>
-      {tasks.length === 0 && (
-        <div className="space-y-2 py-3 text-center">
-          <p className="text-sm text-muted-foreground">Nenhuma tarefa vinculada a este cliente ainda.</p>
-          <button type="button" data-testid="criar-tarefas-padrao" onClick={() => { void createDefaultTasks(client.id, { force: true }).then((n) => { void qc.invalidateQueries({ queryKey: ["tasks"] }); toast.success(n ? `${n} tarefas padrão criadas` : "Nada novo para criar"); }).catch((e: Error) => toast.error(e.message)); }} className="rounded-full border border-cyan/50 px-4 py-1.5 text-xs text-cyan transition hover:bg-cyan/10">Criar as tarefas padrão</button>
-        </div>
       )}
-      {tasks.some((t) => t.done) && (
-        <button type="button" onClick={() => setShowDone((v) => !v)} aria-pressed={showDone} data-testid="cliente-tarefas-concluidas" className="mx-auto flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1 text-[0.7rem] text-muted-foreground transition hover:text-cyan">{showDone ? <EyeOff size={12} /> : <Eye size={12} />} {showDone ? "Ocultar concluídas" : `Mostrar concluídas (${tasks.filter((t) => t.done).length})`}</button>
-      )}
-      {tasks.length > 0 && tasks.every((t) => t.done) && !showDone && <p className="py-2 text-center text-sm text-emerald">✓ Todas as tarefas concluídas</p>}
-      {tasks.map((t, idx) => (!t.done || showDone) && (
-        <div key={t.id} draggable onDragStart={() => setDragId(t.id)} onDragOver={(e) => { if (dragId) e.preventDefault(); }} onDrop={() => { if (dragId) { move(tasks.findIndex((x) => x.id === dragId), idx); setDragId(null); } }} onDragEnd={() => setDragId(null)} className={`ex-card flex items-center gap-3 p-3 ${dragId === t.id ? "opacity-50" : ""}`} style={{ "--rail": "var(--violet)" } as CSSProperties} data-testid="cliente-tarefa">
-          <GripVertical size={14} className="-ml-1 shrink-0 cursor-grab text-muted-foreground/60" aria-hidden />
-          <button onClick={() => toggle.mutate({ id: t.id, done: !t.done })} aria-label={t.done ? "Reabrir" : "Concluir"} className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${t.done ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{t.done && <Check size={12} />}</button>
-          <div className="min-w-0 flex-1"><p className={`break-words text-sm font-medium ${t.done ? "text-muted-foreground line-through" : ""}`}>{t.title}</p>
-            <TaskThumbs files={t.attachments ?? []} title={t.title} />
-            <p className="truncate text-xs text-muted-foreground">{[catName(t.category_id), t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.remind_before?.length ? `avisa ${t.remind_before.map(beforeWords).join(", ")} antes` : "", t.person_id && people.find((x) => x.id === t.person_id) ? `Para ${people.find((x) => x.id === t.person_id)!.name}` : ""].filter(Boolean).join(" · ") || "Sem data"}</p></div>
-          <button type="button" onClick={() => setEditing(t)} aria-label={`Editar ${t.title}`} data-testid="cliente-tarefa-editar" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><Pencil size={13} /></button>
-          <button type="button" onClick={() => { if (window.confirm(`Excluir a tarefa "${t.title}"?`)) del.mutate(t.id, { onSuccess: () => toast.success("Tarefa excluída"), onError: (e) => toast.error((e as Error).message) }); }} aria-label={`Excluir ${t.title}`} data-testid="cliente-tarefa-excluir" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></button>
-        </div>
-      ))}
+      <div className="relative flex flex-col items-center pt-3">
+        <svg aria-hidden viewBox="0 0 400 40" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-3 h-10 w-full opacity-70"><defs><linearGradient id="onda-ficha" x1="0" x2="1"><stop offset="0" stopColor="var(--cyan)" stopOpacity="0" /><stop offset=".5" stopColor="var(--cyan)" stopOpacity=".8" /><stop offset="1" stopColor="var(--violet)" stopOpacity="0" /></linearGradient></defs><path d="M0 24 C 50 6, 100 40, 150 22 S 250 6, 300 22 S 370 36, 400 20" fill="none" stroke="url(#onda-ficha)" strokeWidth="1.5" /></svg>
+        <button type="button" onClick={() => setAdding((a) => !a)} aria-label="Nova tarefa" aria-expanded={adding} data-testid="cliente-tarefa-nova" className="relative grid h-14 w-14 place-items-center rounded-full border border-cyan/60 bg-background/80 text-cyan shadow-[0_0_30px_-4px_var(--cyan)] backdrop-blur transition hover:scale-105 active:scale-95"><span aria-hidden className="absolute inset-0 animate-pulse rounded-full bg-cyan/10" /><Plus size={24} className={`relative transition ${adding ? "rotate-45" : ""}`} /></button>
+      </div>
       {editing && (
         <TaskEditDialog task={editing} categories={cats} clients={allClients} people={allPeople} saving={update.isPending} onClose={() => setEditing(null)}
           onSave={(patch) => update.mutate({ id: editing.id, patch }, { onSuccess: () => { setEditing(null); toast.success("Tarefa atualizada"); }, onError: (e) => toast.error((e as Error).message) })}
