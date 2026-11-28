@@ -36,6 +36,7 @@ import { SetupSummary } from "@/components/SetupGuide";
 import { MAX_PENDING, readPending, sizeLabel, toPending, type Pending } from "@/lib/brain-files";
 import { signedUrls } from "@/lib/data/brain";
 import { useAllClients, useClientActions, useClientExtras, useClientLinks, useClients, useFreeMeetings, useProjectDossiers } from "@/lib/data/clients";
+import { scheduleClientMeeting } from "@/lib/data/client-meetings";
 import { createNewUserTasks, createPerson, useAllPeople, usePeopleActions, type Person } from "@/lib/data/people";
 import { CreateDefaultButton, QuickTask, StepDoneButton } from "@/components/ClientCardParts";
 import { DOC_KINDS, STATUS_LABEL, STATUS_TONE, brl, dateBR, dueOf, quickAnswer, summarize, todayBR, type Client, type ClientStatus, type QuickAnswer } from "@/lib/clients";
@@ -329,7 +330,7 @@ function Ficha({ client: c, links, projectId: _pid, tab, setTab, onClose, onEdit
       {tab !== "tar" && cur && <h4 className="flex items-center gap-2 font-display text-sm font-semibold">{(() => { const I = cur[3]; return <I size={15} className="text-cyan" />; })()} {cur[1]}{cur[2] > 0 && <span className="font-normal text-muted-foreground"> ({cur[2]})</span>}</h4>}
       {tab === "imp" && <SetupSummary clientId={c.id} clientName={c.name} projectId={c.projectId} />}
       {tab === "docs" && <><DocsTab client={c} docs={docs} acts={acts} err={err} />{(links?.libDocs.length ?? 0) > 0 && <div className="mt-4 space-y-2" data-testid="cliente-docs-dossie"><p className="mono-caps">Da pasta do dossiê (Biblioteca)</p>{links!.libDocs.map((d) => <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2"><FileText size={14} className="shrink-0 text-cyan" /><div className="min-w-0 flex-1"><p className="truncate text-sm">{d.title}</p><p className="truncate text-xs text-muted-foreground">{d.kind}{d.folder && ` · ${d.folder}`}{d.updated && ` · ${d.updated}`}</p></div></div>)}</div>}</>}
-      {tab === "reun" && <MeetingsTab client={c} meets={meets} acts={acts} err={err} />}
+      {tab === "reun" && <MeetingsTab client={c} meets={meets} tasks={clientTasks} acts={acts} err={err} />}
       {tab === "dem" && <div className="space-y-2">{!c.dossierId ? <p className="rounded-xl border border-dashed border-white/15 p-4 text-center text-xs text-muted-foreground">Vincule um dossiê a este cliente (botão de editar) e as demandas dele aparecem aqui.</p> : dem.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma demanda neste dossiê.</p> : dem.map((d) => <button key={d.code} onClick={() => acts.setDemand.mutate({ code: d.code, status: d.status === "done" ? "todo" : "done" }, { onError: err })} className="ex-card flex w-full items-center gap-3 p-3 text-left" style={{ "--rail": "var(--emerald)" } as CSSProperties}><span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${d.status === "done" ? "border-emerald bg-emerald/20 text-emerald" : "border-white/20"}`}>{d.status === "done" && <Check size={12} />}</span><div className="min-w-0"><p className={`truncate text-sm font-medium ${d.status === "done" ? "text-muted-foreground line-through" : ""}`}>{d.title}</p><p className="text-xs text-muted-foreground">{d.code}{d.deadline && ` · prazo ${d.deadline}`}</p></div></button>)}<Link to="/demandas" className="block text-center text-xs text-cyan hover:underline">Abrir todas as demandas</Link></div>}
       {tab === "tar" && <ClientTasks client={c} tasks={clientTasks} people={people} />}
       {tab === "pes" && <PeopleTab client={c} people={people} tasks={clientTasks} />}
@@ -419,11 +420,46 @@ function MeetingViewer({ id, onClose }: { id: string; onClose: () => void }) {
   );
 }
 
-function MeetingsTab({ client, meets, acts, err }: { client: Client; meets: { id: string; title: string; happenedOn: string; summary: string }[]; acts: Acts; err: (e: unknown) => void }) {
+function MeetingsTab({ client, meets, tasks, acts, err }: { client: Client; meets: { id: string; title: string; happenedOn: string; summary: string }[]; tasks: Task[]; acts: Acts; err: (e: unknown) => void }) {
   const free = useFreeMeetings().data ?? [], [pick, setPick] = useState(""), [view, setView] = useState<string | null>(null);
+  const qc = useQueryClient(), cats = useCategories().data ?? [], compId = cats.find((x) => x.slug === "comp")?.id, toggle = useToggleTask();
+  const [agendando, setAgendando] = useState(false), [titulo, setTitulo] = useState(""), [data, setData] = useState(todayBR()), [hora, setHora] = useState(""), [local, setLocal] = useState(""), [lembrar, setLembrar] = useState<number[]>([]), [busy, setBusy] = useState(false);
+  const agendadas = tasks.filter((t) => !!compId && t.category_id === compId && !t.done).sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? "") || (a.due_time ?? "").localeCompare(b.due_time ?? ""));
+  const field = "min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-base outline-none focus:border-cyan/60 [color-scheme:dark] md:text-sm";
+  const agendar = async () => {
+    if (busy || !data) return; setBusy(true);
+    try {
+      await scheduleClientMeeting({ clientId: client.id, projectId: client.projectId, dossierId: client.dossierId, compId, title: titulo.trim() || `Reunião — ${client.name}`, date: data, time: hora, place: local, remind: lembrar });
+      void qc.invalidateQueries({ queryKey: ["tasks"] }); void qc.invalidateQueries({ queryKey: ["schedule"] });
+      toast.success("Reunião agendada", { description: "Aparece nas Tarefas e no Calendário." }); setTitulo(""); setHora(""); setLocal(""); setLembrar([]); setAgendando(false);
+    } catch (e) { err(e); } finally { setBusy(false); }
+  };
   return (
-    <div className="space-y-2">
-      {meets.length === 0 && <p className="py-3 text-center text-sm text-muted-foreground">Nenhuma reunião vinculada.</p>}
+    <div className="space-y-3" data-testid="cliente-reunioes">
+      <div className="grid grid-cols-2 gap-2">
+        <Link to="/reunioes" search={{ gravar: "1", cliente: client.id }} data-testid="reuniao-iniciar-agora" className="flex items-center justify-center gap-2 rounded-2xl border border-violet/60 bg-violet/15 px-3 py-3 text-sm font-medium text-violet shadow-[0_0_28px_-8px_var(--violet)] transition hover:bg-violet/25 active:scale-[0.98]"><Mic size={16} /> Iniciar agora</Link>
+        <button type="button" onClick={() => setAgendando((v) => !v)} aria-expanded={agendando} data-testid="reuniao-agendar-abrir" className="flex items-center justify-center gap-2 rounded-2xl border border-cyan/50 px-3 py-3 text-sm font-medium text-cyan transition hover:bg-cyan/10 active:scale-[0.98]"><CalendarClock size={16} /> Agendar</button>
+      </div>
+      {agendando && (
+        <form onSubmit={(e) => { e.preventDefault(); void agendar(); }} className="space-y-2 rounded-2xl border border-cyan/30 bg-black/25 p-3 backdrop-blur" data-testid="reuniao-agendar-form">
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder={`Reunião — ${client.name}`} aria-label="Título da reunião" maxLength={200} autoFocus className={`${field} w-full`} />
+          <div className="flex gap-2"><input type="date" value={data} onChange={(e) => setData(e.target.value)} aria-label="Data da reunião" required className={field} /><input type="time" value={hora} onChange={(e) => setHora(e.target.value)} aria-label="Hora da reunião" data-testid="reuniao-hora" className={field} /></div>
+          <input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Local ou link (opcional)" aria-label="Local ou link" maxLength={200} className={`${field} w-full`} />
+          <div><p className="mb-1 text-[0.7rem] text-muted-foreground">Lembrar antes {!hora && "(precisa de hora)"}</p><RemindPicker value={lembrar} onChange={setLembrar} disabled={!hora} /></div>
+          <div className="flex gap-2"><button type="button" onClick={() => setAgendando(false)} className="rounded-full border border-white/10 px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancelar</button><button type="submit" disabled={busy || !data} data-testid="reuniao-agendar-ok" className="flex-1 rounded-full border border-cyan/60 py-1.5 text-sm text-cyan transition hover:bg-cyan/10 disabled:opacity-40">{busy ? "Agendando…" : "Agendar reunião"}</button></div>
+        </form>)}
+      {agendadas.length > 0 && (
+        <div className="space-y-1.5" data-testid="reunioes-agendadas">
+          <p className="mono-caps">Agendadas</p>
+          {agendadas.map((t) => (
+            <div key={t.id} className="ex-card ex-glass flex items-center gap-3 px-3.5 py-2.5" style={{ "--rail": "var(--cyan)" } as CSSProperties}>
+              <button type="button" onClick={() => toggle.mutate({ id: t.id, done: true }, { onError: (e) => toast.error(e.message) })} aria-label={`Concluir ${t.title}`} className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/30 transition hover:border-cyan active:scale-90" />
+              <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium leading-snug">{t.title}</p><p className="text-[0.7rem] text-muted-foreground">{[t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.place].filter(Boolean).join(" · ")}</p></div>
+              <Link to="/reunioes" search={{ gravar: "1", cliente: client.id }} aria-label={`Iniciar: ${t.title}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-violet transition hover:bg-violet/15"><Mic size={15} /></Link>
+            </div>))}
+        </div>)}
+      {meets.length === 0 && agendadas.length === 0 && <p className="py-2 text-center text-sm text-muted-foreground">Nenhuma reunião ainda.</p>}
+      {meets.length > 0 && <p className="mono-caps">Gravadas</p>}
       {meets.map((m) => <div key={m.id} className="ex-card flex items-center gap-3 p-3" style={{ "--rail": "var(--violet)" } as CSSProperties}><span className="icon-tile h-9 w-9 shrink-0 !rounded-lg font-mono text-[0.6rem]" style={tint("violet")}>ATA</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{m.title}</p><p className="truncate text-xs text-muted-foreground">{dateBR(m.happenedOn)}{m.summary && ` · ${m.summary}`}</p></div><button onClick={() => setView(m.id)} data-testid={`reuniao-abrir-${m.id}`} className="shrink-0 text-[0.7rem] text-violet hover:underline">Abrir</button><button onClick={() => acts.linkMeeting.mutate({ meetingId: m.id, clientId: null }, { onError: err })} aria-label="Desvincular reunião" className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"><X size={13} /></button></div>)}
       {free.length > 0 && <div className="flex gap-2"><select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Reunião para vincular" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-xs"><option value="">Vincular uma reunião…</option>{free.map((m) => <option key={m.id} value={m.id}>{dateBR(m.happened_on)} · {m.title}</option>)}</select><button disabled={!pick} onClick={() => { acts.linkMeeting.mutate({ meetingId: pick, clientId: client.id }, { onSuccess: () => setPick(""), onError: err }); }} className="rounded-full border border-cyan/60 px-4 text-xs text-cyan disabled:opacity-40">Vincular</button></div>}
       <Link to="/reunioes" className="block text-center text-xs text-cyan hover:underline">Abrir Reuniões</Link>

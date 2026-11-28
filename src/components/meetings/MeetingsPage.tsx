@@ -48,6 +48,16 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
   const [selected, setSelected] = useState<Set<number>>(new Set()), [sent, setSent] = useState<Set<number>>(new Set()), [inbox, setInbox] = useState<{ id: number; text: string } | null>(null), [burst, setBurst] = useState(0), [chunkMs] = useState(() => { const n = typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("trecho")) : 0; return n >= 3000 && n <= 60000 ? n : 25000; });
   const rec = useLiveRecorder(chunkMs), resultRef = useRef<HTMLDivElement>(null), inboxRef = useRef<HTMLDivElement>(null);
 
+  // "Iniciar agora" na ficha do cliente: abre já ligada a ele (lê o cliente da URL uma vez; a gravação limpa a URL depois)
+  const wantedClient = useRef<string | null>(typeof location !== "undefined" ? new URLSearchParams(location.search).get("cliente") : null);
+  useEffect(() => {
+    if (!wantedClient.current || !targets) return;
+    const c = (targets.clients ?? []).find((x) => x.id === wantedClient.current); wantedClient.current = null;
+    if (!c) return;
+    setLink((l) => ({ dossierId: c.dossierId ?? l.dossierId, dossierProject: c.dossierId ? c.project : (l.dossierProject ?? homeProject), clientId: c.id }));
+    setTitle((t) => t || `Reunião — ${c.name}`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targets]);
   useEffect(() => { ls.set("orion:reunioes:eu", me); }, [me]);
   // "Orion, grava a reunião": a voz abre a página com ?gravar=1 e a gravação começa assim que a conversa por voz acaba (para não gravar a fala do Orion)
   const voice = useVoice();
