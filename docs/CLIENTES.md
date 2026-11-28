@@ -102,4 +102,4 @@ Na aba **Tarefas** da ficha, cada tarefa tem **setas para subir e descer** e dá
 - Nova tarefa: botão **+** embaixo (abre o formulário; fica aberto para criar várias). "Apagar cliente" está no ⋯ do topo.
 
 ## Reuniões do cliente
-- Aba Reuniões da ficha: **Iniciar agora** (abre /reunioes já ligada ao cliente e começa a gravar; `?gravar=1&cliente=<id>`), **Agendar** (cria um compromisso com data, hora, local e lembrete, ligado ao cliente: aparece em Tarefas, no Calendário e na ficha) e a lista de agendadas/gravadas. Código: `client-meetings.ts`, `MeetingsTab`.
+- Aba Reuniões da ficha: **Iniciar agora** (abre /reunioes já ligada ao cliente e começa a gravar; `?gravar=1&cliente=<id>`), **Agendar** (cria um compromisso com data, hora, local e lembrete, ligado ao cliente: aparece em Tarefas, no Calendário e na ficha) e a lista de agendadas/gravadas. O microfone de uma reunião agendada conclui o compromisso sozinho quando a ata é salva (`?agendada=<id>`). Código: `client-meetings.ts`, `MeetingsTab`.

@@ -455,7 +455,7 @@ function MeetingsTab({ client, meets, tasks, acts, err }: { client: Client; meet
             <div key={t.id} className="ex-card ex-glass flex items-center gap-3 px-3.5 py-2.5" style={{ "--rail": "var(--cyan)" } as CSSProperties}>
               <button type="button" onClick={() => toggle.mutate({ id: t.id, done: true }, { onError: (e) => toast.error(e.message) })} aria-label={`Concluir ${t.title}`} className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/30 transition hover:border-cyan active:scale-90" />
               <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium leading-snug">{t.title}</p><p className="text-[0.7rem] text-muted-foreground">{[t.due_date && dateBR(t.due_date), t.due_time?.slice(0, 5), t.place].filter(Boolean).join(" · ")}</p></div>
-              <Link to="/reunioes" search={{ gravar: "1", cliente: client.id }} aria-label={`Iniciar: ${t.title}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-violet transition hover:bg-violet/15"><Mic size={15} /></Link>
+              <Link to="/reunioes" search={{ gravar: "1", cliente: client.id, agendada: t.id }} aria-label={`Iniciar: ${t.title}`} data-testid="reuniao-agendada-iniciar" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-violet transition hover:bg-violet/15"><Mic size={15} /></Link>
             </div>))}
         </div>)}
       {meets.length === 0 && agendadas.length === 0 && <p className="py-2 text-center text-sm text-muted-foreground">Nenhuma reunião ainda.</p>}

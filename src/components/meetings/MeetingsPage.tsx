@@ -11,6 +11,7 @@ import { demoAnalysis, demoByKind } from "@/lib/meetings-demo";
 import { MeetingResult } from "@/components/meetings/MeetingResult";
 import { WhatsAppDemands } from "@/components/meetings/WhatsAppDemands";
 import { WhatsAppPicker } from "@/components/meetings/WhatsAppPicker";
+import { useToggleTask } from "@/lib/data/tasks";
 import { useLinkTargets, useMeetingActions, useMeetings, type Meeting } from "@/lib/data/meetings";
 import { KIND_LABEL, actionsToInboxText, analysisToMarkdown, type Analysis, type MeetingKind, type Mode, type Source } from "@/lib/meetings";
 import { analyzeMeeting } from "@/lib/meetings.functions";
@@ -49,6 +50,7 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
   const rec = useLiveRecorder(chunkMs), resultRef = useRef<HTMLDivElement>(null), inboxRef = useRef<HTMLDivElement>(null);
 
   // "Iniciar agora" na ficha do cliente: abre já ligada a ele (lê o cliente da URL uma vez; a gravação limpa a URL depois)
+  const scheduled = useRef<string | null>(typeof location !== "undefined" ? new URLSearchParams(location.search).get("agendada") : null), toggleTask = useToggleTask();
   const wantedClient = useRef<string | null>(typeof location !== "undefined" ? new URLSearchParams(location.search).get("cliente") : null);
   useEffect(() => {
     if (!wantedClient.current || !targets) return;
@@ -98,6 +100,8 @@ export function MeetingsPage({ embedded = false, projectId }: { embedded?: boole
       setA(analysis); setSelected(new Set(analysis.acoes.map((_, i) => i))); setSent(new Set()); setBurst((n) => n + 1);
       let id: string | null = null;
       try { id = await acts.save.mutateAsync({ title: analysis.titulo, source, mode, raw: text, analysis, happenedOn: today, link }); } catch (e) { toast.error(`A análise ficou pronta, mas não consegui salvar no histórico: ${(e as Error).message}`); }
+      // a reunião veio de um compromisso agendado: ao salvar a ata, ele fica concluído
+      if (id && scheduled.current) { toggleTask.mutate({ id: scheduled.current, done: true }, { onSuccess: () => toast.success("Reunião agendada concluída"), onError: () => undefined }); scheduled.current = null; }
       setCur({ id, title: analysis.titulo, date: today, raw: body, source, mode });
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     } catch (e) { toast.error(`Não consegui analisar: ${(e as Error).message}`); }
